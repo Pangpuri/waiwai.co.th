@@ -14,7 +14,9 @@ import {
   HERO_CARD_STATE_SHOWN,
   HERO_CARD_STORAGE_KEY,
 } from "@/lib/hero-card";
+import { COOKIE_CONSENT_ATTRIBUTE } from "@/lib/cookie-consent";
 import { MOURNING_ATTRIBUTE, MOURNING_STORAGE_KEY } from "@/lib/mourning-notice";
+import { REVEAL_ATTRIBUTE } from "@/lib/scroll-reveal";
 
 import { readStrippedCss } from "./css-source.ts";
 
@@ -174,19 +176,47 @@ test("CSS: การ์ดต้องถูกซ่อนไว้ก่อน
   const css = await readStrippedCss();
 
   assert.ok(
-    /\[data-hero-card\]\s*\{\s*display:\s*none;/.test(css),
+    /\[data-hero-card-panel\]\s*\{\s*display:\s*none;/.test(css),
     "ค่าเริ่มต้นของการ์ดต้องเป็น display: none (กันการ์ดตุ๊บขึ้นมาหลัง hydrate)",
   );
   assert.ok(
-    css.includes(`html[${HERO_CARD_ATTRIBUTE}="${HERO_CARD_STATE_SHOWN}"] [data-hero-card]`),
-    `globals.css ต้องมีกฎ html[${HERO_CARD_ATTRIBUTE}="${HERO_CARD_STATE_SHOWN}"] [data-hero-card]`,
+    css.includes(`html[${HERO_CARD_ATTRIBUTE}="${HERO_CARD_STATE_SHOWN}"] [data-hero-card-panel]`),
+    `globals.css ต้องมีกฎ html[${HERO_CARD_ATTRIBUTE}="${HERO_CARD_STATE_SHOWN}"] [data-hero-card-panel]`,
   );
   assert.ok(
-    css.includes("[data-hero-card][data-closing]"),
+    css.includes("[data-hero-card-panel][data-closing]"),
     "globals.css ต้องมีกฎจางออกตอนกดปิด",
   );
   assert.ok(
     css.includes(`opacity ${HERO_CARD_CLOSE_MS}ms`),
     `transition ตอนปิดต้องเป็น ${HERO_CARD_CLOSE_MS}ms ให้ตรงกับ HERO_CARD_CLOSE_MS`,
   );
+});
+
+test("CSS: ห้ามใช้ selector เดี่ยวกับ attribute ที่สคริปต์ติดบน <html>", async () => {
+  const css = await readStrippedCss();
+
+  /*
+    ⚠️ บั๊กจริงในรอบที่ 21: `[data-hero-card] { display: none }` ไปโดน `<html>` เอง (เพราะสคริปต์
+    ก่อน paint ติด attribute นี้บน <html>) → **ซ่อนทั้งเว็บ** · อาการที่ผู้ใช้เห็นคือ "ทุกอย่างกว้าง 0"
+    จน Next.js เตือนเรื่อง `sizes` ของภาพ hero (ratio = 0) เป็นเงื่อนงำ
+
+    กฎกันพลาด: attribute ที่อยู่บน <html> ต้องใช้เป็น `html[attr="…"] …` เท่านั้น
+    ส่วน attribute ของ "ชิ้นส่วน" ต้องเป็นคนละชื่อ (เช่น data-mourning-notice · data-hero-card-panel)
+  */
+  const htmlAttributes = [
+    COOKIE_CONSENT_ATTRIBUTE,
+    HERO_CARD_ATTRIBUTE,
+    MOURNING_ATTRIBUTE,
+    REVEAL_ATTRIBUTE,
+  ];
+
+  for (const attribute of htmlAttributes) {
+    // ต้องมี "ช่องว่าง/ตัวคั่น" นำหน้า จึงนับเป็น selector เดี่ยว
+    // (แบบนี้ `html[data-cookie-consent] [data-cookie-banner]` จะไม่ถูกตีความผิด)
+    assert.ok(
+      !new RegExp(`(^|[\\s,>+~])\\[${attribute}\\]`).test(css),
+      `globals.css ห้ามใช้ [${attribute}] เป็น selector เดี่ยว — attribute นี้อยู่บน <html> จะซ่อนทั้งหน้า`,
+    );
+  }
 });

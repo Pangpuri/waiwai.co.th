@@ -176,18 +176,24 @@ html[data-mourning="shown"] [data-mourning-notice] {
   ค่าที่ต้องตรงกัน: data-hero-card / "shown" (HERO_CARD_ATTRIBUTE, HERO_CARD_STATE_SHOWN)
   และระยะจางตอนปิด 420ms (HERO_CARD_CLOSE_MS) — มีเทสต์ตรวจกฎนี้อยู่
 
-  ⚠️ ห้ามใส่ `animation: … both` บน `[data-hero-card]` เอง เพราะ fill mode จะทับค่า opacity
-  ของสถานะกำลังปิด (transition จะไม่ทำงาน) — ใส่แอนิเมชันเปิดที่แผงด้านในแทน
+  ⚠️⚠️ **บทเรียนราคาแพง (รอบที่ 21):** attribute `data-hero-card` ถูกติดบน `<html>` (จากสคริปต์ก่อน paint)
+  ส่วน attribute ของ "ตัวการ์ด" คือ `data-hero-card-panel` — **ต้องเป็นคนละชื่อกัน**
+  เพราะตอนแรกใช้ชื่อเดียวกัน กฎ `[data-hero-card] { display: none }` จึงไปโดน `<html>` →
+  **ซ่อนทั้งเว็บ** (ทุก element กว้าง 0 → ภาพ hero ได้ ratio 0 → Next เตือนเรื่อง `sizes` ให้เห็นเป็นเงื่อนงำ)
+  เจอโดยการวัดค่าจริงในเบราว์เซอร์ผ่าน CDP ไม่ใช่การอ่าน HTML/CSS — ดู "how to verify" ใน PRODUCT_ROADMAP.md § 10
+
+  ⚠️ ห้ามใส่ `animation: … both` บน `[data-hero-card-panel]` เอง เพราะ fill mode จะทับค่า opacity
+  ของสถานะกำลังปิด (transition จะไม่ทำงาน)
 */
-[data-hero-card] {
+[data-hero-card-panel] {
   display: none;
 }
 
-html[data-hero-card="shown"] [data-hero-card] {
+html[data-hero-card="shown"] [data-hero-card-panel] {
   display: flex;
 }
 
-[data-hero-card][data-closing] {
+[data-hero-card-panel][data-closing] {
   opacity: 0;
   pointer-events: none;
   transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -204,7 +210,7 @@ html[data-hero-card="shown"] [data-hero-card] {
   }
 }
 
-[data-hero-card] {
+[data-hero-card-panel] {
   animation: hero-card-in 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 

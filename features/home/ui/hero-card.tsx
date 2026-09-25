@@ -94,7 +94,7 @@ export function HeroCard({ href, labels }: HeroCardProps) {
     */
     <div className="relative z-20 mt-10 lg:absolute lg:right-0 lg:bottom-0 lg:mt-0">
       <aside
-        data-hero-card=""
+        data-hero-card-panel=""
         data-closing={isClosing ? "" : undefined}
         aria-label={labels.title}
         className="relative flex max-w-sm flex-col gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-2xl backdrop-blur-sm lg:w-56 lg:max-w-none lg:gap-0 lg:p-3.5 lg:rotate-[-2deg]"
@@ -141,7 +141,7 @@ export function HeroCard({ href, labels }: HeroCardProps) {
             type="button"
             onClick={close}
             aria-label={labels.close}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-surface text-sm font-bold text-fg-muted transition-colors hover:bg-bg-subtle hover:text-fg lg:absolute lg:top-2 lg:right-2 lg:shadow-md"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-line bg-surface text-sm font-bold text-fg-muted transition-colors hover:bg-bg-subtle hover:text-fg lg:absolute lg:top-2 lg:right-2 lg:border-on-brand/40 lg:bg-overlay/75 lg:text-on-brand lg:shadow-md lg:hover:bg-overlay lg:hover:text-on-brand"
           >
             <span aria-hidden="true">✕</span>
           </button>
