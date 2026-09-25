@@ -110,3 +110,25 @@ export const notFound = {
     body: "The link may have changed, or the address may be incomplete. Start again from the home page.",
     cta: "Back to home",
 };
+
+/**
+ * Mourning notice — the dialog shown once when a visitor enters the site
+ * (see lib/mourning-notice.ts).
+ *
+ * The Thai text inside the image is not repeated here; `caption` is the
+ * signature line taken from the artwork itself, which also gives
+ * English readers the same information.
+ */
+export const mourning = {
+    dialogLabel: "Mourning announcement",
+    caption: "The management and staff of Thai Food Products Factory Co., Ltd.",
+    close: "Close this window",
+    prev: "Previous image",
+    next: "Next image",
+    gotoSlide: "Go to image",
+    images: {
+      banner: {
+        alt: "A black-and-white mourning banner with a royal portrait in an ornate oval frame among beams of light and clouds, captioned in Thai: forever in our hearts.",
+      },
+    },
+};

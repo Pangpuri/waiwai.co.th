@@ -1,4 +1,4 @@
-import { a11y, actions, cookie, footer, lang, meta, nav, notFound, theme, topbar } from "./areas/th/core.ts";
+import { a11y, actions, cookie, footer, lang, meta, mourning, nav, notFound, theme, topbar } from "./areas/th/core.ts";
 import { brand, hero, news, newsletter, products, recipes, sustainability, whereToBuy } from "./areas/th/home.ts";
 import { about } from "./areas/th/about.ts";
 import { productsPage } from "./areas/th/catalog.ts";
@@ -42,6 +42,7 @@ export const th = {
   footer,
   cookie,
   notFound,
+  mourning,
 };
 
 /**

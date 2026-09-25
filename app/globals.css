@@ -120,6 +120,76 @@ html[data-cookie-consent] [data-cookie-banner] {
   display: none;
 }
 
+/*
+  ── หน้าต่างประกาศไว้อาลัย ────────────────────────────────────────────────────
+  กลับด้านกับแถบคุกกี้โดยเจตนา: "ซ่อนไว้ก่อน แล้วค่อยเปิด"
+  เปิดก็ต่อเมื่อสคริปต์ก่อน paint ยืนยันว่าผู้ใช้ยังไม่เคยกดปิด
+  (ดู lib/mourning-notice.ts) — ถ้าเบราว์เซอร์ไม่รัน JavaScript เลย หน้าต่างจะไม่ขึ้น
+  ซึ่งดีกว่าเปิด modal ที่กดปิดไม่ได้แล้วบังทั้งเว็บ
+
+  ค่าที่ต้องตรงกัน: data-mourning / "shown" (MOURNING_ATTRIBUTE, MOURNING_STATE_SHOWN)
+  และระยะจางตอนปิด 420ms (MOURNING_CLOSE_MS) — มีเทสต์ตรวจกฎนี้อยู่
+*/
+[data-mourning-notice] {
+  display: none;
+}
+
+html[data-mourning="shown"] [data-mourning-notice] {
+  display: grid;
+}
+
+/* จางออกก่อน แล้ว React ค่อยเปลี่ยนสถานะเป็น "ปิดแล้ว" — ผู้ใช้เห็นภาพค่อย ๆ หาย ไม่ใช่หายวับ */
+[data-mourning-notice][data-closing] {
+  opacity: 0;
+  transform: scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 420ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+  เปิดเข้ามาแบบนุ่ม ๆ — ใช้ animation ที่ "แผงใน" ไม่ใช่ตัวครอบ
+  เพราะ animation ที่ค้างค่าด้วย fill mode จะทับค่า opacity ของตอนปิด (transition จะไม่ทำงาน)
+*/
+@keyframes mourning-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-mourning-panel] {
+  animation: mourning-panel-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/*
+  ── สไลด์ภาพฉากหลังของ hero หน้าแรก ─────────────────────────────────────────
+  ภาพทุกใบถูกวางซ้อนกันไว้ตั้งแต่แรก (ไม่ mount/unmount) → เปลี่ยนภาพคือสลับ data-state
+  จึงจางข้ามภาพได้เนียน ไม่มีจังหวะภาพหายวับหรือภาพโหลดใหม่
+
+  - opacity: 1.4 วินาที (ผู้ใช้สั่ง "ค่อย ๆ เลื่อน")
+  - transform: ซูมเข้าแบบช้ามาก (10 วินาที) และตอนหลุดเป็นภาพรองมันจะค่อย ๆ ซูมกลับ
+    พร้อมจางออก — ใช้ transition ไม่ใช่ animation จึงย้อนกลับได้เนียน ไม่กระโดด
+  - ผู้ใช้ขอ reduced-motion → กฎกลางใน @layer base บีบ transition ให้เหลือ ~0 อยู่แล้ว
+*/
+[data-hero-slide] {
+  opacity: 0;
+  transform: scale(1.02);
+  transition:
+    opacity 1400ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 10000ms cubic-bezier(0.25, 1, 0.4, 1);
+}
+
+[data-hero-slide][data-state="active"] {
+  opacity: 1;
+  transform: scale(1.09);
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

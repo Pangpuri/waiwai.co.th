@@ -3,8 +3,10 @@ import { Anuphan, IBM_Plex_Sans_Thai } from "next/font/google";
 
 import "../globals.css";
 
+import { MOURNING_IMAGES, type MourningImageView } from "@/features/shell/mourning";
 import { CookieBanner } from "@/features/shell/ui/cookie-banner";
 import { InlineScript } from "@/features/shell/ui/inline-script";
+import { MourningNotice } from "@/features/shell/ui/mourning-notice";
 import { ScrollReveal } from "@/features/shell/ui/scroll-reveal";
 import { SiteFooter } from "@/features/shell/ui/site-footer";
 import { SiteHeader } from "@/features/shell/ui/site-header";
@@ -17,6 +19,7 @@ import {
 } from "@/lib/i18n/config";
 import { COOKIE_CONSENT_INIT_SCRIPT } from "@/lib/cookie-consent";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { MOURNING_INIT_SCRIPT } from "@/lib/mourning-notice";
 import { REVEAL_INIT_SCRIPT } from "@/lib/scroll-reveal";
 import { SITE } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme/theme";
@@ -88,10 +91,11 @@ export default async function LocaleLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* สคริปต์ก่อน paint — ตั้งธีม สถานะคุกกี้ และสวิตช์จางเนื้อหา เพื่อกันจอวาบ
+        {/* สคริปต์ก่อน paint — ตั้งธีม สถานะคุกกี้/ประกาศไว้อาลัย และสวิตช์จางเนื้อหา เพื่อกันจอวาบ
             (รายละเอียดใน features/shell/ui/inline-script.tsx) */}
         <InlineScript html={THEME_INIT_SCRIPT} />
         <InlineScript html={COOKIE_CONSENT_INIT_SCRIPT} />
+        <InlineScript html={MOURNING_INIT_SCRIPT} />
         <InlineScript html={REVEAL_INIT_SCRIPT} />
       </head>
 
@@ -119,6 +123,23 @@ export default async function LocaleLayout({
             accept: messages.cookie.accept,
             essentialOnly: messages.cookie.essentialOnly,
             policyLink: messages.cookie.policyLink,
+          }}
+        />
+
+        {/* ประกาศไว้อาลัย — แสดงครั้งเดียวต่อการเข้าเว็บ 1 ครั้ง (จำการกดปิดใน localStorage)
+            alt ประกอบจากพจนานุกรมที่นี่ เพื่อให้ Client Component ไม่ต้อง import พจนานุกรม */}
+        <MourningNotice
+          images={MOURNING_IMAGES.map((image): MourningImageView => ({
+            ...image,
+            alt: messages.mourning.images[image.id].alt,
+          }))}
+          labels={{
+            dialogLabel: messages.mourning.dialogLabel,
+            caption: messages.mourning.caption,
+            close: messages.mourning.close,
+            prev: messages.mourning.prev,
+            next: messages.mourning.next,
+            gotoSlide: messages.mourning.gotoSlide,
           }}
         />
 

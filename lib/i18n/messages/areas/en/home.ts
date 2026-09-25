@@ -11,6 +11,22 @@ export const hero = {
     titleAccent: "in every meal of the day",
     body: "Wai Wai makes instant noodles that are easy, comforting and within reach for everyone.",
     note: "Imagery and copy on this page are placeholders used to test the design.",
+    // ── Hero background slideshow (see features/home/slides.ts) ──
+    galleryLabel: "Wai Wai promotional images",
+    gotoSlide: "Go to image",
+    pauseSlides: "Pause the slideshow",
+    playSlides: "Resume the slideshow",
+    slides: {
+      flavours: {
+        alt: "Wai Wai promotional banner showing the minced pork and minced pork tom yum flavours side by side, each with a bowl of noodles.",
+      },
+      event: {
+        alt: "Two presenters holding Wai Wai minced pork and minced pork tom yum packets at a product launch event.",
+      },
+      promotion: {
+        alt: "A presenter holding a bowl of noodles and a Wai Wai minced pork packet next to campaign artwork.",
+      },
+    },
 };
 
 export const products = {

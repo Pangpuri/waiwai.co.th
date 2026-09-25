@@ -1,4 +1,4 @@
-import { a11y, actions, cookie, footer, lang, meta, nav, notFound, theme, topbar } from "./areas/en/core.ts";
+import { a11y, actions, cookie, footer, lang, meta, mourning, nav, notFound, theme, topbar } from "./areas/en/core.ts";
 import { brand, hero, news, newsletter, products, recipes, sustainability, whereToBuy } from "./areas/en/home.ts";
 import { about } from "./areas/en/about.ts";
 import { productsPage } from "./areas/en/catalog.ts";
@@ -43,4 +43,5 @@ export const en: Messages = {
   footer,
   cookie,
   notFound,
+  mourning,
 };
