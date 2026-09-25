@@ -190,17 +190,27 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
       aria-label={labels.dialogLabel}
       className="fixed inset-0 z-[60] place-items-center bg-overlay p-4 sm:p-6"
     >
-      <div data-mourning-panel="" className="flex w-full max-w-3xl flex-col items-center">
-        <figure className="w-full" aria-live="polite">
-          <div className="relative w-full overflow-hidden rounded-2xl border border-line-strong bg-surface">
+      <div data-mourning-panel="" className="flex w-full flex-col items-center">
+        <figure className="flex w-full flex-col items-center" aria-live="polite">
+          {/*
+            รูปกว้างเต็มจอ (ผู้ใช้เลือก "เต็มจอแบบมีขอบ" รอบที่ 21) — เหลือขอบดำจาก p-4/p-6 ของฉากหลัง
+            วิธีวาง (คัดจาก lightbox ใบรับรองที่ทำงานอยู่แล้ว):
+            - กล่อง `relative` ข้างในโหลดขนาดตามรูป → ปุ่มลูกศรอยู่ตรงขอบรูปพอดี ไม่ลอยไปขอบจอ
+            - การ์ด (มุมโค้ง/ขอบ/พื้น) อยู่บนตัว <img> ไม่ใช่บนกล่อง → ไม่มีแถบพื้นโผล่ข้างรูป
+            - `max-w-[calc(100vw-2rem)]` อ้างความกว้าง "วิวพอร์ต" ไม่ใช่อ้างกล่องแม่
+              → เลี่ยงปัญหาเปอร์เซ็นต์อ้างพ่อที่ความกว้างยังไม่รู้ค่า (กรณีรูปถูกจำกัดด้วยความสูง)
+            - `max-h-[72vh]` กันจอเตี้ยแต่กว้าง (เช่น 2560×800) ที่รูปจะสูงจนปุ่มปิดล้นจอ
+              → ความสูงชนเพดานเมื่อไหร่ ความกว้างถอยตามสัดส่วนเอง (3:1 เสมอ)
+          */}
+          <div className="relative">
             <Image
               src={active.src}
               alt={active.alt}
               width={active.width}
               height={active.height}
-              sizes="(min-width: 768px) 768px, 92vw"
+              sizes="100vw"
               loading="eager"
-              className="h-auto w-full"
+              className="block h-auto max-h-[72vh] w-auto max-w-[calc(100vw-2rem)] rounded-2xl border border-line-strong bg-surface sm:max-w-[calc(100vw-3rem)]"
             />
 
             {hasSlideControls(total) ? (
@@ -225,7 +235,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
             ) : null}
           </div>
 
-          <figcaption className="mt-4 text-center text-sm leading-relaxed text-on-brand/85">
+          <figcaption className="mt-4 max-w-3xl px-2 text-center text-sm leading-relaxed text-on-brand/85">
             {labels.caption}
           </figcaption>
         </figure>
