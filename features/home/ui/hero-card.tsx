@@ -89,10 +89,11 @@ export function HeroCard({ href, labels }: HeroCardProps) {
 
   return (
     /*
-      ตัวครอบทำหน้าที่ "วางตำแหน่ง" อย่างเดียว — ในการ์ดเป็นตัวที่ CSS เปิด/ปิด
-      (ถ้าเอา attribute ไปไว้บนตัวครอบ opacity/แอนิเมชันจะชนกันเอง)
+      ตำแหน่งมาจาก "ตัวครอบ" ใน hero.tsx (แปะบนภาพ มุมขวาล่าง) — ที่นี่ทำแค่
+      pointer-events ให้กดได้ (ตัวครอบปิดไว้เพื่อไม่บังการกดสไลด์) และยกการ์ดขึ้นชั้นบนสุด
+      ⚠️ การ์ดต้องเป็นตัวที่ CSS เปิด/ปิด (attribute อยู่ที่ aside ด้านใน) ไม่ใช่ตัวครอบ
     */
-    <div className="relative z-20 mt-10 lg:absolute lg:right-0 lg:bottom-0 lg:mt-0">
+    <div className="pointer-events-auto relative z-20 max-w-sm lg:absolute lg:right-0 lg:bottom-0 lg:max-w-none">
       <aside
         data-hero-card-panel=""
         data-closing={isClosing ? "" : undefined}

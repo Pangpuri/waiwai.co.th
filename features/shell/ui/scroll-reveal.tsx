@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import {
   REVEAL_READY,
+  REVEAL_ROOT_MARGIN,
   REVEALED_ATTRIBUTE,
   REVEAL_ATTRIBUTE,
   shouldRevealOnScroll,
@@ -59,7 +60,7 @@ export function ScrollReveal() {
       },
       {
         // ย่อขอบล่างของพื้นที่ตรวจจับ 12% → เนื้อหาจางเข้า "ก่อน" ถึงกลางจอ
-        rootMargin: "0px 0px -12% 0px",
+        rootMargin: REVEAL_ROOT_MARGIN,
       },
     );
 

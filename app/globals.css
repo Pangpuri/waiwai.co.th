@@ -399,43 +399,6 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
 }
 
 /*
-  เงาใต้ข้อความสำหรับ "ข้อความที่ทับอยู่บนภาพ"
-  ─────────────────────────────────────────────────────────────
-  ใช้เมื่อไม่ต้องการฉากมืดทับภาพทั้งใบ (ผู้ใช้สั่งให้ถอดฉากมืดออกจาก hero หน้าแรก
-  เพื่อให้ภาพสว่างเต็มที่) — เงาช่วยให้ตัวอักษรขาว/เหลืองอ่านออกบนภาพที่สว่างจัด
-
-  ใช้สีจาก token `--overlay` (ค่ามืดคงที่ทั้งสองโหมด) ไม่ได้ตั้งสีใหม่
-  เงาสองชั้น: ชั้นแน่น (ขอบตัวอักษร) + ชั้นฟุ้ง (กันพื้นที่สว่างจ้ารอบตัวอักษร)
-*/
-@utility text-shadow-photo {
-  text-shadow:
-    0 1px 2px var(--overlay),
-    0 6px 22px var(--overlay);
-}
-
-/*
-  ออร่าแสงขาวฟุ้งรอบตัวอักษร (soft glow)
-  ─────────────────────────────────────────────────────────────
-  ใช้กับหัวข้อที่ทับบนภาพ "หลายสี" — เงามืด (text-shadow-photo) แยกตัวอักษรออกจากพื้นได้ไม่พอ
-  เพราะพื้นภาพมีทั้งสว่างและมืดปนกัน (ผู้ใช้สรุปเองว่า "ไม่ว่าสีอะไรก็จม")
-
-  วิธีคิด: ล้อมตัวอักษรด้วยแสงขาว 3 ชั้นเรียงจากแน่นไปฟุ้ง
-    ชั้น 1 (1px)  = เก็บขอบตัวอักษรให้คม
-    ชั้น 2 (10px) = กันพื้นสีจัดรอบตัวอักษร
-    ชั้น 3 (26px) = ออร่าฟุ้ง ๆ ที่ผู้ใช้ขอ
-  ชั้น 2–3 ผสมความโปร่งใสด้วย color-mix → ชั้นนอกจะได้ไม่ทึบจนเป็นปื้นขาวทึบ
-
-  สีมาจาก token `--on-brand` (ขาวนวลของแบรนด์ คงที่ทั้งสองโหมด) ไม่ได้ตั้งสีใหม่
-  ⚠️ ใช้กับ "ตัวอักษรสีอ่อน/เหลือง" จะกลืนกับออร่า — เหมาะกับตัวอักษรสีเข้ม/แดง
-*/
-@utility text-glow-soft {
-  text-shadow:
-    0 2px 3px var(--on-brand),
-    0 0 10px color-mix(in oklab, var(--on-brand) 90%, transparent),
-    0 0 26px color-mix(in oklab, var(--on-brand) 90%, transparent);
-}
-
-/*
   ── Fade in/out ตอนเลื่อนดูเนื้อหา ─────────────────────────────────────
   กลไก: สคริปต์ใน <head> ติด `data-reveal="ready"` ที่ <html> ตั้งแต่ก่อน paint (กันจอวาบ)
   แล้ว IntersectionObserver (features/shell/ui/scroll-reveal.tsx) ติด `data-revealed` ให้ section
@@ -443,19 +406,22 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
 
   ทำไมไม่ใช้ล้วน CSS (animation-timeline: view())
   - ผูกกับระยะ scroll → จางหมดเร็วจน "ไม่รู้สึก" และ Firefox ยังไม่รองรับ (จะไม่มีผลอะไรเลย)
-  - วิธีนี้ใช้เวลา (700ms) จึงเห็นชัด และทำงานได้ทุกเบราว์เซอร์ที่มี IntersectionObserver
+  - วิธีนี้ใช้เวลา (ตอนนี้ 900ms + หน่วง 90ms) จึงเห็นชัด และใช้ได้ทุกเบราว์เซอร์ที่มี IntersectionObserver
 
   กติกา
   - ครอบทุก section ใน main ยกเว้น section แรก (hero/หัวหน้าเพจ) · จะยกเว้นเพิ่ม → ใส่ `data-reveal="off"`
   - ใช้เฉพาะ opacity/transform → ไม่มี layout shift และเนื้อหายังอยู่ใน a11y tree ตามปกติ
   - ผู้ใช้ขอ reduced-motion → สคริปต์ไม่เปิดสวิตช์เลย → เนื้อหาแสดงปกติ 100%
+
+  รอบที่ 21: การตลาดขอ "เพิ่ม motion delay ตอนเลื่อนเพจลงอีกนิด" → 700ms → 900ms + หน่วง 90ms
+  ค่าต้องตรงกับ REVEAL_DURATION_MS / REVEAL_DELAY_MS / REVEAL_ROOT_MARGIN ใน lib/scroll-reveal.ts
 */
 [data-reveal="ready"] main > section:where(:not(:first-of-type):not([data-reveal="off"])) {
   opacity: 0;
   transform: translateY(2.5rem);
   transition:
-    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 900ms cubic-bezier(0.22, 1, 0.36, 1) 90ms,
+    transform 900ms cubic-bezier(0.22, 1, 0.36, 1) 90ms;
 }
 
 /*

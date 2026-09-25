@@ -14,6 +14,30 @@ export const REVEAL_READY = "ready";
 /** attribute บน section ที่ IntersectionObserver ติดเมื่อเนื้อหาเข้ามาในจอแล้ว */
 export const REVEALED_ATTRIBUTE = "data-revealed";
 
+/**
+ * ระยะเวลาจางเข้า (ms) — ต้องตรงกับ `transition` ของกฎ `[data-reveal="ready"]` ใน app/globals.css
+ *
+ * รอบที่ 21: การตลาดขอ "เพิ่ม motion delay ตอนเลื่อนเพจลงอีกนิด" → 700 → 900ms
+ * (ของเดิม 700ms รู้สึกจบเร็วเกินไป แทบไม่ทันเห็นว่ามีอะไรโผล่มา)
+ */
+export const REVEAL_DURATION_MS = 900;
+
+/**
+ * หน่วงก่อนเริ่มจาง (ms) — ต้องตรงกับ delay ใน transition ของ CSS
+ *
+ * นี่คือ "motion delay" ที่การตลาดขอ: นิ่งนิดหนึ่งก่อนค่อยจางเข้า ไม่ใช่โผล่ทันทีที่แตะขอบจอ
+ * (ยังสั้นพอไม่ให้รู้สึกหน่วง)
+ */
+export const REVEAL_DELAY_MS = 90;
+
+/**
+ * ขอบเขตที่ถือว่า "เข้ามาในจอแล้ว" — ส่งให้ IntersectionObserver
+ *
+ * ค่าลบด้านล่าง = ต้องเลื่อน section ให้พ้นขอบล่างของจอขึ้นมาเท่านั้นก่อนจึงเริ่มจาง
+ * รอบที่ 21: −12% → −18% (เริ่มช้าลงอีกนิด ให้สอดคล้องกับที่ขอให้หน่วงขึ้น)
+ */
+export const REVEAL_ROOT_MARGIN = "0px 0px -18% 0px";
+
 export type RevealEnv = {
   readonly hasIntersectionObserver: boolean;
   readonly prefersReducedMotion: boolean;
