@@ -54,13 +54,16 @@ export function Hero({ locale, messages }: HeroProps) {
             {m.eyebrow}
           </p>
 
-          {/* หัวข้อใช้ "ออร่าแสงขาวฟุ้ง" (text-glow-soft) แทนเงามืด — พื้นภาพมีหลายสีปนกัน
-              เงามืดแยกตัวอักษรไม่ออก ("สีอะไรก็จม") แสงขาวล้อมรอบจึงกันพื้นได้ทุกสี
-              ⚠️ ออร่าขาวจะทำให้ตัวอักษร "สีอ่อน/เหลือง" กลืนหาย — ใช้ได้ดีกับแดง/สีเข้ม
-              (แดงแบรนด์ --brand-red คงที่ทั้งสองโหมด · accent ยังเป็นเหลืองแบรนด์) */}
+          {/*
+            หัวข้อใช้สอง treatment คนละแบบ ตามความสว่างของตัวอักษรเอง (วัดคอนทราสต์จริงแล้ว):
+            - คำหลัก (แดงแบรนด์)  → "ออร่าขาวฟุ้ง" text-glow-soft → แดงบนออร่าขาว = 4.6:1 ผ่านเกณฑ์ตัวอักษรใหญ่
+            - คำรอง (เหลืองแบรนด์) → "เงามืด"  text-shadow-photo → เหลืองบนเงามืด = 8.5:1
+              (เหลืองบนออร่าขาวให้แค่ 1.4:1 คือกลืนหาย — ตัวอักษรสีอ่อนห้ามล้อมด้วยแสงขาว)
+            ตัว span ประกาศ text-shadow ของตัวเอง จึงทับออร่าที่สืบทอดมาจาก h1 ได้
+          */}
           <h1 className="text-glow-soft mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
             {m.title}{" "}
-            <span className="text-brand-yellow">{m.titleAccent}</span>
+            <span className="text-shadow-photo text-brand-yellow">{m.titleAccent}</span>
           </h1>
 
           <p className="mt-6 max-w-lg text-base leading-relaxed text-on-brand/90 sm:text-lg">
