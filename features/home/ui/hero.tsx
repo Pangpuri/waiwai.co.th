@@ -54,11 +54,12 @@ export function Hero({ locale, messages }: HeroProps) {
             {m.eyebrow}
           </p>
 
-          <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
+          {/* หัวข้อใช้ "ออร่าแสงขาวฟุ้ง" (text-glow-soft) แทนเงามืด — พื้นภาพมีหลายสีปนกัน
+              เงามืดแยกตัวอักษรไม่ออก ("สีอะไรก็จม") แสงขาวล้อมรอบจึงกันพื้นได้ทุกสี
+              ⚠️ ออร่าขาวจะทำให้ตัวอักษร "สีอ่อน/เหลือง" กลืนหาย — ใช้ได้ดีกับแดง/สีเข้ม
+              (แดงแบรนด์ --brand-red คงที่ทั้งสองโหมด · accent ยังเป็นเหลืองแบรนด์) */}
+          <h1 className="text-glow-soft mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
             {m.title}{" "}
-            {/* แดงแบรนด์ (--brand-red คงที่ทั้งสองโหมด) + เหลืองแบรนด์ = คู่สีเดียวกับโลโก้
-                ⚠️ บนภาพที่พื้นสว่างจัด (เช่นป้ายพื้นเหลือง) แดงนี้คอนทราสต์ต่ำ — ถ้าอ่านยาก
-                เปลี่ยน token เป็น text-accent-on-yellow (แดงเข้มที่ globals.css เลือกไว้สำหรับพื้นเหลือง) */}
             <span className="text-brand-yellow">{m.titleAccent}</span>
           </h1>
 
