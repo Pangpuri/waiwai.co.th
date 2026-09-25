@@ -132,5 +132,8 @@ export const mourning = {
       banner: {
         alt: "A black-and-white mourning banner with a royal portrait in an ornate oval frame among beams of light and clouds, captioned in Thai: forever in our hearts.",
       },
+      banner2: {
+        alt: "A second black-and-white mourning banner: the royal portrait in a decorative sparkling frame on a plain black background, with the same Thai tribute text.",
+      },
     },
 };

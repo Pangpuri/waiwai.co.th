@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -89,6 +89,20 @@ test("MOURNING_IMAGES: ไฟล์มีจริง เป็น JPEG แล�
     assert.equal(actual.width, image.width, `${image.id}: ความกว้างไม่ตรงกับไฟล์จริง`);
     assert.equal(actual.height, image.height, `${image.id}: ความสูงไม่ตรงกับไฟล์จริง`);
   }
+});
+
+test("MOURNING_IMAGES: ไม่มีไฟล์ค้างใน public/rip/ ที่ไม่มีใครอ้างถึง", () => {
+  // ด่านเดียวกับ public/slide/ — เจอเคสจริงในรอบที่ 21 ที่มีไฟล์ค้างโดยไม่มีใครใช้
+  const used = new Set(MOURNING_IMAGES.map((image) => image.src.replace("/rip/", "")));
+  const orphans = readdirSync(path.join(PROJECT_ROOT, "public", "rip")).filter(
+    (name) => !used.has(name),
+  );
+
+  assert.deepEqual(
+    orphans,
+    [],
+    `มีไฟล์ที่ไม่มีใน MOURNING_IMAGES: ${orphans.join(", ")} — ถ้าตั้งใจเก็บไว้ก่อน ให้ย้ายไปโฟลเดอร์ rip/ (ต้นทาง)`,
+  );
 });
 
 test("พจนานุกรม mourning: alt ของทุกภาพและป้ายกำกับต้องครบทั้งสองภาษา", () => {
