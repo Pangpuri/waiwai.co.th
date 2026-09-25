@@ -5,7 +5,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
-import { HERO_CARD_CLOSE_MS, HERO_CARD_IMAGE } from "@/features/home/hero-card";
+import {
+  HERO_CARD_CLOSE_MS,
+  HERO_CARD_IMAGE,
+  HERO_CARD_WIGGLE_MS,
+} from "@/features/home/hero-card";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import {
@@ -176,7 +180,8 @@ test("CSS: การ์ดต้องถูกซ่อนไว้ก่อน
   const css = await readStrippedCss();
 
   assert.ok(
-    /\[data-hero-card-panel\]\s*\{\s*display:\s*none;/.test(css),
+    // กฎนี้อาจมีตัวแปร (--hero-card-tilt) นำหน้า จึงจับแบบ "ในบล็อกเดียวกัน"
+    /\[data-hero-card-panel\]\s*\{[^}]*display:\s*none/.test(css),
     "ค่าเริ่มต้นของการ์ดต้องเป็น display: none (กันการ์ดตุ๊บขึ้นมาหลัง hydrate)",
   );
   assert.ok(
@@ -190,6 +195,50 @@ test("CSS: การ์ดต้องถูกซ่อนไว้ก่อน
   assert.ok(
     css.includes(`opacity ${HERO_CARD_CLOSE_MS}ms`),
     `transition ตอนปิดต้องเป็น ${HERO_CARD_CLOSE_MS}ms ให้ตรงกับ HERO_CARD_CLOSE_MS`,
+  );
+});
+
+test("CSS: การ์ด 'ยิก' เรียกความสนใจ — ต้องตรงกับค่าที่โค้ดใช้", async () => {
+  const css = await readStrippedCss();
+
+  assert.ok(css.includes("@keyframes hero-card-wiggle"), "ต้องมี keyframes ของการยิก");
+  assert.ok(
+    css.includes(`hero-card-wiggle ${HERO_CARD_WIGGLE_MS}ms`),
+    `รอบการยิกต้องเป็น ${HERO_CARD_WIGGLE_MS}ms ให้ตรงกับ HERO_CARD_WIGGLE_MS`,
+  );
+  assert.ok(
+    css.includes("calc(var(--hero-card-tilt)"),
+    "keyframes ต้องอ้างมุมเอียงตั้งต้นจากตัวแปรเดียวกัน จึงจะไม่เอียงเพี้ยนตอนยิก",
+  );
+  assert.ok(
+    css.includes("rotate: var(--hero-card-tilt)"),
+    "ต้องมีมุมเอียงตั้งต้นนอกแอนิเมชันด้วย (เผื่อผู้ใช้ขอ reduced-motion แล้วแอนิเมชันถูกปิด)",
+  );
+  assert.ok(
+    css.includes("animation-play-state: running, paused"),
+    "ต้องหยุดยิกตอน hover/โฟกัส/กำลังปิดการ์ด (แอนิเมชันแรกคือตอนเปิด ต้องยังทำงาน)",
+  );
+});
+
+test("CSS: มุมเอียงของการ์ด — จอเล็กตั้งตรง จอใหญ่เอียง", async () => {
+  const css = await readStrippedCss();
+
+  assert.ok(/--hero-card-tilt:\s*0deg/.test(css), "ค่าเริ่มต้นต้องตั้งตรง");
+  assert.ok(
+    /@media \(min-width: 1024px\)[\s\S]{0,200}--hero-card-tilt:\s*-2deg/.test(css),
+    "จอใหญ่ (lg) ต้องเอียง -2deg",
+  );
+});
+
+test("CSS: ผู้ใช้ขอ reduced-motion → การยิกต้องถูกกฎกลางปิด", async () => {
+  const css = await readStrippedCss();
+
+  // กฎกลางต้องครอบทุก element และปิด animation จริง ไม่ใช่เฉพาะ transition
+  assert.ok(
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,600}\*,[\s\S]{0,40}animation-duration: 0\.01ms !important[\s\S]{0,80}animation-iteration-count: 1 !important/.test(
+      css,
+    ),
+    "การยิก (animation) ต้องถูกปิดเมื่อผู้ใช้ขอ reduced-motion ไม่ใช่แค่ transition",
   );
 });
 

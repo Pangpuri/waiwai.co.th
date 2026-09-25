@@ -35,5 +35,15 @@ export const HERO_CARD_IMAGE: HeroCardImage = {
  */
 export const HERO_CARD_CLOSE_MS = 420;
 
+/**
+ * รอบของการ "ยิก" เรียกความสนใจ (ms) — ผู้ใช้ขอว่าให้ขยับทุก 2 วินาที (ยิก ๆ แล้วหยุด สลับกัน)
+ *
+ * ทำด้วย CSS animation ล้วน (ดู `@keyframes hero-card-wiggle` ใน app/globals.css) — ไม่มี JS/setInterval
+ * จึงไม่มี render เพิ่ม และหยุดเองเมื่อผู้ใช้ขอ reduced-motion (กฎกลางใน globals.css)
+ * · หนึ่งรอบ = "ยิก" ประมาณ 0.7 วินาที แล้ว "หยุด" ที่เหลือ
+ * · หยุดยิกให้ด้วยขณะผู้ใช้ hover/โฟกัสในการ์ด หรือตอนกำลังปิดการ์ด
+ */
+export const HERO_CARD_WIGGLE_MS = 2000;
+
 /** ลิงก์ปลายทางของการ์ด (หน้าที่มีอยู่จริงใน IA — ดู PRODUCT_ROADMAP.md) */
 export const HERO_CARD_HREF = "/news";

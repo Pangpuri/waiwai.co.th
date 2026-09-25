@@ -184,9 +184,24 @@ html[data-mourning="shown"] [data-mourning-notice] {
 
   ⚠️ ห้ามใส่ `animation: … both` บน `[data-hero-card-panel]` เอง เพราะ fill mode จะทับค่า opacity
   ของสถานะกำลังปิด (transition จะไม่ทำงาน)
+
+  ── การ "ยิก" เรียกความสนใจ ────────────────────────────────────────────────────
+  ผู้ใช้ขอให้การ์ดขยับเองทุก 2 วินาที (ยิก ๆ แล้วหยุด สลับกัน) — ทำด้วย CSS animation ล้วน
+  ไม่มี JS/setInterval จึงไม่มี render เพิ่ม และกฎ reduced-motion กลางปิดให้เองโดยอัตโนมัติ
+
+  · ใช้ `rotate` (individual transform property) ซึ่ง **ไม่ชนกับ `transform`** ของแอนิเมชันเปิดการ์ด
+  · มุมเอียงตั้งต้นอยู่ในตัวแปร `--hero-card-tilt` (จอเล็ก 0deg · จอใหญ่ -2deg) เพราะ keyframes
+    ต้องอ้างค่าเดียวกัน — และเมื่อแอนิเมชันถูกปิด (reduced-motion) การ์ดยังเอียงถูกจากค่านี้
+  · หยุดยิกขณะผู้ใช้ hover/โฟกัสในการ์ด หรือตอนกำลังปิด → ไม่กวนตอนอ่าน/กดปุ่ม
+  · WCAG 2.2.2 (การเคลื่อนไหวที่เริ่มเองและวนไปเรื่อย ๆ ต้องหยุด/ซ่อนได้): ปุ่มปิดของการ์ดคือทางนั้น
+    ถ้าต้องการให้ยิกแค่ N ครั้งแล้วหยุดถาวร → แก้ `animation-iteration-count` เป็นตัวเลข
 */
 [data-hero-card-panel] {
+  /* มุมเอียงตั้งต้นของการ์ด — จอใหญ่เอียง -2deg (ดู @media ด้านล่าง) */
+  --hero-card-tilt: 0deg;
+
   display: none;
+  rotate: var(--hero-card-tilt);
 }
 
 html[data-hero-card="shown"] [data-hero-card-panel] {
@@ -210,8 +225,50 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
   }
 }
 
+/*
+  "ยิก ๆ แล้วหยุด" — ในหนึ่งรอบ (2 วินาที) ยิกช่วง 55%–90% แล้วหยุดที่เหลือ
+  ใช้ rotate จึงไม่ชนกับ transform ของ hero-card-in (แอนิเมชันทั้งสองอยู่บน element เดียวกันได้)
+*/
+@keyframes hero-card-wiggle {
+  0%,
+  55% {
+    rotate: var(--hero-card-tilt);
+  }
+  61% {
+    rotate: calc(var(--hero-card-tilt) + 1.8deg);
+  }
+  68% {
+    rotate: calc(var(--hero-card-tilt) - 1.8deg);
+  }
+  75% {
+    rotate: calc(var(--hero-card-tilt) + 1.2deg);
+  }
+  82% {
+    rotate: calc(var(--hero-card-tilt) - 0.9deg);
+  }
+  90%,
+  100% {
+    rotate: var(--hero-card-tilt);
+  }
+}
+
 [data-hero-card-panel] {
-  animation: hero-card-in 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation:
+    hero-card-in 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    hero-card-wiggle 2000ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* หยุดยิกให้ตอนผู้ใช้กำลังอ่าน/กดปุ่ม หรือตอนการ์ดกำลังจางออก */
+[data-hero-card-panel]:hover,
+[data-hero-card-panel]:focus-within,
+[data-hero-card-panel][data-closing] {
+  animation-play-state: running, paused;
+}
+
+@media (min-width: 1024px) {
+  [data-hero-card-panel] {
+    --hero-card-tilt: -2deg;
+  }
 }
 
 /*

@@ -84,5 +84,8 @@ public/                 ภาพที่ใช้จริง (ใบรับ
   - เปลี่ยนภาพ: วางไฟล์ใน `public/promo/` + แก้ `HERO_CARD_IMAGE` ใน `features/home/hero-card.ts` (ขนาดจริง + ธงลายน้ำ)
   - กติกา: แสดงทุกครั้งที่โหลดหน้า · ✕ = ปิดรอบนี้ · ติ๊ก "ไม่แสดงอีกในวันนี้" = เงียบถึงสิ้นวันนี้ (พรุ่งนี้กลับมา)
     ตรรกะวันอยู่ที่ `lib/day-mute.ts` (ใช้ร่วมกับประกาศไว้อาลัย) · สถานะอยู่ที่ `lib/hero-card.ts`
+  - การ์ด "ยิก" เรียกความสนใจทุก 2 วินาที — CSS ล้วน ไม่มี JS (`HERO_CARD_WIGGLE_MS` + `@keyframes hero-card-wiggle`)
+    · หยุดยิกเองตอน hover/โฟกัส/กำลังปิด · ผู้ใช้ที่ขอ reduced-motion จะเห็นการ์ดนิ่ง
+    · ปรับความแรงที่ keyframes (amplitude) · จังหวะที่ `HERO_CARD_WIGGLE_MS` · มุมเอียงตั้งต้นที่ `--hero-card-tilt`
 - เนื้อหาที่เป็นข้อมูลจริง (บริษัท · ใบรับรอง · คณะผู้บริหาร · รับสมัครงาน · ติดต่อ) แก้ที่
   `features/*/…` หรือ `lib/i18n/messages/areas/<locale>/…` แล้วรัน `npm test` + `npm run check:i18n`

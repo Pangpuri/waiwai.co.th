@@ -97,7 +97,12 @@ export function HeroCard({ href, labels }: HeroCardProps) {
         data-hero-card-panel=""
         data-closing={isClosing ? "" : undefined}
         aria-label={labels.title}
-        className="relative flex max-w-sm flex-col gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-2xl backdrop-blur-sm lg:w-56 lg:max-w-none lg:gap-0 lg:p-3.5 lg:rotate-[-2deg]"
+        /*
+          ⚠️ ไม่ใส่คลาสมุมเอียง (rotate) ที่นี่ — มุมเอียงตั้งต้น + การ "ยิก" อยู่ที่
+          `--hero-card-tilt` / `@keyframes hero-card-wiggle` ใน app/globals.css
+          เพราะ keyframes ต้องอ้างมุมเดียวกัน (จอเล็ก 0deg · จอใหญ่ -2deg)
+        */
+        className="relative flex max-w-sm flex-col gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-2xl backdrop-blur-sm lg:w-56 lg:max-w-none lg:gap-0 lg:p-3.5"
       >
         <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-0">
           <Image
