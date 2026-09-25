@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -94,6 +94,24 @@ test("HERO_SLIDES: id ไม่ซ้ำ และ path อยู่ใต้ /s
   }
 });
 
+test("HERO_SLIDES: ไม่มีไฟล์ภาพค้างใน public/slide/ ที่ไม่มีใครอ้างถึง", () => {
+  /*
+    เจอจริงในรอบที่ 20: ผู้ใช้สลับภาพใน HERO_SLIDES แล้วไฟล์เดิม 2 ไฟล์ (544K + 136K)
+    ยังค้างอยู่ใน public/ ซึ่งจะติดไปกับ build/deploy โดยไม่มีใครใช้
+    → ด่านนี้เตือนให้ย้ายไฟล์ที่ยังไม่ใช้กลับไปโฟลเดอร์ต้นทาง `slide/` (ถูก .gitignore ไว้)
+  */
+  const used = new Set(HERO_SLIDES.map((slide) => slide.src.replace("/slide/", "")));
+  const onDisk = readdirSync(path.join(PROJECT_ROOT, "public", "slide"));
+
+  const orphans = onDisk.filter((name) => !used.has(name));
+
+  assert.deepEqual(
+    orphans,
+    [],
+    `มีไฟล์ที่ไม่มีใน HERO_SLIDES: ${orphans.join(", ")} — ถ้าตั้งใจเก็บไว้ก่อน ให้ย้ายไปโฟลเดอร์ slide/ (ต้นทาง)`,
+  );
+});
+
 test("HERO_SLIDES: ไฟล์ภาพมีจริง เป็น JPEG และขนาดตรงกับที่ประกาศ", () => {
   for (const slide of HERO_SLIDES) {
     const filePath = path.join(PROJECT_ROOT, "public", slide.src.replace(/^\//, ""));
@@ -113,7 +131,7 @@ test("HERO_SLIDES: รูปที่มีลายน้ำของเพจ�
   // ภาพตัวอย่างรอการตลาดอนุมัติ — ถ้ามีการเปลี่ยนไฟล์ ต้องอัปเดตทั้งข้อมูลและ PRODUCT_ROADMAP § 9
   assert.deepEqual(
     HERO_SLIDES.filter((slide) => slide.watermarked).map((slide) => slide.id),
-    ["promotion"],
+    ["event"],
   );
 });
 

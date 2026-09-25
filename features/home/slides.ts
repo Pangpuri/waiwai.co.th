@@ -7,7 +7,7 @@ import type { Messages } from "@/lib/i18n/messages/th";
  * ข้อความ alt อยู่ในพจนานุกรม (`hero.slides.<id>.alt`) — ที่นี่เก็บเฉพาะรหัส/ไฟล์/สี
  *
  * ⚠️ ทั้งสามรูปเป็น "ภาพตัวอย่างรอการตลาดอนุมัติ" (ผู้ใช้ให้มาจากโฟลเดอร์ `slide/`)
- *    รูป `promotion` ยังมีลายน้ำ "AD ADDICT" ของเพจต้นทางติดมาด้วย → ห้ามใช้จริงจนกว่าจะเปลี่ยน
+ *    รูป `event` (event2.jpg) ยังมีลายน้ำ "METAS NEWS" ของเพจต้นทางติดมาด้วย → ห้ามใช้จริงจนกว่าจะเปลี่ยน
  */
 
 export type HeroSlideId = keyof Messages["hero"]["slides"];
@@ -40,21 +40,21 @@ export const HERO_SLIDES: readonly HeroSlide[] = [
   },
   {
     id: "event",
-    src: "/slide/event-packs.jpg",
+    src: "/slide/event2.jpg",
     width: 1280,
     height: 720,
-    // งานเปิดตัวสินค้า — หน้าคนอยู่ค่อนไปทางขอบบน จึงดันกรอบขึ้นเล็กน้อย
+    // ผู้บริหารถือซอง WOW หน้าเวที "54th ANNIVERSARY" — ผู้แสดงอยู่ค่อนไปทางขวา จึงดันกรอบขึ้นเล็กน้อย
     objectPosition: "center 35%",
-    watermarked: false,
+    watermarked: true,
   },
   {
     id: "promotion",
-    src: "/slide/promotion-banner.jpg",
-    width: 1386,
-    height: 1007,
-    // ภาพแนวตั้งกว่าจะถูกครอปมาก — ล็อกที่หน้าผู้แสดงและซองสินค้าด้านบน
-    objectPosition: "center 28%",
-    watermarked: true,
+    src: "/slide/products.jpg",
+    width: 1200,
+    height: 675,
+    // ป้ายเปิดตัว WOW 3 รส (พื้นเหลือง) — หัวข้ออยู่ช่วงบน จึงดันกรอบขึ้นเล็กน้อยไม่ให้ข้อความถูกตัด
+    objectPosition: "center 35%",
+    watermarked: false,
   },
 ];
 

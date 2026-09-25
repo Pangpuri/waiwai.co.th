@@ -22,6 +22,10 @@ import type { HeroSlideView } from "../slides";
  *
  * a11y: ภาพที่ไม่ได้แสดงถูก `aria-hidden` (ไม่ให้โปรแกรมอ่านหน้าจออ่านทับกัน),
  *      มีปุ่มจุดบอกตำแหน่ง + ปุ่มหยุด/เล่นต่อ ตาม WCAG 2.2.2 (เนื้อหาที่เลื่อนเองต้องหยุดได้)
+ *
+ * ⚠️ **ไม่มีฉากมืดทับภาพ** (ผู้ใช้สั่งให้เอาออก — ต้องการให้ภาพสว่างเต็มที่)
+ *    ความอ่านออกของข้อความจึงพึ่ง `text-shadow-photo` (utility ใน app/globals.css) แทน
+ *    ถ้าอนาคตได้ภาพที่สว่างจัดกว่านี้ ทางเลือกคือเปิดฉากมืดเฉพาะด้านซ้ายกลับมา
  */
 
 type HeroSliderLabels = {
@@ -87,12 +91,6 @@ export function HeroSlider({ slides, labels }: HeroSliderProps) {
             </div>
           );
         })}
-
-        {/* ฉากมืดให้ข้อความด้านซ้ายอ่านออก — เข้มซ้ายแล้วจางไปทางขวา ไม่ทึบทั้งภาพ */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-linear-to-r from-overlay via-overlay/75 to-overlay/30"
-        />
       </div>
 
       {hasSlideControls(total) ? (

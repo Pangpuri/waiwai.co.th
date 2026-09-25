@@ -21,10 +21,10 @@ export const hero = {
         alt: "Wai Wai promotional banner showing the minced pork and minced pork tom yum flavours side by side, each with a bowl of noodles.",
       },
       event: {
-        alt: "Two presenters holding Wai Wai minced pork and minced pork tom yum packets at a product launch event.",
+        alt: "An executive in a suit holding three packets of WOW instant noodles in front of a 54th anniversary stage backdrop.",
       },
       promotion: {
-        alt: "A presenter holding a bowl of noodles and a Wai Wai minced pork packet next to campaign artwork.",
+        alt: "A WOW noodle launch banner on a yellow and orange background, with three packets and a bowl of noodles for each flavour.",
       },
     },
 };

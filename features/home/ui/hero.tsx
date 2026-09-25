@@ -29,7 +29,12 @@ export function Hero({ locale, messages }: HeroProps) {
   }));
 
   return (
-    <section className="relative isolate flex min-h-[32rem] items-center overflow-hidden bg-overlay text-on-brand lg:min-h-[38rem]">
+    /*
+      ความสูงของแถบ hero — ยิ่งสูง ยิ่งเห็นภาพสไลด์มาก (ภาพถูกครอปน้อยลง)
+      ปรับได้ที่ min-h-* สามจุดนี้ · ตอนนี้: จอเล็ก 34rem (544px) · lg 44rem (704px) · 2xl 50rem (800px)
+      จอที่กว้างกว่า 800px จะเริ่มครอปด้านบน-ล่างอีกครั้ง (ภาพตัวอย่างชุดนี้เป็น 16:9)
+    */
+    <section className="relative isolate flex min-h-[34rem] items-center overflow-hidden bg-overlay text-on-brand lg:min-h-[44rem] 2xl:min-h-[50rem]">
       <HeroSlider
         slides={slides}
         labels={{
@@ -41,7 +46,8 @@ export function Hero({ locale, messages }: HeroProps) {
       />
 
       <div className="container-site relative z-10 py-16 lg:py-24">
-        <div className="max-w-xl">
+        {/* ไม่มีฉากมืดทับภาพ → ข้อความใช้เงา (text-shadow-photo) เพื่อให้อ่านออกบนภาพสว่าง */}
+        <div className="max-w-xl text-shadow-photo">
           <p className="inline-flex items-center gap-2 rounded-full border border-on-brand/30 bg-overlay/40 px-3.5 py-1.5 text-xs font-bold tracking-[0.16em] uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-yellow" />
             {m.eyebrow}
@@ -49,7 +55,7 @@ export function Hero({ locale, messages }: HeroProps) {
 
           <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-on-brand sm:text-5xl lg:text-[3.75rem]">
             {m.title}{" "}
-            {/* เหลืองบนฉากมืดคือสีที่แบรนด์ใช้อยู่แล้ว และตัดกับภาพได้ชัดกว่าตัวอักษรขาวล้วน */}
+            {/* เหลืองคือสีที่แบรนด์ใช้อยู่แล้ว และตัดกับภาพได้ชัดกว่าตัวอักษรขาวล้วน */}
             <span className="text-brand-yellow">{m.titleAccent}</span>
           </h1>
 
@@ -68,7 +74,7 @@ export function Hero({ locale, messages }: HeroProps) {
 
             <Link
               href={localePath(locale, "/where-to-buy")}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-on-brand/60 px-6 py-3.5 text-sm font-bold transition-colors hover:bg-on-brand/10"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-on-brand/60 px-6 py-3.5 text-sm font-bold backdrop-blur-sm transition-colors hover:bg-on-brand/10"
             >
               {messages.actions.findStore}
             </Link>
