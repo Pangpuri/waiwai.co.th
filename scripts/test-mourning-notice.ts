@@ -6,7 +6,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
-import { MOURNING_CLOSE_MS, MOURNING_IMAGES } from "@/features/shell/mourning";
+import {
+  MOURNING_CLOSE_MS,
+  MOURNING_IMAGES,
+  MOURNING_SLIDE_FADE_MS,
+} from "@/features/shell/mourning";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import {
@@ -19,6 +23,18 @@ import {
 } from "@/lib/mourning-notice";
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+/**
+ * อ่าน globals.css แบบ **ตัดคอมเมนต์ออกก่อน**
+ *
+ * บทเรียนรอบที่ 21: คอมเมนต์อธิบายในไฟล์ CSS มีวงเล็บปีกกา (`body { overflow: hidden }`)
+ * ทำให้ regex ที่ไล่จับบล็อก `html { … scrollbar-gutter: stable }` ขาดกลางทาง → เทสต์แดงทั้งที่โค้ดถูก
+ * (วิธีเดียวกับที่ scripts/check-i18n.ts ทำกับไฟล์ .tsx)
+ */
+async function readMourningCss(): Promise<string> {
+  const raw = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  return raw.replace(/\/\*[\s\S]*?\*\//g, " ");
+}
 
 /** ขนาดจริงของไฟล์ JPEG (อ่าน marker SOF) — คัดวิธีเดียวกับ scripts/test-contact.ts */
 function readJpegSize(filePath: string): { width: number; height: number } | null {
@@ -90,6 +106,7 @@ test("พจนานุกรม mourning: alt ของทุกภาพแ�
       ["caption", messages.mourning.caption],
       ["close", messages.mourning.close],
       ["muteToday", messages.mourning.muteToday],
+      ["seeNext", messages.mourning.seeNext],
       ["prev", messages.mourning.prev],
       ["next", messages.mourning.next],
       ["gotoSlide", messages.mourning.gotoSlide],
@@ -217,7 +234,7 @@ test("isMourningMuted: ต้องเป็นวันเดียวกัน
 });
 
 test("CSS: หน้าต่างต้องถูกซ่อนไว้ก่อน แล้วค่อยเปิดเมื่อสคริปต์ยืนยัน", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const css = await readMourningCss();
 
   assert.ok(
     /\[data-mourning-notice\]\s*\{\s*display:\s*none;/.test(css),
@@ -234,5 +251,33 @@ test("CSS: หน้าต่างต้องถูกซ่อนไว้ก
   assert.ok(
     css.includes(`opacity ${MOURNING_CLOSE_MS}ms`),
     `transition ตอนปิดต้องเป็น ${MOURNING_CLOSE_MS}ms ให้ตรงกับ MOURNING_CLOSE_MS`,
+  );
+});
+
+test("CSS: หน้าต่างต้องกัน 'เนื้อเว็บกระตุก' ตอนล็อก/ปลดล็อกการเลื่อน", async () => {
+  const css = await readMourningCss();
+
+  /*
+    อาการที่ผู้ใช้รายงานในรอบที่ 21: ตอนปิดหน้าต่าง เนื้อเว็บหลักกระตุกหนึ่งจังหวะ
+    สาเหตุ: `body { overflow: hidden }` ทำให้แถบเลื่อนหาย → ความกว้างวิวพอร์ตเพิ่มขึ้น
+    ทางแก้: สงวนที่ให้แถบเลื่อนไว้ตลอดด้วย scrollbar-gutter: stable ที่ <html>
+  */
+  assert.ok(
+    /html\s*\{[^}]*scrollbar-gutter:\s*stable/.test(css),
+    "globals.css ต้องมี `scrollbar-gutter: stable` ที่ html ไม่งั้นเนื้อเว็บจะกระตุกตอนปิดหน้าต่าง",
+  );
+});
+
+test("CSS: จางข้ามภาพของหน้าต่างไว้อาลัย ต้องตรงกับค่าที่โค้ดใช้", async () => {
+  const css = await readMourningCss();
+
+  assert.ok(css.includes("[data-mourning-frame]"), "globals.css ต้องมีกฎ [data-mourning-frame]");
+  assert.ok(
+    css.includes('[data-mourning-frame][data-state="active"]'),
+    "globals.css ต้องมีกฎสำหรับภาพที่กำลังแสดง",
+  );
+  assert.ok(
+    css.includes(`opacity ${MOURNING_SLIDE_FADE_MS}ms`),
+    `transition ของภาพต้องจาง ${MOURNING_SLIDE_FADE_MS}ms ให้ตรงกับ MOURNING_SLIDE_FADE_MS`,
   );
 });

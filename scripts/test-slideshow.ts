@@ -13,6 +13,7 @@ import {
   HERO_SLIDE_INTERVAL_MS,
   advanceIndex,
   hasSlideControls,
+  isLastSlide,
 } from "@/lib/slideshow";
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -81,6 +82,30 @@ test("hasSlideControls: มีภาพเดียวต้องไม่แ�
   assert.equal(hasSlideControls(1), false, "ภาพเดียว = ไม่มีอะไรให้เลื่อน");
   assert.equal(hasSlideControls(2), true);
   assert.equal(hasSlideControls(3), true);
+});
+
+test("isLastSlide: กติกา 'ดูให้ครบทุกภาพก่อนปิด'", () => {
+  // 2 ภาพ: ภาพแรกกด = ไปภาพที่สอง · ภาพที่สองกด = ปิดได้
+  assert.equal(isLastSlide(0, 2), false);
+  assert.equal(isLastSlide(1, 2), true);
+
+  // 3 ภาพ
+  assert.equal(isLastSlide(0, 3), false);
+  assert.equal(isLastSlide(1, 3), false);
+  assert.equal(isLastSlide(2, 3), true);
+});
+
+test("isLastSlide: ภาพเดียวต้องปิดได้ทันที (พฤติกรรมเดิมไม่เปลี่ยน)", () => {
+  assert.equal(isLastSlide(0, 1), true);
+});
+
+test("isLastSlide: ค่าเพี้ยนต้องไม่ทำให้ปุ่มปิดใช้ไม่ได้", () => {
+  // กันเคสข้อมูลเปลี่ยนระหว่างเปิดหน้าต่าง — ถ้าตอบ false ผู้ใช้จะค้างอยู่ในหน้าต่างที่ปิดไม่ได้
+  assert.equal(isLastSlide(0, 0), true, "ไม่มีภาพ = ถือว่าถึงภาพสุดท้าย");
+  assert.equal(isLastSlide(0, -3), true);
+  assert.equal(isLastSlide(0, 2.5), true, "จำนวนภาพที่ไม่ใช่จำนวนเต็มเชื่อถือไม่ได้");
+  assert.equal(isLastSlide(Number.NaN, 3), true);
+  assert.equal(isLastSlide(99, 3), true, "index เกินช่วง = ถือว่าถึงภาพสุดท้าย");
 });
 
 test("HERO_SLIDES: id ไม่ซ้ำ และ path อยู่ใต้ /slide/", () => {

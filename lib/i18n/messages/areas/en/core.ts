@@ -124,6 +124,7 @@ export const mourning = {
     caption: "The management and staff of Thai Food Products Factory Co., Ltd.",
     close: "Close this window",
     muteToday: "Do not show again today",
+    seeNext: "See the next image",
     prev: "Previous image",
     next: "Next image",
     gotoSlide: "Go to image",

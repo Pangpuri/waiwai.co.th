@@ -138,6 +138,7 @@ export default async function LocaleLayout({
             caption: messages.mourning.caption,
             close: messages.mourning.close,
             muteToday: messages.mourning.muteToday,
+            seeNext: messages.mourning.seeNext,
             prev: messages.mourning.prev,
             next: messages.mourning.next,
             gotoSlide: messages.mourning.gotoSlide,

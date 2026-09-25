@@ -35,3 +35,11 @@ export type MourningImageView = MourningImage & { readonly alt: string };
  * ถ้าต่างกัน หน้าต่างจะหายก่อนที่ภาพจะจางสุด หรือค้างอยู่เฉย ๆ
  */
 export const MOURNING_CLOSE_MS = 420;
+
+/**
+ * เวลาจางข้ามภาพตอนกด "ดูภาพต่อไป" (ms) — ต้องตรงกับกฎ `[data-mourning-frame]` ใน app/globals.css
+ *
+ * สั้นกว่าสไลด์ hero (1400ms) เพราะนี่คือการเปลี่ยนภาพที่ "ผู้ใช้สั่ง" ไม่ใช่ฉากหลังที่เลื่อนเอง
+ * — รอนานไปจะรู้สึกหน่วง แต่สั้นเกินไปจะเหมือนภาพกระพริบ · มี unit test เทียบค่านี้กับ CSS ให้
+ */
+export const MOURNING_SLIDE_FADE_MS = 700;

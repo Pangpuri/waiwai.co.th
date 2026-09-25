@@ -10,7 +10,7 @@ import {
   MOURNING_STORAGE_KEY,
   mourningDateStamp,
 } from "@/lib/mourning-notice";
-import { advanceIndex, hasSlideControls } from "@/lib/slideshow";
+import { advanceIndex, hasSlideControls, isLastSlide } from "@/lib/slideshow";
 
 import { MOURNING_CLOSE_MS, type MourningImageView } from "../mourning";
 
@@ -37,6 +37,8 @@ type MourningNoticeLabels = {
   readonly caption: string;
   readonly close: string;
   readonly muteToday: string;
+  /** ข้อความบนปุ่มหลักตอนที่ยังไม่ถึงภาพสุดท้าย (ยังปิดไม่ได้) */
+  readonly seeNext: string;
   readonly prev: string;
   readonly next: string;
   readonly gotoSlide: string;
@@ -199,6 +201,16 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
   const active = total > 0 ? (images[advanceIndex(index, total)] ?? null) : null;
   if (!active) return null;
 
+  const atLastSlide = isLastSlide(index, total);
+
+  /*
+    ยังไม่ถึงภาพสุดท้าย = ปุ่มหลักพาไปภาพถัดไป (ผู้ใช้สั่งว่า "กดปิด 1 ครั้งโชว์ภาพที่สอง
+    กดปิดอีก 1 ครั้งถึงจะยอมปิด") · ถึงภาพสุดท้ายแล้วจึงปิดจริง
+  */
+  const onPrimaryAction = atLastSlide
+    ? close
+    : () => setIndex((current) => advanceIndex(current, total));
+
   return (
     <div
       ref={dialogRef}
@@ -213,24 +225,49 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
         <figure className="flex w-full flex-col items-center" aria-live="polite">
           {/*
             รูปกว้างเต็มจอ (ผู้ใช้เลือก "เต็มจอแบบมีขอบ" รอบที่ 21) — เหลือขอบดำจาก p-4/p-6 ของฉากหลัง
-            วิธีวาง (คัดจาก lightbox ใบรับรองที่ทำงานอยู่แล้ว):
-            - กล่อง `relative` ข้างในโหลดขนาดตามรูป → ปุ่มลูกศรอยู่ตรงขอบรูปพอดี ไม่ลอยไปขอบจอ
-            - การ์ด (มุมโค้ง/ขอบ/พื้น) อยู่บนตัว <img> ไม่ใช่บนกล่อง → ไม่มีแถบพื้นโผล่ข้างรูป
+            และจางข้ามภาพได้เนียนเมื่อมีหลายภาพ (ผู้ใช้สั่งในรอบที่ 21)
+
+            วิธีวาง:
+            - ชั้นล่างสุด = รูปที่กำลังแสดง ทำหน้าที่ **กำหนดขนาดกรอบ** (invisible) เพราะ <img>
+              รักษาสัดส่วนให้เองเมื่อชนเพดานความสูง — ไม่ต้องคำนวณ min()/vh เองใน JS
+            - ชั้นที่เห็นจริง = รูปทุกใบซ้อน absolute เต็มกรอบ จางเข้าออก (`data-mourning-frame` ใน globals.css)
+              → ภาพใบถัดไปถูกโหลดไว้ล่วงหน้าตั้งแต่เปิดหน้าต่าง จึงไม่มีจังหวะภาพโหว่ตอนกดเปลี่ยน
+            - กล่อง `relative` ห่อขนาดเท่ากรอบ → ปุ่มลูกศรอยู่ตรงขอบรูปพอดี ไม่ลอยไปขอบจอ
             - `max-w-[calc(100vw-2rem)]` อ้างความกว้าง "วิวพอร์ต" ไม่ใช่อ้างกล่องแม่
-              → เลี่ยงปัญหาเปอร์เซ็นต์อ้างพ่อที่ความกว้างยังไม่รู้ค่า (กรณีรูปถูกจำกัดด้วยความสูง)
+              → เลี่ยงปัญหาเปอร์เซ็นต์อ้างพ่อที่ความกว้างยังไม่รู้ค่า
             - `max-h-[72vh]` กันจอเตี้ยแต่กว้าง (เช่น 2560×800) ที่รูปจะสูงจนปุ่มปิดล้นจอ
-              → ความสูงชนเพดานเมื่อไหร่ ความกว้างถอยตามสัดส่วนเอง (3:1 เสมอ)
           */}
           <div className="relative">
             <Image
               src={active.src}
-              alt={active.alt}
+              alt=""
+              aria-hidden="true"
               width={active.width}
               height={active.height}
               sizes="100vw"
               loading="eager"
-              className="block h-auto max-h-[72vh] w-auto max-w-[calc(100vw-2rem)] rounded-2xl border border-line-strong bg-surface sm:max-w-[calc(100vw-3rem)]"
+              className="invisible block h-auto max-h-[72vh] w-auto max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-3rem)]"
             />
+
+            {images.map((image, position) => {
+              const isActiveFrame = position === index;
+
+              return (
+                <Image
+                  key={image.id}
+                  src={image.src}
+                  alt={isActiveFrame ? image.alt : ""}
+                  aria-hidden={!isActiveFrame}
+                  data-mourning-frame=""
+                  data-state={isActiveFrame ? "active" : "idle"}
+                  width={image.width}
+                  height={image.height}
+                  sizes="100vw"
+                  loading={position === 0 ? "eager" : "lazy"}
+                  className="absolute inset-0 h-full w-full rounded-2xl border border-line-strong bg-surface object-contain"
+                />
+              );
+            })}
 
             {hasSlideControls(total) ? (
               <>
@@ -285,29 +322,38 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
           </div>
         ) : null}
 
+        {/*
+          ปุ่มหลัก: "ต้องดูให้ครบทุกภาพก่อนปิด" (ผู้ใช้สั่งในรอบที่ 21)
+          - ยังไม่ถึงภาพสุดท้าย → ปุ่มทำหน้าที่ไปภาพถัดไป (พร้อมจางข้ามภาพ)
+          - ภาพสุดท้าย → จึงเป็นปุ่มปิดจริง (จางออกแล้วซ่อน)
+          ชื่อปุ่มเปลี่ยนตามการกระทำจริง เพื่อไม่ให้ผู้ใช้คีย์บอร์ด/โปรแกรมอ่านหน้าจอเข้าใจผิด
+        */}
         <button
           ref={closeButtonRef}
           type="button"
-          onClick={close}
+          onClick={onPrimaryAction}
           className="mt-6 rounded-full bg-brand-red px-7 py-3.5 text-sm font-bold text-on-brand shadow-lg transition-transform hover:-translate-y-0.5"
         >
-          {labels.close}
+          {atLastSlide ? labels.close : labels.seeNext}
         </button>
 
         {/*
           ตัวเลือก "ไม่แสดงอีกในวันนี้" — ไม่ติ๊กไว้เป็นค่าเริ่มต้น (ผู้ใช้เลือกกติกานี้)
+          แสดงเฉพาะตอนที่ปุ่มหลักเป็น "ปิด" แล้วเท่านั้น (ตอนกดไปภาพถัดไป การติ๊กยังไม่มีความหมาย)
           ถ้าติ๊กตอนกดปิด → เก็บ "วันที่ที่ปิด" ไว้ แล้ววันถัดไปหน้าต่างกลับมาเอง
           <label> ครอบ input จริง → กดที่ข้อความก็ติ๊กได้ และโปรแกรมอ่านหน้าจออ่านชื่อให้
         */}
-        <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-on-brand/85">
-          <input
-            type="checkbox"
-            checked={muteToday}
-            onChange={(event) => setMuteToday(event.currentTarget.checked)}
-            className="h-4 w-4 shrink-0 accent-brand-yellow"
-          />
-          {labels.muteToday}
-        </label>
+        {atLastSlide ? (
+          <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-on-brand/85">
+            <input
+              type="checkbox"
+              checked={muteToday}
+              onChange={(event) => setMuteToday(event.currentTarget.checked)}
+              className="h-4 w-4 shrink-0 accent-brand-yellow"
+            />
+            {labels.muteToday}
+          </label>
+        ) : null}
       </div>
     </div>
   );

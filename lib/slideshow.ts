@@ -44,3 +44,18 @@ export function advanceIndex(current: number, total: number, step = 1): number {
 export function hasSlideControls(total: number): boolean {
   return Number.isInteger(total) && total > 1;
 }
+
+/**
+ * ตอนนี้อยู่ภาพสุดท้ายแล้วหรือยัง
+ *
+ * ใช้กับการ์ดที่บังคับให้ "ดูให้ครบทุกภาพก่อนปิด" — ปุ่มหลักของหน้าต่างนั้น
+ * จะเป็น "ไปภาพถัดไป" จนกว่าจะถึงภาพสุดท้าย แล้วจึงเปลี่ยนเป็น "ปิด"
+ *
+ * - มีภาพเดียว (หรือไม่มีภาพ) → ถือว่าอยู่ภาพสุดท้ายแล้ว → ปุ่มปิดทำงานทันที (พฤติกรรมเดิม)
+ * - index หลุดช่วง (เช่น เกินไปเพราะข้อมูลเปลี่ยน) → ถือว่าถึงภาพสุดท้าย ไม่ให้ค้างปิดไม่ได้
+ */
+export function isLastSlide(index: number, total: number): boolean {
+  if (!Number.isInteger(total) || total <= 0) return true;
+  if (!Number.isFinite(index)) return true;
+  return Math.trunc(index) >= total - 1;
+}
