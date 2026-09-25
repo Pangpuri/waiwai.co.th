@@ -19,6 +19,32 @@ const nextConfig: NextConfig = {
     "192.168.10.*", // เผื่อ IP ในวงเดียวกันเปลี่ยน
     "172.31.192.1", // Hyper-V Default Switch (IP ที่ `next dev` พิมพ์ให้ — คนละ adapter กับวงแลนด์)
   ],
+
+  /*
+    ── ความปลอดภัยพื้นฐานของเว็บสาธารณะ ─────────────────────────────────────────
+    ย้ายมาจาก `netlify.toml` (รอบที่ 21) เพราะผู้ใช้ย้ายไป deploy บน **Vercel** ซึ่งอ่านไฟล์นั้นไม่ได้
+    → ถ้าปล่อยไว้ เว็บจริงจะไม่มี header เหล่านี้เลย · วางที่นี่แล้วทำงานกับทุกโฮสต์ที่รัน Next
+    (Vercel · Netlify · self-host) และมีเทสต์กันถอยหลังที่ scripts/test-deploy-config.ts
+
+    เว็บนี้ไม่ใช้กล้อง/ไมโครโฟน และไม่เรียก Geolocation API เลย → ปิดสิทธิ์ไว้ล่วงหน้า
+
+    ⚠️ จงใจ **ไม่ตั้ง Content-Security-Policy** เพราะเว็บนี้ใช้สคริปต์ inline ก่อน paint
+    (ธีม/สถานะป๊อปอัพ/การ์ด — ดู features/shell/ui/inline-script.tsx) CSP ที่เข้มจะบล็อกสคริปต์เหล่านั้น
+    ทำให้หน้าวาบ · ถ้าจะทำ CSP ต้องใช้ nonce ซึ่งกระทบเรื่อง static rendering → เป็นงานแยกที่ต้องคุยกันก่อน
+  */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

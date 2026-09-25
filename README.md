@@ -49,13 +49,21 @@ scripts/                สคริปต์ด่าน (check:*) และ un
 public/                 ภาพที่ใช้จริง (ใบรับรองมาตรฐาน · คณะผู้บริหาร · ผลิตภัณฑ์ · แผนที่ · สไลด์ · ประกาศไว้อาลัย)
 ```
 
-## Deploy ขึ้น Netlify
+## Deploy
 
-ตั้งค่าไว้ใน `netlify.toml` แล้ว — build ด้วย `npm run build` บน Node 22
+**Vercel (ที่ใช้อยู่)** — ไม่ต้องมีไฟล์ตั้งค่าใด ๆ และ **ไม่ต้องตั้ง environment variable** เพราะเว็บนี้ไม่ใช้ env เลย
+
+- Vercel ตรวจพบ Next.js เอง · build ด้วย `npm run build` · Next 16 รองรับ `proxy.ts` (ตัวทำ locale redirect) ได้ native
+- ตรวจหลัง deploy: เปิด `/` แล้วต้องเด้งไป `/th`
+- **header ความปลอดภัยตั้งที่ `next.config.ts` → `headers()`** (แหล่งความจริงเดียว ใช้ได้ทุกโฮสต์)
+  ตรวจเร็ว ๆ ด้วย `curl -I https://<โดเมน>/th` แล้วต้องเห็น `X-Content-Type-Options` · `Referrer-Policy` ·
+  `X-Frame-Options` · `Permissions-Policy`
+
+**Netlify (ทางสำรอง)** — `netlify.toml` ยังอยู่ (build command + Node 22)
 
 - **ไม่ต้องเพิ่ม `@netlify/plugin-nextjs`** — Netlify ตรวจพบ Next.js และติดตั้ง Next.js Runtime ให้เองตอน build
-- ต้องเป็น runtime รุ่นล่าสุด (v5.10+) จึงรองรับ `proxy.ts` ของ Next 16 (ตัวที่ทำ locale redirect)
-- ตรวจหลัง deploy ครั้งแรก: เปิด `/` แล้วต้องเด้งไป `/th`
+- ต้องเป็น runtime รุ่นล่าสุด (v5.10+) จึงรองรับ `proxy.ts` ของ Next 16
+- **ห้ามคัดลอก header กลับไปไว้ใน `netlify.toml`** — แก้ที่ `next.config.ts` เท่านั้น (มีเทสต์คุมอยู่)
 
 ## หมายเหตุ
 
