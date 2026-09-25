@@ -27,6 +27,19 @@ export const hero = {
         alt: "A WOW noodle launch banner on a yellow and orange background, with three packets and a bowl of noodles for each flavour.",
       },
     },
+    /*
+      ── Announcement card pinned to the bottom-right of the hero (see features/home/hero-card.ts) ──
+      This card exists to show small, occasional announcements — edit the copy here, no code change.
+      The link target lives in HERO_CARD_HREF in features/home/hero-card.ts
+    */
+    card: {
+      title: "A campaign from Wai Wai",
+      body: "Our latest campaigns and news live on the news page.",
+      link: "See all news",
+      close: "Close this card",
+      muteToday: "Do not show again today",
+      alt: "A Wai Wai campaign poster: a block of dry instant noodles on a wooden surface with a noodle packet, an empty bowl and a tiny figurine sitting on the chopsticks.",
+    },
 };
 
 export const products = {

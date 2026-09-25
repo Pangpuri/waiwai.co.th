@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { createAttributeStore } from "@/lib/attribute-store";
 import {
   MOURNING_ATTRIBUTE,
   MOURNING_STATE_MUTED,
@@ -51,34 +52,11 @@ type MourningNoticeProps = {
 
 /* ── แหล่งความจริงเดียวของ "หน้าต่างเปิดอยู่ไหม" คือ attribute บน <html> ─────────── */
 
-function subscribeToMourningAttribute(onStoreChange: () => void): () => void {
-  if (typeof MutationObserver === "undefined") return () => {};
-
-  const observer = new MutationObserver(onStoreChange);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: [MOURNING_ATTRIBUTE],
-  });
-
-  return () => observer.disconnect();
-}
-
-function readIsShown(): boolean {
-  return document.documentElement.getAttribute(MOURNING_ATTRIBUTE) === MOURNING_STATE_SHOWN;
-}
-
-/** ฝั่งเซิร์ฟเวอร์ไม่มี DOM — และ CSS จะไม่เปิดหน้าต่างจนกว่าสคริปต์ก่อน paint จะติด attribute */
-function readIsShownOnServer(): boolean {
-  return false;
-}
+const store = createAttributeStore(MOURNING_ATTRIBUTE, MOURNING_STATE_SHOWN);
 
 export function MourningNotice({ images, labels }: MourningNoticeProps) {
   const total = images.length;
-  const isShown = useSyncExternalStore(
-    subscribeToMourningAttribute,
-    readIsShown,
-    readIsShownOnServer,
-  );
+  const isShown = useSyncExternalStore(store.subscribe, store.read, store.readOnServer);
   const [isClosing, setIsClosing] = useState(false);
   const [muteToday, setMuteToday] = useState(false);
   const [index, setIndex] = useState(0);

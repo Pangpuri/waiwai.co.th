@@ -4,7 +4,9 @@ import { SectionCurve } from "@/features/shell/ui/section-curve";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
+import { HERO_CARD_HREF } from "../hero-card";
 import { HERO_SLIDES, type HeroSlideView } from "../slides";
+import { HeroCard } from "./hero-card";
 import { HeroSlider } from "./hero-slider";
 
 type HeroProps = {
@@ -89,6 +91,23 @@ export function Hero({ locale, messages }: HeroProps) {
 
           <p className="mt-6 text-xs text-on-brand/70">{m.note}</p>
         </div>
+
+        {/*
+          การ์ดประกาศเล็ก ๆ — ผู้ใช้ขอให้เอา "การ์ดเอียง ๆ" ที่เคยอยู่ใน hero กลับมา
+          ในแบบที่ปิดได้ (รอบที่ 21) · ข้อความทั้งหมดมาจากพจนานุกรม `hero.card.*`
+          กติกาการแสดง/ปิดอยู่ใน lib/hero-card.ts + lib/day-mute.ts
+        */}
+        <HeroCard
+          href={localePath(locale, HERO_CARD_HREF)}
+          labels={{
+            title: m.card.title,
+            body: m.card.body,
+            link: m.card.link,
+            close: m.card.close,
+            muteToday: m.card.muteToday,
+            alt: m.card.alt,
+          }}
+        />
       </div>
 
       {/* ขอบล่างโค้งนุ่ม — สีพื้นของ section ถัดไป (พื้นหน้าเว็บ) */}

@@ -168,6 +168,47 @@ html[data-mourning="shown"] [data-mourning-notice] {
 }
 
 /*
+  ── การ์ดประกาศบน hero หน้าแรก ─────────────────────────────────────────────────
+  กลไกเดียวกับหน้าต่างไว้อาลัย: "ซ่อนไว้ก่อน แล้วค่อยเปิด" เมื่อสคริปต์ก่อน paint ยืนยัน
+  (ดู lib/hero-card.ts) — ทำไมต้องมี: การ์ดนี้ลอยทับภาพ hero ที่ผู้ใช้เห็นเป็นอย่างแรก
+  ถ้าปล่อยให้โผล่หลัง hydrate จะเห็นการ์ด "ตุ๊บ" ขึ้นมา
+
+  ค่าที่ต้องตรงกัน: data-hero-card / "shown" (HERO_CARD_ATTRIBUTE, HERO_CARD_STATE_SHOWN)
+  และระยะจางตอนปิด 420ms (HERO_CARD_CLOSE_MS) — มีเทสต์ตรวจกฎนี้อยู่
+
+  ⚠️ ห้ามใส่ `animation: … both` บน `[data-hero-card]` เอง เพราะ fill mode จะทับค่า opacity
+  ของสถานะกำลังปิด (transition จะไม่ทำงาน) — ใส่แอนิเมชันเปิดที่แผงด้านในแทน
+*/
+[data-hero-card] {
+  display: none;
+}
+
+html[data-hero-card="shown"] [data-hero-card] {
+  display: flex;
+}
+
+[data-hero-card][data-closing] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes hero-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-hero-card] {
+  animation: hero-card-in 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
   ── จางข้ามภาพในหน้าต่างไว้อาลัย ──────────────────────────────────────────────
   ภาพทุกใบถูกวางซ้อนกันตั้งแต่แรก (ชั้นล่างสุดเป็นตัวกำหนดขนาดกรอบ) → เปลี่ยนภาพคือสลับ data-state
   จึงจางข้ามภาพได้เนียน และภาพใบถัดไปถูกโหลดไว้ล่วงหน้าแล้ว ไม่มีจังหวะภาพโหว่

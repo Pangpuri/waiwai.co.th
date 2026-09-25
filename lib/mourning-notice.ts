@@ -13,11 +13,16 @@
  * ค่าเริ่มต้น: **แสดงทุกครั้งที่โหลดหน้า** (รีเฟรช = เห็นอีก)
  * แต่ผู้ใช้เลือกได้ตอนกดปิด: ติ๊ก "ไม่แสดงอีกในวันนี้" → เก็บ "วันที่ที่ปิด" ไว้
  * แล้วสคริปต์จะเทียบกับวันที่ของเครื่องผู้ใช้ (เวลาท้องถิ่น) → วันที่ตรงกัน = ไม่แสดง
- * พอขึ้นวันใหม่ก็แสดงอีกเองโดยไม่ต้องมีใครมาล้างค่า
+ * พอขึ้นวันใหม่ก็แสดงอีกเองโดยไม่มีใครมาล้างค่า
+ *
+ * ตรรกะวัน/สคริปต์ย้ายไปอยู่ที่ `lib/day-mute.ts` (ใช้ร่วมกับการ์ดประกาศบน hero)
+ * ที่นี่เหลือแค่ชื่อเฉพาะของประกาศชุดนี้
  *
  * หมายเหตุ: การกดลิงก์ไปหน้าอื่นในเว็บ (client-side navigation) **ไม่**ทำให้หน้าต่างเด้งซ้ำ
  * เพราะสคริปต์นี้รันตอน "โหลดเอกสาร" เท่านั้น (ดู features/shell/ui/inline-script.tsx)
  */
+
+import { buildDayMuteInitScript, dayStamp, isMutedToday } from "@/lib/day-mute";
 
 export const MOURNING_STORAGE_KEY = "waiwai-mourning-muted-date";
 
@@ -30,33 +35,17 @@ export const MOURNING_STATE_SHOWN = "shown";
 /** ค่าที่ตั้งหลังผู้ใช้กดปิด (CSS ไม่แสดงผลแล้ว และอ่านใน devtools ได้ว่าปิดรอบนี้ไปแล้ว) */
 export const MOURNING_STATE_MUTED = "muted";
 
-/**
- * วันนี้ในรูปแบบ `YYYY-MM-DD` ตาม **เวลาท้องถิ่น** ของเครื่องผู้ใช้
- *
- * จงใจไม่ใช้ `toISOString()` เพราะค่านั้นเป็น UTC — ผู้ใช้ในไทย (UTC+7) ที่เปิดเว็บช่วงเช้าตรู่
- * จะได้ "เมื่อวาน" แล้วหน้าต่างจะเด้งทั้งวันที่ตั้งใจปิดไว้
- */
-export function mourningDateStamp(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
+/** วันที่ในรูปแบบ `YYYY-MM-DD` ตามเวลาท้องถิ่น (ดู lib/day-mute.ts) */
+export const mourningDateStamp = dayStamp;
 
-/** ผู้ใช้ขอปิดไว้ "ถึงสิ้นวันนี้" และวันนี้คือวันเดียวกับที่ปิดไว้หรือไม่ */
-export function isMourningMuted(stored: unknown, today: string): boolean {
-  return typeof stored === "string" && stored === today;
-}
+/** ผู้ใช้ขอปิดไว้ "ถึงสิ้นวันนี้" หรือไม่ */
+export const isMourningMuted = isMutedToday;
 
 /**
- * สคริปต์ก่อน paint: แสดงเป็นค่าเริ่มต้น เว้นแต่ผู้ใช้เคยกดปิดไว้ "ในวันเดียวกัน"
- *
- * - เทียบวันที่แบบเวลาท้องถิ่น (สร้างสตริงเองให้ตรงกับ `mourningDateStamp`)
- * - ถ้าอ่าน storage ไม่ได้ (โหมดส่วนตัว/ถูกบล็อก) → **ยังคงแสดง** เพราะยังรัน JS อยู่
- *   จึงกดปิดได้ปกติ และการ "พลาดประกาศ" เสียหายกว่าการเห็นซ้ำหนึ่งครั้ง
- *   (ต่างจากกรณีไม่มี JavaScript เลย ซึ่งสคริปต์ไม่ทำงานและหน้าต่างไม่ขึ้น — เลี่ยง modal ที่ปิดไม่ได้)
+ * สคริปต์ก่อน paint ของประกาศไว้อาลัย (รายละเอียดกติกาอยู่ใน lib/day-mute.ts)
  */
-export const MOURNING_INIT_SCRIPT = `(function(){try{var d=new Date(),today=d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);if(localStorage.getItem(${JSON.stringify(
-  MOURNING_STORAGE_KEY,
-)})===today)return;}catch(_){}document.documentElement.setAttribute(${JSON.stringify(
-  MOURNING_ATTRIBUTE,
-)},${JSON.stringify(MOURNING_STATE_SHOWN)});})();`;
+export const MOURNING_INIT_SCRIPT = buildDayMuteInitScript({
+  storageKey: MOURNING_STORAGE_KEY,
+  attribute: MOURNING_ATTRIBUTE,
+  shownValue: MOURNING_STATE_SHOWN,
+});

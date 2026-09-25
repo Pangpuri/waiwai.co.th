@@ -19,6 +19,7 @@ import {
 } from "@/lib/i18n/config";
 import { COOKIE_CONSENT_INIT_SCRIPT } from "@/lib/cookie-consent";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { HERO_CARD_INIT_SCRIPT } from "@/lib/hero-card";
 import { MOURNING_INIT_SCRIPT } from "@/lib/mourning-notice";
 import { REVEAL_INIT_SCRIPT } from "@/lib/scroll-reveal";
 import { SITE } from "@/lib/site";
@@ -91,11 +92,12 @@ export default async function LocaleLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* สคริปต์ก่อน paint — ตั้งธีม สถานะคุกกี้/ประกาศไว้อาลัย และสวิตช์จางเนื้อหา เพื่อกันจอวาบ
+        {/* สคริปต์ก่อน paint — ตั้งธีม สถานะคุกกี้/ประกาศไว้อาลัย/การ์ดบน hero และสวิตช์จางเนื้อหา เพื่อกันจอวาบ
             (รายละเอียดใน features/shell/ui/inline-script.tsx) */}
         <InlineScript html={THEME_INIT_SCRIPT} />
         <InlineScript html={COOKIE_CONSENT_INIT_SCRIPT} />
         <InlineScript html={MOURNING_INIT_SCRIPT} />
+        <InlineScript html={HERO_CARD_INIT_SCRIPT} />
         <InlineScript html={REVEAL_INIT_SCRIPT} />
       </head>
 

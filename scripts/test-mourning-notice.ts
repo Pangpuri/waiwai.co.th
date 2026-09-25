@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -22,19 +21,9 @@ import {
   mourningDateStamp,
 } from "@/lib/mourning-notice";
 
-const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+import { readStrippedCss } from "./css-source.ts";
 
-/**
- * อ่าน globals.css แบบ **ตัดคอมเมนต์ออกก่อน**
- *
- * บทเรียนรอบที่ 21: คอมเมนต์อธิบายในไฟล์ CSS มีวงเล็บปีกกา (`body { overflow: hidden }`)
- * ทำให้ regex ที่ไล่จับบล็อก `html { … scrollbar-gutter: stable }` ขาดกลางทาง → เทสต์แดงทั้งที่โค้ดถูก
- * (วิธีเดียวกับที่ scripts/check-i18n.ts ทำกับไฟล์ .tsx)
- */
-async function readMourningCss(): Promise<string> {
-  const raw = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  return raw.replace(/\/\*[\s\S]*?\*\//g, " ");
-}
+const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /** ขนาดจริงของไฟล์ JPEG (อ่าน marker SOF) — คัดวิธีเดียวกับ scripts/test-contact.ts */
 function readJpegSize(filePath: string): { width: number; height: number } | null {
@@ -248,7 +237,7 @@ test("isMourningMuted: ต้องเป็นวันเดียวกัน
 });
 
 test("CSS: หน้าต่างต้องถูกซ่อนไว้ก่อน แล้วค่อยเปิดเมื่อสคริปต์ยืนยัน", async () => {
-  const css = await readMourningCss();
+  const css = await readStrippedCss();
 
   assert.ok(
     /\[data-mourning-notice\]\s*\{\s*display:\s*none;/.test(css),
@@ -269,7 +258,7 @@ test("CSS: หน้าต่างต้องถูกซ่อนไว้ก
 });
 
 test("CSS: หน้าต่างต้องกัน 'เนื้อเว็บกระตุก' ตอนล็อก/ปลดล็อกการเลื่อน", async () => {
-  const css = await readMourningCss();
+  const css = await readStrippedCss();
 
   /*
     อาการที่ผู้ใช้รายงานในรอบที่ 21: ตอนปิดหน้าต่าง เนื้อเว็บหลักกระตุกหนึ่งจังหวะ
@@ -283,7 +272,7 @@ test("CSS: หน้าต่างต้องกัน 'เนื้อเว�
 });
 
 test("CSS: จางข้ามภาพของหน้าต่างไว้อาลัย ต้องตรงกับค่าที่โค้ดใช้", async () => {
-  const css = await readMourningCss();
+  const css = await readStrippedCss();
 
   assert.ok(css.includes("[data-mourning-frame]"), "globals.css ต้องมีกฎ [data-mourning-frame]");
   assert.ok(
