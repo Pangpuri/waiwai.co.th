@@ -5,33 +5,38 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 
 import {
   MOURNING_ATTRIBUTE,
-  MOURNING_STATE_DISMISSED,
+  MOURNING_STATE_MUTED,
   MOURNING_STATE_SHOWN,
   MOURNING_STORAGE_KEY,
+  mourningDateStamp,
 } from "@/lib/mourning-notice";
 import { advanceIndex, hasSlideControls } from "@/lib/slideshow";
 
 import { MOURNING_CLOSE_MS, type MourningImageView } from "../mourning";
 
 /**
- * หน้าต่างประกาศไว้อาลัย — เด้งครั้งเดียวเมื่อเข้าเว็บ
+ * หน้าต่างประกาศไว้อาลัย — เด้งทุกครั้งที่โหลดหน้า (ค่าเริ่มต้น)
  *
  * ทำงานร่วมกับ lib/mourning-notice.ts (สคริปต์ก่อน paint + attribute บน <html>):
  *  - **CSS เป็นคนตัดสินว่าแสดงหรือไม่** (ดู app/globals.css) → ไม่มีอาการวาบ และไม่ต้องรอ hydrate
  *  - สถานะ "กำลังแสดงอยู่ไหม" อ่านจาก attribute บน <html> ด้วย useSyncExternalStore
  *    (ไม่ใช้ useEffect + setState ซึ่งทำให้เกิด cascading render) และเฝ้าการเปลี่ยนแปลงด้วย
  *    MutationObserver → พอปิดเสร็จแล้วเปลี่ยน attribute ตัวเก็บกวาดของ effect จะทำงานเอง
- *  - กดปิด: ติด `data-closing` ให้ CSS จางออกก่อน (MOURNING_CLOSE_MS) แล้วค่อยบันทึกว่าปิดแล้ว
- *    → ผู้ใช้เห็นภาพค่อย ๆ หาย ไม่ใช่หายวับ
+ *  - กดปิด: จดตัวเลือก "ไม่แสดงอีกในวันนี้" ทันที แล้วติด `data-closing` ให้ CSS จางออกก่อน
+ *    (MOURNING_CLOSE_MS) ค่อยเปลี่ยน attribute → ผู้ใช้เห็นภาพค่อย ๆ หาย ไม่ใช่หายวับ
+ *  - ติ๊ก "ไม่แสดงอีกในวันนี้" = เก็บ "วันที่ที่ปิด" ไว้เทียบกับวันที่ของเครื่องผู้ใช้ (เวลาท้องถิ่น)
+ *    พอขึ้นวันใหม่หน้าต่างจะกลับมาเองโดยไม่ต้องมีใครล้างค่า
  *
  * a11y: role=dialog + aria-modal · โฟกัสย้ายเข้าปุ่มปิด · Tab วนอยู่ในหน้าต่าง · Esc ปิดได้
  *      · ลูกศรซ้าย/ขวาเปลี่ยนภาพ · มี aria-live ให้โปรแกรมอ่านหน้าจอรู้ว่าเปลี่ยนภาพแล้ว
+ *      · เช็คบ็อกมี <label> ครอบจริง (กดที่ข้อความก็ติ๊กได้)
  */
 
 type MourningNoticeLabels = {
   readonly dialogLabel: string;
   readonly caption: string;
   readonly close: string;
+  readonly muteToday: string;
   readonly prev: string;
   readonly next: string;
   readonly gotoSlide: string;
@@ -73,6 +78,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
     readIsShownOnServer,
   );
   const [isClosing, setIsClosing] = useState(false);
+  const [muteToday, setMuteToday] = useState(false);
   const [index, setIndex] = useState(0);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -80,22 +86,32 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
   // ระหว่างจางออกยังต้องล็อกการเลื่อนไว้ ไม่งั้นพื้นหลังจะเลื่อนตามนิ้วระหว่างที่ภาพยังไม่หาย
   const isOpen = isShown && !isClosing;
 
+  /*
+    จดตัวเลือกของผู้ใช้ "ตอนกดปิด" ไม่ใช่ตอนจางเสร็จ — ถ้าผู้ใช้ปิดแท็บระหว่างที่ภาพยังจางอยู่
+    ตัวเลือกจะได้ไม่หายไป (เขียน storage สำเร็จแล้วตั้งแต่ตอนคลิก)
+  */
   const close = useCallback(() => {
-    setIsClosing(true);
-  }, []);
+    try {
+      if (muteToday) {
+        window.localStorage.setItem(MOURNING_STORAGE_KEY, mourningDateStamp(new Date()));
+      } else {
+        // ไม่ติ๊ก = ค่าเริ่มต้น "แสดงทุกครั้งที่โหลดหน้า" → ล้างค่าที่อาจค้างจากวันก่อน
+        window.localStorage.removeItem(MOURNING_STORAGE_KEY);
+      }
+    } catch {
+      // เบราว์เซอร์โหมดส่วนตัวเขียนไม่ได้ — ยังต้องปิดหน้าต่างให้ผู้ใช้ใช้งานเว็บต่อได้
+    }
 
-  // จางออกให้จบก่อน แล้วค่อยจำว่าผู้ใช้ปิดแล้ว
+    setIsClosing(true);
+  }, [muteToday]);
+
+  // จางออกให้จบก่อน แล้วค่อยซ่อน (เปลี่ยน attribute)
   useEffect(() => {
     if (!isClosing) return;
 
     const timer = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(MOURNING_STORAGE_KEY, MOURNING_STATE_DISMISSED);
-      } catch {
-        // เบราว์เซอร์โหมดส่วนตัวเขียนไม่ได้ — ยังต้องปิดหน้าต่างให้ผู้ใช้ใช้งานเว็บต่อได้
-      }
       // การเปลี่ยน attribute จะทำให้ useSyncExternalStore อัปเดต → CSS ซ่อนหน้าต่าง และ effect ถูกเก็บกวาด
-      document.documentElement.setAttribute(MOURNING_ATTRIBUTE, MOURNING_STATE_DISMISSED);
+      document.documentElement.setAttribute(MOURNING_ATTRIBUTE, MOURNING_STATE_MUTED);
       // หน้าต่างถูกซ่อนไปแล้ว — ไม่ควรทิ้งโฟกัสค้างไว้บนปุ่มที่มองไม่เห็น
       closeButtonRef.current?.blur();
       setIsClosing(false);
@@ -143,13 +159,16 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
 
       /*
         หน้าต่างนี้เป็น modal — โฟกัสต้องไม่หลุดไปที่เนื้อหาข้างหลัง
-        วนกลับไปจุดแรก/จุดสุดท้ายของปุ่มที่อยู่ในหน้าต่าง (ปิด · ก่อนหน้า · ถัดไป)
+        วนกลับไปจุดแรก/จุดสุดท้ายของสิ่งที่โฟกัสได้ในหน้าต่าง
+        (ปุ่มก่อนหน้า/ถัดไป · เช็คบ็อก · ปุ่มปิด)
       */
       if (event.key === "Tab") {
         const node = dialogRef.current;
         if (!node) return;
 
-        const focusables = Array.from(node.querySelectorAll<HTMLElement>("button:not([disabled])"));
+        const focusables = Array.from(
+          node.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled])"),
+        );
         const first = focusables.at(0) ?? null;
         const last = focusables.at(-1) ?? null;
         if (!first || !last) return;
@@ -274,6 +293,21 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
         >
           {labels.close}
         </button>
+
+        {/*
+          ตัวเลือก "ไม่แสดงอีกในวันนี้" — ไม่ติ๊กไว้เป็นค่าเริ่มต้น (ผู้ใช้เลือกกติกานี้)
+          ถ้าติ๊กตอนกดปิด → เก็บ "วันที่ที่ปิด" ไว้ แล้ววันถัดไปหน้าต่างกลับมาเอง
+          <label> ครอบ input จริง → กดที่ข้อความก็ติ๊กได้ และโปรแกรมอ่านหน้าจออ่านชื่อให้
+        */}
+        <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-on-brand/85">
+          <input
+            type="checkbox"
+            checked={muteToday}
+            onChange={(event) => setMuteToday(event.currentTarget.checked)}
+            className="h-4 w-4 shrink-0 accent-brand-yellow"
+          />
+          {labels.muteToday}
+        </label>
       </div>
     </div>
   );

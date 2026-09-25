@@ -112,8 +112,8 @@ export const notFound = {
 };
 
 /**
- * Mourning notice — the dialog shown once when a visitor enters the site
- * (see lib/mourning-notice.ts).
+ * Mourning notice — the dialog shown on every page load until the visitor
+ * ticks "do not show again today" (see lib/mourning-notice.ts).
  *
  * The Thai text inside the image is not repeated here; `caption` is the
  * signature line taken from the artwork itself, which also gives
@@ -123,6 +123,7 @@ export const mourning = {
     dialogLabel: "Mourning announcement",
     caption: "The management and staff of Thai Food Products Factory Co., Ltd.",
     close: "Close this window",
+    muteToday: "Do not show again today",
     prev: "Previous image",
     next: "Next image",
     gotoSlide: "Go to image",

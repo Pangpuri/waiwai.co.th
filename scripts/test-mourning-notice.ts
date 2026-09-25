@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 
 import { MOURNING_CLOSE_MS, MOURNING_IMAGES } from "@/features/shell/mourning";
 import { en } from "@/lib/i18n/messages/en";
@@ -11,10 +12,10 @@ import { th } from "@/lib/i18n/messages/th";
 import {
   MOURNING_ATTRIBUTE,
   MOURNING_INIT_SCRIPT,
-  MOURNING_STATE_DISMISSED,
   MOURNING_STATE_SHOWN,
   MOURNING_STORAGE_KEY,
-  isMourningDismissed,
+  isMourningMuted,
+  mourningDateStamp,
 } from "@/lib/mourning-notice";
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -88,6 +89,7 @@ test("พจนานุกรม mourning: alt ของทุกภาพแ�
       ["dialogLabel", messages.mourning.dialogLabel],
       ["caption", messages.mourning.caption],
       ["close", messages.mourning.close],
+      ["muteToday", messages.mourning.muteToday],
       ["prev", messages.mourning.prev],
       ["next", messages.mourning.next],
       ["gotoSlide", messages.mourning.gotoSlide],
@@ -97,7 +99,98 @@ test("พจนานุกรม mourning: alt ของทุกภาพแ�
   }
 });
 
-test("สคริปต์ก่อน paint: ต้องอ้างคีย์/attribute เดียวกับที่โค้ดใช้ และทน localStorage ถูกบล็อก", () => {
+/* ── รันสคริปต์ก่อน paint จริงใน sandbox ───────────────────────────────────────
+   เทสต์แบบนี้ตรวจ "พฤติกรรม" ได้ ไม่ใช่แค่ตรวจว่ามีข้อความอยู่ในสตริง
+   (บทเรียนจากรอบที่ 21: เทสต์ที่ตรวจแค่ว่ามี `if(v)return;` อยู่ ผ่านได้ทั้งที่กติกาผิด)
+   ของที่ต้องมีใน sandbox: document.documentElement.setAttribute · localStorage.getItem · Date
+*/
+type SandboxOptions = {
+  /** ค่าที่อ่านได้จาก localStorage (null = ไม่มีค่า) */
+  readonly stored?: string | null;
+  /** วันที่ของ "ตอนนี้" — ต้องตรึงไว้ไม่ให้เทสต์ผูกกับวันที่รันจริง */
+  readonly now: Date;
+  /** จำลอง localStorage ที่ถูกบล็อก (โหมดส่วนตัว) */
+  readonly storageThrows?: boolean;
+};
+
+function runInitScript({ stored = null, now, storageThrows = false }: SandboxOptions): string | null {
+  const attributes = new Map<string, string>();
+
+  const context = vm.createContext({
+    document: {
+      documentElement: {
+        setAttribute: (name: string, value: string) => {
+          attributes.set(name, value);
+        },
+      },
+    },
+    localStorage: {
+      getItem: () => {
+        if (storageThrows) throw new Error("storage ถูกบล็อก");
+        return stored;
+      },
+    },
+    // สคริปต์เรียก new Date() เอง — ใส่วันที่ปลอมเข้าไปเพื่อให้ผลเทสต์คงที่
+    Date: class extends Date {
+      constructor() {
+        super(now.getTime());
+      }
+    },
+  });
+
+  vm.runInContext(MOURNING_INIT_SCRIPT, context);
+
+  return attributes.get(MOURNING_ATTRIBUTE) ?? null;
+}
+
+const TODAY = new Date(2026, 8, 25, 10, 30); // 25 ก.ย. 2026 เวลาท้องถิ่น
+
+test("สคริปต์ก่อน paint: ยังไม่เคยกดปิด → ต้องติด attribute ให้ CSS เปิดหน้าต่าง", () => {
+  assert.equal(runInitScript({ now: TODAY }), MOURNING_STATE_SHOWN);
+});
+
+test("สคริปต์ก่อน paint: ค่าเริ่มต้นคือแสดงทุกครั้งที่โหลดหน้า (รีเฟรช = เห็นอีก)", () => {
+  // ไม่มีค่าใน storage = รอบนี้ต้องแสดง · ค่าที่ไม่ใช่วันนี้ (เช่นของเก่าที่รูปแบบไม่ตรง) ก็ต้องแสดง
+  assert.equal(runInitScript({ stored: "", now: TODAY }), MOURNING_STATE_SHOWN);
+  assert.equal(runInitScript({ stored: "dismissed", now: TODAY }), MOURNING_STATE_SHOWN);
+});
+
+test("สคริปต์ก่อน paint: ติ๊ก 'ไม่แสดงอีกในวันนี้' → วันเดียวกันไม่เด้ง", () => {
+  assert.equal(
+    runInitScript({ stored: mourningDateStamp(TODAY), now: TODAY }),
+    null,
+    "วันที่เก็บไว้ตรงกับวันนี้ ต้องไม่ติด attribute",
+  );
+});
+
+test("สคริปต์ก่อน paint: ขึ้นวันใหม่แล้วต้องกลับมาแสดงเอง", () => {
+  const yesterday = new Date(2026, 8, 24, 23, 59);
+
+  assert.equal(
+    runInitScript({ stored: mourningDateStamp(yesterday), now: TODAY }),
+    MOURNING_STATE_SHOWN,
+    "ค่าที่เก็บเป็นของเมื่อวาน ต้องไม่ถูกตีความว่าปิดไว้วันนี้",
+  );
+});
+
+test("สคริปต์ก่อน paint: เขียน/อ่านวันแบบเดียวกับ mourningDateStamp (รวมวันที่หลักเดียว)", () => {
+  // 5 ม.ค. 2026 → เดือนและวันต้องเติมศูนย์หน้าให้ตรงกับฟังก์ชันฝั่ง TS
+  const singleDigitDay = new Date(2026, 0, 5, 9, 0);
+  assert.equal(mourningDateStamp(singleDigitDay), "2026-01-05");
+
+  assert.equal(
+    runInitScript({ stored: mourningDateStamp(singleDigitDay), now: singleDigitDay }),
+    null,
+    "สคริปต์กับฟังก์ชัน TS ต้องสร้างสตริงวันที่รูปแบบเดียวกัน",
+  );
+});
+
+test("สคริปต์ก่อน paint: localStorage ถูกบล็อก → ยังต้องแสดง (ไม่ปิดประกาศทิ้ง)", () => {
+  // เทียบกับแถบคุกกี้: ที่นี่ "ไม่แสดง" เสียหายกว่าการเห็นซ้ำ เพราะเป็นประกาศของบริษัท
+  assert.equal(runInitScript({ now: TODAY, storageThrows: true }), MOURNING_STATE_SHOWN);
+});
+
+test("สคริปต์ก่อน paint: อ้างคีย์/attribute เดียวกับที่โค้ดใช้ และมี try/catch", () => {
   assert.ok(MOURNING_INIT_SCRIPT.includes(MOURNING_STORAGE_KEY));
   assert.ok(MOURNING_INIT_SCRIPT.includes(MOURNING_ATTRIBUTE));
   assert.ok(MOURNING_INIT_SCRIPT.includes(MOURNING_STATE_SHOWN));
@@ -106,22 +199,21 @@ test("สคริปต์ก่อน paint: ต้องอ้างคีย
   assert.ok(MOURNING_INIT_SCRIPT.includes("catch"), "ต้องมี catch");
 });
 
-test("สคริปต์ก่อน paint: ผู้ใช้ที่เคยกดปิดแล้วต้องไม่ถูกเปิดหน้าต่างอีก", () => {
-  // ถ้าลบ `if(v)return;` ออก หน้าต่างไว้อาลัยจะเด้งทุกครั้งที่โหลดหน้าใหม่
-  assert.ok(
-    /if\s*\(\s*v\s*\)\s*return;/.test(MOURNING_INIT_SCRIPT),
-    "สคริปต์ต้องออกก่อนติด attribute เมื่อ localStorage มีค่าแล้ว",
-  );
+test("mourningDateStamp: ใช้เวลาท้องถิ่น ไม่ใช่ UTC", () => {
+  // 1 ม.ค. 2026 00:30 เวลาท้องถิ่น → ถ้าใช้ toISOString() จะเพี้ยนเป็นวันที่ก่อนหน้าในบางโซนเวลา
+  const earlyMorning = new Date(2026, 0, 1, 0, 30);
+  assert.equal(mourningDateStamp(earlyMorning), "2026-01-01");
 });
 
-test("isMourningDismissed: รับเฉพาะสตริงที่ไม่ว่าง", () => {
-  assert.equal(isMourningDismissed(MOURNING_STATE_DISMISSED), true);
-  assert.equal(isMourningDismissed("yes"), true);
-  assert.equal(isMourningDismissed(""), false);
-  assert.equal(isMourningDismissed(null), false);
-  assert.equal(isMourningDismissed(undefined), false);
-  assert.equal(isMourningDismissed(0), false);
-  assert.equal(isMourningDismissed(true), false);
+test("isMourningMuted: ต้องเป็นวันเดียวกันเท่านั้นจึงจะปิด", () => {
+  const today = mourningDateStamp(TODAY);
+
+  assert.equal(isMourningMuted(today, today), true);
+  assert.equal(isMourningMuted("2026-09-24", today), false, "ของเมื่อวานต้องไม่ปิดวันนี้");
+  assert.equal(isMourningMuted("", today), false);
+  assert.equal(isMourningMuted(null, today), false);
+  assert.equal(isMourningMuted(undefined, today), false);
+  assert.equal(isMourningMuted(20260925, today), false, "ค่าที่ไม่ใช่สตริงต้องไม่ทำให้พัง");
 });
 
 test("CSS: หน้าต่างต้องถูกซ่อนไว้ก่อน แล้วค่อยเปิดเมื่อสคริปต์ยืนยัน", async () => {
