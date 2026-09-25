@@ -1,34 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# waiwai.com — เว็บองค์กรไทย/อังกฤษ
 
-## Getting Started
+เว็บไซต์องค์กรแบบ static สำหรับแบรนด์ไวไว · Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS 4
+ทุกหน้า prerender เป็น static และรองรับสองภาษา (`/th` และ `/en`)
 
-First, run the development server:
+> A bilingual (Thai/English) corporate website. Every page is statically prerendered.
+
+## เริ่มใช้งาน
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## คำสั่งที่ใช้บ่อย
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| คำสั่ง | ทำอะไร |
+|---|---|
+| `npm run dev` | dev server (พอร์ต 3000) |
+| `npm run build` | production build — ดูรายการ route ที่เป็น static |
+| `npm test` | unit test (`node --test` ผ่าน import hook เล็ก ๆ ไม่ได้เพิ่ม dependency) |
+| `npm run typecheck` | TypeScript (`strict`) |
+| `npm run lint` | ESLint |
+| `npm run check:dark` | ห้ามคลาสสีดิบ/hex นอก `app/globals.css` (กันโหมดมืดพัง) |
+| `npm run check:i18n` | คีย์สองภาษาตรงกัน · ไม่มีข้อความไทยฝังใน `.tsx` · ขนาดพจนานุกรมไม่เกินเพดานรายพื้นที่ |
 
-## Learn More
+## โครงสร้าง
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/[lang]/…            หน้าทั้งหมด (ไทย/อังกฤษ) — หน้าละ 1 โฟลเดอร์
+features/<area>/        ตรรกะ + คอมโพเนนต์แยกตามพื้นที่
+  ├── content.ts / catalog.ts / jobs.ts …  = pure module ที่ unit test ตรวจได้ (ไม่มี JSX)
+  └── ui/                คอมโพเนนต์ของพื้นที่นั้น
+features/shell/ui/      คอมโพเนนต์กลาง (header · footer · breadcrumb · ช่องภาพตัวอย่าง · กล่องแจ้งตัวอย่างรออนุมัติ)
+lib/i18n/messages/      พจนานุกรม — แยกเป็นรายพื้นที่ใน areas/<locale>/
+scripts/                สคริปต์ด่าน (check:*) และ unit test (test-*.ts)
+public/                 ภาพที่ใช้จริง (ใบรับรองมาตรฐาน · คณะผู้บริหาร · ผลิตภัณฑ์ · แผนที่)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy ขึ้น Netlify
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+ตั้งค่าไว้ใน `netlify.toml` แล้ว — build ด้วย `npm run build` บน Node 22
 
-## Deploy on Vercel
+- **ไม่ต้องเพิ่ม `@netlify/plugin-nextjs`** — Netlify ตรวจพบ Next.js และติดตั้ง Next.js Runtime ให้เองตอน build
+- ต้องเป็น runtime รุ่นล่าสุด (v5.10+) จึงรองรับ `proxy.ts` ของ Next 16 (ตัวที่ทำ locale redirect)
+- ตรวจหลัง deploy ครั้งแรก: เปิด `/` แล้วต้องเด้งไป `/th`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## หมายเหตุ
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **ไฟล์ข้อมูลต้นทางของบริษัท และเอกสารภายใน** (บรีฟ · roadmap · กฎการเขียนโค้ด) ถูก `.gitignore` ไว้โดยตั้งใจ
+  repo นี้จึงมีทุกอย่างที่ต้องใช้ build แต่ไม่มีเอกสารต้นทาง — สำเนาภาพที่ใช้จริงอยู่ใน `public/` แล้ว
+- หน้า `/products` · `/recipes` · `/news` เป็น **หน้าตัวอย่าง (mockup)** และฟอร์มในหน้า `/contact` ยังไม่เปิดใช้งาน
+  (ปุ่มส่งถูกปิดไว้ + มีข้อความแจ้งบนหน้า) — ตั้งใจไม่ทำปุ่มที่กดแล้วไม่มีปลายทาง
+- เนื้อหาที่เป็นข้อมูลจริง (บริษัท · ใบรับรอง · คณะผู้บริหาร · รับสมัครงาน · ติดต่อ) แก้ที่
+  `features/*/…` หรือ `lib/i18n/messages/areas/<locale>/…` แล้วรัน `npm test` + `npm run check:i18n`

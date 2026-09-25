@@ -2,11 +2,16 @@
   "name": "waiwai.com",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./scripts/alias-hook.mjs --test \"scripts/test-*.ts\"",
+    "check:dark": "node scripts/check-dark.ts",
+    "check:i18n": "node scripts/check-i18n.ts"
   },
   "dependencies": {
     "next": "16.3.5",

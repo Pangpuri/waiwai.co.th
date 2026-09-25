@@ -1,0 +1,28 @@
+# การตั้งค่า deploy บน Netlify — waiwai.com (เว็บองค์กร ไทย/อังกฤษ)
+#
+# ไม่ต้องเพิ่ม `@netlify/plugin-nextjs` ใน package.json:
+# Netlify ตรวจพบ Next.js เองและติดตั้ง Next.js Runtime ให้ตอน build
+# (runtime นั้นดูแล App Router · proxy.ts (middleware) · การย่อภาพของ next/image)
+# ⚠️ ต้องเป็น runtime รุ่นล่าสุด (v5.10+) จึงรู้จัก `proxy.ts` ของ Next 16
+#    ถ้าต้องการ pin เวอร์ชันเองจึงค่อยเพิ่ม plugin ใน package.json + [[plugins]] ที่นี่
+#
+# ตรวจหลัง deploy ครั้งแรก: เปิด "/" แล้วต้องเด้งไป "/th" (proxy.ts ทำ locale redirect)
+
+[build]
+  command = "npm run build"
+  # ไม่ระบุ publish โดยตั้งใจ — Next.js Runtime เป็นตัวกำหนดเอง
+  # ถ้า build ล้มเหลวเรื่อง publish path ให้เพิ่ม: publish = ".next"
+
+[build.environment]
+  # Next 16 ต้องใช้ Node >= 20.9 — ล็อกให้ตรงกับที่พัฒนา/ทดสอบ (Node 22)
+  NODE_VERSION = "22"
+
+# ความปลอดภัยพื้นฐานของเว็บสาธารณะ
+# เว็บนี้ไม่ใช้กล้อง/ไมโครโฟน และไม่เรียก Geolocation API เลย → ปิดสิทธิ์ไว้ล่วงหน้า
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

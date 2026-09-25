@@ -33,9 +33,35 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local tooling / agent settings — มี API key อยู่ข้างใน ห้าม commit
+# (ใส่ทั้งแบบมีและไม่มี slash เผื่อวันหนึ่งมันกลายเป็นไฟล์/symlink ที่ git มองไม่เป็นโฟลเดอร์)
+.deepcode/
+.deepcode
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ข้อมูลต้นทางจากบริษัท — ใช้ทำเว็บเท่านั้น ห้าม commit / ห้ามเผยแพร่
+# (สำเนาที่ใช้จริงถูกคัดลอกเข้า public/ แล้ว จึง build ได้โดยไม่ต้องมีโฟลเดอร์เหล่านี้)
+# ─────────────────────────────────────────────────────────────────────────────
+/cer/
+/provider/
+/products/
+/contact/
+/company.txt
+/Work with Wai Wai.txt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# เอกสารภายใน (บรีฟ / roadmap / กฎ) — เก็บไว้ในเครื่อง ไม่ขึ้น repo
+# ⚠️ _CODINGRULES.md_Next.js.md มีข้อมูลของโปรเจกต์อื่น (asset-lending SaaS) ปนอยู่
+# ─────────────────────────────────────────────────────────────────────────────
+/AGENTS.md
+/CLAUDE.md
+/PRODUCT_ROADMAP.md
+/CODING_RULES.en.md
+/_CODINGRULES.md_Next.js.md
