@@ -31,10 +31,11 @@ export function Hero({ locale, messages }: HeroProps) {
   return (
     /*
       ความสูงของแถบ hero — ยิ่งสูง ยิ่งเห็นภาพสไลด์มาก (ภาพถูกครอปน้อยลง)
-      ปรับได้ที่ min-h-* สามจุดนี้ · ตอนนี้: จอเล็ก 34rem (544px) · lg 44rem (704px) · 2xl 50rem (800px)
-      จอที่กว้างกว่า 800px จะเริ่มครอปด้านบน-ล่างอีกครั้ง (ภาพตัวอย่างชุดนี้เป็น 16:9)
+      ปรับได้ที่ min-h-* สามจุดนี้ · ตอนนี้: จอเล็ก 34rem (544px) · lg 44rem (704px) · 2xl 45rem (720px)
+      (2xl ผู้ใช้ลดจาก 50rem → 45rem เองในรอบที่ 21)
+      จอที่กว้างกว่า ~720px ในแนวตั้งจะเริ่มครอปด้านบน-ล่าง (ภาพตัวอย่างชุดนี้เป็น 16:9)
     */
-    <section className="relative isolate flex min-h-[34rem] items-center overflow-hidden bg-overlay text-on-brand lg:min-h-[44rem] 2xl:min-h-[50rem]">
+    <section className="relative isolate flex min-h-[34rem] items-center overflow-hidden bg-overlay text-on-brand lg:min-h-[44rem] 2xl:min-h-[45rem]">
       <HeroSlider
         slides={slides}
         labels={{
@@ -53,9 +54,11 @@ export function Hero({ locale, messages }: HeroProps) {
             {m.eyebrow}
           </p>
 
-          <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-on-brand sm:text-5xl lg:text-[3.75rem]">
+          <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
             {m.title}{" "}
-            {/* เหลืองคือสีที่แบรนด์ใช้อยู่แล้ว และตัดกับภาพได้ชัดกว่าตัวอักษรขาวล้วน */}
+            {/* แดงแบรนด์ (--brand-red คงที่ทั้งสองโหมด) + เหลืองแบรนด์ = คู่สีเดียวกับโลโก้
+                ⚠️ บนภาพที่พื้นสว่างจัด (เช่นป้ายพื้นเหลือง) แดงนี้คอนทราสต์ต่ำ — ถ้าอ่านยาก
+                เปลี่ยน token เป็น text-accent-on-yellow (แดงเข้มที่ globals.css เลือกไว้สำหรับพื้นเหลือง) */}
             <span className="text-brand-yellow">{m.titleAccent}</span>
           </h1>
 
