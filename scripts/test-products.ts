@@ -107,6 +107,46 @@ test("productsPage: ข้อความ 'ตัวอย่างรออน�
   }
 });
 
+test("productsPage: ชื่อหมวดต้องไม่มีอักขระหลุดหัวท้าย (กัน ':' หลุดเข้าไปในชื่อ)", () => {
+  for (const item of CATALOG_ITEMS) {
+    for (const [locale, messages] of [
+      ["th", th],
+      ["en", en],
+    ] as const) {
+      const { name } = messages.productsPage.items[item.id];
+      assert.equal(name, name.trim(), `${locale}/${item.id}: name มีช่องว่างหัวท้าย`);
+      assert.ok(
+        !/^[\s:;,.·\-–—]/.test(name),
+        `${locale}/${item.id}: name มีเครื่องหมายนำหน้าโดยไม่ตั้งใจ`,
+      );
+    }
+  }
+});
+
+test("productsPage: ต้องไม่เหลือชื่อแบรนด์เดิม (ชื่อยืนยันแล้ว vs ภาพที่ดูคล้าย)", () => {
+  // บทเรียนรอบที่ 22 — โลโก้ในภาพเขียนคล้ายชื่อเดิมมาก และผลอ่านภาพเพี้ยนได้
+  // ชื่อจริงคือ SERDA / Noodie (เจ้าของยืนยันแล้ว) → กันการ "แก้กลับ" ตามภาพโดยไม่ตั้งใจ
+  const legacyNames = ["VIRODA", "วีรอดะ", "Noodle", "นูดเดิ้ล"];
+
+  for (const [locale, messages] of [
+    ["th", th],
+    ["en", en],
+  ] as const) {
+    const names = CATALOG_ITEMS.map((item) => messages.productsPage.items[item.id].name);
+    for (const legacy of legacyNames) {
+      assert.ok(
+        !names.some((name) => name.includes(legacy)),
+        `${locale}: ยังมีชื่อแบรนด์เดิม "${legacy}" หลงเหลือ`,
+      );
+    }
+  }
+
+  assert.ok(th.productsPage.items.serda.name.includes("SERDA"), "th: serda ต้องสะกด SERDA");
+  assert.ok(en.productsPage.items.serda.name.includes("Serda"), "en: serda ต้องสะกด Serda");
+  assert.ok(th.productsPage.items.noodie.name.includes("Noodie"), "th: noodie ต้องสะกด Noodie");
+  assert.ok(en.productsPage.items.noodie.name.includes("Noodie"), "en: noodie ต้องสะกด Noodie");
+});
+
 test("findCatalogItem / catalogSlugs: หา slug ได้ถูก และไม่รู้จักต้องคืน undefined", () => {
   assert.deepEqual(catalogSlugs(), CATALOG_ITEMS.map((item) => item.slug));
 

@@ -39,9 +39,9 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     image: { src: "/products/dried-vermicelli.png", width: 300, height: 189 },
   },
   {
-    id: "viroda",
-    slug: "viroda",
-    image: { src: "/products/viroda.png", width: 300, height: 257 },
+    id: "serda",
+    slug: "serda",
+    image: { src: "/products/serda.png", width: 300, height: 257 },
   },
   {
     id: "quickZabb",
@@ -49,9 +49,9 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     image: { src: "/products/quick-zabb.png", width: 300, height: 157 },
   },
   {
-    id: "noodle",
-    slug: "noodle",
-    image: { src: "/products/noodle.png", width: 300, height: 196 },
+    id: "noodie",
+    slug: "noodie",
+    image: { src: "/products/noodie.png", width: 300, height: 196 },
   },
   {
     id: "rodDed",

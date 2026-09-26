@@ -33,18 +33,18 @@ export const productsPage = {
         name: "Dried rice vermicelli",
         imageAlt: "Wai Wai dried rice vermicelli category logo",
       },
-      viroda: {
-        name: "Viroda",
+      serda: {
+        name: "Serda",
         imageAlt:
-          "Viroda brand logo with the Thai slogan meaning delicious in every flavour, and a halal mark",
+          "Serda brand logo with the Thai slogan meaning delicious in every flavour, and a halal mark",
       },
       quickZabb: {
         name: "Quick Zabb",
         imageAlt: "Quick Zabb brand logo with the Thai slogan meaning spicy right into the strands",
       },
-      noodle: {
-        name: "Noodle",
-        imageAlt: "Noodle brand logo marked as a registered trademark",
+      noodie: {
+        name: "Noodie",
+        imageAlt: "Noodie brand logo marked as a registered trademark",
       },
       rodDed: {
         name: "Wai Wai Rod Ded (seasoning powder)",
