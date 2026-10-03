@@ -9,7 +9,7 @@ import { CERTIFICATIONS } from "@/features/about/certifications";
  * เทมเพลตตั้งต้นของหน้า "ใบรับรองมาตรฐาน" (/about/certifications) — S2 รอบที่ 83
  *
  * ที่มา: ใบรับรองจริง (`CERTIFICATIONS` — ไฟล์ภาพใน public/certifications) + ชื่อ/ผู้ออกใบรับรองจากพจนานุกรม
- * ⚠️ เวอร์ชันบล็อกแสดงเป็นการ์ดที่มีภาพ แต่ **ไม่มีตัวขยายดูภาพเต็มจอ (lightbox)** ของเลย์เอาต์เดิม
+ * รอบที่ 87: ใช้บล็อก `gallery` ⇒ ได้ **ตัวขยายดูภาพเต็มจอ (lightbox)** เหมือนเลย์เอาต์เดิม ⇒ ปิดช่อง gallery/lightbox ของหน้านี้
  */
 export function buildCertificationsTemplate(): BlockDocument {
   const blocks: Block[] = [
@@ -28,19 +28,17 @@ export function buildCertificationsTemplate(): BlockDocument {
     {
       id: templateBlockId(1),
       version: TEMPLATE_BLOCK_VERSION,
-      type: "cards",
+      type: "gallery",
       style: templateStyle({ background: "cream" }),
       heading: { th: th.about.certifications.eyebrow, en: en.about.certifications.eyebrow },
-      body: { th: "", en: "" },
       columns: 3,
       items: CERTIFICATIONS.map((certificate) => {
         const item = th.about.certifications.items[certificate.id];
         const itemEn = en.about.certifications.items[certificate.id];
         return {
-          title: { th: item.title, en: itemEn.title },
-          body: { th: item.issuer, en: itemEn.issuer },
-          href: certificate.image.src,
+          id: `cert-${certificate.id}`,
           image: templateMedia(certificate.image.src, item.title, itemEn.title),
+          caption: { th: `${item.title} · ${item.issuer}`, en: `${itemEn.title} · ${itemEn.issuer}` },
         };
       }),
     },

@@ -85,10 +85,10 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
     หน้าที่เนื้อหาส่วนหนึ่ง "ไม่ใช่บล็อก" ต้องถูกประกาศว่าขาด เพื่อให้หน้าจอเตือนก่อนเปิดสวิตช์
     (เปิดแล้วส่วนนั้นหายจากหน้าเว็บจริง) — ถ้าวันหนึ่งทำเป็นบล็อกได้ ค่อยถอดออกจากรายการนี้
   */
-  assert.ok(blockCoverageGaps("contact").includes("form"), "หน้าติดต่อมีฟอร์มที่ยังไม่ใช่บล็อก");
-  assert.ok(blockCoverageGaps("contact").includes("map"), "หน้าติดต่อมีแผนที่ที่ยังไม่ใช่บล็อก");
-  assert.ok(blockCoverageGaps("careers").includes("jobBoard"), "หน้าร่วมงานมีตารางตำแหน่งงาน");
-  assert.ok(blockCoverageGaps("certifications").includes("lightbox"), "หน้าใบรับรองมีตัวขยายภาพ");
+  assert.deepEqual([...blockCoverageGaps("contact")], [], "รอบที่ 87: ฟอร์ม + แผนที่เป็นบล็อกแล้ว ⇒ หน้าติดต่อครอบคลุมครบ");
+  assert.ok(blockCoverageGaps("careers").includes("jobBoard"), "หน้าร่วมงานมีตารางตำแหน่งงาน (ยังไม่เป็นบล็อก)");
+  assert.ok(!blockCoverageGaps("careers").includes("form"), "รอบที่ 87: ใบสมัครงานเป็นบล็อกแล้ว");
+  assert.deepEqual([...blockCoverageGaps("certifications")], [], "รอบที่ 87: gallery มี lightbox ในตัว ⇒ ครอบคลุมครบ");
   assert.ok(blockCoverageGaps("executives").includes("rosterText"), "ชื่อผู้บริหารยังอยู่ในภาพ");
   assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
   assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
@@ -112,6 +112,36 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
   assert.ok(!adminTh.includes("coverageGallery:"), "คีย์ของเทมเพลตต้องอยู่พื้นที่ย่อย ไม่ใช่ admin หลัก");
   assert.ok(page.includes("blockCoverageGaps(page)"), "หน้าจอต้องอ่านส่วนที่ขาดจากทะเบียนกลาง");
   assert.ok(!page.includes("switch (part) {\n    default"), "ห้ามใช้ default (ต้อง exhaustive)");
+});
+
+test("templates: หน้าที่ปิดช่อง coverage ต้องมีบล็อกชนิดนั้นจริง (คำเตือนต้องไม่โกหก)", () => {
+  const typesOf = (page: string): readonly string[] => {
+    const template = buildBlockTemplate(page);
+    assert.ok(template !== null, `${page}: ต้องมีเทมเพลต`);
+    if (template === null) return [];
+    return template.blocks.map((block) => block.type);
+  };
+
+  assert.ok(typesOf("contact").includes("form"), "contact: ต้องมีบล็อกฟอร์มติดต่อจริง");
+  assert.ok(typesOf("contact").includes("map"), "contact: ต้องมีบล็อกแผนที่ (ภาพ)");
+  assert.ok(typesOf("careers").includes("form"), "careers: ต้องมีบล็อกฟอร์มสมัครงาน");
+  assert.ok(typesOf("certifications").includes("gallery"), "certifications: ต้องมีบล็อกแกลเลอรี (มี lightbox)");
+
+  /* ชนิดฟอร์มต้องตรงกับหน้าของเทมเพลต (กันต่อฟอร์มผิดหน้า) */
+  const formKindOf = (page: string): string => {
+    const template = buildBlockTemplate(page);
+    assert.ok(template !== null, `${page}: ต้องมีเทมเพลต`);
+    const block = template?.blocks.find((entry) => entry.type === "form");
+    assert.ok(block !== undefined && block.type === "form", `${page}: ต้องมีบล็อกฟอร์ม`);
+    return block.kind;
+  };
+  assert.equal(formKindOf("contact"), "contact");
+  assert.equal(formKindOf("careers"), "careers");
+
+  /* หน้าที่ปิดช่องแล้ว = ต้องไม่มีรายการขาดเหลือ */
+  for (const page of ["contact", "certifications"]) {
+    assert.deepEqual([...blockCoverageGaps(page)], [], `${page}: ปิดช่องครบแล้ว`);
+  }
 });
 
 test("templates: คำเตือนเรื่องส่วนที่ขาดต้องแสดงทั้งตอนว่างและข้างสวิตช์ (คอมโพเนนต์กลางตัวเดียว)", () => {

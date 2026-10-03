@@ -1,15 +1,18 @@
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
-import { TEMPLATE_BLOCK_VERSION, templateBlockId, templateStyle, templateValueCards } from "@/lib/blocks/template-kit";
+import { TEMPLATE_BLOCK_VERSION, templateBlockId, templateMedia, templateStyle, templateValueCards } from "@/lib/blocks/template-kit";
 import type { Block, BlockDocument } from "@/lib/blocks/types";
+
+import { MAP_IMAGE } from "@/features/contact/content";
 
 /**
  * เทมเพลตตั้งต้นของหน้า "ติดต่อเรา" (/contact) — S2
  *
  * ที่มา: ข้อความชุดเดียวกับหน้าที่ใช้งานอยู่ (พจนานุกรม TH/EN) — ที่อยู่จริงจากพจนานุกรม (ไม่แต่งขึ้นเอง)
  *
- * ⚠️ **แบบฟอร์มติดต่อไม่ใช่บล็อก** — ฟอร์มเป็นคอมโพเนนต์ที่ผูกกับ Server Action/ความยินยอม PDPA
- *    ⇒ เทมเพลตนี้ให้ "ทางติดต่อ + ที่ตั้งโรงงาน" ส่วนฟอร์มยังใช้หน้าจอเดิม (และเข้าถึงได้เสมอเมื่อปิดสวิตช์เวอร์ชันบล็อก)
+ * รอบที่ 87: ใช้ **ชนิดบล็อกใหม่** ⇒ ปิดช่อง "ส่วนที่ไม่ครอบคลุม" ของหน้านี้ครบ
+ * - `form` (kind = contact) = ฟอร์มติดต่อจริง (Server Action + ยินยอม PDPA เดิมทั้งชุด)
+ * - `map` = ภาพแผนที่ที่บริษัททำเอง + คำบรรยาย (ไม่ฝัง iframe/พิกัด — ยังไม่มีลิงก์แผนที่ออนไลน์ที่ยืนยันแล้ว)
  */
 export function buildContactTemplate(): BlockDocument {
   const contact = th.contactPage;
@@ -50,13 +53,22 @@ export function buildContactTemplate(): BlockDocument {
     {
       id: templateBlockId(2),
       version: TEMPLATE_BLOCK_VERSION,
-      type: "cta",
-      style: templateStyle(),
+      type: "form",
+      style: templateStyle({ background: "subtle" }),
+      kind: "contact",
       heading: { th: contact.formTitle, en: contactEn.formTitle },
       body: { th: contact.formIntro, en: contactEn.formIntro },
-      label: { th: contact.submit, en: contactEn.submit },
-      href: "/contact",
-      tone: "brand",
+    },
+    {
+      id: templateBlockId(3),
+      version: TEMPLATE_BLOCK_VERSION,
+      type: "map",
+      style: templateStyle(),
+      heading: { th: contact.mapTitle, en: contactEn.mapTitle },
+      caption: { th: contact.mapCaption, en: contactEn.mapCaption },
+      image: templateMedia(MAP_IMAGE.src, contact.mapAlt, contactEn.mapAlt),
+      linkHref: "",
+      linkLabel: { th: "", en: "" },
     },
   ];
 

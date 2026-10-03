@@ -8,9 +8,10 @@ import type { Block, BlockDocument } from "@/lib/blocks/types";
  *
  * ที่มา: ข้อความชุดเดียวกับหน้าที่ใช้งานอยู่ (พจนานุกรม TH/EN)
  *
- * ⚠️ **ตารางตำแหน่งงานไม่ใช่บล็อก** — ข้อมูลตำแหน่ง (ฝ่าย/คุณสมบัติ/อัตรา) มาจาก `lib/careers/*`
- *    ⇒ เทมเพลตนี้เป็น "ส่วนหัว + ฝ่ายที่เปิดรับ + ช่องทางสมัคร" ส่วนตารางงานยังต้องใช้หน้าจอเดิม
- *    (ถ้าต้องการตารางในหน้าเวอร์ชันบล็อก ต้องย้ายข้อมูลตำแหน่งมาเป็นบล็อกก่อน — ยังไม่ทำในรอบนี้)
+ * ⚠️ **ตารางตำแหน่งงานยังไม่เป็นบล็อก** — ข้อมูลตำแหน่ง (ฝ่าย/คุณสมบัติ/อัตรา) มาจาก `features/careers/*`
+ *    ⇒ เทมเพลตนี้เป็น "ส่วนหัว + ฝ่ายที่เปิดรับ + ฟอร์มสมัครงานจริง" ส่วนตารางงานยังต้องใช้หน้าจอเดิม
+ *
+ * รอบที่ 87: เพิ่มบล็อก `form` (kind = careers) = ใบสมัครงานจริง ⇒ ปิดช่อง "form" ของหน้านี้
  */
 export function buildCareersTemplate(): BlockDocument {
   const careers = th.careersPage;
@@ -52,13 +53,11 @@ export function buildCareersTemplate(): BlockDocument {
     {
       id: templateBlockId(3),
       version: TEMPLATE_BLOCK_VERSION,
-      type: "cta",
+      type: "form",
       style: templateStyle(),
-      heading: { th: th.contactPage.formTitle, en: en.contactPage.formTitle },
-      body: { th: th.contactPage.formIntro, en: en.contactPage.formIntro },
-      label: { th: th.nav.contact, en: en.nav.contact },
-      href: "/contact",
-      tone: "brand",
+      kind: "careers",
+      heading: { th: careers.applyFormTitle, en: careersEn.applyFormTitle },
+      body: { th: careers.applyFormIntro, en: careersEn.applyFormIntro },
     },
   ];
 

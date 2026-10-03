@@ -70,13 +70,19 @@ export type BlockCoveragePartId = (typeof BLOCK_COVERAGE_PART_IDS)[number];
 
 const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartId[]>> = {
   home: [],
+  /* หน้าข้อความล้วน — ไม่มีแกลเลอรีในเลย์เอาต์เดิม (เผื่อไว้ถ้าเจ้าของเพิ่มภาพชุดภายหลัง) */
   about: ["gallery"],
-  careers: ["jobBoard", "form"],
-  contact: ["form", "map"],
+  /* ตารางตำแหน่งงานยังไม่เป็นบล็อก (ข้อมูลตำแหน่งมาจาก `features/careers`) */
+  careers: ["jobBoard"],
+  /* รอบที่ 87: ฟอร์มติดต่อ + แผนที่ (ภาพ) เป็นบล็อกแล้ว ⇒ ครอบคลุมครบ */
+  contact: [],
+  /* หน้านี้แสดงเป็นกริดการ์ดสินค้าอยู่แล้ว (`cards`) — ไม่มีแกลเลอรี/lightbox แยก */
   products: ["gallery"],
   recipes: ["sampleData"],
   news: ["sampleData"],
-  certifications: ["gallery", "lightbox"],
+  /* รอบที่ 87: ใช้บล็อก `gallery` (มี lightbox ในตัว) แทนการ์ด ⇒ ครอบคลุม gallery + lightbox */
+  certifications: [],
+  /* ชื่อ/ตำแหน่งผู้บริหารยังอยู่ในตัวภาพ (รอรายชื่อที่ยืนยัน) + ไม่มีแกลเลอรีจริง */
   executives: ["rosterText", "gallery"],
 };
 
