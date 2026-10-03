@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageFileInput } from "@/features/admin/ui/image-file-input";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -71,6 +72,7 @@ type Strings = {
   readonly mediaDeleteBlocked: string;
   readonly mediaDeleted: string;
   readonly mediaUsage: string;
+  readonly imageShrinkNote: string;
 };
 
 /** อัปโหลดภาพใหม่จากหน้าคลังภาพ */
@@ -79,10 +81,11 @@ export function MediaUpload({ strings }: { readonly strings: Strings }) {
 
   return (
     <form action={action} className="border-line flex flex-wrap items-end gap-2 rounded-2xl border p-3">
-      <label className="flex min-w-48 flex-1 flex-col gap-1">
-        <span className="text-fg-muted text-xs">{strings.mediaUploadTitle}</span>
-        <input type="file" name="file" accept="image/*" className={FIELD_CLASS} />
-      </label>
+      <ImageFileInput
+        className={FIELD_CLASS}
+        label={strings.mediaUploadTitle}
+        hint={strings.imageShrinkNote}
+      />
       <Submit label={strings.mediaUploadAction} />
       <StatusLine state={state} strings={strings} />
     </form>
@@ -106,10 +109,7 @@ export function MediaItemActions({
     <div className="flex flex-col gap-2">
       <form action={replaceAction} className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="id" value={id} />
-        <label className="flex min-w-40 flex-1 flex-col gap-1">
-          <span className="text-fg-muted text-[11px]">{strings.mediaReplace}</span>
-          <input type="file" name="file" accept="image/*" className={FIELD_CLASS} />
-        </label>
+        <ImageFileInput className={FIELD_CLASS} label={strings.mediaReplace} hint={strings.imageShrinkNote} />
         <Submit label={strings.mediaReplaceAction} />
         <StatusLine state={replaceState} strings={strings} />
       </form>

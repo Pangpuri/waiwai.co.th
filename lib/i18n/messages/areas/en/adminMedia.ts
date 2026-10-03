@@ -35,6 +35,9 @@ export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaNoResults: "No images found",
   mediaDimensions: "Size",
   /* Pick from the library inside the content editor (round 93) */
+  /* Automatic shrink before upload (round 99) */
+  imageShrunkHint: "Shrunk automatically:",
+  imageShrinkNote: "Large images are downscaled and converted to WebP in the browser before upload (max 2400px) — files with JavaScript disabled are sent unchanged.",
   mediaPickFromLibrary: "Pick from library",
   mediaPickHint: "Click an image to use it here (alt text comes from the library and can be edited)",
 };

@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+
+import { shrinkImageFile, shrinkSummary } from "@/features/admin/ui/image-resize";
 import { useFormStatus } from "react-dom";
 
 import { uploadImageAction } from "@/app/admin/media/actions";
@@ -92,6 +94,8 @@ export function ImageDrop({
   const [dragging, setDragging] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [localError, setLocalError] = useState<UploadFailure | null>(null);
+  /* สรุปการย่อภาพอัตโนมัติ (รอบที่ 99) — ตัวเลข KB → KB ล้วน */
+  const [shrinkNote, setShrinkNote] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const appliedPath = useRef<string | null>(null);
@@ -105,8 +109,13 @@ export function ImageDrop({
     onChange({ path: state.path, altTh: base.replace(/\.[a-z0-9]+$/i, ""), altEn: "" });
   }, [state.status, state.path, state.filename, onChange]);
 
-  /** ใส่ไฟล์ที่ลากมา ลงใน input จริง แล้วส่งฟอร์ม (เส้นทางเดียวกับการกดปุ่ม) */
-  function submitFile(file: File | undefined | null) {
+  /**
+   * ใส่ไฟล์ที่ลากมา/เลือก ลงใน input จริง แล้วส่งฟอร์ม (เส้นทางเดียวกับการกดปุ่ม)
+   *
+   * ⚠️ รอบที่ 99: **ย่อ/แปลงเป็น WebP ก่อนส่ง** (ทำในเบราว์เซอร์ ไม่เพิ่ม dependency)
+   *    ถ้าย่อไม่สำเร็จ/ไฟล์ไม่เล็กลง = ใช้ไฟล์เดิม · เบราว์เซอร์เก่าที่ไม่มี `DataTransfer` = ส่งไฟล์เดิม (ไม่พัง)
+   */
+  async function submitFile(file: File | undefined | null): Promise<void> {
     if (file === undefined || file === null) {
       setLocalError("no-file");
       return;
@@ -116,9 +125,17 @@ export function ImageDrop({
     const form = formRef.current;
     if (input === null || form === null) return;
 
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    input.files = transfer.files;
+    setShrinkNote(null);
+    const outcome = await shrinkImageFile(file);
+    setShrinkNote(shrinkSummary(outcome));
+
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(outcome.file);
+      input.files = transfer.files;
+    } catch {
+      /* เบราว์เซอร์เก่า: ส่งไฟล์ที่ผู้ใช้เลือกไว้ใน input ตามเดิม */
+    }
     form.requestSubmit();
   }
 
@@ -211,7 +228,7 @@ export function ImageDrop({
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.item(0) ?? null;
-            if (file !== null) submitFile(file);
+            if (file !== null) void submitFile(file);
           }}
         />
 
@@ -260,6 +277,13 @@ export function ImageDrop({
       )}
 
       {reason !== null ? <p className="text-fg text-xs font-semibold">{failureMessage(strings, reason)}</p> : null}
+
+      {/* บอกผลการย่ออัตโนมัติ (ตัวเลข KB → KB ล้วน — ไม่ต้องใช้พจนานุกรม) */}
+      {shrinkNote === null ? null : (
+        <p className="text-fg-muted text-[11px]">
+          {strings.imageShrunkHint} {shrinkNote}
+        </p>
+      )}
 
       {current.path !== "" ? (
         <div className="grid gap-2">

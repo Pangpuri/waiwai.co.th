@@ -71,6 +71,7 @@ export default async function AdminMediaPage({
     mediaDeleteBlocked: strings.mediaDeleteBlocked,
     mediaDeleted: strings.mediaDeleted,
     mediaUsage: strings.mediaUsage,
+    imageShrinkNote: strings.imageShrinkNote,
   };
 
   return (
