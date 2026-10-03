@@ -43,6 +43,26 @@ function withDatabase(url: string, databaseName: string): string {
   return parsed.toString();
 }
 
+/**
+ * คำอธิบายจุดเชื่อมต่อ (ไม่มีรหัสผ่าน) — ใช้ในข้อความ error ให้รู้ทันทีว่า "ตรวจที่ไหน"
+ *
+ * ทำไมต้องมี (บทเรียนรอบที่ 83): CI ตกที่ด่านนี้ในสภาพที่รันในเครื่องไม่ตก ⇒ ต้องมีข้อมูลพอ
+ * ที่จะรู้ว่าปัญหาอยู่ที่เครื่องรัน (บริการฐานข้อมูล/สิทธิ์) ไม่ใช่ที่ migration เอง
+ */
+function describeTarget(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}:${parsed.port || "5432"}${parsed.pathname}`;
+  } catch {
+    return "(อ่าน DATABASE_URL ไม่ได้)";
+  }
+}
+
+/** หน่วงเวลาสั้น ๆ (ใช้ตอนลองสร้างฐานข้อมูลชั่วคราวซ้ำ) */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function shapesOf(pool: pg.Pool): Promise<readonly TableShape[]> {
   const { rows } = await pool.query<{ table_name: string; columns: string }>(
     `select table_name, (select count(*)::text from information_schema.columns c
@@ -97,8 +117,31 @@ async function main(): Promise<void> {
   try {
     console.log(`ตรวจ migration ${migrations.length} ไฟล์ กับฐานข้อมูลใหม่ "${CHECK_DB}"`);
 
-    await admin.query(`drop database if exists ${CHECK_DB}`);
-    await admin.query(`create database ${CHECK_DB}`);
+    /*
+      สร้างฐานข้อมูลชั่วคราว (ขั้น "เตรียมสภาพแวดล้อม" ไม่ใช่ตัวสมบัติที่กำลังตรวจ)
+      ⚠️ `drop database ... with (force)` อาจชนกับการเชื่อมต่อที่เพิ่งปิดไป ⇒ ลองซ้ำหนึ่งครั้ง
+      ถ้ายังไม่ผ่าน ให้ error บอกชัดว่าเชื่อมฐานข้อมูลผู้ดูแล (postgres) ที่ไหนได้/ไม่ได้
+    */
+    try {
+      await admin.query(`drop database if exists ${CHECK_DB} with (force)`);
+      await admin.query(`create database ${CHECK_DB}`);
+    } catch (firstError) {
+      console.warn(
+        `  (สร้างฐานข้อมูลชั่วคราวไม่ผ่านครั้งแรก — ลองใหม่ · เป้าหมาย ${describeTarget(url)} · ` +
+          `${firstError instanceof Error ? firstError.message : String(firstError)})`,
+      );
+      await delay(500);
+      try {
+        await admin.query(`drop database if exists ${CHECK_DB} with (force)`);
+        await admin.query(`create database ${CHECK_DB}`);
+      } catch (secondError) {
+        throw new Error(
+          `สร้างฐานข้อมูลชั่วคราว "${CHECK_DB}" ไม่ได้ (ต้องมีสิทธิ์ CREATEDB) · ` +
+            `เชื่อมฐานข้อมูลผู้ดูแล "postgres" ที่ ${describeTarget(url)} · ` +
+            `${secondError instanceof Error ? secondError.message : String(secondError)}`,
+        );
+      }
+    }
 
     for (const migration of migrations) {
       await target.query(migration.sql);

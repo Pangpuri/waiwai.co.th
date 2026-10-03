@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import {
@@ -12,6 +14,8 @@ import {
 } from "@/lib/db/migrations";
 
 /** เทสต์ระบบ migration (รอบที่ 60) — ตรรกะล้วน ไม่ต้องมีฐานข้อมูล */
+
+const ROOT = join(import.meta.dirname, "..");
 
 const file = (id: string, name: string, sql: string): MigrationFile => ({ id, name, sql });
 
@@ -121,4 +125,18 @@ test("ไฟล์ migration จริงในโปรเจกต์: ชื�
       entry.sql.includes("if not exists") || entry.sql.includes("add column if not exists") || entry.sql.includes("create or replace");
     assert.ok(usesGuard, `${entry.id}-${entry.name} ต้องมี if not exists / add column if not exists`);
   }
+});
+
+test("check:migrations — ข้อความวินิจฉัยต้องบอกจุดเชื่อมต่อและลองซ้ำได้ (บทเรียน CI รอบที่ 83)", () => {
+  const source = readFileSync(join(ROOT, "scripts", "check-migrations.ts"), "utf8");
+
+  /* ตรวจที่ไหน ต้องรู้ได้จาก log (และห้ามมีรหัสผ่านโผล่) */
+  assert.ok(source.includes("function describeTarget"), "ต้องมีตัวอธิบายจุดเชื่อมต่อ");
+  assert.ok(source.includes('parsed.hostname}:${parsed.port || "5432"}'), "ต้องบอก host/port");
+  assert.ok(!source.includes("parsed.password"), "ห้ามเอารหัสผ่านมาแสดง");
+
+  /* ขั้น "สร้างฐานข้อมูลชั่วคราว" ต้องลองซ้ำได้ (เป็น environment setup ไม่ใช่สมบัติที่ตรวจ) */
+  assert.ok(source.includes("with (force)`);\n      await admin.query(`create database"), "ต้อง drop แบบ force ก่อนสร้าง");
+  assert.ok(source.includes("await delay(500)"), "ต้องหน่วงก่อนลองซ้ำ");
+  assert.ok(source.includes("ต้องมีสิทธิ์ CREATEDB"), "ข้อความ error ต้องบอกสิ่งที่ต้องมี");
 });
