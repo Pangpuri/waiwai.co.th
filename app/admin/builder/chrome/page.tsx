@@ -11,7 +11,10 @@ import {
 import { FooterEditor } from "@/features/admin/ui/footer-editor";
 import { MourningEditor } from "@/features/admin/ui/mourning-editor";
 import { NavbarEditor } from "@/features/admin/ui/navbar-editor";
+import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
+import { listMedia } from "@/lib/media/repository";
 import { loadDocumentRow, listRevisions } from "@/lib/blocks/repository";
 import {
   MAX_CHROME_PRESETS_PER_KIND,
@@ -44,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ChromePage() {
-  await requireAdminUser("presets");
+  const user = await requireAdminUser("presets");
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
@@ -194,12 +197,26 @@ export default async function ChromePage() {
     chromePresetImportTooMany: strings.chromePresetImportTooMany,
   };
 
+  /*
+    คลังภาพสำหรับช่องภาพของ "ส่วนกลาง" (รอบที่ 98) — ต่อ context เดียวกับตัวสร้างหน้าเว็บ
+    ⚠️ ส่งให้เฉพาะผู้มีสิทธิ์ media — คนอื่นยังอัปโหลด/วางพาธเองได้เหมือนเดิม
+  */
+  const imageLibrary: readonly ImageLibraryItem[] = can(user.role, "media")
+    ? (await listMedia(48)).map((item) => ({
+        id: item.id,
+        filename: item.filename,
+        altTh: item.altTh,
+        altEn: item.altEn,
+      }))
+    : [];
+
   return (
-    <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-fg text-lg font-semibold">{strings.chromeTitle}</h1>
-        <p className="text-fg-muted text-xs">{strings.chromeIntro}</p>
-      </header>
+    <ImageLibraryProvider items={imageLibrary}>
+      <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-6">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-fg text-lg font-semibold">{strings.chromeTitle}</h1>
+          <p className="text-fg-muted text-xs">{strings.chromeIntro}</p>
+        </header>
 
       {/* ส่งออก/นำเข้าคลังชุดทั้งก้อน (รอบที่ 91) — แสดงครั้งเดียว ไม่ใช่ต่อส่วน */}
       <ChromePresetIoPanel strings={presetStrings} maxImport={MAX_CHROME_PRESET_IMPORT} />
@@ -333,6 +350,7 @@ export default async function ChromePage() {
           </section>
         </div>
       </section>
-    </main>
+      </main>
+    </ImageLibraryProvider>
   );
 }

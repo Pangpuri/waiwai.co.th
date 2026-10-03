@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import {
   BLOCK_COVERAGE_PART_IDS,
@@ -89,7 +90,20 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
   assert.deepEqual([...blockCoverageGaps("contact")], [], "รอบที่ 87: ฟอร์ม + แผนที่เป็นบล็อกแล้ว ⇒ หน้าติดต่อครอบคลุมครบ");
   assert.deepEqual([...blockCoverageGaps("careers")], [], "รอบที่ 88: กระดานงาน + ฟอร์มเป็นบล็อกแล้ว ⇒ หน้าสมัครงานครอบคลุมครบ");
   assert.deepEqual([...blockCoverageGaps("certifications")], [], "รอบที่ 87: gallery มี lightbox ในตัว ⇒ ครอบคลุมครบ");
-  assert.ok(blockCoverageGaps("executives").includes("rosterText"), "ชื่อผู้บริหารยังอยู่ในภาพ");
+  /*
+    executives: **ไม่มีช่องว่างแล้ว** — เจ้าของยืนยัน (2026-10-03) ว่าภาพผัง `public/executives/management-team.jpg`
+    คือแหล่งข้อมูลที่ถูกต้อง (ชื่อ/ตำแหน่ง/ข้อความอยู่ในตัวภาพ) ⇒ ไม่ต้องมีบล็อก `rosterText`
+    ⚠️ และ **ห้ามถอดชื่อจากภาพมาใส่เป็นข้อความเอง** (บทเรียนรอบที่ 22: ตัวอักษรในภาพอ่านเพี้ยนได้)
+  */
+  assert.deepEqual([...blockCoverageGaps("executives")], [], "executives ต้องไม่เหลือช่องว่าง");
+  assert.ok(
+    buildExecutivesTemplate().blocks.some((block) => block.type === "imageText"),
+    "เทมเพลต executives ต้องมีภาพผังจริง (ภาพคือแหล่งข้อมูล)",
+  );
+  assert.ok(
+    buildExecutivesTemplate().blocks.every((block) => block.type !== "rosterText"),
+    "ห้ามใส่รายชื่อผู้บริหารที่ยังไม่ยืนยันเป็นข้อความ",
+  );
   assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
   assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
   assert.deepEqual([...blockCoverageGaps("home")], [], "หน้าแรกครอบคลุมครบ");
