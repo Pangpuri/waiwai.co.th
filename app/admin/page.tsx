@@ -47,6 +47,7 @@ export default async function AdminHomePage() {
       "preview-link-purge": strings.auditPreviewLinkPurge,
       "chrome-preset-save": strings.auditChromePresetSave,
       "chrome-preset-apply": strings.auditChromePresetApply,
+      "chrome-preset-undo": strings.auditChromePresetUndo,
     };
     return map[action] ?? action;
   };

@@ -222,3 +222,29 @@ test("trash: พจนานุกรมต้องไม่ hardcode จำน
     assert.ok(source.includes("{days}"), `${locale}/adminTrash.ts ต้องใช้ตัวเติม {days}`);
   }
 });
+
+test("trash: ตัวอย่างภาพของในถัง — ต้องเป็นเส้นทางหลังบ้านที่ล็อกอินเท่านั้น (ปิดหนี้ รอบที่ 81)", () => {
+  const route = sourceOf("app/admin/trash/thumbnail/[id]/route.ts");
+
+  assert.ok(route.includes("getSessionUser()"), "ต้องตรวจเซสชันผู้ดูแล");
+  assert.ok(route.includes("getTrashedMediaBinary"), "ต้องอ่านผ่านฟังก์ชันที่เจาะจงของในถัง");
+  assert.ok(route.includes('dynamic = "force-dynamic"'), "ห้ามแคชตัวอย่างของในถัง");
+  assert.ok(route.includes('"cache-control": "no-store"'), "ต้องไม่ให้แคช");
+  assert.ok(route.includes('"x-content-type-options": "nosniff"'), "ต้องกันเบราว์เซอร์ตีความผิด");
+  assert.ok(!route.includes('"content-disposition"'), "ไม่ต้องส่งชื่อไฟล์ออกไป");
+  assert.ok(route.includes("if (user === null)"), "ไม่ล็อกอิน = 404 (ไม่เปิดเผยว่ามีของในถัง)");
+
+  /* ฝั่งสาธารณะต้องไม่เปลี่ยน: ของในถังยัง 404 */
+  const publicRoute = sourceOf("app/media/[id]/route.ts");
+  assert.ok(publicRoute.includes("getMediaBinary"), "เส้นทางสาธารณะใช้ตัวอ่านปกติ");
+  assert.ok(!publicRoute.includes("getTrashedMediaBinary"), "ห้ามใช้ตัวอ่านของในถังบนเส้นทางสาธารณะ");
+
+  const mediaRepo = sourceOf("lib/media/repository.ts");
+  assert.ok(mediaRepo.includes("export async function getTrashedMediaBinary"), "ต้องมีตัวอ่านของในถัง");
+  assert.ok(mediaRepo.includes("where id = $1 and deleted_at is not null"), "ตัวอ่านของในถังต้องกรองเฉพาะของในถัง");
+  assert.ok(mediaRepo.includes("where id = $1 and deleted_at is null"), "ตัวอ่านปกติต้องไม่เห็นของในถัง");
+
+  const list = sourceOf("features/admin/ui/trash-list.tsx");
+  assert.ok(list.includes("/admin/trash/thumbnail/"), "หน้าถังขยะต้องแสดงตัวอย่างภาพ");
+  assert.ok(list.includes('row.kind === "media"'), "แสดงตัวอย่างเฉพาะแถวที่เป็นภาพ");
+});

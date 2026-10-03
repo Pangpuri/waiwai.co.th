@@ -34,7 +34,7 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashEmptyAction: "Delete everything permanently",
   trashEmptyDone: "Permanently deleted {count} items",
   trashNotFound: "Item not found (it may already be gone)",
-  trashNoPreview: "Trashed images are not served on the website — restore it first to use it again.",
+  trashNoPreview: "The thumbnail above is visible to admins only — trashed images are never served on the website (restore it first).",
   trashPurgeNow: "Delete expired items now",
   trashPurgeHint: "Use this instead of waiting for the automatic run (it normally runs on admin sign-in or via cron).",
   trashBackToMedia: "Go to the media library",

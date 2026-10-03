@@ -86,6 +86,42 @@ export async function getMediaBinary(id: string): Promise<MediaBinary | null> {
   };
 }
 
+/**
+ * อ่านไฟล์ของภาพที่ **อยู่ในถังขยะ** — สำหรับตัวอย่างภาพในหน้าหลังบ้าน (รอบที่ 81)
+ *
+ * 🔑 ทำไมต้องแยกฟังก์ชัน: `getMediaBinary()` กรอง `deleted_at is null` ⇒ ภาพในถังได้ 404 เสมอ
+ *    (เจตนา — ของที่ "ลบแล้ว" ต้องไม่ถูกเสิร์ฟบนเว็บ) แต่ผู้ดูแลต้องเห็นว่าของในถังคือภาพไหน
+ *    ⇒ เส้นทางที่ใช้ฟังก์ชันนี้ **ต้องตรวจสิทธิ์ผู้ดูแลก่อนเสมอ** (`app/admin/trash/thumbnail/[id]/route.ts`)
+ *
+ * ⚠️ ห้ามเรียกจากเส้นทางสาธารณะ (`/media/[id]`) — จะกลายเป็นช่องให้ภาพที่ลบแล้วยังเข้าถึงได้
+ */
+export async function getTrashedMediaBinary(id: string): Promise<MediaBinary | null> {
+  const result = await getPool().query<{
+    mime: AllowedImageMime;
+    data: Buffer;
+    size_bytes: number;
+    filename: string;
+    created_at: Date;
+  }>(
+    `select mime, data, size_bytes, filename, created_at
+       from media
+      where id = $1 and deleted_at is not null
+      limit 1`,
+    [id],
+  );
+
+  const row = result.rows[0];
+  if (row === undefined) return null;
+
+  return {
+    mime: row.mime,
+    data: row.data,
+    sizeBytes: row.size_bytes,
+    filename: row.filename,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
 export async function listMedia(limit = 40): Promise<readonly MediaListItem[]> {
   const result = await getPool().query<{
     id: string;
@@ -128,17 +164,32 @@ export async function updateMediaAlt(id: string, altTh: string, altEn: string): 
 
 /* ── คลังภาพ (X1.2) ───────────────────────────────────────────────────────── */
 
+export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset";
+
 export type MediaUsage = {
-  /** ชนิดของที่อ้างถึง: เอกสาร (เพจ/navbar/footer/ป้าย/ตั้งค่า) หรือคอลัมน์ OG ของหน้า */
-  readonly kind: "document" | "og-image" | "favicon";
-  /** คีย์ที่ใช้เรียกในระบบ เช่น `home:draft` */
+  /**
+   * ชนิดของที่อ้างถึง
+   * - `document` — เอกสารใน `page_document` (เพจ/navbar/footer/ป้าย/ตั้งค่า)
+   * - `og-image` / `favicon` — คอลัมน์ SEO ของหน้า / ตั้งค่าส่วนกลาง
+   * - `block-preset` — **พรีเซ็ตบล็อก** (`block_preset`) ที่อ้างภาพนี้ (X2.4 ปิดจุดรั่ว รอบที่ 81)
+   * - `chrome-preset` — **พรีเซ็ตของส่วนกลาง** (`chrome_preset`) เช่นโลโก้ในพรีเซ็ตแถบเมนู
+   */
+  readonly kind: MediaUsageKind;
+  /** คีย์ที่ใช้เรียกในระบบ เช่น `home:draft` · `preset:งานปีใหม่` */
   readonly target: string;
   readonly detail: string | null;
 };
 
 /**
- * หาว่าภาพนี้ถูกใช้ที่ไหน (เดินดูทุกเอกสาร + คอลัมน์ OG + favicon)
+ * หาว่าภาพนี้ถูกใช้ที่ไหน (เดินดูทุกเอกสาร + พรีเซ็ตทั้งสองชนิด + คอลัมน์ OG + favicon)
+ *
  * ⚠️ ใช้ `like` บนข้อความ JSON — รหัสภาพเป็น base64url (a-z A-Z 0-9 - _) ⇒ ไม่มีอักขระพิเศษของ LIKE
+ *
+ * 🔑 ประวัติของจุดนี้ (ปิดหนี้รอบที่ 81)
+ * - เดิมตรวจแค่ `page_document` + `page.og_image_path` ⇒ ภาพที่ **พรีเซ็ตบล็อก** หรือ
+ *   **พรีเซ็ตของส่วนกลาง (W3b)** อ้างถึง ถูกกดลบเข้าถังได้โดยไม่เตือน (พรีเซ็ตจะชี้ภาพที่หายไป)
+ * - ตอนนี้รวม **ของในถังด้วย** (`deleted_at is not null`): พรีเซ็ตที่อ้างภาพซึ่งอยู่ในถังก็ยังต้องเห็น
+ *   ⇒ ผู้ดูแลกู้คืนภาพได้ก่อนใช้พรีเซ็ตนั้น
  */
 export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]> {
   const path = `/media/${id}`;
@@ -152,9 +203,41 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
     usage.push({ kind: "document", target: `${row.page}:${row.status}`, detail: null });
   }
 
+  /* พรีเซ็ตบล็อก — ต้องเห็นทั้งของที่ใช้งานอยู่และของในถัง (ผู้ดูแลต้องกู้คืนภาพก่อนใช้พรีเซ็ตนั้น) */
+  const blockPresets = await getPool().query<{ name: string; block_type: string; in_trash: boolean }>(
+    `select name, block_type, deleted_at is not null as in_trash
+       from block_preset
+      where block::text like '%' || $1 || '%'
+      order by name`,
+    [path],
+  );
+  for (const row of blockPresets.rows) {
+    usage.push({
+      kind: "block-preset",
+      target: `preset:${row.name}`,
+      detail: row.in_trash ? `${row.block_type} · trash` : row.block_type,
+    });
+  }
+
+  /* พรีเซ็ตของส่วนกลาง (W3b) — เช่นโลโก้ในพรีเซ็ตแถบเมนู · ภาพในพรีเซ็ตป้ายประกาศ */
+  const chromePresets = await getPool().query<{ name: string; kind: string; in_trash: boolean }>(
+    `select name, kind, deleted_at is not null as in_trash
+       from chrome_preset
+      where payload::text like '%' || $1 || '%'
+      order by name`,
+    [path],
+  );
+  for (const row of chromePresets.rows) {
+    usage.push({
+      kind: "chrome-preset",
+      target: `chrome-preset:${row.name}`,
+      detail: row.in_trash ? `${row.kind} · trash` : row.kind,
+    });
+  }
+
   const ogRows = await getPool().query<{ id: string }>(`select id from page where og_image_path = $1`, [path]);
   for (const row of ogRows.rows) {
-    usage.push({ kind: "og-image", target: row.id, detail: null });
+    usage.push({ kind: "og-image", target: row.id, detail: "og-image" });
   }
 
   return usage;

@@ -131,9 +131,26 @@ function TrashRowItem({
   return (
     <tr className="border-line border-t align-top">
       <td className="py-2 pr-3">
-        <span className="text-fg block text-xs font-semibold break-all">{row.label}</span>
-        {row.detail === null ? null : <span className="text-fg-muted block text-[11px]">{row.detail}</span>}
-        {row.sizeLabel === null ? null : <span className="text-fg-muted block text-[11px]">{row.sizeLabel}</span>}
+        <div className="flex items-start gap-2">
+          {/*
+            ตัวอย่างภาพของในถัง (รอบที่ 81) — เสิร์ฟจากเส้นทางหลังบ้านที่ต้องล็อกอิน
+            (/admin/trash/thumbnail/<id>) เพราะ /media/<id> ต้อง 404 กับของในถัง (เจตนาเดิม)
+          */}
+          {row.kind === "media" ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={`/admin/trash/thumbnail/${row.id}`}
+              alt={row.label}
+              className="border-line max-h-16 w-auto rounded border"
+              loading="lazy"
+            />
+          ) : null}
+          <span className="flex min-w-0 flex-col">
+            <span className="text-fg block text-xs font-semibold break-all">{row.label}</span>
+            {row.detail === null ? null : <span className="text-fg-muted block text-[11px]">{row.detail}</span>}
+            {row.sizeLabel === null ? null : <span className="text-fg-muted block text-[11px]">{row.sizeLabel}</span>}
+          </span>
+        </div>
       </td>
       <td className="text-fg-muted py-2 pr-3 text-xs whitespace-nowrap">{kindLabel}</td>
       <td className="text-fg-muted py-2 pr-3 font-mono text-[11px] whitespace-nowrap">

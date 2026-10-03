@@ -7,6 +7,7 @@ import {
   applyChromePresetAction,
   deleteChromePresetAction,
   saveChromePresetAction,
+  undoChromePresetAction,
 } from "@/app/admin/builder/chrome/preset-actions";
 import {
   INITIAL_CHROME_PRESET_STATE,
@@ -58,6 +59,11 @@ export type ChromePresetStrings = {
   readonly chromePresetInvalid: string;
   readonly chromePresetNotFound: string;
   readonly chromePresetDbMissing: string;
+  readonly chromePresetUndo: string;
+  readonly chromePresetUndoAvailable: string;
+  readonly chromePresetUndoHint: string;
+  readonly chromePresetUndoDone: string;
+  readonly chromePresetUndoMissing: string;
 };
 
 export type ChromePresetRow = {
@@ -97,6 +103,10 @@ function messageOf(
       return strings.chromePresetApplied;
     case "deleted":
       return strings.chromePresetDeleted;
+    case "undo-done":
+      return strings.chromePresetUndoDone;
+    case "undo-missing":
+      return strings.chromePresetUndoMissing;
     case "bad-name":
       return strings.chromePresetBadName;
     case "invalid":
@@ -171,14 +181,18 @@ export function ChromePresetPanel({
   strings,
   maxPerKind,
   dbMissing = false,
+  undoLabel = null,
 }: {
   readonly kind: string;
   readonly rows: readonly ChromePresetRow[];
   readonly strings: ChromePresetStrings;
   readonly maxPerKind: number;
   readonly dbMissing?: boolean;
+  /** ข้อความบอกว่าย้อนกลับได้ (แปลงแล้ว) — `null` = ไม่มีให้ย้อน */
+  readonly undoLabel?: string | null;
 }) {
   const [saveState, saveAction] = useActionState(saveChromePresetAction, INITIAL_CHROME_PRESET_STATE);
+  const [undoState, undoAction] = useActionState(undoChromePresetAction, INITIAL_CHROME_PRESET_STATE);
 
   return (
     <div className="flex flex-col gap-2">
@@ -211,6 +225,19 @@ export function ChromePresetPanel({
           </label>
           <Submit label={strings.chromePresetSave} />
           <StatusLine state={saveState} strings={strings} maxPerKind={maxPerKind} />
+        </form>
+      )}
+
+      {/* ย้อนกลับฉบับร่างก่อนใช้ชุด (รอบที่ 81) — มีปุ่มเฉพาะเมื่อมีของให้ย้อนจริง */}
+      {undoLabel === null || dbMissing ? null : (
+        <form action={undoAction} className="border-line flex flex-col gap-1 rounded-lg border p-2">
+          <input type="hidden" name="kind" value={kind} />
+          <span className="text-fg-muted text-[11px]">{undoLabel}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <Submit label={strings.chromePresetUndo} />
+            <StatusLine state={undoState} strings={strings} maxPerKind={maxPerKind} />
+          </span>
+          <span className="text-fg-muted text-[11px]">{strings.chromePresetUndoHint}</span>
         </form>
       )}
 

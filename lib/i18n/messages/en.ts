@@ -18,6 +18,7 @@ import { adminTrash } from "./areas/en/adminTrash.ts";
 import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/en/previewLink.ts";
+import { pendingPages } from "./areas/en/pendingPages.ts";
 
 import type { Messages } from "./th";
 
@@ -60,6 +61,7 @@ export const en: Messages = {
   privacyPage,
   maintenancePage,
   previewLinkPage,
+  pendingPages,
   admin: {
     ...admin,
     ...adminMedia,

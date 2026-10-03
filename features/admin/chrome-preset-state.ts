@@ -11,6 +11,8 @@ export type ChromePresetActionCode =
   | "overwritten"
   | "applied"
   | "deleted"
+  | "undo-done"
+  | "undo-missing"
   | "bad-name"
   | "invalid"
   | "too-many"

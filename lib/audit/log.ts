@@ -45,7 +45,9 @@ export type AuditAction =
   /** บันทึกชุดสำเร็จของส่วนกลาง (W3b) — navbar/footer/ป้ายประกาศ */
   | "chrome-preset-save"
   /** ใช้ชุดสำเร็จของส่วนกลางกับฉบับร่าง (W3b) — ไม่แตะฉบับเผยแพร่ */
-  | "chrome-preset-apply";
+  | "chrome-preset-apply"
+  /** ย้อนกลับฉบับร่างก่อนใช้ชุด (W3b ต่อ · รอบที่ 81) */
+  | "chrome-preset-undo";
 
 export type AuditEntry = {
   readonly action: AuditAction;

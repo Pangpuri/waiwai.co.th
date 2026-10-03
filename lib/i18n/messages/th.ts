@@ -18,6 +18,7 @@ import { adminTrash } from "./areas/th/adminTrash.ts";
 import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
 import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/th/previewLink.ts";
+import { pendingPages } from "./areas/th/pendingPages.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -59,6 +60,7 @@ export const th = {
   privacyPage,
   maintenancePage,
   previewLinkPage,
+  pendingPages,
   admin: {
     ...admin,
     ...adminMedia,

@@ -13,7 +13,7 @@ import { NavbarEditor } from "@/features/admin/ui/navbar-editor";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { loadDocumentRow, listRevisions } from "@/lib/blocks/repository";
 import { MAX_CHROME_PRESETS_PER_KIND, chromePresetCounts, type ChromePreset } from "@/lib/chrome/presets";
-import { listChromePresets } from "@/lib/chrome/preset-repository";
+import { listChromePresets, readChromeDraftUndo } from "@/lib/chrome/preset-repository";
 import { FOOTER_PAGE_KEY, defaultFooterConfig, parseFooterConfig } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY, applyPageMenu, defaultNavbarConfig, parseNavbarConfig } from "@/lib/chrome/navbar";
 import { defaultPages } from "@/lib/pages/model";
@@ -125,6 +125,22 @@ export default async function ChromePage() {
     savedAt: preset.updatedAt.slice(0, 16).replace("T", " "),
   }));
 
+  /* ข้อมูลย้อนกลับของแต่ละส่วน (มี/ไม่มี + ย้อนจากชุดไหนเมื่อไร) — แสดงเป็นข้อความจากค่ากลาง */
+  const undoLabelFor = async (kind: "navbar" | "footer" | "mourning"): Promise<string | null> => {
+    const undo = await readChromeDraftUndo(kind);
+    if (undo === null) return null;
+    return fillTemplate(strings.chromePresetUndoAvailable, {
+      name: undo.presetName ?? strings.chromePresetTitle,
+      time: undo.replacedAt.slice(0, 16).replace("T", " "),
+    });
+  };
+
+  const [undoNavbar, undoFooter, undoNotice] = await Promise.all([
+    undoLabelFor("navbar"),
+    undoLabelFor("footer"),
+    undoLabelFor("mourning"),
+  ]);
+
   const presetStrings: ChromePresetStrings = {
     chromePresetSaveTitle: strings.chromePresetSaveTitle,
     chromePresetSaveHint: strings.chromePresetSaveHint,
@@ -150,6 +166,11 @@ export default async function ChromePage() {
     chromePresetInvalid: strings.chromePresetInvalid,
     chromePresetNotFound: strings.chromePresetNotFound,
     chromePresetDbMissing: strings.chromePresetDbMissing,
+    chromePresetUndo: strings.chromePresetUndo,
+    chromePresetUndoAvailable: strings.chromePresetUndoAvailable,
+    chromePresetUndoHint: strings.chromePresetUndoHint,
+    chromePresetUndoDone: strings.chromePresetUndoDone,
+    chromePresetUndoMissing: strings.chromePresetUndoMissing,
   };
 
   return (
@@ -261,6 +282,7 @@ export default async function ChromePage() {
               rows={presetRows.filter((row) => row.kind === "navbar")}
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+              undoLabel={undoNavbar}
             />
           </section>
 
@@ -271,6 +293,7 @@ export default async function ChromePage() {
               rows={presetRows.filter((row) => row.kind === "footer")}
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+              undoLabel={undoFooter}
             />
           </section>
 
@@ -281,6 +304,7 @@ export default async function ChromePage() {
               rows={presetRows.filter((row) => row.kind === "mourning")}
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+              undoLabel={undoNotice}
             />
           </section>
         </div>

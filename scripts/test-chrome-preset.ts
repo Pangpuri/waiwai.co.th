@@ -196,7 +196,7 @@ test("chrome-preset: ทุก action ตรวจสิทธิ์ และ�
 
   const exported = actions.match(/export async function/g) ?? [];
   const required = actions.match(/await requireAdminUser\(\)/g) ?? [];
-  assert.equal(exported.length, 3, "ต้องมี 3 action (บันทึก · ใช้ชุด · ลบ)");
+  assert.equal(exported.length, 4, "ต้องมี 4 action (บันทึก · ใช้ชุด · ย้อนกลับ · ลบ)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
 
   assert.ok(actions.includes("isChromePresetKind(kind)"), "ต้องตรวจชนิดของส่วน");
@@ -241,4 +241,56 @@ test("chrome-preset: migration ใหม่ idempotent และมี guard ค
   assert.ok(migration.includes("unique index if not exists chrome_preset_kind_name_key"), "ชื่อซ้ำในชนิดเดียวกันต้องชนกันได้");
   assert.ok(migration.includes("(kind, lower(name))"), "ต้องไม่สนตัวพิมพ์");
   assert.ok(migration.includes("deleted_at"), "ต้องเข้ากับถังขยะกลาง");
+});
+
+/* ── 6) ปิดหนี้รอบที่ 81: "ภาพถูกใช้ที่ไหน" ต้องเห็นพรีเซ็ตของส่วนกลางด้วย ──────── */
+
+test("chrome-preset: ภาพที่พรีเซ็ตของส่วนกลางอ้างถึงต้องถูกนับเป็น 'ใช้งานอยู่'", () => {
+  const repo = sourceOf("lib/media/repository.ts");
+
+  assert.ok(repo.includes("from chrome_preset"), "findMediaUsage ต้องเดินดู chrome_preset ด้วย");
+  assert.ok(repo.includes("from block_preset"), "และต้องเดินดู block_preset ด้วย");
+  assert.ok(repo.includes('kind: "chrome-preset"'), "ต้องรายงานชนิด chrome-preset");
+  assert.ok(repo.includes('kind: "block-preset"'), "ต้องรายงานชนิด block-preset");
+  assert.ok(repo.includes("deleted_at is not null as in_trash"), "ต้องเห็นของในถังด้วย (บอกได้ว่าต้องกู้คืนก่อน)");
+  assert.ok(repo.includes("payload::text like"), "ตรวจจาก payload ของพรีเซ็ตส่วนกลาง");
+});
+
+test("chrome-preset: ป้ายชื่อชนิดการใช้งานในคลังภาพมีครบ (สองภาษา)", () => {
+  for (const locale of ["th", "en"]) {
+    const area = sourceOf(`lib/i18n/messages/areas/${locale}/adminMedia.ts`);
+    assert.ok(area.includes("mediaUsageBlockPreset"), `${locale}: ขาดป้ายพรีเซ็ตบล็อก`);
+    assert.ok(area.includes("mediaUsageChromePreset"), `${locale}: ขาดป้ายพรีเซ็ตส่วนกลาง`);
+    assert.ok(area.includes("mediaUsageSeo"), `${locale}: ขาดป้ายงาน SEO`);
+  }
+
+  const page = sourceOf("app/admin/media/page.tsx");
+  for (const kind of ["document", "og-image", "favicon", "block-preset", "chrome-preset"]) {
+    assert.ok(page.includes(`case "${kind}"`), `หน้าคลังภาพต้องมีป้ายของชนิด ${kind}`);
+  }
+});
+
+/* ── 7) ปิดหนี้รอบที่ 81: ย้อนกลับหลังใช้ชุด ─────────────────────────────────── */
+
+test("chrome-preset: ใช้ชุดแล้วต้องเก็บฉบับร่างเดิมไว้ให้ย้อนกลับ", () => {
+  const repo = sourceOf("lib/chrome/preset-repository.ts");
+
+  assert.ok(repo.includes("insert into chrome_draft_undo"), "ต้องบันทึกฉบับร่างก่อนใช้ชุด");
+  assert.ok(repo.includes("on conflict (page) do update set"), "หนึ่งส่วน = หนึ่งแถว (ไม่โตตามการใช้งาน)");
+  assert.ok(repo.includes("export async function undoChromePreset"), "ต้องมีฟังก์ชันย้อนกลับ");
+  assert.ok(repo.includes("delete from chrome_draft_undo where page = $1"), "ย้อนสำเร็จแล้วลบข้อมูลย้อนกลับ");
+  assert.ok(repo.includes("parseChromePresetPayload(input.kind, row.payload"), "ต้องตรวจรูปทรงก่อนเขียนกลับ");
+  assert.ok(repo.includes('action: "chrome-preset-undo"'), "ต้องลง audit");
+
+  const actions = sourceOf("app/admin/builder/chrome/preset-actions.ts");
+  assert.ok(actions.includes("undoChromePresetAction"), "ต้องมี Server Action ของการย้อนกลับ");
+  assert.ok(actions.includes("isChromePresetKind(kind)"), "ตรวจชนิดของส่วนก่อนทำงาน");
+
+  const panel = sourceOf("features/admin/ui/chrome-preset-panel.tsx");
+  assert.ok(panel.includes("undoChromePresetAction"), "แผงต้องเรียก action ย้อนกลับ");
+  assert.ok(panel.includes("chromePresetUndoHint"), "ต้องบอกว่าย้อนกลับได้ครั้งเดียว/ไม่แตะเว็บจริง");
+
+  const migration = sourceOf("db/migrations/0011-chrome-draft-undo.sql");
+  assert.ok(migration.includes("create table if not exists chrome_draft_undo"), "ตารางต้อง idempotent");
+  assert.ok(migration.includes("page        text        primary key"), "หนึ่งส่วน = หนึ่งแถว");
 });

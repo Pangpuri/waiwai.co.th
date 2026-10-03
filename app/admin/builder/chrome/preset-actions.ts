@@ -8,6 +8,7 @@ import { isChromePresetKind } from "@/lib/chrome/presets";
 import {
   applyChromePreset,
   saveChromePresetFromRow,
+  undoChromePreset,
   type ApplyChromePresetResult,
   type SaveChromePresetResult,
 } from "@/lib/chrome/preset-repository";
@@ -109,4 +110,31 @@ export async function deleteChromePresetAction(
 
   revalidateChrome();
   return { status: "ok", code: "deleted" };
+}
+
+/**
+ * "ย้อนกลับ" ฉบับร่างก่อนใช้ชุด (รอบที่ 81)
+ *
+ * - ใช้ได้ครั้งเดียวต่อการกดใช้ชุดหนึ่งครั้ง (แถวข้อมูลย้อนกลับถูกลบเมื่อย้อนสำเร็จ)
+ * - เขียนเฉพาะ **ฉบับร่าง** — ฉบับเผยแพร่ (เว็บจริง) ยังต้องกดเผยแพร่เองเสมอ
+ */
+export async function undoChromePresetAction(
+  _previous: ChromePresetActionState,
+  formData: FormData,
+): Promise<ChromePresetActionState> {
+  const user = await requireAdminUser();
+  if (!isDatabaseConfigured()) return { status: "failed", code: "no-database" };
+
+  const kind = String(formData.get("kind") ?? "").trim();
+  if (!isChromePresetKind(kind)) return { status: "failed", code: "invalid" };
+
+  const messages = await getMessagesFor("th");
+  const result = await undoChromePreset({ kind, actor: user.email, messages });
+
+  if (!result.ok) {
+    return { status: "failed", code: result.reason === "not-found" ? "undo-missing" : "invalid" };
+  }
+
+  revalidateChrome();
+  return { status: "ok", code: "undo-done" };
 }

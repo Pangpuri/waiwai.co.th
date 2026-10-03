@@ -24,7 +24,15 @@ import { countPageRows, importPageSeed, loadPageContent, savePageContent } from 
 import { itemKeyOf } from "@/lib/content/sql";
 import { errorsOf, validateContent } from "@/lib/content/validate";
 import type { PageContent } from "@/lib/content/types";
-import { getMediaBinary, insertMedia, listMedia, mediaStats, searchMedia } from "@/lib/media/repository";
+import {
+  findMediaUsage,
+  getMediaBinary,
+  getTrashedMediaBinary,
+  insertMedia,
+  listMedia,
+  mediaStats,
+  searchMedia,
+} from "@/lib/media/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
@@ -32,7 +40,9 @@ import {
   applyChromePreset,
   countChromePresets,
   listChromePresets,
+  readChromeDraftUndo,
   saveChromePresetFromRow,
+  undoChromePreset,
 } from "@/lib/chrome/preset-repository";
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
 import { th } from "@/lib/i18n/messages/th";
@@ -725,6 +735,26 @@ async function checkTrash(): Promise<void> {
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "แถวต้องหายจากฐานข้อมูล");
     assert.equal(await getMediaBinary(mediaId), null, "ลบถาวรแล้วต้องอ่านไม่ได้");
     done("ลบถาวรจากถังแล้วแถวหายจริง", "ภาพทดสอบ");
+
+    /* ── 8) ปิดหนี้ รอบที่ 81: ตัวอย่างภาพของในถัง (หลังบ้านเท่านั้น) ── */
+    {
+      const thumbId = `${TRASH_TEST_PREFIX}thumb`;
+      await pool.query(
+        `insert into media (id, filename, mime, size_bytes, width, height, alt_th, alt_en, data, deleted_at, deleted_by)
+           values ($1, 'check-db-thumb.png', 'image/png', 4, 1, 1, 'ทดสอบ', 'test', $2::bytea, now(), $3)
+         on conflict (id) do update set deleted_at = now(), deleted_by = $3, data = excluded.data`,
+        [thumbId, Buffer.from([0x89, 0x50, 0x4e, 0x47]), actor],
+      );
+
+      /* ฝั่งสาธารณะ: ของในถังต้องไม่ถูกเสิร์ฟ */
+      assert.equal(await getMediaBinary(thumbId), null, "ของในถังต้องไม่ถูกเสิร์ฟผ่านเส้นทางสาธารณะ");
+
+      /* ฝั่งหลังบ้าน: ตัวอ่านเฉพาะของในถังได้ไฟล์จริง (เส้นทาง /admin/trash/thumbnail ตรวจสิทธิ์ก่อนใช้) */
+      const trashed = await getTrashedMediaBinary(thumbId);
+      assert.ok(trashed !== null, "ตัวอ่านของในถังต้องได้ไฟล์สำหรับตัวอย่างในหลังบ้าน");
+      assert.equal(trashed.mime, "image/png", "ต้องคืนชนิดไฟล์ให้ตั้ง content-type ได้");
+      done("ตัวอย่างภาพของในถัง (หลังบ้านเท่านั้น)", "สาธารณะยัง 404 · ของในถังอ่านได้เฉพาะเส้นทางที่ล็อกอิน");
+    }
   } finally {
     /* คืนสภาพ: ลบรอยทดสอบทั้งหมด (ทั้งที่ยังอยู่ในถังและที่กู้คืนแล้ว) */
     await pool.query("delete from media where id like $1", [`${TRASH_TEST_PREFIX}%`]);
@@ -864,7 +894,7 @@ async function checkChromePresets(): Promise<void> {
   const navbarKey = chromePresetPageKey("navbar");
   const footerKey = chromePresetPageKey("footer");
 
-  const before = await countWhere("chrome_preset where name = $1", [CHROME_PRESET_TEST_NAME]);
+  const before = await countWhere("chrome_preset where name like $1", [`${CHROME_PRESET_TEST_NAME}%`]);
   assert.equal(before, 0, "ต้องไม่มีรอยทดสอบพรีเซ็ตส่วนกลางค้างจากรอบก่อน");
 
   /* จำสภาพเดิมของแถว draft/published ของ navbar ไว้คืนตอนจบ */
@@ -888,6 +918,9 @@ async function checkChromePresets(): Promise<void> {
     });
     assert.equal(saved.ok, true, "บันทึกชุดจากฉบับร่างต้องสำเร็จ");
     if (!saved.ok) return;
+
+    /* จำฉบับร่าง ณ ตอนนี้ไว้เทียบตอนย้อนกลับ (คือ "ของใหม่" ที่จะถูกทับเมื่อใช้ชุด) */
+    const draftBeforeApply = (await loadDocumentRow(navbarKey, "draft"))?.raw ?? null;
 
     const listed = await listChromePresets(th);
     const mine = listed.filter((preset) => preset.name === CHROME_PRESET_TEST_NAME);
@@ -934,6 +967,41 @@ async function checkChromePresets(): Promise<void> {
     );
     done("ใช้ชุดนี้เขียนทับเฉพาะฉบับร่าง", "ของเก่าไม่ถูกแตะ");
 
+    /* ── 3.5) ปิดหนี้ รอบที่ 81: ภาพที่พรีเซ็ตอ้างถึงต้องถูกนับเป็น "ใช้งานอยู่" ── */
+    {
+      const mediaId = "check-db-preset-media";
+      await pool.query(
+        `insert into media (id, filename, mime, size_bytes, width, height, alt_th, alt_en, data)
+           values ($1, 'check-db-preset.png', 'image/png', 4, 1, 1, 'ทดสอบ', 'test', $2::bytea)
+         on conflict (id) do update set deleted_at = null, deleted_by = null`,
+        [mediaId, Buffer.from([0x89, 0x50, 0x4e, 0x47])],
+      );
+
+      /* พรีเซ็ตของส่วนกลางที่อ้างภาพนี้ (โลโก้ในแถบเมนู) */
+      const withLogo = {
+        ...defaultChromePresetPayload("navbar", th).config,
+        logo: { path: `/media/${mediaId}`, altTh: "ทดสอบ", altEn: "test" },
+      };
+      await saveJsonDraft(navbarKey, withLogo, CHROME_PRESET_TEST_ACTOR);
+      const linked = await saveChromePresetFromRow({
+        kind: "navbar",
+        name: `${CHROME_PRESET_TEST_NAME}-logo`,
+        source: "draft",
+        actor: CHROME_PRESET_TEST_ACTOR,
+        messages: th,
+      });
+      assert.equal(linked.ok, true, "บันทึกชุดที่มีภาพต้องสำเร็จ");
+
+      const usage = await findMediaUsage(mediaId);
+      const fromChrome = usage.filter((entry) => entry.kind === "chrome-preset");
+      assert.ok(fromChrome.length >= 1, "findMediaUsage ต้องเห็นภาพที่พรีเซ็ตของส่วนกลางอ้างถึง");
+
+      /* ภาพที่ถูกพรีเซ็ตอ้าง = ย้ายเข้าถังไม่ได้ (ด่านเดียวกับที่ library-actions ใช้) */
+      const blocked = usage.length > 0;
+      assert.equal(blocked, true, "ภาพที่พรีเซ็ตใช้อยู่ต้องถูกล็อกไม่ให้ลบ");
+      done("ภาพที่พรีเซ็ตของส่วนกลางอ้าง ถูกนับว่าใช้งานอยู่", `${usage.length} ที่อ้างอิง`);
+    }
+
     /* ── 4) ชนิดต้องตรง: ใช้ชุด navbar กับ footer ไม่ได้ ── */
     const wrongKind = await applyChromePreset({
       kind: "footer",
@@ -975,12 +1043,36 @@ async function checkChromePresets(): Promise<void> {
       "บันทึกชื่อเดิมต้องกู้คืนกลับมาใช้อัตโนมัติ",
     );
     done("บันทึกชื่อเดิมทับ = กู้คืนจากถังอัตโนมัติ", "ไม่มีชุดค้างในถังแบบงง ๆ");
+    /* ── 4.5) ปิดหนี้ รอบที่ 81: ย้อนกลับฉบับร่างก่อนใช้ชุดได้จริง ── */
+    {
+      const beforeUndo = await readChromeDraftUndo("navbar");
+      assert.ok(beforeUndo !== null, "หลังใช้ชุดต้องมีข้อมูลให้ย้อนกลับ");
+
+      const undone = await undoChromePreset({ kind: "navbar", actor: CHROME_PRESET_TEST_ACTOR, messages: th });
+      assert.equal(undone.ok, true, "ย้อนกลับต้องสำเร็จ");
+
+      const draftAfterUndo = await loadDocumentRow(navbarKey, "draft");
+      /*
+        "ก่อนใช้ชุด" ในที่นี้ = ฉบับร่างที่มีตอนก่อนกดใช้ชุด (ด่านนี้สร้างเองถ้ายังไม่มี)
+        ⚠️ ต้องเทียบกับ **สิ่งที่บันทึกไว้ในข้อมูลย้อนกลับ** ซึ่งคือสภาพ ณ ตอนนั้น
+        ⇒ เทียบกับค่าที่ด่านนี้เซ็ตไว้ (withLogo) หรือของเดิมก่อนทดสอบ
+      */
+      const expectedDraft = draftBeforeApply;
+      assert.deepEqual(draftAfterUndo?.raw ?? null, expectedDraft, "ฉบับร่างหลังย้อนกลับต้องเป็นชุดก่อนใช้ชุด");
+      assert.equal(await readChromeDraftUndo("navbar"), null, "ย้อนกลับสำเร็จแล้วต้องลบข้อมูลย้อนกลับ (ใช้ได้ครั้งเดียว)");
+
+      const again = await undoChromePreset({ kind: "navbar", actor: CHROME_PRESET_TEST_ACTOR, messages: th });
+      assert.equal(again.ok, false, "ย้อนกลับซ้ำต้องบอกว่าไม่มีให้ย้อน ไม่ใช่พัง");
+      done("ย้อนกลับฉบับร่างก่อนใช้ชุดได้", "และย้อนซ้ำอย่างปลอดภัย");
+    }
   } finally {
     /* คืนสภาพ: ลบเฉพาะของด่านนี้ + คืนแถว navbar ให้เหมือนก่อนทดสอบ */
-    await pool.query("delete from chrome_preset where name = $1 or created_by = $2", [
-      CHROME_PRESET_TEST_NAME,
+    await pool.query("delete from chrome_preset where name like $1 or created_by = $2", [
+      `${CHROME_PRESET_TEST_NAME}%`,
       CHROME_PRESET_TEST_ACTOR,
     ]);
+    await pool.query("delete from chrome_draft_undo where page = $1", [navbarKey]);
+    await pool.query("delete from media where id = $1", ["check-db-preset-media"]);
     await pool.query("delete from audit_log where actor_email = $1", [CHROME_PRESET_TEST_ACTOR]);
 
     if (navbarDraftBefore === null && navbarPublishedBefore === null) {
@@ -988,7 +1080,11 @@ async function checkChromePresets(): Promise<void> {
       await pool.query("delete from page_document where page = $1 and updated_by = $2", [navbarKey, CHROME_PRESET_TEST_ACTOR]);
     }
 
-    assert.equal(await countWhere("chrome_preset where name = $1", [CHROME_PRESET_TEST_NAME]), 0, "ต้องไม่เหลือรอยทดสอบ");
+    assert.equal(
+      await countWhere("chrome_preset where name like $1", [`${CHROME_PRESET_TEST_NAME}%`]),
+      0,
+      "ต้องไม่เหลือรอยทดสอบ",
+    );
     assert.deepEqual(
       (await loadDocumentRow(navbarKey, "draft"))?.raw ?? null,
       navbarDraftBefore?.raw ?? null,

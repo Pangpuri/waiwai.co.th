@@ -37,6 +37,12 @@ export const adminChromePreset = {
   chromePresetInvalid: "ชุดนี้ใช้ไม่ได้ — ต้องแก้ค่าที่ผิดในส่วนนั้นก่อน",
   chromePresetNotFound: "ไม่พบชุดนี้ (อาจถูกลบไปแล้ว)",
   chromePresetDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — ใช้พรีเซ็ตไม่ได้",
+  chromePresetUndo: "ย้อนกลับไปฉบับร่างก่อนใช้ชุด",
+  chromePresetUndoAvailable: "ย้อนกลับได้: ฉบับร่างก่อนใช้ “{name}” เมื่อ {time}",
+  chromePresetUndoHint: "ย้อนกลับได้ครั้งเดียว · เขียนทับเฉพาะฉบับร่าง (เว็บจริงยังไม่เปลี่ยนจนกดเผยแพร่)",
+  chromePresetUndoDone: "ย้อนกลับแล้ว — ฉบับร่างกลับมาเป็นชุดก่อนหน้า",
+  chromePresetUndoMissing: "ไม่มีฉบับร่างให้ย้อนกลับแล้ว",
+  auditChromePresetUndo: "ย้อนกลับพรีเซ็ตส่วนกลาง",
   auditChromePresetSave: "บันทึกพรีเซ็ตส่วนกลาง",
   auditChromePresetApply: "ใช้พรีเซ็ตส่วนกลาง",
 };

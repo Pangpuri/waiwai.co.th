@@ -41,6 +41,12 @@ export const adminChromePreset: Pick<Messages["admin"], keyof typeof thAdminChro
   chromePresetInvalid: "This set cannot be used — fix the invalid values in that part first",
   chromePresetNotFound: "Set not found (it may have been deleted)",
   chromePresetDbMissing: "Database not configured — presets are unavailable",
+  chromePresetUndo: "Revert to the draft from before",
+  chromePresetUndoAvailable: "Revert available: the draft from before “{name}” at {time}",
+  chromePresetUndoHint: "Revert works once · it only replaces the draft (the live site changes after you publish)",
+  chromePresetUndoDone: "Reverted — the draft is back to the previous set",
+  chromePresetUndoMissing: "There is no earlier draft to revert to",
+  auditChromePresetUndo: "Reverted a site-wide preset",
   auditChromePresetSave: "Saved a site-wide preset",
   auditChromePresetApply: "Applied a site-wide preset",
 };

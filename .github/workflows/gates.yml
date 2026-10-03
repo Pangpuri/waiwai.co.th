@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# waiwai.com — ด่านคุณภาพอัตโนมัติ (ปิดหนี้ "ยังไม่มี CI" · รอบที่ 81)
+#
+# รัน **ทุก push และทุก pull request** เพื่อไม่ให้ของที่พังหลุดขึ้น `master`
+#   · งาน `gates`     = ด่าน 1–7 + build (ไม่ต้องมีฐานข้อมูล)
+#   · งาน `database`  = ด่าน 10–12 + `check:restore` บน Postgres 17 ในคอนเทนเนอร์
+#
+# กติกาที่ตั้งใจ
+# - ใช้ Node 22 ให้ตรงกับ `engines` ของโปรเจกต์ (และกับที่ผู้ใช้รันบนเครื่อง)
+# - **ไม่ตั้ง env ลับใด ๆ** — ค่าที่ใช้เป็นค่าเฉพาะของ CI (รหัสผ่านฐานข้อมูลชั่วคราว)
+#   ⚠️ ห้ามใส่ secret จริง (SESSION_SECRET/ADMIN_PASSWORD_HASH) ในไฟล์นี้เด็ดขาด
+# - `check:restore` รันได้เพราะมี `postgresql-client` (pg_dump/pg_restore/psql) ในเครื่องรัน
+#   ⇒ ตัวสคริปต์จึงไม่ต้องตั้ง `DB_TOOLS_PREFIX` (นั่นเป็นเรื่องของเครื่อง dev ที่มีแต่ Docker)
+# - ถ้าเบราว์เซอร์/DB ไม่พร้อม ให้ "แดง" ดีกว่าเงียบ (ไม่มี continue-on-error)
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: gates
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+  workflow_dispatch:
+
+# ยกเลิกรอบเก่าของสาขาเดียวกันเมื่อมี push ใหม่ (ประหยัดเวลา CI)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── ด่าน 1–7 + build (ไม่ต้องมีฐานข้อมูล) ─────────────────────────────────────
+  gates:
+    name: gates (typecheck · lint · test · 4 ตัวตรวจ · build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies (ตาม lockfile เท่านั้น)
+        run: npm ci
+
+      # build ก่อน แล้วค่อยตรวจ ⇒ `.next/types` (route types) ถูกสร้างให้ typecheck เห็นเส้นทางใหม่
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck (ด่าน 1)
+        run: npm run typecheck
+
+      - name: Lint (ด่าน 2)
+        run: npm run lint
+
+      - name: Tests (ด่าน 3)
+        run: npm test
+
+      - name: check:dark (ด่าน 5)
+        run: npm run check:dark
+
+      - name: check:i18n (ด่าน 6)
+        run: npm run check:i18n
+
+      - name: check:content (ด่าน 7)
+        run: npm run check:content
+
+      - name: check:actions (ด่าน 10)
+        run: npm run check:actions
+
+  # ── ด่าน 11–12 + พิสูจน์กู้คืนได้จริง (ต้องมี Postgres) ────────────────────────
+  database:
+    name: database (migrate · check:db · check:migrations · check:restore)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: waiwai
+          POSTGRES_PASSWORD: waiwai_ci_only
+          POSTGRES_DB: waiwai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U waiwai -d waiwai"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # ⚠️ ค่าเฉพาะ CI เท่านั้น (ฐานข้อมูลชั่วคราวในคอนเทนเนอร์) — ไม่ใช่ความลับของโปรเจกต์
+      DATABASE_URL: postgres://waiwai:waiwai_ci_only@127.0.0.1:5432/waiwai
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: ติดตั้งเครื่องมือ Postgres (pg_dump/pg_restore/psql)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
+
+      - name: Install dependencies (ตาม lockfile เท่านั้น)
+        run: npm ci
+
+      - name: รัน migration จากศูนย์ (ด่าน 12 ต่อ)
+        run: npm run db:migrate
+
+      - name: check:migrations (ด่าน 12)
+        run: npm run check:migrations
+
+      - name: check:db (ด่าน 11)
+        run: npm run check:db
+
+      - name: สำรองฐานข้อมูล
+        run: npm run db:backup
+
+      - name: check:restore — พิสูจน์ว่ากู้คืนได้จริง (X2.3)
+        run: npm run check:restore

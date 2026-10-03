@@ -4,9 +4,10 @@ import { updateMediaAltAction } from "@/app/admin/media/library-actions";
 import { MediaItemActions, MediaUpload } from "@/features/admin/ui/media-library";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { formatBytes } from "@/lib/format/bytes";
-import { findMediaUsage, mediaStats, searchMedia } from "@/lib/media/repository";
+import { findMediaUsage, mediaStats, searchMedia, type MediaUsageKind } from "@/lib/media/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
+import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
  * คลังภาพ (X1.2) — ที่รวมภาพทั้งหมดที่อัปโหลดเข้าฐานข้อมูล
@@ -22,6 +23,22 @@ const FIELD_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 const BUTTON_CLASS =
   "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none";
+
+/** ป้ายชื่อชนิดของการใช้งาน (ใช้ `switch` ครอบทุกชนิด ⇒ เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที) */
+function usageKindLabel(kind: MediaUsageKind, strings: Messages["admin"]): string {
+  switch (kind) {
+    case "document":
+      return strings.mediaUsage;
+    case "og-image":
+    case "favicon":
+      /* ทั้งคู่คือคอลัมน์ SEO ของหน้า/ตั้งค่าส่วนกลาง — ใช้ป้ายเดียวกันพอ (detail บอกว่าเป็นอะไร) */
+      return strings.mediaUsageSeo;
+    case "block-preset":
+      return strings.mediaUsageBlockPreset;
+    case "chrome-preset":
+      return strings.mediaUsageChromePreset;
+  }
+}
 
 export default async function AdminMediaPage({
   searchParams,
@@ -129,9 +146,10 @@ export default async function AdminMediaPage({
                         {strings.mediaUsage}: {usage.length}
                       </span>
                       <ul className="mt-0.5 flex flex-col">
-                        {usage.slice(0, 4).map((entry) => (
+                        {usage.slice(0, 5).map((entry) => (
                           <li key={`${entry.kind}-${entry.target}`} className="font-mono">
-                            {entry.target}
+                            {usageKindLabel(entry.kind, strings)} · {entry.target}
+                            {entry.detail === null ? "" : ` · ${entry.detail}`}
                           </li>
                         ))}
                       </ul>
