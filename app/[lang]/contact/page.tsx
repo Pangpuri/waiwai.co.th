@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SubmitForm } from "@/features/forms/ui/submit-form";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
@@ -12,6 +13,16 @@ import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { loadPageSeo } from "@/lib/pages/repository";
+import { withPageSeo } from "@/lib/seo/page-seo";
+
+/*
+  ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
+  ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
+     (ถ้าเขียน = PAGE_REVALIDATE_SECONDS จะพังด้วย "Invalid segment configuration export detected")
+     เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
+*/
+export const revalidate = 300;
 
 /**
  * หน้า /contact (ติดต่อเรา)
@@ -31,7 +42,8 @@ export async function generateMetadata({
 
   const messages = await getMessagesFor(lang);
 
-  return {
+  /* ค่า SEO จากหลังบ้าน (W2) — ไม่ตั้งค่า = ใช้ค่าเดิมจากพจนานุกรมเป๊ะ */
+  return withPageSeo(lang, "/contact", {
     title: { absolute: messages.contactPage.meta.title },
     description: messages.contactPage.meta.description,
     alternates: buildAlternates(lang, "/contact"),
@@ -39,7 +51,7 @@ export async function generateMetadata({
       title: messages.contactPage.meta.title,
       description: messages.contactPage.meta.description,
     },
-  };
+  }, () => loadPageSeo("contact"));
 }
 
 export default async function ContactPage({ params }: PageProps<"/[lang]/contact">) {
@@ -142,7 +154,27 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
           */}
           <SampleNotice text={m.notice} />
 
-          <form className="mt-8 max-w-3xl">
+          {/* 
+            ฟอร์มจริง (X1.9): ส่งเข้าฐานข้อมูลของบริษัท · ตรวจซ้ำฝั่งเซิร์ฟเวอร์ · มีกับดักบอต
+            ช่องกรอกยังเรนเดอร์จากฝั่งเซิร์ฟเวอร์ (SEO/ไม่มี JS ก็เห็นครบ) — ตัวครอบเป็น client
+          */}
+          <SubmitForm
+            formKind="contact"
+            className="mt-8 max-w-3xl"
+            strings={{
+              submit: m.submit,
+              submitting: m.formSubmitting,
+              consent: m.consent,
+              sent: m.formSent,
+              invalid: m.formInvalid,
+              rateLimited: m.formRateLimited,
+              unavailable: m.formUnavailable,
+              consentRequired: m.formConsentRequired,
+            }}
+            notice={
+              <p className="border-line bg-surface text-fg-muted rounded-2xl border px-4 py-3 text-xs leading-relaxed">{m.note}</p>
+            }
+          >
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className={labelClass} htmlFor="contact-topic">
@@ -246,35 +278,8 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
               </div>
             </div>
 
-            <p className="mt-4 text-xs text-fg-muted">{m.requiredNote}</p>
-
-            <label className="mt-5 flex items-start gap-2.5 text-xs leading-relaxed text-fg-muted">
-              <input
-                type="checkbox"
-                name="consent"
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand-red)]"
-              />
-              <span>{m.consent}</span>
-            </label>
-
-            <div className="mt-6 flex flex-wrap items-center gap-4">
-              <button
-                type="submit"
-                disabled
-                aria-describedby="contact-form-status"
-                className="rounded-full bg-brand-red px-6 py-3.5 text-sm font-bold text-on-brand opacity-60 disabled:cursor-not-allowed"
-              >
-                {m.submit}
-              </button>
-              <p id="contact-form-status" className="text-xs leading-relaxed text-fg-muted">
-                {m.formStatus}
-              </p>
-            </div>
-
-            <p className="mt-6 rounded-2xl border border-line bg-surface px-4 py-3 text-xs leading-relaxed text-fg-muted">
-              {m.note}
-            </p>
-          </form>
+            <p className="text-fg-muted mt-4 text-xs">{m.requiredNote}</p>
+          </SubmitForm>
         </div>
       </section>
 

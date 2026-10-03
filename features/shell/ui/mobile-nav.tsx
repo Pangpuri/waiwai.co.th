@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { activeNavId, type NavLink } from "@/features/shell/nav";
+import type { NavbarButtonView } from "@/lib/chrome/navbar-view";
+
+import { NavIcon } from "./nav-icon";
 
 type MobileNavProps = {
   readonly links: readonly NavLink[];
@@ -12,9 +15,21 @@ type MobileNavProps = {
   /** label ของแต่ละเมนู แปลแล้ว — ส่งมาจาก server */
   readonly labels: Readonly<Record<string, string>>;
   readonly toggleLabel: { readonly open: string; readonly close: string };
+  /** ปุ่มจากหลังบ้าน (ถ้าไม่ส่งมา = ใช้ cta เดิม) */
+  readonly buttons?: readonly NavbarButtonView[];
 };
 
-export function MobileNav({ links, cta, labels, toggleLabel }: MobileNavProps) {
+export function MobileNav({ links, cta, labels, toggleLabel, buttons }: MobileNavProps) {
+  const actionButtons: readonly { readonly id: string; readonly href: string; readonly label: string; readonly className: string; readonly icon: NavbarButtonView["icon"] }[] =
+    buttons === undefined || buttons.length === 0
+      ? [{ id: cta.id, href: cta.href, label: labels[cta.id] ?? cta.id, className: "bg-brand-red text-on-brand", icon: "none" }]
+      : buttons.map((button) => ({
+          id: button.id,
+          href: button.href,
+          label: button.label,
+          className: button.className,
+          icon: button.icon,
+        }));
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const activeId = activeNavId(pathname, links);
@@ -85,20 +100,26 @@ export function MobileNav({ links, cta, labels, toggleLabel }: MobileNavProps) {
                       active ? "bg-bg-subtle text-accent" : "text-fg hover:bg-bg-subtle",
                     ].join(" ")}
                   >
-                    {labels[link.id] ?? link.id}
+                    <span className="flex items-center gap-2">
+                      <NavIcon name={link.icon ?? "none"} />
+                      {labels[link.id] ?? link.id}
+                    </span>
                   </Link>
                 </li>
               );
             })}
-            <li className="pt-2">
-              <Link
-                href={cta.href}
-                onClick={() => setOpen(false)}
-                className="block rounded-full bg-brand-red px-4 py-3 text-center text-base font-semibold text-on-brand"
-              >
-                {labels[cta.id] ?? cta.id}
-              </Link>
-            </li>
+            {actionButtons.map((button) => (
+              <li key={button.id} className="pt-2">
+                <Link
+                  href={button.href}
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center justify-center gap-2 rounded-full px-4 py-3 text-center text-base font-semibold ${button.className}`}
+                >
+                  <NavIcon name={button.icon} />
+                  {button.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       ) : null}

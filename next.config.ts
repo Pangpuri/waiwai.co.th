@@ -21,6 +21,20 @@ const nextConfig: NextConfig = {
   ],
 
   /*
+    ⚠️ จำเป็นสำหรับ "อัปโหลดภาพ" (เจอจริง 2026-10-02)
+    Server Action ถูกจำกัด body ไว้ 1MB โดยปริยาย → อัปโหลดภาพ 2MB ขึ้นไปล้มทั้งที่ validator อนุญาต 5MB
+    (อาการที่เห็น: `Error: Body exceeded 1 MB limit` · ไม่มีข้อความบอกผู้ใช้)
+    ⇒ ตั้ง 8MB (เพดานไฟล์จริง 5MB + เผื่อ multipart) · เผื่อไว้ให้ validator ของเราได้เป็นคนบอกผู้ใช้ว่า "ไฟล์ใหญ่เกิน 5MB"
+    (ถ้าตั้งเท่าเพดานจริง ไฟล์เกินจะชนเพดาน transport ก่อน แล้วผู้ใช้เห็นแค่ 500)
+    เอกสาร: node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/serverActions.md
+  */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
+  },
+
+  /*
     ── ความปลอดภัยพื้นฐานของเว็บสาธารณะ ─────────────────────────────────────────
     ย้ายมาจาก `netlify.toml` (รอบที่ 21) เพราะผู้ใช้ย้ายไป deploy บน **Vercel** ซึ่งอ่านไฟล์นั้นไม่ได้
     → ถ้าปล่อยไว้ เว็บจริงจะไม่มี header เหล่านี้เลย · วางที่นี่แล้วทำงานกับทุกโฮสต์ที่รัน Next

@@ -5,6 +5,10 @@ import { productsPage } from "./areas/en/catalog.ts";
 import { newsPage, recipesPage } from "./areas/en/contentPages.ts";
 import { careersPage } from "./areas/en/careers.ts";
 import { contactPage } from "./areas/en/contact.ts";
+import { admin } from "./areas/en/admin.ts";
+import { adminMedia } from "./areas/en/adminMedia.ts";
+import { adminSettings } from "./areas/en/adminSettings.ts";
+import { adminDraft } from "./areas/en/adminDraft.ts";
 
 import type { Messages } from "./th";
 
@@ -44,4 +48,5 @@ export const en: Messages = {
   cookie,
   notFound,
   mourning,
+  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft },
 };

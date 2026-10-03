@@ -13,7 +13,7 @@ import {
 } from "@/lib/mourning-notice";
 import { advanceIndex, hasSlideControls, isLastSlide } from "@/lib/slideshow";
 
-import { MOURNING_CLOSE_MS, type MourningImageView } from "../mourning";
+import { MOURNING_CLOSE_MS, type MourningNoticeImage } from "../mourning";
 
 /**
  * หน้าต่างประกาศไว้อาลัย — เด้งทุกครั้งที่โหลดหน้า (ค่าเริ่มต้น)
@@ -46,7 +46,8 @@ type MourningNoticeLabels = {
 };
 
 type MourningNoticeProps = {
-  readonly images: readonly MourningImageView[];
+  /** ภาพที่ใช้จริง — มาจากค่าเริ่มต้นในโค้ด หรือจากหลังบ้าน (คลังภาพ) */
+  readonly images: readonly MourningNoticeImage[];
   readonly labels: MourningNoticeLabels;
 };
 
@@ -197,8 +198,14 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
       role="dialog"
       aria-modal="true"
       aria-label={labels.dialogLabel}
-      className="fixed inset-0 z-[60] place-items-center bg-overlay p-4 sm:p-6"
+      /*
+        ผู้ใช้รายงาน รอบที่ 39: "เป็นหน้าต่างด้านบน แต่ความสูงน้อยไป เอาให้เห็นภาพเต็ม"
+        ⇒ เดิมใช้ grid + place-items-center ในกล่องที่เลื่อนไม่ได้ ⇒ พอเนื้อหาสูงกว่าจอ ส่วนบนจะถูกตัดและเลื่อนตามไม่ได้
+        ⇒ เปลี่ยนเป็น "เลื่อนได้ + จัดกลางเมื่อพอดี" (flex + min-h-full items-center) และจำกัดความสูงรูปให้เหลือที่ให้ปุ่ม
+      */
+      className="fixed inset-0 z-[60] overflow-y-auto overscroll-contain bg-overlay"
     >
+      <div className="flex min-h-full w-full items-center justify-center p-3 sm:p-5">
       <div data-mourning-panel="" className="flex w-full flex-col items-center">
         <figure className="flex w-full flex-col items-center" aria-live="polite">
           {/*
@@ -213,18 +220,22 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
             - กล่อง `relative` ห่อขนาดเท่ากรอบ → ปุ่มลูกศรอยู่ตรงขอบรูปพอดี ไม่ลอยไปขอบจอ
             - `max-w-[calc(100vw-2rem)]` อ้างความกว้าง "วิวพอร์ต" ไม่ใช่อ้างกล่องแม่
               → เลี่ยงปัญหาเปอร์เซ็นต์อ้างพ่อที่ความกว้างยังไม่รู้ค่า
-            - `max-h-[72vh]` กันจอเตี้ยแต่กว้าง (เช่น 2560×800) ที่รูปจะสูงจนปุ่มปิดล้นจอ
+            - `max-h-[min(78dvh,calc(100dvh-13rem))]` = ใหญ่ที่สุดเท่าที่เห็นภาพเต็มและยังเหลือที่ให้จุด/ปุ่ม/คำบรรยาย
+              (เดิม 72vh ทำให้ "ความสูงน้อยไป" · และไม่คิดเผื่อปุ่ม ⇒ เนื้อหาสูงเกินจอ ด้านบนถูกตัด)
+            - ใช้ `dvh` (ไม่ใช่ `vh`) เพราะบนมือถือแถบที่อยู่เลื่อนหายได้ ความสูงจริงเปลี่ยน
           */}
           <div className="relative">
-            <Image
+            {/*
+              ชั้นนี้กำหนดขนาดกรอบ — ต้องใช้ "สัดส่วนจริงของไฟล์" จึงใช้ <img> ธรรมดาแบบไม่ใส่ width/height
+              ⇒ เบราว์เซอร์อ่านขนาดจริงจากไฟล์เอง · ถ้าค่าที่บันทึกในฐานข้อมูลผิดหรือว่าง กรอบก็ยังถูกต้อง
+              (ใช้ next/image ตรงนี้ไม่ได้ เพราะต้องรู้สัดส่วนล่วงหน้า — ตัวภาพที่เห็นจริงยังใช้ next/image ตามเดิม)
+            */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src={active.src}
               alt=""
               aria-hidden="true"
-              width={active.width}
-              height={active.height}
-              sizes="100vw"
-              loading="eager"
-              className="invisible block h-auto max-h-[72vh] w-auto max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-3rem)]"
+              className="invisible block h-auto max-h-[min(78dvh,calc(100dvh-13rem))] w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-2.5rem)]"
             />
 
             {images.map((image, position) => {
@@ -269,9 +280,12 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
             ) : null}
           </div>
 
-          <figcaption className="mt-4 max-w-3xl px-2 text-center text-sm leading-relaxed text-on-brand/85">
-            {labels.caption}
-          </figcaption>
+          {/* คำบรรยาย: แสดงเฉพาะเมื่อมีข้อความ — รอบที่ 36 ใช้ "รูป" เป็นตัวประกาศ จึงมักเว้นว่าง */}
+          {labels.caption.trim() === "" ? null : (
+            <figcaption className="mt-4 max-w-3xl px-2 text-center text-sm leading-relaxed text-on-brand/85">
+              {labels.caption}
+            </figcaption>
+          )}
         </figure>
 
         {hasSlideControls(total) ? (
@@ -332,6 +346,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
             {labels.muteToday}
           </label>
         ) : null}
+      </div>
       </div>
     </div>
   );

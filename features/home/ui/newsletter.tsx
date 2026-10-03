@@ -27,6 +27,11 @@ export function Newsletter({ messages }: { readonly messages: Messages }) {
             consent: m.consent,
             submit: messages.actions.subscribe,
             note: m.note,
+            submitting: m.submitting,
+            sent: m.successMessage,
+            rateLimited: m.rateLimited,
+            unavailable: m.unavailable,
+            consentRequired: m.consentRequired,
           }}
         />
       </div>

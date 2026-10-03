@@ -164,6 +164,10 @@ export const whereToBuy = {
 };
 
 export const newsletter = {
+  consentRequired: "Please tick the consent box first.",
+  unavailable: "Temporarily unavailable — please try again.",
+  rateLimited: "Too many sign-ups — please wait a moment.",
+  submitting: "Sending…",
     eyebrow: "Wai Wai newsletter",
     title: "Hear about products and activities first",
     body: "Leave your email and we will send occasional updates. We will not flood your inbox, and you can unsubscribe at any time.",
@@ -171,6 +175,6 @@ export const newsletter = {
     emailPlaceholder: "name@example.com",
     invalidEmail: "Please enter a valid email address.",
     consent: "I agree that Wai Wai may store and use this information to send me updates, as described in the privacy policy.",
-    successMessage: "Thank you. We will be in touch once this channel is live.",
-    note: "Newsletter sign-up is not active in this preview build.",
+    successMessage: "You are subscribed. Thank you!",
+    note: "Your email is stored for newsletters only · you can unsubscribe at any time.",
 };

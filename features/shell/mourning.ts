@@ -37,6 +37,18 @@ export const MOURNING_IMAGES: readonly MourningImage[] = [
   },
 ];
 
+/**
+ * ภาพที่หน้าต่างใช้จริง — id เป็นข้อความอิสระ เพราะภาพอาจมาจากหลังบ้าน (คลังภาพ) ไม่ใช่พจนานุกรม
+ * (ยังใช้เป็น React key เท่านั้น)
+ */
+export type MourningNoticeImage = {
+  readonly id: string;
+  readonly src: string;
+  readonly alt: string;
+  readonly width: number;
+  readonly height: number;
+};
+
 /** ข้อมูลภาพ + alt ที่แปลแล้ว (ประกอบใน Server Component แล้วส่งเข้า Client Component) */
 export type MourningImageView = MourningImage & { readonly alt: string };
 

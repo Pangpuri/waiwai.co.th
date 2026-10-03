@@ -5,10 +5,21 @@ import { notFound } from "next/navigation";
 import { buildBoard } from "@/features/careers/board";
 import { CAREERS_CONTACT } from "@/features/careers/contact";
 import { countPositions, departmentsInUse, totalOpenings } from "@/features/careers/jobs";
+import { ApplicationForm } from "@/features/careers/ui/application-form";
 import { JobBoard } from "@/features/careers/ui/job-board";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { loadPageSeo } from "@/lib/pages/repository";
+import { withPageSeo } from "@/lib/seo/page-seo";
+
+/*
+  ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
+  ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
+     (ถ้าเขียน = PAGE_REVALIDATE_SECONDS จะพังด้วย "Invalid segment configuration export detected")
+     เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
+*/
+export const revalidate = 300;
 
 /**
  * หน้า /careers (ร่วมงานกับไวไว)
@@ -27,7 +38,8 @@ export async function generateMetadata({
 
   const messages = await getMessagesFor(lang);
 
-  return {
+  /* ค่า SEO จากหลังบ้าน (W2) — ไม่ตั้งค่า = ใช้ค่าเดิมจากพจนานุกรมเป๊ะ */
+  return withPageSeo(lang, "/careers", {
     title: { absolute: messages.careersPage.meta.title },
     description: messages.careersPage.meta.description,
     alternates: buildAlternates(lang, "/careers"),
@@ -35,7 +47,7 @@ export async function generateMetadata({
       title: messages.careersPage.meta.title,
       description: messages.careersPage.meta.description,
     },
-  };
+  }, () => loadPageSeo("careers"));
 }
 
 export default async function CareersPage({ params }: PageProps<"/[lang]/careers">) {
@@ -115,6 +127,11 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
             {m.applyTitle}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-muted">{m.applyIntro}</p>
+
+          {/* ฟอร์มสมัครงานออนไลน์ (X1.9 ส่วนที่ 2): ใบสมัคร + เรซูเม่ เข้าฐานข้อมูลของบริษัทจริง */}
+          <h3 className="font-display text-fg mt-10 text-xl font-bold">{m.applyFormTitle}</h3>
+          <p className="text-fg-muted mt-2 max-w-2xl text-sm leading-relaxed">{m.applyFormIntro}</p>
+          <ApplicationForm messages={messages} />
 
           <dl className="mt-8 grid gap-5 sm:grid-cols-2">
             <div className="rounded-2xl border border-line bg-surface p-5">

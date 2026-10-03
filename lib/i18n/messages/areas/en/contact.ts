@@ -51,10 +51,16 @@ export const contactPage = {
     subjectPlaceholder: "Briefly summarise your enquiry",
     detailsLabel: "Details",
     detailsPlaceholder: "Tell us more",
+    formSubmitting: "Sending…",
+    formSent: "We have received your message — our team will get back to you soon.",
+    formInvalid: "Some required details are missing or invalid — please check again.",
+    formRateLimited: "Too many submissions — please wait a moment and try again.",
+    formUnavailable: "The message system is temporarily unavailable — please try again or call us.",
+    formConsentRequired: "Please tick the consent box before sending.",
     submit: "Send message",
     consent:
       "I consent to Wai Wai storing and using this information to reply, in line with the privacy policy.",
-    note: "The contact form is not live in this sample version.",
+    note: "Messages sent through this form are stored in our system and used only to reply · you can ask us to delete them at any time.",
     topics: {
       productIssue: "Product enquiry and problem report",
       orderDomestic: "Order products (in Thailand)",

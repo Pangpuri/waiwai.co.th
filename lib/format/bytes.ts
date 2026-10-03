@@ -1,0 +1,8 @@
+/**
+ * แปลงขนาดไฟล์เป็นข้อความอ่านง่าย — ที่เดียวใช้ร่วมกัน (คลังภาพ · ไฟล์แนบใบสมัคร)
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

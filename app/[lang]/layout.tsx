@@ -3,7 +3,6 @@ import { Anuphan, IBM_Plex_Sans_Thai } from "next/font/google";
 
 import "../globals.css";
 
-import { MOURNING_IMAGES, type MourningImageView } from "@/features/shell/mourning";
 import { CookieBanner } from "@/features/shell/ui/cookie-banner";
 import { InlineScript } from "@/features/shell/ui/inline-script";
 import { MourningNotice } from "@/features/shell/ui/mourning-notice";
@@ -20,10 +19,22 @@ import {
 import { COOKIE_CONSENT_INIT_SCRIPT } from "@/lib/cookie-consent";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { HERO_CARD_INIT_SCRIPT } from "@/lib/hero-card";
+import { loadFooterConfig, loadNavbarConfig } from "@/lib/chrome/loader";
+import { loadSiteSettings } from "@/lib/site-settings/loader";
+import { siteNameFor } from "@/lib/site-settings/model";
+import { loadMourningNotice } from "@/lib/mourning/loader";
 import { MOURNING_INIT_SCRIPT } from "@/lib/mourning-notice";
 import { REVEAL_INIT_SCRIPT } from "@/lib/scroll-reveal";
 import { SITE } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme/theme";
+
+/*
+  ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
+  ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
+     (ถ้าเขียน = PAGE_REVALIDATE_SECONDS จะพังด้วย "Invalid segment configuration export detected")
+     เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
+*/
+export const revalidate = 300;
 
 /* ฟอนต์ต้องโหลดผ่าน next/font เท่านั้น (กฎข้อ 7) */
 const headingFont = Anuphan({
@@ -51,22 +62,29 @@ export async function generateMetadata({
   if (!isLocale(lang)) return {};
 
   const messages = await getMessagesFor(lang);
+  /* ตั้งค่าส่วนกลางจากหลังบ้าน (X1.3) — ค่าเริ่มต้น = พฤติกรรมเดิมเป๊ะ */
+  const settings = await loadSiteSettings(lang);
+  const siteName = siteNameFor(settings, lang);
 
   return {
     metadataBase: new URL(SITE.url),
+    /* ไอคอนเว็บ: ใส่เฉพาะเมื่อตั้งไว้ (ไม่ตั้ง = พฤติกรรมเดิม) */
+    ...(settings.favicon === "" ? {} : { icons: { icon: settings.favicon } }),
     title: {
       default: messages.meta.defaultTitle,
-      template: `%s | ${messages.meta.siteName}`,
+      template: `%s | ${siteName}`,
     },
     description: messages.meta.defaultDescription,
     // ไม่ตั้ง `alternates` ที่นี่ — canonical/hreflang ต้องเป็นของแต่ละหน้า
     // (ถ้าตั้งที่ layout ทุกหน้าจะประกาศตัวเองเป็นหน้าแรก) ใช้ buildAlternates() ใน page แทน
     openGraph: {
       type: "website",
-      siteName: messages.meta.siteName,
+      siteName,
       locale: LOCALE_HTML_LANG[lang],
       title: messages.meta.defaultTitle,
       description: messages.meta.defaultDescription,
+      /* รูปแชร์เริ่มต้น: ใช้เมื่อหน้าบางหน้าไม่ได้ตั้งของตัวเอง */
+      ...(settings.defaultOgImage === "" ? {} : { images: [settings.defaultOgImage] }),
     },
   };
 }
@@ -83,6 +101,13 @@ export default async function LocaleLayout({
   */
   const chromeLocale = isLocale(lang) ? lang : DEFAULT_LOCALE;
   const messages = isLocale(lang) ? await getMessagesFor(lang) : await getMessagesFor(DEFAULT_LOCALE);
+
+  /* ค่าป๊อปอัพไว้อาลัย: อ่านจากหลังบ้าน (ฉบับที่เผยแพร่) — ถ้าไม่มีฐานข้อมูล/ข้อมูลเสีย ใช้ค่าเริ่มต้นในโค้ด */
+  const mourningNotice = await loadMourningNotice(chromeLocale);
+  /* แถบเมนูจากหลังบ้าน — null = ใช้เมนูเดิมในโค้ด (ดู lib/chrome/loader.ts) */
+  const navbarConfig = await loadNavbarConfig(chromeLocale);
+  /* ท้ายเว็บจากหลังบ้าน — null = ใช้ของเดิมในโค้ด (W3) */
+  const footerConfig = await loadFooterConfig(chromeLocale);
 
   return (
     <html
@@ -109,13 +134,17 @@ export default async function LocaleLayout({
           {messages.a11y.skipToContent}
         </a>
 
-        <SiteHeader locale={chromeLocale} messages={messages} />
+        {/*
+          ⚠️ รอบที่ 56: ติดธง `data-layout-header` ที่ตัว <header> เอง (ไม่ห่อ div)
+          เพราะการห่อ div ทำให้ `position: sticky` ของหัวเว็บหลุด (มันจะติดอยู่แค่ในกรอบ div นั้น)
+        */}
+        <SiteHeader locale={chromeLocale} messages={messages} navbar={navbarConfig} layoutHeader />
 
         <main id="main" className="flex-1">
           {children}
         </main>
 
-        <SiteFooter locale={chromeLocale} messages={messages} />
+        <SiteFooter locale={chromeLocale} messages={messages} footer={footerConfig} layoutFooter />
 
         <CookieBanner
           policyHref={localePath(chromeLocale, "/cookie-policy")}
@@ -128,24 +157,23 @@ export default async function LocaleLayout({
           }}
         />
 
-        {/* ประกาศไว้อาลัย — แสดงครั้งเดียวต่อการเข้าเว็บ 1 ครั้ง (จำการกดปิดใน localStorage)
-            alt ประกอบจากพจนานุกรมที่นี่ เพื่อให้ Client Component ไม่ต้อง import พจนานุกรม */}
-        <MourningNotice
-          images={MOURNING_IMAGES.map((image): MourningImageView => ({
-            ...image,
-            alt: messages.mourning.images[image.id].alt,
-          }))}
-          labels={{
-            dialogLabel: messages.mourning.dialogLabel,
-            caption: messages.mourning.caption,
-            close: messages.mourning.close,
-            muteToday: messages.mourning.muteToday,
-            seeNext: messages.mourning.seeNext,
-            prev: messages.mourning.prev,
-            next: messages.mourning.next,
-            gotoSlide: messages.mourning.gotoSlide,
-          }}
-        />
+        {/* ประกาศไว้อาลัย — ค่ามาจากหลังบ้าน (แก้ได้เอง) โดยมีค่าเริ่มต้นในโค้ด/พจนานุกรมเป็น fallback
+            ⇒ ถ้าฐานข้อมูลว่างหรือยังไม่ตั้งค่า หน้าเว็บทำงานเหมือนเดิมเป๊ะ (ดู lib/mourning/loader.ts) */}
+        {mourningNotice.enabled && mourningNotice.images.length > 0 ? (
+          <MourningNotice
+            images={mourningNotice.images}
+            labels={{
+              dialogLabel: messages.mourning.dialogLabel,
+              caption: mourningNotice.caption,
+              close: mourningNotice.closeLabel,
+              muteToday: mourningNotice.muteTodayLabel,
+              seeNext: mourningNotice.seeNextLabel,
+              prev: messages.mourning.prev,
+              next: messages.mourning.next,
+              gotoSlide: messages.mourning.gotoSlide,
+            }}
+          />
+        ) : null}
 
         {/* ผูก IntersectionObserver ให้เนื้อหาจางเข้าตอนเลื่อน (สคริปต์ใน <head> เป็นคนเปิดสวิตช์) */}
         <ScrollReveal />

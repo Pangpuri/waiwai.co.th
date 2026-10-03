@@ -114,8 +114,12 @@ function pathSuffix(path: string): string {
 export const PROXY_BYPASS_PREFIXES = [
   "/_next",
   "/api",
+  // หลังบ้านเป็นพื้นที่แยก ไม่มีภาษาใน URL (เข้าที่ /admin เสมอ) → ห้ามเติม prefix ภาษา
+  "/admin",
   "/icons",
   "/images",
+  // คลังภาพที่อัปโหลดจากหลังบ้าน (เสิร์ฟจากฐานข้อมูล) — ไม่มีภาษาใน URL
+  "/media",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",

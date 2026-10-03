@@ -70,3 +70,10 @@ next-env.d.ts
 /PRODUCT_ROADMAP.md
 /CODING_RULES.en.md
 /_CODINGRULES.md_Next.js.md
+# ใบตัดสินใจหลังบ้าน (มีชื่อ/อีเมลผู้ใช้ + ที่เก็บข้อมูล + งบ) — เก็บในเครื่องเท่านั้น
+/BACKEND_DECISIONS.md
+# แผนงานเป็นเฟส/เซสชั่น (เอกสารภายใน — คู่กับ PRODUCT_ROADMAP.md)
+/WORK_PLAN.md
+# ร่างบรีฟ/โน้ตสถาปัตยกรรมจากโมเดลอื่น (สแตกผิด: Drizzle/Zod/WordPress) — อ้างอิงในเครื่องเท่านั้น
+/PRODUCTROADMAP.md_Corporate_CMS_Backend_.md
+/roadmapWP.txt

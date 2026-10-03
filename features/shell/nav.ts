@@ -1,3 +1,4 @@
+import type { NavIconKey } from "@/lib/chrome/navbar";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -28,6 +29,8 @@ export type NavLink = {
   readonly labelKey: NavLabelKey;
   readonly href: string;
   readonly exact: boolean;
+  /** ไอคอนที่เลือกจากหลังบ้าน (ไม่บังคับ — ของเดิมไม่มีไอคอน) */
+  readonly icon?: NavIconKey;
 };
 
 /**

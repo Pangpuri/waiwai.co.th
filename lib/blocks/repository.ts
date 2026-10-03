@@ -1,0 +1,293 @@
+import { getPool, withTransaction } from "@/db/pool";
+import { recordAudit } from "@/lib/audit/log";
+import { countRawBlocks, migrateDocumentValue, storedVersionSummary } from "@/lib/blocks/migrate";
+import { parseBlockDocument } from "@/lib/blocks/parse";
+import type { BlockDocument } from "@/lib/blocks/types";
+
+/**
+ * ที่เก็บ "เอกสารบล็อก" (draft / published) + ประวัติย้อนกลับ — **ฝั่งเซิร์ฟเวอร์เท่านั้น**
+ *
+ * กติกา
+ * - ทุกอย่างอยู่ใน DB ไม่มีไฟล์บนดิสก์ ⇒ ย้ายโฮสต์/Docker ได้ (มติ D9)
+ * - 「เผยแพร่」 = คัดลอก draft → published **และ** บันทึกประวัติในทรานแซกชันเดียว
+ *   (ถ้าขั้นใดพัง ต้องไม่เหลือสภาพ "เผยแพร่ครึ่งทาง")
+ * - เอกสารถูกเก็บเป็น `jsonb` ทั้งก้อน — ตรวจรูปทรงด้วย `parseBlockDocument()` ตอนอ่านเสมอ
+ *   (ข้อมูลใน DB อาจมาจากเวอร์ชันก่อนของโค้ด → ห้ามเชื่อ)
+ */
+
+export type DocumentStatus = "draft" | "published";
+
+export type LoadedDocumentRow = {
+  /** ค่าดิบจาก jsonb — ต้องผ่าน `parseBlockDocument()` ก่อนใช้เสมอ */
+  readonly raw: unknown;
+  readonly updatedAt: string;
+  readonly updatedBy: string | null;
+  readonly publishedAt: string | null;
+};
+
+export type RevisionSummary = {
+  readonly revision: number;
+  readonly note: string | null;
+  readonly createdAt: string;
+  readonly createdBy: string | null;
+  readonly blockCount: number;
+};
+
+type RawDocumentRow = {
+  document: unknown;
+  updated_at: Date;
+  updated_by: string | null;
+  published_at: Date | null;
+};
+
+/** อ่านเอกสารตามสถานะ — คืน null เมื่อยังไม่มีแถว */
+export async function loadDocumentRow(page: string, status: DocumentStatus): Promise<LoadedDocumentRow | null> {
+  const result = await getPool().query<RawDocumentRow>(
+    `select document, updated_at, updated_by, published_at from page_document where page = $1 and status = $2`,
+    [page, status],
+  );
+
+  const row = result.rows[0];
+  if (row === undefined) return null;
+
+  return {
+    raw: row.document,
+    updatedAt: row.updated_at.toISOString(),
+    updatedBy: row.updated_by,
+    publishedAt: row.published_at === null ? null : row.published_at.toISOString(),
+  };
+}
+
+/** บันทึกฉบับร่าง (ไม่มีประวัติ — ประวัติเกิดตอนเผยแพร่) */
+export async function saveDraft(page: string, document: BlockDocument, actor: string): Promise<void> {
+  await getPool().query(
+    `insert into page_document (page, status, document, updated_at, updated_by)
+       values ($1, 'draft', $2::jsonb, now(), $3)
+     on conflict (page, status) do update set
+       document = excluded.document,
+       updated_at = now(),
+       updated_by = excluded.updated_by`,
+    [page, JSON.stringify(document), actor],
+  );
+}
+
+/**
+ * บันทึกฉบับร่างแบบ JSON อะไรก็ได้ (ไม่ใช่เอกสารบล็อก)
+ * ใช้กับ `page = "mourning"` (ประกาศไว้อาลัย) — ได้ตาราง/ประวัติ/การเผยแพร่ชุดเดิมโดยไม่ต้องเพิ่มตารางใหม่
+ */
+export async function saveJsonDraft(page: string, value: unknown, actor: string): Promise<void> {
+  await getPool().query(
+    `insert into page_document (page, status, document, updated_at, updated_by)
+       values ($1, 'draft', $2::jsonb, now(), $3)
+     on conflict (page, status) do update set
+       document = excluded.document,
+       updated_at = now(),
+       updated_by = excluded.updated_by`,
+    [page, JSON.stringify(value), actor],
+  );
+}
+
+/**
+ * เผยแพร่: คัดลอกฉบับร่างเป็นฉบับที่ใช้จริง + เก็บประวัติ
+ * ต้องมีฉบับร่างอยู่ก่อน (ถ้าไม่มี → โยน error ให้หน้าจอบอกผู้ใช้ ไม่ใช่เผยแพร่หน้าเปล่า)
+ */
+export async function publishDraft(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
+  const result = await publishDraftInTransaction(page, actor, note);
+  /* ร่องรอยการเผยแพร่ (X2.2) — เขียนนอก transaction · ล้มเหลวก็ไม่ทำให้การเผยแพร่พัง */
+  await recordAudit({ action: "publish", actorEmail: actor, target: page, detail: note });
+  return result;
+}
+
+async function publishDraftInTransaction(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
+  return withTransaction(async (client) => {
+    const draft = await client.query<{ document: unknown }>(
+      `select document from page_document where page = $1 and status = 'draft'`,
+      [page],
+    );
+    const draftRow = draft.rows[0];
+    if (draftRow === undefined) {
+      throw new Error("ไม่มีฉบับร่างให้เผยแพร่");
+    }
+
+    await client.query(
+      `insert into page_document (page, status, document, updated_at, updated_by, published_at)
+         values ($1, 'published', $2::jsonb, now(), $3, now())
+       on conflict (page, status) do update set
+         document = excluded.document,
+         updated_at = now(),
+         updated_by = excluded.updated_by,
+         published_at = now()`,
+      [page, JSON.stringify(draftRow.document), actor],
+    );
+
+    const revisionResult = await client.query<{ next: number }>(
+      `select coalesce(max(revision), 0) + 1 as next from page_document_revision where page = $1`,
+      [page],
+    );
+    const revision = revisionResult.rows[0]?.next ?? 1;
+
+    await client.query(
+      `insert into page_document_revision (page, revision, document, note, created_by)
+         values ($1, $2, $3::jsonb, $4, $5)`,
+      [page, revision, JSON.stringify(draftRow.document), note, actor],
+    );
+
+    return { revision };
+  });
+}
+
+/** ประวัติการเผยแพร่ (ใหม่สุดก่อน) */
+export async function listRevisions(page: string, limit = 20): Promise<readonly RevisionSummary[]> {
+  const result = await getPool().query<{
+    revision: number;
+    note: string | null;
+    created_at: Date;
+    created_by: string | null;
+    document: unknown;
+  }>(
+    `select revision, note, created_at, created_by, document
+       from page_document_revision
+      where page = $1
+      order by revision desc
+      limit $2`,
+    [page, limit],
+  );
+
+  return result.rows.map((row) => ({
+    revision: row.revision,
+    note: row.note,
+    createdAt: row.created_at.toISOString(),
+    createdBy: row.created_by,
+    /* นับรวมบล็อกที่ซ้อนในคอลัมน์ด้วย (X1.1) — เดิมนับแค่ระดับหน้า ทำให้ตัวเลขต่ำกว่าความจริง */
+    blockCount: countRawBlocks(row.document),
+  }));
+}
+
+/** อ่านเอกสารของรุ่นหนึ่งในประวัติ (ใช้ตอนกู้คืน/ดูก่อนย้อน) */
+export async function loadRevision(page: string, revision: number): Promise<unknown | null> {
+  const result = await getPool().query<{ document: unknown }>(
+    `select document from page_document_revision where page = $1 and revision = $2`,
+    [page, revision],
+  );
+  return result.rows[0]?.document ?? null;
+}
+
+/**
+ * กู้คืนรุ่นเก่า → เขียนทับ **ฉบับร่าง** (ไม่แตะฉบับที่เผยแพร่อยู่)
+ * เจ้าของต้องกด "เผยแพร่" อีกครั้ง → ปลอดภัยกว่าการย้อนทับหน้าเว็บที่คนกำลังดูอยู่
+ */
+export async function restoreRevisionToDraft(page: string, revision: number, actor: string): Promise<void> {
+  const document = await loadRevision(page, revision);
+  if (document === null) {
+    throw new Error(`ไม่พบประวัติรุ่นที่ ${revision}`);
+  }
+
+  await getPool().query(
+    `insert into page_document (page, status, document, updated_at, updated_by)
+       values ($1, 'draft', $2::jsonb, now(), $3)
+     on conflict (page, status) do update set
+       document = excluded.document,
+       updated_at = now(),
+       updated_by = excluded.updated_by`,
+    [page, JSON.stringify(document), actor],
+  );
+}
+
+/* ── "ใช้เนื้อหานี้กับหน้าเว็บจริง" (เซสชั่น S1) ───────────────────────────────── */
+
+/**
+ * หน้านี้ตั้งใจให้หน้าเว็บสาธารณะใช้ **เอกสารฉบับที่เผยแพร่** แทนเลย์เอาต์ที่ออกแบบไว้หรือยัง
+ * เก็บที่แถว `published` เท่านั้น · ค่าเริ่มต้น false = หน้าเว็บใช้ของเดิม (ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ)
+ */
+export async function isPageLive(page: string): Promise<boolean> {
+  const { rows } = await getPool().query<{ readonly is_live: boolean }>(
+    'select is_live from page_document where page = $1 and status = $2',
+    [page, 'published'],
+  );
+  return rows[0]?.is_live === true;
+}
+
+/** เปิด/ปิดการใช้เอกสารนี้กับหน้าเว็บจริง */
+export async function setPageLive(page: string, live: boolean, actor: string): Promise<void> {
+  await getPool().query(
+    'update page_document set is_live = $1, updated_by = $2, updated_at = now() where page = $3 and status = $4',
+    [live, actor, page, 'published'],
+  );
+}
+
+/* ── ตัวย้ายเวอร์ชันของข้อมูลที่เก็บไว้ (X1.1) ────────────────────────────── */
+
+/** เขียนทับเอกสารทั้งก้อนของสถานะหนึ่ง (ใช้โดยตัวย้ายเวอร์ชันเท่านั้น — ทางปกติคือ saveDraft/publishDraft) */
+export async function replaceDocumentRaw(
+  page: string,
+  status: DocumentStatus,
+  document: BlockDocument,
+  actor: string,
+): Promise<void> {
+  await getPool().query(
+    `update page_document
+        set document = $1::jsonb, updated_at = now(), updated_by = $2
+      where page = $3 and status = $4`,
+    [JSON.stringify(document), actor, page, status],
+  );
+}
+
+export type StoredMigrationResult = {
+  /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับร่าง */
+  readonly draft: number;
+  /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับเผยแพร่ */
+  readonly published: number;
+};
+
+/**
+ * ย้ายเอกสารที่เก็บไว้ (ฉบับร่าง + ฉบับเผยแพร่) ให้เป็นรุ่นรูปทรงปัจจุบัน
+ *
+ * ทำไมต้องมีปุ่มนี้ทั้งที่ตัวอ่าน (`parseBlockDocument`) ย้ายให้อยู่แล้ว
+ * - ตัวอ่านย้าย "ในความจำ" ทุกครั้งที่อ่าน ⇒ ข้อมูลในฐานข้อมูลยังเป็นรุ่นเก่าค้างอยู่
+ *   (สำรองข้อมูล/ส่งออก/เครื่องมืออื่นที่อ่าน JSONB ตรง ๆ จะเห็นรูปทรงเก่า)
+ * - ปุ่มนี้ทำให้ข้อมูลสะอาดจบในที่เดียว และตัวย้ายเป็นฟังก์ชันบริสุทธิ์ที่มีเทสต์คุม
+ *
+ * ความปลอดภัย
+ * - **ไม่แตะประวัติ (revision)** — ประวัติคือภาพในอดีต ต้องคงไว้ตามจริง
+ * - เอกสารที่ย้ายแล้วยัง parse ไม่ผ่าน = **ไม่เขียนทับ** (คืน 0) เพื่อไม่ให้ข้อมูลเสียหายหนักกว่าเดิม
+ * - ย้ายซ้ำ = ไม่ทำอะไร (นับเฉพาะบล็อกรุ่นเก่า)
+ */
+export async function migrateStoredDocuments(page: string, actor: string): Promise<StoredMigrationResult> {
+  const counts: { draft: number; published: number } = { draft: 0, published: 0 };
+
+  for (const status of ["draft", "published"] as const) {
+    const row = await loadDocumentRow(page, status);
+    if (row === null) continue;
+
+    const summary = storedVersionSummary(row.raw);
+    if (summary.legacy === 0) continue;
+
+    const parsed = parseBlockDocument(page, migrateDocumentValue(row.raw));
+    if (!parsed.ok) continue;
+
+    await replaceDocumentRaw(page, status, parsed.document, actor);
+    counts[status] = summary.legacy;
+  }
+
+  if (counts.draft + counts.published > 0) {
+    await recordAudit({
+      action: "migrate-blocks",
+      actorEmail: actor,
+      target: page,
+      detail: `draft=${counts.draft} published=${counts.published}`,
+    });
+  }
+
+  return { draft: counts.draft, published: counts.published };
+}
+
+/** สรุปรุ่นของข้อมูลที่เก็บไว้ของหน้านี้ (ใช้เตือนในหน้าจอหลังบ้าน) */
+export async function readStoredVersions(
+  page: string,
+): Promise<{ readonly draft: ReturnType<typeof storedVersionSummary> | null; readonly published: ReturnType<typeof storedVersionSummary> | null }> {
+  const [draftRow, publishedRow] = await Promise.all([loadDocumentRow(page, "draft"), loadDocumentRow(page, "published")]);
+  return {
+    draft: draftRow === null ? null : storedVersionSummary(draftRow.raw),
+    published: publishedRow === null ? null : storedVersionSummary(publishedRow.raw),
+  };
+}

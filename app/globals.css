@@ -441,3 +441,96 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
     transition: none !important;
   }
 }
+
+/*
+  ── พรีวิวหลังบ้าน: ไฮไลต์ตอนชี้ (L1 — รอบที่ 50) ─────────────────────────────
+  ผู้ใช้สั่ง "กดส่วนไหนเป็นส่วนนั้นให้แก้ไข" ⇒ ต้องเห็นก่อนว่าอะไรกดได้
+  ⚠️ เลือกเฉพาะโหมดแก้ไข (ตัวเรนเดอร์ติด `data-editable` ให้เฉพาะพรีวิว) — หน้าเว็บจริงไม่มี attribute นี้
+*/
+[data-editable] [data-block-id]:hover {
+  outline: 2px dashed var(--color-brand-red);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* ส่วนที่กำลังเลือกอยู่ (คลิกแล้ว) — ตีกรอบทึบให้รู้ว่ากำลังแก้ส่วนไหน */
+[data-editable] [data-block-id][data-selected] {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 2px;
+}
+
+/*
+  ── พรีวิวหลังบ้าน: แทน "หัวเว็บ" ของ layout ด้วยหัวเว็บสด (รอบที่ 54/56) ──
+  พรีวิวเรนเดอร์หัวเว็บเอง (SiteHeaderLive) เพื่อให้แก้ navbar แล้วเห็นทันที
+  ⇒ ซ่อนเฉพาะหัวเว็บของ layout (ซึ่งห่อด้วย `data-layout-header`)
+  ⚠️ บทเรียน รอบที่ 56: เดิมซ่อนด้วย `header[data-navbar]` เปล่า ๆ ซึ่งไปโดน "หัวเว็บสด" ด้วย
+     ⇒ พรีวิวไม่เหลือหัวเว็บเลย · และอย่าซ่อนท้ายเว็บ เพราะพรีวิวไม่ได้แทนที่ท้ายเว็บ
+*/
+[data-preview-chrome="1"] header[data-layout-header] {
+  display: none;
+}
+
+/*
+  ── พรีวิว "เฉพาะส่วน" (?parts=nav) — รอบที่ 57 ──
+  ตอนแก้แถบเมนู ไม่ต้องให้ป้ายประกาศ (โอเวอร์เลย์เต็มจอ) หรือเนื้อหาหน้าบังสายตา
+  ⚠️ มีผลเฉพาะในพรีวิว (attribute ตั้งโดยสคริปต์ในหน้า /[lang]/preview/[page])
+*/
+/*
+  ⚠️ บทเรียน รอบที่ 58: ต้องมี `html` นำหน้าเพื่อให้ความจำเพาะ (0,2,1) **เท่ากับ**
+  กฎที่เปิดป้าย `html[data-mourning="shown"] [data-mourning-notice]` — ไม่งั้นกฎเปิดจะชนะแล้วป้ายเด้งทับพรีวิว
+  (ของเดิมเป็น `[data-preview-parts="nav"] [data-mourning-notice]` = (0,2,0) ⇒ แพ้)
+  ใช้ `html[data-preview-parts]` + อยู่ทีหลังในไฟล์ ⇒ ชนะเมื่อความจำเพาะเท่ากัน
+*/
+html[data-preview-parts="nav"] [data-mourning-notice],
+html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice] {
+  display: none;
+}
+
+[data-preview-parts="nav"] [data-preview-content] {
+  display: none;
+}
+
+/*
+  ── พรีวิว "เฉพาะท้ายเว็บ" (?parts=footer) — W3 ──
+  แทนท้ายเว็บของ layout ด้วยท้ายเว็บสด (SiteFooterLive) ⇒ ซ่อนอันของ layout + ซ่อนเนื้อหา
+  ⚠️ ใช้ธง `data-layout-footer` (ไม่ใช่ `footer[data-site-footer]`) เพราะท้ายเว็บสดใช้คอมโพเนนต์เดียวกัน
+*/
+[data-preview-parts="footer"] header[data-layout-header] {
+  display: none;
+}
+
+[data-preview-parts="footer"] footer[data-layout-footer] {
+  display: none;
+}
+
+[data-preview-parts="footer"] [data-mourning-notice] {
+  display: none;
+}
+
+[data-preview-parts="footer"] [data-preview-content] {
+  display: none;
+}
+
+/*
+  ── ซ่อนบล็อกตามขนาดจอ (X1.6) ──
+  ใช้ `data-hide-on="mobile tablet"` + `display:none` (ไม่ใช้คลาส `hidden md:block` ของ Tailwind
+  เพราะบล็อกมี display ได้หลายแบบ — สั่ง `block` ทับจะทำให้เลย์เอาต์เพี้ยน)
+  จุดตัด: มือถือ < 768 · แท็บเล็ต 768–1023 · เดสก์ท็อป ≥ 1024 (ตรงกับค่าเริ่มต้นของ Tailwind)
+*/
+@media (max-width: 767px) {
+  [data-hide-on~="mobile"] {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  [data-hide-on~="tablet"] {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-hide-on~="desktop"] {
+    display: none !important;
+  }
+}

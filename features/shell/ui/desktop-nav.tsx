@@ -4,11 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { activeNavId, type NavLink } from "@/features/shell/nav";
+import { NavIcon } from "./nav-icon";
 
 type DesktopNavProps = {
   readonly links: readonly NavLink[];
   readonly labels: Readonly<Record<string, string>>;
   readonly ariaLabel: string;
+  /** พื้นแถบเมนูเป็นสีเข้ม (แดงแบรนด์/ดํา) ⇒ เปลี่ยนสีตัวอักษรให้อ่านได้ */
+  readonly onDark?: boolean;
 };
 
 /**
@@ -18,7 +21,7 @@ type DesktopNavProps = {
  * แทนที่จะดันล้นจอแนวนอน (ตรวจด้วยการวัด `scrollWidth == clientWidth`)
  * และเลือก active ด้วย `activeNavId` ให้ได้เมนูเดียว ไม่ซ้ำกับเมนูแม่
  */
-export function DesktopNav({ links, labels, ariaLabel }: DesktopNavProps) {
+export function DesktopNav({ links, labels, ariaLabel, onDark = false }: DesktopNavProps) {
   const pathname = usePathname();
   const activeId = activeNavId(pathname, links);
 
@@ -33,10 +36,17 @@ export function DesktopNav({ links, labels, ariaLabel }: DesktopNavProps) {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={[
-                  "relative block whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors",
-                  active ? "text-accent" : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
+                  "relative flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? onDark
+                      ? "text-on-brand"
+                      : "text-accent"
+                    : onDark
+                      ? "text-on-brand/80 hover:bg-on-brand/10 hover:text-on-brand"
+                      : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
                 ].join(" ")}
               >
+                <NavIcon name={link.icon ?? "none"} />
                 {labels[link.id] ?? link.id}
                 {active ? (
                   <span

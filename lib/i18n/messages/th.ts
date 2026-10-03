@@ -5,6 +5,10 @@ import { productsPage } from "./areas/th/catalog.ts";
 import { newsPage, recipesPage } from "./areas/th/contentPages.ts";
 import { careersPage } from "./areas/th/careers.ts";
 import { contactPage } from "./areas/th/contact.ts";
+import { admin } from "./areas/th/admin.ts";
+import { adminMedia } from "./areas/th/adminMedia.ts";
+import { adminSettings } from "./areas/th/adminSettings.ts";
+import { adminDraft } from "./areas/th/adminDraft.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -43,6 +47,7 @@ export const th = {
   cookie,
   notFound,
   mourning,
+  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft },
 };
 
 /**

@@ -6,6 +6,16 @@ import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { loadPageSeo } from "@/lib/pages/repository";
+import { withPageSeo } from "@/lib/seo/page-seo";
+
+/*
+  ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
+  ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
+     (ถ้าเขียน = PAGE_REVALIDATE_SECONDS จะพังด้วย "Invalid segment configuration export detected")
+     เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
+*/
+export const revalidate = 300;
 
 /**
  * หน้า /news (ข่าวสาร & กิจกรรม) — **หน้าตัวอย่าง (mockup) รอการอนุมัติ**
@@ -23,7 +33,8 @@ export async function generateMetadata({
 
   const messages = await getMessagesFor(lang);
 
-  return {
+  /* ค่า SEO จากหลังบ้าน (W2) — ไม่ตั้งค่า = ใช้ค่าเดิมจากพจนานุกรมเป๊ะ */
+  return withPageSeo(lang, "/news", {
     title: { absolute: messages.newsPage.meta.title },
     description: messages.newsPage.meta.description,
     alternates: buildAlternates(lang, "/news"),
@@ -33,7 +44,7 @@ export async function generateMetadata({
       title: messages.newsPage.meta.title,
       description: messages.newsPage.meta.description,
     },
-  };
+  }, () => loadPageSeo("news"));
 }
 
 export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
