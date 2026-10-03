@@ -14,7 +14,7 @@
 import { TRASH_RETENTION_DAYS, MS_PER_DAY, trashCutoffFor } from "@/lib/retention/plan";
 
 /** ชนิดของที่อยู่ในถัง — เพิ่มชนิดใหม่ต้องอัปเดตทุกที่ที่ผูกกับค่านี้ (type บังคับให้รู้ตัว) */
-export const TRASH_KINDS = ["media", "preset"] as const;
+export const TRASH_KINDS = ["media", "preset", "chromePreset"] as const;
 
 export type TrashKind = (typeof TRASH_KINDS)[number];
 
@@ -33,9 +33,13 @@ export const TRASH_AUDIT_ACTIONS = {
 /** target ของ audit log (ใช้ค่าเดียวทั้งชนิด — ชนิดจริงอยู่ใน `target` เช่น `media:<id>`) */
 export const TRASH_AUDIT_TARGET = "trash";
 
-/** จำนวนชนิดของที่อยู่ในถัง (นับเป็น 0 ทุกชนิด) */
+/**
+ * จำนวนชนิดของที่อยู่ในถัง (นับเป็น 0 ทุกชนิด)
+ * ⚠️ เขียนเป็นรายการตรง ๆ โดยเจตนา — เพิ่มชนิดใหม่ใน  แล้ว type จะฟ้องที่นี่ทันที
+ *    (ดีกว่าวนสร้างจากอาร์เรย์แล้วลืมอัปเดตหน้าจอ)
+ */
 export function emptyTrashCounts(): Record<TrashKind, number> {
-  return { media: 0, preset: 0 };
+  return { media: 0, preset: 0, chromePreset: 0 };
 }
 
 export function isTrashKind(value: string): value is TrashKind {

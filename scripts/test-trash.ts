@@ -82,21 +82,22 @@ test("trash: หมดอายุใช้ขอบเขต 'เก่าก�
 });
 
 test("trash: ชนิดของที่อยู่ในถัง — ตรวจค่าจากฟอร์มก่อนเสมอ", () => {
-  assert.deepEqual([...TRASH_KINDS], ["media", "preset"]);
+  assert.deepEqual([...TRASH_KINDS], ["media", "preset", "chromePreset"]);
   assert.equal(isTrashKind("media"), true);
   assert.equal(isTrashKind("preset"), true);
+  assert.equal(isTrashKind("chromePreset"), true);
 
   /* ค่าที่ไม่รู้จักต้องไม่ผ่าน (กันการยิงฟอร์มปลอมมาหา kind อื่น) */
-  for (const bad of ["", "MEDIA", "media ", "users", "media; drop table media", "form_submission", "presets"]) {
+  for (const bad of ["", "MEDIA", "media ", "users", "media; drop table media", "form_submission", "presets", "chromepreset"]) {
     assert.equal(isTrashKind(bad), false, `"${bad}" ต้องไม่ใช่ชนิดที่รู้จัก`);
   }
 });
 
 test("trash: สรุปยอดสำหรับ audit log มีทุกชนิด และยอดรวมถูก", () => {
-  const counts = { media: 2, preset: 3 };
-  assert.equal(trashTotal(counts), 5);
-  assert.equal(summarizeTrash(counts), "media=2 preset=3");
-  assert.equal(summarizeTrash(emptyTrashCounts()), "media=0 preset=0");
+  const counts = { media: 2, preset: 3, chromePreset: 1 };
+  assert.equal(trashTotal(counts), 6);
+  assert.equal(summarizeTrash(counts), "media=2 preset=3 chromePreset=1");
+  assert.equal(summarizeTrash(emptyTrashCounts()), "media=0 preset=0 chromePreset=0");
   assert.equal(trashTotal(emptyTrashCounts()), 0);
 
   /* ชื่อ action ต้องไม่ว่างและไม่ซ้ำกัน (ใช้แยกแยะใน audit log) */

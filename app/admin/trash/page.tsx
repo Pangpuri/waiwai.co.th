@@ -51,6 +51,7 @@ export default async function AdminTrashPage() {
     trashColActions: strings.trashColActions,
     trashKindMedia: strings.trashKindMedia,
     trashKindPreset: strings.trashKindPreset,
+    trashKindChromePreset: strings.trashKindChromePreset,
     trashDaysLeft: strings.trashDaysLeft,
     trashDueNow: strings.trashDueNow,
     trashRestore: strings.trashRestore,

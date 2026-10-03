@@ -15,6 +15,7 @@ import { maintenancePage } from "./areas/en/maintenance.ts";
 import { adminMaintenance } from "./areas/en/adminMaintenance.ts";
 import { adminErasure } from "./areas/en/adminErasure.ts";
 import { adminTrash } from "./areas/en/adminTrash.ts";
+import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/en/previewLink.ts";
 
@@ -69,5 +70,6 @@ export const en: Messages = {
     ...adminErasure,
     ...adminTrash,
     ...adminPreviewLink,
+    ...adminChromePreset,
   },
 };

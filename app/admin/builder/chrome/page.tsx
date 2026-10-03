@@ -2,17 +2,25 @@ import type { Metadata } from "next";
 
 import { publishChromeAction } from "@/app/admin/builder/chrome/actions";
 import { ChromeWorkspace } from "@/features/admin/ui/chrome-workspace";
+import {
+  ChromePresetPanel,
+  type ChromePresetRow,
+  type ChromePresetStrings,
+} from "@/features/admin/ui/chrome-preset-panel";
 import { FooterEditor } from "@/features/admin/ui/footer-editor";
 import { MourningEditor } from "@/features/admin/ui/mourning-editor";
 import { NavbarEditor } from "@/features/admin/ui/navbar-editor";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { loadDocumentRow, listRevisions } from "@/lib/blocks/repository";
+import { MAX_CHROME_PRESETS_PER_KIND, chromePresetCounts, type ChromePreset } from "@/lib/chrome/presets";
+import { listChromePresets } from "@/lib/chrome/preset-repository";
 import { FOOTER_PAGE_KEY, defaultFooterConfig, parseFooterConfig } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY, applyPageMenu, defaultNavbarConfig, parseNavbarConfig } from "@/lib/chrome/navbar";
 import { defaultPages } from "@/lib/pages/model";
 import { listPages } from "@/lib/pages/repository";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { fillTemplate } from "@/lib/i18n/template";
 import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
 /**
@@ -90,6 +98,58 @@ export default async function ChromePage() {
         </span>
       </li>
     );
+  };
+
+  /* ── พรีเซ็ตของส่วนกลาง (W3b): สรุปแต่ละชุดให้อ่านรู้เรื่อง + แปลงเป็นแถวของแผง ── */
+  const presets: readonly ChromePreset[] = await listChromePresets(messages);
+
+  function detailOf(preset: ChromePreset): string {
+    const counts = chromePresetCounts(preset.payload);
+    switch (preset.payload.kind) {
+      case "navbar":
+        return fillTemplate(strings.chromePresetCountNavbar, { items: counts.primary, buttons: counts.secondary });
+      case "footer":
+        return fillTemplate(strings.chromePresetCountFooter, { groups: counts.primary, socials: counts.secondary });
+      case "mourning":
+        return `${fillTemplate(strings.chromePresetCountMourning, { images: counts.primary })} · ${
+          counts.enabled === true ? strings.chromePresetMourningOn : strings.chromePresetMourningOff
+        }`;
+    }
+  }
+
+  const presetRows: readonly ChromePresetRow[] = presets.map((preset) => ({
+    id: preset.id,
+    kind: preset.kind,
+    name: preset.name,
+    detail: detailOf(preset),
+    savedAt: preset.updatedAt.slice(0, 16).replace("T", " "),
+  }));
+
+  const presetStrings: ChromePresetStrings = {
+    chromePresetSaveTitle: strings.chromePresetSaveTitle,
+    chromePresetSaveHint: strings.chromePresetSaveHint,
+    chromePresetNameLabel: strings.chromePresetNameLabel,
+    chromePresetNamePlaceholder: strings.chromePresetNamePlaceholder,
+    chromePresetSourceLabel: strings.chromePresetSourceLabel,
+    chromePresetSourceDraft: strings.chromePresetSourceDraft,
+    chromePresetSourcePublished: strings.chromePresetSourcePublished,
+    chromePresetSave: strings.chromePresetSave,
+    chromePresetSaved: strings.chromePresetSaved,
+    chromePresetOverwritten: strings.chromePresetOverwritten,
+    chromePresetEmpty: strings.chromePresetEmpty,
+    chromePresetListTitle: strings.chromePresetListTitle,
+    chromePresetApply: strings.chromePresetApply,
+    chromePresetApplied: strings.chromePresetApplied,
+    chromePresetApplyHint: strings.chromePresetApplyHint,
+    chromePresetDelete: strings.chromePresetDelete,
+    chromePresetDeleted: strings.chromePresetDeleted,
+    chromePresetSavedAt: strings.chromePresetSavedAt,
+    chromePresetTooMany: strings.chromePresetTooMany,
+    chromePresetBadName: strings.chromePresetBadName,
+    chromePresetSavedFromDefault: strings.chromePresetSavedFromDefault,
+    chromePresetInvalid: strings.chromePresetInvalid,
+    chromePresetNotFound: strings.chromePresetNotFound,
+    chromePresetDbMissing: strings.chromePresetDbMissing,
   };
 
   return (
@@ -179,6 +239,52 @@ export default async function ChromePage() {
           </div>
         }
       />
+
+      {/*
+        ── พรีเซ็ตของส่วนกลาง (W3b) ──────────────────────────────────────────────
+        แผงนี้ทำงานกับ "สามฉาก" ที่ผู้ใช้ขอไว้ (รอบที่ 58):
+          ของเก่า = ฉบับเผยแพร่ (เก็บเป็นชุดได้) · ของใหม่ = ฉบับร่าง (ถูกเขียนทับเมื่อ "ใช้ชุดนี้")
+          พรีเซ็ต = คลังชุดในตาราง chrome_preset
+        ⚠️ "ใช้ชุดนี้" ไม่แตะฉบับเผยแพร่ ⇒ ต้องกด "ใช้กับเว็บจริงเลย" ด้านบนก่อน
+      */}
+      <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.chromePresetTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.chromePresetHint}</p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <section className="flex flex-col gap-2">
+            <p className="text-fg text-xs font-bold">{strings.chromePartNavbar}</p>
+            <ChromePresetPanel
+              kind="navbar"
+              rows={presetRows.filter((row) => row.kind === "navbar")}
+              strings={presetStrings}
+              maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <p className="text-fg text-xs font-bold">{strings.chromePartFooter}</p>
+            <ChromePresetPanel
+              kind="footer"
+              rows={presetRows.filter((row) => row.kind === "footer")}
+              strings={presetStrings}
+              maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <p className="text-fg text-xs font-bold">{strings.chromePartNotice}</p>
+            <ChromePresetPanel
+              kind="mourning"
+              rows={presetRows.filter((row) => row.kind === "mourning")}
+              strings={presetStrings}
+              maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
+            />
+          </section>
+        </div>
+      </section>
     </main>
   );
 }

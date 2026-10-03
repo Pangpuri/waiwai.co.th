@@ -23,6 +23,7 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashColActions: "Manage",
   trashKindMedia: "Image",
   trashKindPreset: "Block preset",
+  trashKindChromePreset: "Site-wide preset",
   trashDaysLeft: "{days} days left",
   trashDueNow: "Will be deleted in the next run",
   trashRestore: "Restore",

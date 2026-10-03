@@ -1,0 +1,244 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { test } from "node:test";
+
+import { NAVBAR_PAGE_KEY, defaultNavbarConfig, navbarErrorsOf, validateNavbarConfig } from "@/lib/chrome/navbar";
+import { FOOTER_PAGE_KEY, defaultFooterConfig } from "@/lib/chrome/footer";
+import {
+  CHROME_PRESET_KINDS,
+  MAX_CHROME_PRESET_NAME_LENGTH,
+  MAX_CHROME_PRESETS_PER_KIND,
+  chromePresetCounts,
+  chromePresetPageKey,
+  chromePresetsAreFull,
+  defaultChromePresetPayload,
+  isChromePresetKind,
+  newChromePresetId,
+  normalizeChromePresetName,
+  parseChromePresetPayload,
+  validateChromePresetConfig,
+} from "@/lib/chrome/presets";
+import { MOURNING_PAGE_KEY, defaultMourningConfig } from "@/lib/mourning/config";
+import { TRASH_KINDS, emptyTrashCounts, isTrashKind, trashTotal } from "@/lib/trash/plan";
+import { th } from "@/lib/i18n/messages/th";
+
+/**
+ * เทสต์ W3b — พรีเซ็ตของส่วนกลาง (แถบเมนู · ท้ายเว็บ · ป้ายประกาศ)
+ *
+ * โจทย์ผู้ใช้ (รอบที่ 58): *"มีของเก่าเก็บไว้ในฐานข้อมูลและโชว์ก่อน · มีของใหม่เตรียมฐานข้อมูลรับ
+ * · มีพรีเซ็ตที่ต้องเตรียมฐานข้อมูลรับ"*
+ *
+ * จุดที่ต้องคุม
+ * 1. **ชนิดของส่วน** ต้องมาจากค่าคงที่ (ค่าจากฟอร์มไม่มีทางเลือกพาธ/ตารางเอง)
+ * 2. **payload ต้องผ่าน parser+validator ของส่วนนั้น** ทั้งตอนบันทึกและตอนอ่าน
+ * 3. **"ใช้ชุดนี้" เขียนทับเฉพาะฉบับร่าง** — ฉบับเผยแพร่ (ของเก่า) ต้องไม่ถูกแตะ
+ * 4. **ลบ = เข้าถังขยะกลาง** ไม่มีทางลบถาวรจากหน้าจอพรีเซ็ต
+ * 5. **ไม่มีข้อความตายตัวในพจนานุกรม** (เพดาน/ความยาวชื่อมาจากค่ากลาง)
+ */
+
+const ROOT = path.resolve(import.meta.dirname, "..");
+
+function sourceOf(relativePath: string): string {
+  return readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
+/* ── 1) ชนิดของส่วน ─────────────────────────────────────────────────────────── */
+
+test("chrome-preset: มีสามส่วนตามที่ผู้ใช้สั่ง และค่าขยะไม่ผ่าน", () => {
+  assert.deepEqual([...CHROME_PRESET_KINDS], ["navbar", "footer", "mourning"], "สามส่วน: แถบเมนู · ท้ายเว็บ · ป้ายประกาศ");
+
+  assert.equal(isChromePresetKind("navbar"), true);
+  assert.equal(isChromePresetKind("footer"), true);
+  assert.equal(isChromePresetKind("mourning"), true);
+
+  for (const bad of ["", "page", "navbar; drop table chrome_preset", "NAVBAR", "home"]) {
+    assert.equal(isChromePresetKind(bad), false, `"${bad}" ต้องไม่ผ่าน`);
+  }
+});
+
+test("chrome-preset: คีย์ของแถวในฐานข้อมูลมาจากค่าคงที่ของแต่ละส่วน (ไม่พิมพ์ซ้ำ)", () => {
+  assert.equal(chromePresetPageKey("navbar"), NAVBAR_PAGE_KEY);
+  assert.equal(chromePresetPageKey("footer"), FOOTER_PAGE_KEY);
+  assert.equal(chromePresetPageKey("mourning"), MOURNING_PAGE_KEY);
+
+  const keys = CHROME_PRESET_KINDS.map((kind) => chromePresetPageKey(kind));
+  assert.equal(new Set(keys).size, keys.length, "แต่ละส่วนต้องคนละคีย์ (ไม่ทับกัน)");
+
+  /* ต้องเป็นค่าที่มีจริงในโค้ดของส่วนนั้น ๆ — ไม่ใช่สตริงที่พิมพ์ขึ้นใหม่ */
+  for (const kind of CHROME_PRESET_KINDS) {
+    const source = sourceOf("lib/chrome/presets.ts");
+    assert.ok(
+      !source.includes(`= "${chromePresetPageKey(kind)}"`),
+      `ห้ามกำหนดคีย์ของ "${kind}" ขึ้นใหม่ในไฟล์พรีเซ็ต — ต้อง import จากของส่วนนั้น`,
+    );
+  }
+});
+
+/* ── 2) ชื่อชุด ──────────────────────────────────────────────────────────────── */
+
+test("chrome-preset: ชื่อชุดใช้กติกาเดียวกับพรีเซ็ตบล็อก", () => {
+  assert.equal(normalizeChromePresetName("  แถบเมนู   งานปีใหม่ "), "แถบเมนู งานปีใหม่");
+  assert.equal(normalizeChromePresetName("   "), null, "ชื่อว่าง = ใช้ไม่ได้");
+  assert.equal(normalizeChromePresetName(""), null);
+
+  const long = "ก".repeat(MAX_CHROME_PRESET_NAME_LENGTH + 50);
+  assert.equal(normalizeChromePresetName(long)?.length, MAX_CHROME_PRESET_NAME_LENGTH, "ยาวเกิน = ตัดให้พอดี");
+
+  assert.ok(newChromePresetId().length >= 8, "รหัสชุดต้องมีพอให้ไม่ชนกัน");
+  assert.notEqual(newChromePresetId(), newChromePresetId());
+});
+
+/* ── 3) อ่าน/ตรวจ payload ───────────────────────────────────────────────────── */
+
+test("chrome-preset: อ่านชุดที่ถูกต้องได้ทุกส่วน และค่าขยะถูกปฏิเสธ", () => {
+  for (const kind of CHROME_PRESET_KINDS) {
+    const parsed = parseChromePresetPayload(kind, defaultChromePresetPayload(kind, th).config, th);
+    assert.ok(parsed !== null, `${kind}: ค่าเริ่มต้นต้องอ่านได้`);
+    assert.equal(parsed.kind, kind);
+    assert.deepEqual(validateChromePresetConfig(parsed), [], `${kind}: ค่าเริ่มต้นต้องไม่มี error`);
+
+    /* ค่าที่ไม่ใช่ "ก้อนข้อมูล" เลย = ปฏิเสธทุกส่วน */
+    for (const bad of [null, undefined, 42, "x", [], true]) {
+      assert.equal(parseChromePresetPayload(kind, bad, th), null, `${kind}: ค่าที่ไม่ใช่ก้อนข้อมูลต้องถูกปฏิเสธ`);
+    }
+
+    /*
+      ก้อนข้อมูลที่ "มีบางฟิลด์" = parser ของส่วนนั้นเติมค่าที่เหลือให้ (เจตนา — ฟิลด์ที่หายไปใช้ค่าเริ่มต้น)
+      ⇒ ต้องได้ชุดที่ใช้ได้ ไม่ใช่ null และต้องไม่มี error
+    */
+    const lenient = parseChromePresetPayload(kind, {}, th);
+    assert.ok(lenient !== null, `${kind}: ก้อนข้อมูลว่างต้องถูกเติมค่าเริ่มต้นให้`);
+    assert.deepEqual(validateChromePresetConfig(lenient), [], `${kind}: ชุดที่เติมค่าเริ่มต้นแล้วต้องไม่มี error`);
+  }
+});
+
+test("chrome-preset: ชุดที่มี error ถูกปฏิเสธ (ไม่เก็บของเสียลงคลัง)", () => {
+  const broken = defaultNavbarConfig(th);
+  const withBadItem = { ...broken, items: broken.items.map((item, index) => (index === 0 ? { ...item, label: { th: "", en: "" } } : item)) };
+
+  assert.ok(navbarErrorsOf(validateNavbarConfig(withBadItem)).length > 0, "ชุดตัวอย่างต้องมี error จริง");
+  assert.equal(parseChromePresetPayload("navbar", withBadItem, th), null, "ชุดที่มี error ต้องไม่ผ่าน");
+});
+
+test("chrome-preset: ตัวเลขสรุปของแต่ละส่วนอ่านจากชุดจริง", () => {
+  const navbar = chromePresetCounts(defaultChromePresetPayload("navbar", th));
+  const footer = chromePresetCounts(defaultChromePresetPayload("footer", th));
+  const mourning = chromePresetCounts(defaultChromePresetPayload("mourning", th));
+
+  assert.equal(navbar.primary, defaultNavbarConfig(th).items.length);
+  assert.equal(navbar.secondary, defaultNavbarConfig(th).buttons.length);
+  assert.equal(navbar.enabled, null, "แถบเมนูไม่มีแนวคิดเปิด/ปิด");
+
+  assert.equal(footer.primary, defaultFooterConfig(th).groups.length);
+  assert.equal(footer.secondary, defaultFooterConfig(th).socials.length);
+
+  assert.equal(mourning.primary, defaultMourningConfig(th).images.length);
+  assert.equal(mourning.enabled, defaultMourningConfig(th).enabled, "ป้ายประกาศต้องบอกว่าตัวป้ายเปิดอยู่ไหม");
+});
+
+test("chrome-preset: เพดานจำนวนชุดต่อส่วน", () => {
+  assert.ok(MAX_CHROME_PRESETS_PER_KIND >= 1);
+  assert.equal(chromePresetsAreFull(0), false);
+  assert.equal(chromePresetsAreFull(MAX_CHROME_PRESETS_PER_KIND - 1), false);
+  assert.equal(chromePresetsAreFull(MAX_CHROME_PRESETS_PER_KIND), true);
+});
+
+/* ── 4) ชั้นฐานข้อมูล ───────────────────────────────────────────────────────── */
+
+test("chrome-preset: บันทึกเป็นชื่อเดียวกันในชนิดเดียวกัน = เขียนทับ และกู้คืนจากถังอัตโนมัติ", () => {
+  const repo = sourceOf("lib/chrome/preset-repository.ts");
+
+  assert.ok(repo.includes("on conflict (kind, lower(name)) do update set"), "ชนกันที่ (kind, ชื่อไม่สนตัวพิมพ์) = ทับ");
+  assert.ok(repo.includes("deleted_at = null"), "ทับชื่อเดิมต้องล้างสถานะถังขยะ (กู้คืนอัตโนมัติ)");
+  assert.ok(repo.includes("deleted_at is null"), "รายการที่ใช้งานต้องไม่รวมของในถัง");
+  assert.ok(repo.includes("normalizeChromePresetName"), "ต้องใช้กติกาชื่อจากค่ากลาง");
+  assert.ok(repo.includes("chromePresetsAreFull"), "ต้องกันคลังบวมไม่จำกัด");
+});
+
+test("chrome-preset: ใช้ชุดนี้เขียนทับเฉพาะฉบับร่าง ไม่แตะฉบับเผยแพร่", () => {
+  const repo = sourceOf("lib/chrome/preset-repository.ts");
+
+  assert.ok(repo.includes("saveJsonDraft(pageKey"), "ต้องเขียนผ่าน saveJsonDraft ของแถว draft");
+  assert.ok(!repo.includes("publishDraft"), "ห้ามเผยแพร่ให้เอง — ผู้ใช้ต้องกดเอง");
+  assert.ok(!/update page_document[^`]*published/.test(repo), "ห้ามเขียนทับแถว published");
+  assert.ok(repo.includes('input.messages'), "ต้องตรวจ payload ด้วยพจนานุกรมของภาษาที่แสดง");
+});
+
+test("chrome-preset: ลบชุดไปที่ถังขยะกลาง (ไม่มีทางลบถาวรจากหน้าจอพรีเซ็ต)", () => {
+  const repo = sourceOf("lib/chrome/preset-repository.ts");
+  assert.ok(!repo.includes("delete from chrome_preset"), "ห้ามมีคำสั่งลบถาวรในชั้นพรีเซ็ต");
+
+  const trash = sourceOf("lib/trash/repository.ts");
+  assert.ok(trash.includes("trashChromePreset"), "ต้องมีตัวย้ายเข้าถังของพรีเซ็ตส่วนกลาง");
+  assert.ok(trash.includes('chromePreset: "chrome_preset"'), "ตารางต้องมาจากค่าคงที่ TABLES");
+  assert.ok(TRASH_KINDS.includes("chromePreset"), "ชนิดต้องอยู่ในรายการกลางของถังขยะ");
+  assert.equal(isTrashKind("chromePreset"), true);
+
+  const counts = emptyTrashCounts();
+  assert.ok(Object.hasOwn(counts, "chromePreset"), "ยอดนับต้องมีชนิดใหม่");
+  assert.equal(trashTotal(counts), 0);
+
+  const trashPage = sourceOf("app/admin/trash/page.tsx");
+  assert.ok(trashPage.includes("trashKindChromePreset"), "หน้าถังขยะต้องมีป้ายชื่อชนิดนี้");
+});
+
+test("chrome-preset: ด่าน DB ต้องพิสูจน์วงจรพรีเซ็ตส่วนกลาง", () => {
+  const checkDb = sourceOf("scripts/check-db.ts");
+  assert.ok(checkDb.includes("checkChromePresets"), "check:db ต้องมีด่านนี้");
+  assert.ok(checkDb.includes("chrome_preset"), "ต้องล้างรอยทดสอบในตาราง chrome_preset");
+});
+
+/* ── 5) สิทธิ์ · หน้าจอ · พจนานุกรม ──────────────────────────────────────────── */
+
+test("chrome-preset: ทุก action ตรวจสิทธิ์ และตรวจชนิดของส่วน", () => {
+  const actions = sourceOf("app/admin/builder/chrome/preset-actions.ts");
+
+  const exported = actions.match(/export async function/g) ?? [];
+  const required = actions.match(/await requireAdminUser\(\)/g) ?? [];
+  assert.equal(exported.length, 3, "ต้องมี 3 action (บันทึก · ใช้ชุด · ลบ)");
+  assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
+
+  assert.ok(actions.includes("isChromePresetKind(kind)"), "ต้องตรวจชนิดของส่วน");
+  assert.ok(actions.includes("trashChromePreset("), "ลบต้องผ่านถังขยะ");
+  assert.ok(actions.includes("revalidatePath(CHROME_PATH)"), "ต้องรีเฟรชหน้าจอหลังแก้");
+});
+
+test("chrome-preset: แผงที่เรนเดอร์ฝั่งเบราว์เซอร์ต้องไม่ดึงชั้นฐานข้อมูลเข้ามา", () => {
+  const panel = sourceOf("features/admin/ui/chrome-preset-panel.tsx");
+
+  assert.ok(panel.startsWith('"use client"'), "ต้องเป็น client component");
+  assert.ok(!panel.includes("preset-repository"), "client ห้าม import ชั้น DB");
+  assert.ok(!panel.includes("@/db/pool"), "client ห้าม import pool");
+  assert.ok(panel.includes("preset-actions"), "ต้องเรียกผ่าน Server Action เท่านั้น");
+});
+
+test("chrome-preset: หน้าจอแสดงครบทั้งสามส่วน (ของเก่า/ของใหม่/พรีเซ็ต)", () => {
+  const page = sourceOf("app/admin/builder/chrome/page.tsx");
+
+  assert.ok(page.includes("listChromePresets("), "หน้าจอต้องอ่านคลังชุด");
+  assert.ok(page.includes('kind="navbar"') && page.includes('kind="footer"') && page.includes('kind="mourning"'), "ต้องมีสามช่อง");
+  assert.ok(page.includes("chromePresetSourcePublished"), "ต้องเลือกเก็บจากของเก่า (ฉบับเผยแพร่) ได้");
+  assert.ok(page.includes("chromePresetSourceDraft"), "ต้องเลือกเก็บจากของใหม่ (ฉบับร่าง) ได้");
+  assert.ok(page.includes("MAX_CHROME_PRESETS_PER_KIND"), "เพดานต้องมาจากค่ากลาง");
+});
+
+test("chrome-preset: พจนานุกรมสองภาษาใช้ตัวเติม ไม่พิมพ์ตัวเลขเอง", () => {
+  for (const locale of ["th", "en"]) {
+    const area = sourceOf(`lib/i18n/messages/areas/${locale}/adminChromePreset.ts`);
+    assert.ok(!area.includes(String(MAX_CHROME_PRESETS_PER_KIND)), `${locale}: ห้ามพิมพ์เพดาน`);
+    assert.ok(!area.includes(String(MAX_CHROME_PRESET_NAME_LENGTH)), `${locale}: ห้ามพิมพ์ความยาวชื่อ`);
+    assert.ok(area.includes("{max}"), `${locale}: ต้องใช้ตัวเติม {max}`);
+    assert.ok(area.includes("{time}"), `${locale}: ต้องใช้ตัวเติม {time}`);
+  }
+});
+
+test("chrome-preset: migration ใหม่ idempotent และมี guard ครบ", () => {
+  const migration = sourceOf("db/migrations/0010-chrome-preset.sql");
+
+  assert.ok(migration.includes("create table if not exists chrome_preset"), "ต้องสร้างตารางแบบ idempotent");
+  assert.ok(migration.includes("check (kind in ('navbar', 'footer', 'mourning'))"), "ต้องกันค่า kind นอกเหนือรายการที่ชั้น DB ด้วย");
+  assert.ok(migration.includes("unique index if not exists chrome_preset_kind_name_key"), "ชื่อซ้ำในชนิดเดียวกันต้องชนกันได้");
+  assert.ok(migration.includes("(kind, lower(name))"), "ต้องไม่สนตัวพิมพ์");
+  assert.ok(migration.includes("deleted_at"), "ต้องเข้ากับถังขยะกลาง");
+});

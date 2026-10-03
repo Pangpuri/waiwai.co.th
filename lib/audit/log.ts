@@ -41,7 +41,11 @@ export type AuditAction =
   /** ยกเลิกลิงก์พรีวิว (X2.6) */
   | "preview-link-revoke"
   /** เก็บกวาดลิงก์พรีวิวที่ปิดแล้วและพ้นอายุเก็บ (X2.6) */
-  | "preview-link-purge";
+  | "preview-link-purge"
+  /** บันทึกชุดสำเร็จของส่วนกลาง (W3b) — navbar/footer/ป้ายประกาศ */
+  | "chrome-preset-save"
+  /** ใช้ชุดสำเร็จของส่วนกลางกับฉบับร่าง (W3b) — ไม่แตะฉบับเผยแพร่ */
+  | "chrome-preset-apply";
 
 export type AuditEntry = {
   readonly action: AuditAction;

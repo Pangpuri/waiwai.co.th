@@ -15,6 +15,7 @@ import { maintenancePage } from "./areas/th/maintenance.ts";
 import { adminMaintenance } from "./areas/th/adminMaintenance.ts";
 import { adminErasure } from "./areas/th/adminErasure.ts";
 import { adminTrash } from "./areas/th/adminTrash.ts";
+import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
 import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/th/previewLink.ts";
 
@@ -68,6 +69,7 @@ export const th = {
     ...adminErasure,
     ...adminTrash,
     ...adminPreviewLink,
+    ...adminChromePreset,
   },
 };
 

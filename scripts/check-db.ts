@@ -29,6 +29,14 @@ import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
 import {
+  applyChromePreset,
+  countChromePresets,
+  listChromePresets,
+  saveChromePresetFromRow,
+} from "@/lib/chrome/preset-repository";
+import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
+import { th } from "@/lib/i18n/messages/th";
+import {
   countActivePreviewLinks,
   createPreviewLink,
   hashPreviewToken,
@@ -37,12 +45,14 @@ import {
   resolvePreviewLink,
   revokePreviewLink,
 } from "@/lib/preview-link/repository";
+import { loadDocumentRow, saveJsonDraft } from "@/lib/blocks/repository";
 import {
   deleteTrashItemPermanently,
   listTrash,
   purgeExpiredTrash,
   restoreTrashItem,
   trashBlockPreset,
+  trashChromePreset,
   trashMedia,
   trashStats,
 } from "@/lib/trash/repository";
@@ -169,6 +179,9 @@ async function main(): Promise<void> {
 
   /* 13) ลิงก์พรีวิวชั่วคราว: สร้าง → เปิดได้ → ปลอม/หมดอายุ/ยกเลิกใช้ไม่ได้ → เก็บกวาด (X2.6 · รอบที่ 79) */
   await checkPreviewLinks();
+
+  /* 14) พรีเซ็ตของส่วนกลาง: เก็บชุด → ใช้ชุด (เฉพาะฉบับร่าง) → ลบเข้าถัง → กู้คืน (W3b · รอบที่ 80) */
+  await checkChromePresets();
 
   await closePool();
 
@@ -827,6 +840,161 @@ async function checkPreviewLinks(): Promise<void> {
     const after = await countWhere("preview_link where created_by = $1", [PREVIEW_LINK_TEST_ACTOR]);
     assert.equal(after, 0, "ลบรอยทดสอบลิงก์พรีวิวต้องไม่เหลืออะไรค้าง");
     done("คืนสภาพตารางลิงก์พรีวิวแล้ว", "ไม่เหลือรอยทดสอบ");
+  }
+}
+
+/**
+ * 14) พรีเซ็ตของส่วนกลาง (W3b · รอบที่ 80) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ "สามฉาก" ที่ผู้ใช้ขอไว้ (รอบที่ 58)
+ * 1. **เก็บชุด** จากของใหม่ (ฉบับร่าง) และจากของเก่า (ฉบับเผยแพร่) ได้ · ชื่อซ้ำ = เขียนทับ (ไม่เกิดชุดซ้ำ)
+ * 2. **ใช้ชุดนี้** เขียนทับ **เฉพาะฉบับร่าง** — ยืนยันด้วยการเทียบ JSON ของแถว draft
+ * 3. **ของเก่าไม่ถูกแตะ** — แถว published ต้องเหมือนเดิมเป๊ะหลังใช้ชุด
+ * 4. **ลบ = เข้าถังขยะกลาง** และ **กู้คืนได้** · บันทึกชื่อเดิมทับ = กู้คืนอัตโนมัติ
+ * 5. **ชนิดต้องตรงกัน** — ใช้ชุดของส่วนหนึ่งกับอีกส่วนไม่ได้
+ *
+ * ⚠️ ล้างรอยทดสอบด้วยชื่อ/ผู้บันทึกของด่านนี้เท่านั้น — ไม่แตะพรีเซ็ตจริงของผู้ใช้
+ * ⚠️ ถ้าส่วนนั้นยังไม่มีแถวใน `page_document` เลย ด่านนี้จะ **สร้างฉบับร่างชั่วคราว** แล้วลบทิ้งในตอนจบ
+ */
+const CHROME_PRESET_TEST_ACTOR = "check-db-chrome-preset@example.invalid";
+const CHROME_PRESET_TEST_NAME = "check-db-navbar-set";
+
+async function checkChromePresets(): Promise<void> {
+  const pool = getPool();
+  const navbarKey = chromePresetPageKey("navbar");
+  const footerKey = chromePresetPageKey("footer");
+
+  const before = await countWhere("chrome_preset where name = $1", [CHROME_PRESET_TEST_NAME]);
+  assert.equal(before, 0, "ต้องไม่มีรอยทดสอบพรีเซ็ตส่วนกลางค้างจากรอบก่อน");
+
+  /* จำสภาพเดิมของแถว draft/published ของ navbar ไว้คืนตอนจบ */
+  const navbarDraftBefore = await loadDocumentRow(navbarKey, "draft");
+  const navbarPublishedBefore = await loadDocumentRow(navbarKey, "published");
+
+  try {
+    /* เตรียม "ของใหม่" ให้มีจริง: ถ้ายังไม่มีฉบับร่าง ใช้ค่าเริ่มต้นของส่วนนั้น (แล้วลบทิ้งตอนจบ) */
+    if (navbarDraftBefore === null) {
+      await saveJsonDraft(navbarKey, defaultChromePresetPayload("navbar", th).config, CHROME_PRESET_TEST_ACTOR);
+      done("เตรียมฉบับร่างของแถบเมนูสำหรับทดสอบ", "จากค่าเริ่มต้น (จะลบทิ้งตอนจบ)");
+    }
+
+    /* ── 1) เก็บชุดจาก "ของใหม่" ── */
+    const saved = await saveChromePresetFromRow({
+      kind: "navbar",
+      name: CHROME_PRESET_TEST_NAME,
+      source: "draft",
+      actor: CHROME_PRESET_TEST_ACTOR,
+      messages: th,
+    });
+    assert.equal(saved.ok, true, "บันทึกชุดจากฉบับร่างต้องสำเร็จ");
+    if (!saved.ok) return;
+
+    const listed = await listChromePresets(th);
+    const mine = listed.filter((preset) => preset.name === CHROME_PRESET_TEST_NAME);
+    assert.equal(mine.length, 1, "ชุดที่บันทึกต้องอยู่ในคลัง");
+    assert.equal(mine[0]?.kind, "navbar", "ชนิดต้องตรงกับที่บันทึก");
+    assert.equal(await countChromePresets("navbar"), mine.length);
+    done("เก็บชุดจากฉบับร่าง (ของใหม่)", `ชุด ${CHROME_PRESET_TEST_NAME}`);
+
+    /* ── 2) ชื่อซ้ำ = เขียนทับ ไม่เกิดชุดซ้ำ ── */
+    const again = await saveChromePresetFromRow({
+      kind: "navbar",
+      name: CHROME_PRESET_TEST_NAME.toUpperCase(),
+      source: "draft",
+      actor: CHROME_PRESET_TEST_ACTOR,
+      messages: th,
+    });
+    assert.equal(again.ok, true, "บันทึกชื่อเดิม (ต่างตัวพิมพ์) ต้องสำเร็จ");
+    assert.equal(again.ok && again.replaced, true, "ต้องบอกว่าเป็นการเขียนทับ");
+    assert.equal(await countWhere("chrome_preset where lower(name) = lower($1)", [CHROME_PRESET_TEST_NAME]), 1, "ต้องมีชุดเดียว");
+    done("ชื่อซ้ำ (ไม่สนตัวพิมพ์) = เขียนทับ", "ไม่เกิดชุดซ้ำในคลัง");
+
+    /* ── 3) ใช้ชุดนี้ → เขียนเฉพาะฉบับร่าง · ของเก่าไม่ถูกแตะ ── */
+    const applied = await applyChromePreset({
+      kind: "navbar",
+      id: saved.id,
+      actor: CHROME_PRESET_TEST_ACTOR,
+      messages: th,
+    });
+    assert.equal(applied.ok, true, "ใช้ชุดต้องสำเร็จ");
+
+    const draftAfter = await loadDocumentRow(navbarKey, "draft");
+    assert.ok(draftAfter !== null, "หลังใช้ชุด ฉบับร่างต้องมีอยู่");
+    assert.deepEqual(
+      draftAfter.raw,
+      mine[0]?.payload.config,
+      "ฉบับร่างต้องเท่ากับชุดที่บันทึกไว้เป๊ะ",
+    );
+
+    const publishedAfter = await loadDocumentRow(navbarKey, "published");
+    assert.deepEqual(
+      publishedAfter?.raw ?? null,
+      navbarPublishedBefore?.raw ?? null,
+      "ของเก่า (ฉบับเผยแพร่) ต้องไม่ถูกแตะ",
+    );
+    done("ใช้ชุดนี้เขียนทับเฉพาะฉบับร่าง", "ของเก่าไม่ถูกแตะ");
+
+    /* ── 4) ชนิดต้องตรง: ใช้ชุด navbar กับ footer ไม่ได้ ── */
+    const wrongKind = await applyChromePreset({
+      kind: "footer",
+      id: saved.id,
+      actor: CHROME_PRESET_TEST_ACTOR,
+      messages: th,
+    });
+    assert.equal(wrongKind.ok, false, "ชุดของส่วนอื่นต้องใช้ไม่ได้");
+    assert.equal(await loadDocumentRow(footerKey, "published"), null, "ห้ามสร้างแถวของส่วนอื่นขึ้นมาเอง");
+    done("ใช้ชุดข้ามส่วนไม่ได้", "กันความผิดพลาดจากค่าที่ส่งมา");
+
+    /* ── 5) ลบ = เข้าถังขยะกลาง แล้วกู้คืนได้ ── */
+    assert.equal(await trashChromePreset(saved.id, CHROME_PRESET_TEST_ACTOR), true, "ลบต้องสำเร็จ");
+    assert.equal(await countWhere("chrome_preset where id = $1 and deleted_at is not null", [saved.id]), 1, "ต้องอยู่ในถัง");
+    assert.equal((await listChromePresets(th)).some((preset) => preset.id === saved.id), false, "ของในถังต้องไม่อยู่ในคลัง");
+
+    const stats = await trashStats();
+    assert.ok(stats.chromePreset >= 1, "ยอดในถังต้องนับพรีเซ็ตส่วนกลาง");
+    const trashEntry = (await listTrash()).find((entry) => entry.id === saved.id);
+    assert.equal(trashEntry?.kind, "chromePreset", "รายการในถังต้องบอกชนิดถูกต้อง");
+
+    assert.equal(await restoreTrashItem("chromePreset", saved.id, CHROME_PRESET_TEST_ACTOR), true, "กู้คืนต้องสำเร็จ");
+    assert.equal((await listChromePresets(th)).some((preset) => preset.id === saved.id), true, "กู้คืนแล้วต้องกลับมาอยู่ในคลัง");
+    done("ลบเข้าถังขยะกลาง → กู้คืนได้", "ชนิด chromePreset ทำงานครบวงจร");
+
+    /* ── 6) บันทึกชื่อเดิมทับขณะอยู่ในถัง = กู้คืนอัตโนมัติ ── */
+    assert.equal(await trashChromePreset(saved.id, CHROME_PRESET_TEST_ACTOR), true, "ย้ายเข้าถังอีกครั้ง");
+    const resaved = await saveChromePresetFromRow({
+      kind: "navbar",
+      name: CHROME_PRESET_TEST_NAME,
+      source: "draft",
+      actor: CHROME_PRESET_TEST_ACTOR,
+      messages: th,
+    });
+    assert.equal(resaved.ok, true, "บันทึกชื่อเดิมทับต้องสำเร็จ");
+    assert.equal(
+      await countWhere("chrome_preset where id = $1 and deleted_at is null", [saved.id]),
+      1,
+      "บันทึกชื่อเดิมต้องกู้คืนกลับมาใช้อัตโนมัติ",
+    );
+    done("บันทึกชื่อเดิมทับ = กู้คืนจากถังอัตโนมัติ", "ไม่มีชุดค้างในถังแบบงง ๆ");
+  } finally {
+    /* คืนสภาพ: ลบเฉพาะของด่านนี้ + คืนแถว navbar ให้เหมือนก่อนทดสอบ */
+    await pool.query("delete from chrome_preset where name = $1 or created_by = $2", [
+      CHROME_PRESET_TEST_NAME,
+      CHROME_PRESET_TEST_ACTOR,
+    ]);
+    await pool.query("delete from audit_log where actor_email = $1", [CHROME_PRESET_TEST_ACTOR]);
+
+    if (navbarDraftBefore === null && navbarPublishedBefore === null) {
+      /* เราเป็นคนสร้างฉบับร่างชั่วคราวเอง (เพราะเดิมไม่มีแถวเลย) ⇒ ลบทิ้งให้สะอาด */
+      await pool.query("delete from page_document where page = $1 and updated_by = $2", [navbarKey, CHROME_PRESET_TEST_ACTOR]);
+    }
+
+    assert.equal(await countWhere("chrome_preset where name = $1", [CHROME_PRESET_TEST_NAME]), 0, "ต้องไม่เหลือรอยทดสอบ");
+    assert.deepEqual(
+      (await loadDocumentRow(navbarKey, "draft"))?.raw ?? null,
+      navbarDraftBefore?.raw ?? null,
+      "ฉบับร่างของแถบเมนูต้องกลับมาเหมือนก่อนทดสอบ",
+    );
+    done("คืนสภาพตารางพรีเซ็ตส่วนกลางแล้ว", "ไม่เหลือรอยทดสอบ");
   }
 }
 

@@ -19,6 +19,7 @@ export const adminTrash = {
   trashColActions: "จัดการ",
   trashKindMedia: "ภาพ",
   trashKindPreset: "พรีเซ็ตบล็อก",
+  trashKindChromePreset: "พรีเซ็ตส่วนกลาง",
   trashDaysLeft: "อีก {days} วัน",
   trashDueNow: "จะถูกลบในรอบถัดไป",
   trashRestore: "กู้คืน",

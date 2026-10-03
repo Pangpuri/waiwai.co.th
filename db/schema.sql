@@ -281,5 +281,24 @@ create table if not exists preview_link (
 create index if not exists preview_link_expires_idx on preview_link (expires_at);
 create index if not exists preview_link_page_idx on preview_link (page, created_at desc);
 
+-- ── พรีเซ็ตของส่วนกลางของเว็บ (W3b · migration 0010) ───────────────────────────
+-- ชุดสำเร็จของ navbar/footer/ป้ายประกาศ · ชื่อซ้ำ (ไม่สนตัวพิมพ์) ทับได้ภายในชนิดเดียวกัน
+-- deleted_at/deleted_by = ใช้ถังขยะกลาง (X2.4) · payload ต้องผ่าน parser ของส่วนนั้นเสมอ
+create table if not exists chrome_preset (
+  id         text        primary key,
+  kind       text        not null check (kind in ('navbar', 'footer', 'mourning')),
+  name       text        not null,
+  payload    jsonb       not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  deleted_by text
+);
+
+create unique index if not exists chrome_preset_kind_name_key on chrome_preset (kind, lower(name));
+create index if not exists chrome_preset_alive_idx on chrome_preset (kind, created_at desc) where deleted_at is null;
+create index if not exists chrome_preset_trash_idx on chrome_preset (deleted_at) where deleted_at is not null;
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

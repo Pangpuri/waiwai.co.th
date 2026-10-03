@@ -45,6 +45,8 @@ export default async function AdminHomePage() {
       "preview-link-create": strings.auditPreviewLinkCreate,
       "preview-link-revoke": strings.auditPreviewLinkRevoke,
       "preview-link-purge": strings.auditPreviewLinkPurge,
+      "chrome-preset-save": strings.auditChromePresetSave,
+      "chrome-preset-apply": strings.auditChromePresetApply,
     };
     return map[action] ?? action;
   };

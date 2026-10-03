@@ -11,6 +11,7 @@ import {
 } from "@/app/admin/trash/actions";
 import { INITIAL_TRASH_STATE, type TrashActionState } from "@/features/admin/trash-state";
 import { fillTemplate } from "@/lib/i18n/template";
+import type { TrashKind } from "@/lib/trash/plan";
 
 /**
  * ส่วนที่ต้องมี JS ของ "ถังขยะ" (X2.4)
@@ -34,6 +35,7 @@ export type TrashStrings = {
   readonly trashColActions: string;
   readonly trashKindMedia: string;
   readonly trashKindPreset: string;
+  readonly trashKindChromePreset: string;
   readonly trashDaysLeft: string;
   readonly trashDueNow: string;
   readonly trashRestore: string;
@@ -51,7 +53,7 @@ export type TrashStrings = {
 };
 
 export type TrashRow = {
-  readonly kind: "media" | "preset";
+  readonly kind: TrashKind;
   readonly id: string;
   readonly label: string;
   readonly detail: string | null;
@@ -60,6 +62,21 @@ export type TrashRow = {
   readonly deletedBy: string | null;
   readonly daysLeft: number | null;
 };
+
+/**
+ * ป้ายชื่อชนิดของในถัง — ใช้ `switch` ครอบทุกชนิดโดยเจตนา
+ * ⇒ เพิ่มชนิดใหม่ใน `TRASH_KINDS` แล้ว type/การคอมไพล์จะฟ้องที่นี่ทันที (ไม่ตกหล่นเงียบ ๆ)
+ */
+function kindLabelOf(strings: TrashStrings, kind: TrashKind): string {
+  switch (kind) {
+    case "media":
+      return strings.trashKindMedia;
+    case "preset":
+      return strings.trashKindPreset;
+    case "chromePreset":
+      return strings.trashKindChromePreset;
+  }
+}
 
 function Submit({ label, danger = false }: { readonly label: string; readonly danger?: boolean }) {
   const { pending } = useFormStatus();
@@ -185,7 +202,7 @@ export function TrashTable({
               key={`${row.kind}-${row.id}`}
               row={row}
               strings={strings}
-              kindLabel={row.kind === "media" ? strings.trashKindMedia : strings.trashKindPreset}
+              kindLabel={kindLabelOf(strings, row.kind)}
               expiryLabel={
                 row.daysLeft === null
                   ? strings.trashDueNow

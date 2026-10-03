@@ -7,6 +7,7 @@ import {
   TRASH_AUDIT_TARGET,
   TRASH_KINDS,
   emptyTrashCounts,
+  isTrashKind,
   summarizeTrash,
   trashTotal,
   type TrashKind,
@@ -26,9 +27,11 @@ import {
  */
 
 /** ชื่อตารางของแต่ละชนิด — คีย์คือ `TrashKind` ที่ตรวจแล้วเท่านั้น */
-const TABLES: Readonly<Record<TrashKind, "media" | "block_preset">> = {
+const TABLES: Readonly<Record<TrashKind, "media" | "block_preset" | "chrome_preset">> = {
   media: "media",
   preset: "block_preset",
+  /* พรีเซ็ตของส่วนกลาง (W3b) — ใช้ถังเดียวกัน ไม่มีทางลบถาวรที่อื่น */
+  chromePreset: "chrome_preset",
 };
 
 export type TrashEntry = {
@@ -87,6 +90,21 @@ export async function listTrash(limit = 200): Promise<readonly TrashEntry[]> {
     [capped],
   );
 
+  const chromePresetRows = await pool.query<{
+    id: string;
+    name: string;
+    kind: string;
+    deleted_at: Date;
+    deleted_by: string | null;
+  }>(
+    `select id, name, kind, deleted_at, deleted_by
+       from chrome_preset
+      where deleted_at is not null
+      order by deleted_at desc
+      limit $1`,
+    [capped],
+  );
+
   const entries: TrashEntry[] = [
     ...mediaRows.rows.map((row) => ({
       kind: "media" as const,
@@ -106,6 +124,15 @@ export async function listTrash(limit = 200): Promise<readonly TrashEntry[]> {
       deletedAt: new Date(row.deleted_at).toISOString(),
       deletedBy: row.deleted_by,
     })),
+    ...chromePresetRows.rows.map((row) => ({
+      kind: "chromePreset" as const,
+      id: row.id,
+      label: row.name,
+      detail: row.kind,
+      sizeBytes: null,
+      deletedAt: new Date(row.deleted_at).toISOString(),
+      deletedBy: row.deleted_by,
+    })),
   ];
 
   entries.sort((a, b) => (a.deletedAt < b.deletedAt ? 1 : a.deletedAt > b.deletedAt ? -1 : 0));
@@ -119,12 +146,15 @@ export async function trashStats(): Promise<TrashStats> {
   const { rows } = await getPool().query<{ kind: string; n: number }>(
     `select 'media'::text as kind, count(*)::int as n from media where deleted_at is not null
      union all
-     select 'preset'::text as kind, count(*)::int as n from block_preset where deleted_at is not null`,
+     select 'preset'::text as kind, count(*)::int as n from block_preset where deleted_at is not null
+     union all
+     select 'chromePreset'::text as kind, count(*)::int as n from chrome_preset where deleted_at is not null`,
   );
 
   const counts = emptyTrashCounts();
   for (const row of rows) {
-    if (row.kind === "media" || row.kind === "preset") counts[row.kind] = row.n;
+    /* ใช้ตัวตรวจกลาง ⇒ เพิ่มชนิดใหม่แล้วไม่ต้องแก้เงื่อนไขซ้ำที่นี่ */
+    if (isTrashKind(row.kind)) counts[row.kind] = row.n;
   }
   return statsOf(counts);
 }
@@ -156,6 +186,14 @@ export async function trashMedia(id: string, actorEmail: string | null): Promise
 
 export async function trashBlockPreset(id: string, actorEmail: string | null): Promise<boolean> {
   return moveToTrash("preset", id, actorEmail);
+}
+
+/**
+ * ย้าย **พรีเซ็ตของส่วนกลาง** (W3b) เข้าถัง — ใช้กลไกเดียวกับภาพ/พรีเซ็ตบล็อก
+ * ⇒ ไม่มีทางลบถาวรของพรีเซ็ตส่วนกลางจากหน้าจอพรีเซ็ต (ต้องผ่านถังเท่านั้น)
+ */
+export async function trashChromePreset(id: string, actorEmail: string | null): Promise<boolean> {
+  return moveToTrash("chromePreset", id, actorEmail);
 }
 
 /** กู้คืนจากถัง — คืน `false` ถ้าไม่พบ หรือของนั้นไม่ได้อยู่ในถัง */
