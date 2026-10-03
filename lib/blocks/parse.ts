@@ -7,6 +7,7 @@ import {
   BLOCK_SPACINGS,
   BLOCK_WIDTHS,
   DEFAULT_BLOCK_STYLE,
+  FORM_BLOCK_KINDS,
   LEGACY_BLOCK_SCHEMA_VERSION,
   MAX_BLOCKS_PER_COLUMN,
   MAX_BLOCKS_PER_PAGE,
@@ -14,18 +15,24 @@ import {
   MAX_BLOCK_DEPTH,
   MAX_CARDS,
   MAX_COLUMNS,
+  MAX_GALLERY_ITEMS,
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
   countBlocks,
   emptyText,
   equalColumnWidth,
   isBlockType,
+  nextPrefixedId,
   readVisibility,
   type Block,
   type BlockCard,
   type BlockColumn,
   type BlockColumnWidth,
   type BlockDocument,
+  type BlockGalleryItem,
   type BlockMedia,
   type BlockStyle,
+  type BlockTableRow,
 } from "@/lib/blocks/types";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
 import type { LocalizedValue } from "@/lib/content/types";
@@ -184,6 +191,139 @@ function readCards(container: Record<string, unknown>, path: string, problems: s
       image: readMedia(entry, "image", `${cardPath}.image`, problems),
     };
   });
+}
+
+/** อ่านข้อความ TH/EN จากค่าดิบตรง ๆ (ใช้กับรายการ เช่น หัวคอลัมน์/เซลล์/คำบรรยายภาพ) */
+function toText(value: unknown, path: string, problems: string[]): LocalizedValue {
+  if (value === undefined || value === null) return emptyText();
+  if (!isRecord(value)) {
+    problems.push(`${path}: ต้องเป็นออบเจ็กต์ {th, en}`);
+    return emptyText();
+  }
+  return {
+    th: readString(value, "th", `${path}.th`, problems),
+    en: readString(value, "en", `${path}.en`, problems),
+  };
+}
+
+/** อ่านภาพจากค่าดิบตรง ๆ — ไม่มีพาธ = null (เหมือนกันทั้งระบบ) */
+function toMedia(value: unknown, path: string, problems: string[]): BlockMedia | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) {
+    problems.push(`${path}: ต้องเป็นออบเจ็กต์ของภาพ`);
+    return null;
+  }
+  const mediaPath = readString(value, "path", `${path}.path`, problems);
+  if (mediaPath === "") return null;
+  return {
+    path: mediaPath,
+    altTh: readString(value, "altTh", `${path}.altTh`, problems),
+    altEn: readString(value, "altEn", `${path}.altEn`, problems),
+    hasWatermark: readBoolean(value, "hasWatermark", `${path}.hasWatermark`, problems),
+  };
+}
+
+/** อ่านรายการข้อความ TH/EN (หัวคอลัมน์ของตาราง) พร้อมเพดานจำนวน */
+function readTextList(
+  container: Record<string, unknown>,
+  key: string,
+  path: string,
+  problems: string[],
+  limit: number,
+): readonly LocalizedValue[] {
+  const value = container[key];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.${key}: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > limit) {
+    problems.push(`${path}.${key}: เกินที่อนุญาต (${value.length} > ${limit}) — ตัดส่วนเกินทิ้ง`);
+  }
+  return value.slice(0, limit).map((raw, index) => toText(raw, `${path}.${key}[${index}]`, problems));
+}
+
+/** อ่านแถวของตาราง — **จัดช่องให้เท่าหัวคอลัมน์เสมอ** (ขาด = ว่าง · เกิน = ตัดทิ้ง) */
+function readTableRows(
+  entry: Record<string, unknown>,
+  path: string,
+  problems: string[],
+  columnCount: number,
+): readonly BlockTableRow[] {
+  const value = entry["rows"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.rows: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_TABLE_ROWS) {
+    problems.push(`${path}.rows: เกินที่อนุญาต (${value.length} > ${MAX_TABLE_ROWS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  return value.slice(0, MAX_TABLE_ROWS).map((raw, index) => {
+    const rowPath = `${path}.rows[${index}]`;
+    const record = isRecord(raw) ? raw : {};
+    if (!isRecord(raw)) problems.push(`${rowPath}: ต้องเป็นออบเจ็กต์`);
+
+    let id = readString(record, "id", `${rowPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${rowPath}.id: ซ้ำกับแถวก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("row", seen);
+    }
+    seen.add(id);
+
+    const cellsRaw = record["cells"];
+    if (cellsRaw !== undefined && !Array.isArray(cellsRaw)) problems.push(`${rowPath}.cells: ต้องเป็นรายการ`);
+    const cells = Array.isArray(cellsRaw) ? cellsRaw : [];
+    const normalized = Array.from({ length: columnCount }, (_unused, cellIndex) =>
+      toText(cells[cellIndex], `${rowPath}.cells[${cellIndex}]`, problems),
+    );
+    return { id, cells: normalized };
+  });
+}
+
+/** อ่านภาพในแกลเลอรี — ใบที่ยังไม่เลือกภาพ (`image = null`) ยังเก็บไว้ได้ (validator เตือนเอง) */
+function readGalleryItems(entry: Record<string, unknown>, path: string, problems: string[]): readonly BlockGalleryItem[] {
+  const value = entry["items"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.items: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_GALLERY_ITEMS) {
+    problems.push(`${path}.items: เกินที่อนุญาต (${value.length} > ${MAX_GALLERY_ITEMS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  const items: BlockGalleryItem[] = [];
+  value.slice(0, MAX_GALLERY_ITEMS).forEach((raw, index) => {
+    const itemPath = `${path}.items[${index}]`;
+    if (!isRecord(raw)) {
+      problems.push(`${itemPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+
+    let id = readString(raw, "id", `${itemPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${itemPath}.id: ซ้ำกับภาพก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("img", seen);
+    }
+    seen.add(id);
+
+    items.push({
+      id,
+      image: toMedia(raw["image"], `${itemPath}.image`, problems),
+      caption: toText(raw["caption"], `${itemPath}.caption`, problems),
+    });
+  });
+  return items;
+}
+
+/** จำนวนคอลัมน์ของแกลเลอรี (2 | 3 | 4) */
+function readGalleryColumns(container: Record<string, unknown>, path: string, problems: string[]): 2 | 3 | 4 {
+  const value = readIntChoice(container, "columns", [2, 3, 4], 3, path, problems);
+  return value === 2 ? 2 : value === 4 ? 4 : 3;
 }
 
 function readColumns(container: Record<string, unknown>, path: string, problems: string[]): 1 | 2 | 3 | 4 {
@@ -382,6 +522,45 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
       };
     case "divider":
       return { ...base, type: "divider" };
+    case "table": {
+      const columns = readTextList(entry, "columns", path, problems, MAX_TABLE_COLUMNS);
+      if (columns.length === 0) problems.push(`${path}.columns: ต้องมีอย่างน้อย 1 คอลัมน์`);
+      return {
+        ...base,
+        type: "table",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        caption: readText(entry, "caption", `${path}.caption`, problems),
+        columns,
+        rows: readTableRows(entry, path, problems, columns.length),
+        firstColumnHeader: readBoolean(entry, "firstColumnHeader", `${path}.firstColumnHeader`, problems),
+      };
+    }
+    case "map":
+      return {
+        ...base,
+        type: "map",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        caption: readText(entry, "caption", `${path}.caption`, problems),
+        image: readMedia(entry, "image", `${path}.image`, problems),
+        linkHref: readString(entry, "linkHref", `${path}.linkHref`, problems),
+        linkLabel: readText(entry, "linkLabel", `${path}.linkLabel`, problems),
+      };
+    case "form":
+      return {
+        ...base,
+        type: "form",
+        kind: readChoice(entry, "kind", FORM_BLOCK_KINDS, "contact", `${path}.kind`, problems),
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+      };
+    case "gallery":
+      return {
+        ...base,
+        type: "gallery",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        items: readGalleryItems(entry, path, problems),
+        columns: readGalleryColumns(entry, `${path}.columns`, problems),
+      };
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };
   }

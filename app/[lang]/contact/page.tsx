@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SubmitForm } from "@/features/forms/ui/submit-form";
+import { ContactFormFields } from "@/features/forms/ui/form-fields";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
@@ -9,7 +10,6 @@ import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import {
   CONTACT_PHONES,
   CONTACT_PLANTS,
-  CONTACT_TOPICS,
   MAP_IMAGE,
 } from "@/features/contact/content";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
@@ -77,18 +77,6 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
   }
 
   const m = messages.contactPage;
-
-  const fieldClass =
-    "w-full rounded-xl border-2 border-line-strong bg-surface px-4 py-3 text-sm text-fg outline-none placeholder:text-fg-muted/70 focus:border-brand-red";
-  const labelClass = "block text-sm font-semibold text-fg";
-  const requiredMark = (
-    <>
-      {" "}
-      <span aria-hidden="true" className="text-brand-red">
-        *
-      </span>
-    </>
-  );
 
   return (
     <>
@@ -190,110 +178,24 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
               <p className="border-line bg-surface text-fg-muted rounded-2xl border px-4 py-3 text-xs leading-relaxed">{m.note}</p>
             }
           >
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className={labelClass} htmlFor="contact-topic">
-                  {m.topicLabel}
-                  {requiredMark}
-                </label>
-                <select
-                  id="contact-topic"
-                  name="topic"
-                  required
-                  defaultValue=""
-                  className={`mt-2 ${fieldClass}`}
-                >
-                  <option value="" disabled>
-                    {m.topicPlaceholder}
-                  </option>
-                  {CONTACT_TOPICS.map((topic) => (
-                    <option key={topic} value={topic}>
-                      {m.topics[topic]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass} htmlFor="contact-name">
-                  {m.nameLabel}
-                  {requiredMark}
-                </label>
-                <input
-                  id="contact-name"
-                  name="name"
-                  type="text"
-                  required
-                  autoComplete="name"
-                  placeholder={m.namePlaceholder}
-                  className={`mt-2 ${fieldClass}`}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass} htmlFor="contact-email">
-                  {m.emailLabel}
-                  {requiredMark}
-                </label>
-                <input
-                  id="contact-email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder={m.emailPlaceholder}
-                  className={`mt-2 ${fieldClass}`}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass} htmlFor="contact-phone">
-                  {m.phoneFieldLabel}
-                  {requiredMark}
-                </label>
-                <input
-                  id="contact-phone"
-                  name="phone"
-                  type="tel"
-                  required
-                  autoComplete="tel"
-                  placeholder={m.phonePlaceholder}
-                  className={`mt-2 ${fieldClass}`}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass} htmlFor="contact-subject">
-                  {m.subjectLabel}
-                  {requiredMark}
-                </label>
-                <input
-                  id="contact-subject"
-                  name="subject"
-                  type="text"
-                  required
-                  placeholder={m.subjectPlaceholder}
-                  className={`mt-2 ${fieldClass}`}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className={labelClass} htmlFor="contact-details">
-                  {m.detailsLabel}
-                  {requiredMark}
-                </label>
-                <textarea
-                  id="contact-details"
-                  name="details"
-                  required
-                  rows={6}
-                  placeholder={m.detailsPlaceholder}
-                  className={`mt-2 ${fieldClass}`}
-                />
-              </div>
-            </div>
-
-            <p className="text-fg-muted mt-4 text-xs">{m.requiredNote}</p>
+            <ContactFormFields
+              strings={{
+                topicLabel: m.topicLabel,
+                topicPlaceholder: m.topicPlaceholder,
+                topics: m.topics,
+                nameLabel: m.nameLabel,
+                namePlaceholder: m.namePlaceholder,
+                emailLabel: m.emailLabel,
+                emailPlaceholder: m.emailPlaceholder,
+                phoneLabel: m.phoneFieldLabel,
+                phonePlaceholder: m.phonePlaceholder,
+                subjectLabel: m.subjectLabel,
+                subjectPlaceholder: m.subjectPlaceholder,
+                detailsLabel: m.detailsLabel,
+                detailsPlaceholder: m.detailsPlaceholder,
+                requiredNote: m.requiredNote,
+              }}
+            />
           </SubmitForm>
         </div>
       </section>

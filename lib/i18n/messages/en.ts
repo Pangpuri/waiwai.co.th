@@ -5,6 +5,7 @@ import { productsPage } from "./areas/en/catalog.ts";
 import { newsPage, recipesPage } from "./areas/en/contentPages.ts";
 import { careersPage } from "./areas/en/careers.ts";
 import { contactPage } from "./areas/en/contact.ts";
+import { blocks } from "./areas/en/blocks.ts";
 import { admin } from "./areas/en/admin.ts";
 import { adminMedia } from "./areas/en/adminMedia.ts";
 import { adminSettings } from "./areas/en/adminSettings.ts";
@@ -17,6 +18,7 @@ import { adminErasure } from "./areas/en/adminErasure.ts";
 import { adminTemplate } from "./areas/en/adminTemplate.ts";
 import { adminTrash } from "./areas/en/adminTrash.ts";
 import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
+import { adminBlockTypes } from "./areas/en/adminBlockTypes.ts";
 import { adminRbac } from "./areas/en/adminRbac.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/en/previewLink.ts";
@@ -64,6 +66,7 @@ export const en: Messages = {
   maintenancePage,
   previewLinkPage,
   pendingPages,
+  blocks,
   admin: {
     ...admin,
     ...adminMedia,
@@ -77,5 +80,6 @@ export const en: Messages = {
     ...adminPreviewLink,
     ...adminRbac,
     ...adminChromePreset,
+    ...adminBlockTypes,
   },
 };

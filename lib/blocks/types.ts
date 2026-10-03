@@ -1,4 +1,5 @@
 import type { LocalizedValue } from "@/lib/content/types";
+import { FORM_KINDS, type FormKind } from "@/lib/forms/model";
 
 /**
  * โมเดล "บล็อกอิสระ" (page builder) — แกนใหม่ของหลังบ้าน ตามมติผู้ใช้ 2026-10-02
@@ -16,7 +17,21 @@ import type { LocalizedValue } from "@/lib/content/types";
  * - หน้าแรกเดิม (140 ฟิลด์มีโครง) ยังอยู่ใน `content_field` และไม่ถูกแตะ — ค่อยย้ายทีละส่วน
  */
 
-export const BLOCK_TYPES = ["hero", "heading", "richText", "imageText", "cards", "cta", "quote", "divider", "row"] as const;
+export const BLOCK_TYPES = [
+  "hero",
+  "heading",
+  "richText",
+  "imageText",
+  "cards",
+  "cta",
+  "quote",
+  "divider",
+  "row",
+  "table",
+  "map",
+  "form",
+  "gallery",
+] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
@@ -220,6 +235,78 @@ export type RowBlock = BlockBase & {
   readonly columns: readonly BlockColumn[];
 };
 
+/* ── ชนิดบล็อกใหม่ รอบที่ 86 (ตาราง · แผนที่ · ฟอร์ม · แกลเลอรี) ─────────────── */
+
+/** แถวของบล็อก "ตาราง" — เซลล์ทุกช่องเป็นข้อความ TH/EN (มติ D3) */
+export type BlockTableRow = {
+  readonly id: string;
+  readonly cells: readonly LocalizedValue[];
+};
+
+/**
+ * บล็อก "ตาราง" — หัวคอลัมน์ + แถวข้อมูล
+ * ⚠️ บนจอมือถือ **เลื่อนแนวนอน** ได้ (ไม่บีบข้อความจนอ่านไม่ออก) — ดู `block-renderer.tsx`
+ */
+export type TableBlock = BlockBase & {
+  readonly type: "table";
+  readonly heading: LocalizedValue;
+  /** คำบรรยายใต้ตาราง (ไม่บังคับ) */
+  readonly caption: LocalizedValue;
+  readonly columns: readonly LocalizedValue[];
+  readonly rows: readonly BlockTableRow[];
+  /** คอลัมน์แรกเป็น "หัวแถว" (ใส่ `<th scope="row">` ให้ screen reader อ่านถูก) */
+  readonly firstColumnHeader: boolean;
+};
+
+/**
+ * บล็อก "แผนที่" — **ภาพแผนที่** (มติ D9: เก็บพาธ) + คำบรรยาย + ลิงก์เปิดแผนที่จริง
+ * ⚠️ ตั้งใจไม่ฝัง iframe/พิกัด: ไม่ส่ง IP ผู้เข้าชมไปบุคคลที่สาม และไม่เพิ่ม dependency
+ *    (ตรงกับหน้า `/contact` เดิมที่ใช้ภาพแผนที่ที่บริษัททำเอง)
+ */
+export type MapBlock = BlockBase & {
+  readonly type: "map";
+  readonly heading: LocalizedValue;
+  readonly caption: LocalizedValue;
+  readonly image: BlockMedia | null;
+  /** ลิงก์ "เปิดในแผนที่" — ตรวจด้วย `isSafeHref()` (https:// เท่านั้น) */
+  readonly linkHref: string;
+  readonly linkLabel: LocalizedValue;
+};
+
+/**
+ * ชนิดฟอร์มที่ฝังในบล็อกได้ — **อ้างทะเบียนกลางตัวเดียวกับ Server Action** (`lib/forms/model.ts`)
+ * (ฟอร์มจริง: เก็บลงฐานข้อมูล · มีกับดักบอต · ยินยอม PDPA · ตรวจซ้ำฝั่งเซิร์ฟเวอร์)
+ */
+export const FORM_BLOCK_KINDS = FORM_KINDS;
+export type FormBlockKind = FormKind;
+
+export function isFormBlockKind(value: string): value is FormBlockKind {
+  return (FORM_BLOCK_KINDS as readonly string[]).includes(value);
+}
+
+/** บล็อก "ฟอร์ม" — ฝังฟอร์มจริงของเว็บ (ติดต่อ/ข่าวสาร/สมัครงาน) โดยใช้ระบบเดิมทั้งชุด */
+export type FormBlock = BlockBase & {
+  readonly type: "form";
+  readonly kind: FormBlockKind;
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+};
+
+/** รูปหนึ่งใบในบล็อก "แกลเลอรี" — `image = null` คือยังไม่ได้เลือกภาพ (validator เตือน · หน้าเว็บข้ามใบนั้น) */
+export type BlockGalleryItem = {
+  readonly id: string;
+  readonly image: BlockMedia | null;
+  readonly caption: LocalizedValue;
+};
+
+/** บล็อก "แกลเลอรี + lightbox" — คลิกภาพแล้วเปิดดูเต็มจอ (เขียนเอง · ไม่เพิ่ม dependency) */
+export type GalleryBlock = BlockBase & {
+  readonly type: "gallery";
+  readonly heading: LocalizedValue;
+  readonly items: readonly BlockGalleryItem[];
+  readonly columns: 2 | 3 | 4;
+};
+
 export type Block =
   | HeroBlock
   | HeadingBlock
@@ -229,7 +316,11 @@ export type Block =
   | CtaBlock
   | QuoteBlock
   | DividerBlock
-  | RowBlock;
+  | RowBlock
+  | TableBlock
+  | MapBlock
+  | FormBlock
+  | GalleryBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -259,6 +350,10 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "quote", label: "คำกล่าว", hint: "ข้อความอ้างอิง + ผู้กล่าว" },
   { type: "divider", label: "เส้นคั่น", hint: "เว้นวรรคด้วยเส้นบาง" },
   { type: "row", label: "แถว (คอลัมน์)", hint: "แบ่งเป็น 1-4 คอลัมน์ แล้ววางบล็อกซ้อนในแต่ละคอลัมน์" },
+  { type: "table", label: "ตาราง", hint: "หัวคอลัมน์ + แถวข้อมูล (เลื่อนแนวนอนได้บนมือถือ)" },
+  { type: "map", label: "แผนที่", hint: "ภาพแผนที่ + คำบรรยาย + ลิงก์เปิดแผนที่" },
+  { type: "form", label: "ฟอร์ม", hint: "ฝังฟอร์มจริง (ติดต่อ · ข่าวสาร · สมัครงาน)" },
+  { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox)" },
 ];
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
@@ -285,6 +380,11 @@ export const MAX_BLOCKS_PER_COLUMN = 12;
 export const MAX_BLOCK_DEPTH = 1;
 /** จำนวนการ์ดสูงสุดในบล็อกเดียว */
 export const MAX_CARDS = 12;
+/** จำนวนคอลัมน์/แถวสูงสุดในบล็อก "ตาราง" (กันตารางยักษ์ที่อ่านไม่ไหว) */
+export const MAX_TABLE_COLUMNS = 8;
+export const MAX_TABLE_ROWS = 30;
+/** จำนวนภาพสูงสุดในบล็อก "แกลเลอรี" (กันหน้าโหลดหนักจากภาพไม่จำกัด) */
+export const MAX_GALLERY_ITEMS = 24;
 
 export function emptyText(): LocalizedValue {
   return { th: "", en: "" };
@@ -292,7 +392,13 @@ export function emptyText(): LocalizedValue {
 
 /** สร้างบล็อกใหม่ตามชนิด พร้อมค่าเริ่มต้นที่พร้อมแก้ */
 export function createBlock(type: BlockType, id: string): Block {
-  const style: BlockStyle = type === "hero" ? { ...DEFAULT_BLOCK_STYLE, size: "lg", width: "full" } : { ...DEFAULT_BLOCK_STYLE };
+  const style: BlockStyle =
+    type === "hero"
+      ? { ...DEFAULT_BLOCK_STYLE, size: "lg", width: "full" }
+      : /* ตาราง/แกลเลอรีเริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุดอ่านยากถ้าแคบ */
+        type === "table" || type === "gallery"
+        ? { ...DEFAULT_BLOCK_STYLE, width: "wide" }
+        : { ...DEFAULT_BLOCK_STYLE };
   const base = { id, version: BLOCK_SCHEMA_VERSION, style };
 
   switch (type) {
@@ -324,6 +430,23 @@ export function createBlock(type: BlockType, id: string): Block {
     case "row":
       /* เริ่มด้วย 2 คอลัมน์แบ่งครึ่ง (ผู้ใช้เพิ่ม/ลด/ปรับความกว้างได้ในแผงตั้งค่า) */
       return { ...base, type: "row", columns: createColumns(2) };
+    case "table":
+      /* เริ่มด้วย 2 คอลัมน์ + 1 แถว (หัวตารางว่าง = validator เตือนให้กรอกก่อนเผยแพร่) */
+      return {
+        ...base,
+        type: "table",
+        heading: emptyText(),
+        caption: emptyText(),
+        columns: [emptyText(), emptyText()],
+        rows: [{ id: "row-1", cells: [emptyText(), emptyText()] }],
+        firstColumnHeader: false,
+      };
+    case "map":
+      return { ...base, type: "map", heading: emptyText(), caption: emptyText(), image: null, linkHref: "", linkLabel: emptyText() };
+    case "form":
+      return { ...base, type: "form", kind: "contact", heading: emptyText(), body: emptyText() };
+    case "gallery":
+      return { ...base, type: "gallery", heading: emptyText(), items: [], columns: 3 };
   }
 }
 
@@ -383,6 +506,21 @@ export function nextBlockIdFrom(used: ReadonlySet<string>): string {
 /** สร้าง id ใหม่ที่ไม่ซ้ำกับที่มีอยู่ — **นับบล็อกที่ซ้อนอยู่ในคอลัมน์ด้วย** (ไม่ใช้สุ่ม เพื่อให้ผลซ้ำได้ในเทสต์) */
 export function nextBlockId(existing: readonly Block[]): string {
   return nextBlockIdFrom(new Set(collectBlockIds(existing)));
+}
+
+/**
+ * สร้าง id ที่มีคำนำหน้าและไม่ซ้ำกับชุดที่ใช้แล้ว
+ * ใช้กับ "id ภายในบล็อก" เช่น แถวของตาราง (`row-`) และภาพในแกลเลอรี (`img-`)
+ * (ไม่ใช้การสุ่ม ⇒ ผลซ้ำได้ในเทสต์)
+ */
+export function nextPrefixedId(prefix: string, used: ReadonlySet<string>): string {
+  let index = used.size + 1;
+  let candidate = `${prefix}-${index}`;
+  while (used.has(candidate)) {
+    index += 1;
+    candidate = `${prefix}-${index}`;
+  }
+  return candidate;
 }
 
 /* ── เดินดูบล็อกทั้งหน้า (รวมบล็อกที่ซ้อน) ───────────────────────────────────

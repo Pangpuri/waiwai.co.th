@@ -4,14 +4,19 @@ import {
   MAX_BLOCKS_TOTAL,
   MAX_CARDS,
   MAX_COLUMNS,
+  MAX_GALLERY_ITEMS,
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
   VISIBLE_EVERYWHERE,
   collectBlockIds,
   countBlocks,
   createBlock,
+  emptyText,
   equalColumnWidth,
   findBlockLocation,
   nextBlockIdFrom,
   nextColumnId,
+  nextPrefixedId,
   type Block,
   type BlockCard,
   type BlockColumnWidth,
@@ -539,4 +544,191 @@ export function duplicateBlock(document: BlockDocument, id: string): BlockDocume
   const used = new Set(collectBlockIds(document.blocks));
   target.splice(location.index + 1, 0, withFreshIds(structuredClone(source) as unknown as MutableBlock, used));
   return next as unknown as BlockDocument;
+}
+
+/* ── ตาราง (รอบที่ 86) ───────────────────────────────────────────────────── */
+
+/** เพิ่มคอลัมน์ — เพิ่มช่องว่างให้ทุกแถวพร้อมกัน (จำนวนช่องเท่าหัวคอลัมน์เสมอ) */
+export function canAddTableColumn(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "table" && block.columns.length < MAX_TABLE_COLUMNS;
+}
+
+export function addTableColumn(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddTableColumn(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    block.columns.push(emptyText());
+    for (const row of block.rows) row.cells.push(emptyText());
+  });
+}
+
+/** ลบคอลัมน์ได้เมื่อเหลือมากกว่า 1 คอลัมน์ (ตารางต้องมีหัวอย่างน้อยหนึ่งช่อง) */
+export function canRemoveTableColumn(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "table" && block.columns.length > 1;
+}
+
+export function removeTableColumn(document: BlockDocument, id: string, columnIndex: number): BlockDocument {
+  if (!canRemoveTableColumn(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    if (columnIndex < 0 || columnIndex >= block.columns.length) return;
+    block.columns.splice(columnIndex, 1);
+    for (const row of block.rows) row.cells.splice(columnIndex, 1);
+  });
+}
+
+export function setTableColumnText(
+  document: BlockDocument,
+  id: string,
+  columnIndex: number,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    const column = block.columns[columnIndex];
+    if (column === undefined) return;
+    column[language] = value;
+  });
+}
+
+/** คอลัมน์แรกเป็น "หัวแถว" หรือไม่ (a11y: `<th scope="row">`) */
+export function setTableFirstColumnHeader(document: BlockDocument, id: string, value: boolean): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type === "table") block.firstColumnHeader = value;
+  });
+}
+
+export function canAddTableRow(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "table" && block.rows.length < MAX_TABLE_ROWS;
+}
+
+export function addTableRow(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddTableRow(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    const used = new Set(block.rows.map((row) => row.id));
+    block.rows.push({ id: nextPrefixedId("row", used), cells: block.columns.map(() => emptyText()) });
+  });
+}
+
+export function removeTableRow(document: BlockDocument, id: string, rowIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    if (rowIndex < 0 || rowIndex >= block.rows.length) return;
+    block.rows.splice(rowIndex, 1);
+  });
+}
+
+/** สลับตำแหน่งแถว (ใช้กับการลากวางในแผงแก้) */
+export function moveTableRow(document: BlockDocument, id: string, fromIndex: number, toIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    const total = block.rows.length;
+    if (fromIndex < 0 || fromIndex >= total) return;
+    const clamped = Math.max(0, Math.min(toIndex, total - 1));
+    if (clamped === fromIndex) return;
+    const [moved] = block.rows.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    block.rows.splice(clamped, 0, moved);
+  });
+}
+
+export function setTableCellText(
+  document: BlockDocument,
+  id: string,
+  rowIndex: number,
+  columnIndex: number,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "table") return;
+    const cell = block.rows[rowIndex]?.cells[columnIndex];
+    if (cell === undefined) return;
+    cell[language] = value;
+  });
+}
+
+/* ── แกลเลอรี (รอบที่ 86) ─────────────────────────────────────────────────── */
+
+export function canAddGalleryItem(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "gallery" && block.items.length < MAX_GALLERY_ITEMS;
+}
+
+/** เพิ่มภาพใหม่ (ยังไม่เลือกไฟล์ — ผู้ใช้ลาก/เลือกภาพในแผงแก้ แล้ว validator จะเตือนถ้ายังว่าง) */
+export function addGalleryItem(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddGalleryItem(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "gallery") return;
+    const used = new Set(block.items.map((item) => item.id));
+    block.items.push({ id: nextPrefixedId("img", used), image: null, caption: emptyText() });
+  });
+}
+
+export function removeGalleryItem(document: BlockDocument, id: string, index: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "gallery") return;
+    if (index < 0 || index >= block.items.length) return;
+    block.items.splice(index, 1);
+  });
+}
+
+/** สลับตำแหน่งภาพในแกลเลอรี (ใช้กับการลากวางในแผงแก้) */
+export function moveGalleryItem(document: BlockDocument, id: string, fromIndex: number, toIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "gallery") return;
+    const total = block.items.length;
+    if (fromIndex < 0 || fromIndex >= total) return;
+    const clamped = Math.max(0, Math.min(toIndex, total - 1));
+    if (clamped === fromIndex) return;
+    const [moved] = block.items.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    block.items.splice(clamped, 0, moved);
+  });
+}
+
+export function setGalleryItemCaption(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "gallery") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item.caption[language] = value;
+  });
+}
+
+/** ตั้งค่าภาพของภาพใบที่ระบุ (path/alt/ลายน้ำ) — พาธว่าง = ลบภาพออกจากใบนั้น */
+export function setGalleryItemImage(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  patch: { path?: string; altTh?: string; altEn?: string; hasWatermark?: boolean },
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "gallery") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+
+    const base = item.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
+    const merged = { ...base, ...patch };
+    item.image = merged.path.trim() === "" ? null : merged;
+  });
 }

@@ -1,3 +1,8 @@
+import { blockRenderStringsFor, type BlockRenderStrings } from "@/features/blocks/render-strings";
+import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
+import { CareerFormFields, ContactFormFields } from "@/features/forms/ui/form-fields";
+import { SubmitForm } from "@/features/forms/ui/submit-form";
+import { NewsletterForm } from "@/features/home/ui/newsletter-form";
 import { hiddenSizesOf, type Block, type BlockCard, type BlockDocument, type BlockMedia } from "@/lib/blocks/types";
 import { alignClass, columnClass, containerClass, headingClass, heroHeightClass, rowGridClass, shellClass } from "@/lib/blocks/style";
 
@@ -133,12 +138,15 @@ function BlockView({
   language,
   editable,
   selectedBlockId,
+  strings,
   nested = false,
 }: {
   readonly block: Block;
   readonly language: Language;
   readonly editable: boolean;
   readonly selectedBlockId: string | null;
+  /** ข้อความของบล็อกที่ต้องใช้พจนานุกรม (แกลเลอรี/ฟอร์ม) — เตรียมไว้ครั้งเดียวที่ BlockDocumentView */
+  readonly strings: BlockRenderStrings;
   /** true = บล็อกนี้อยู่ในคอลัมน์ของ "แถว" (X1.1) ⇒ ไม่ใส่ระยะขอบข้างซ้ำ */
   readonly nested?: boolean;
 }) {
@@ -309,6 +317,165 @@ function BlockView({
           </div>
         );
 
+      /* ── ตาราง (รอบที่ 86) — เลื่อนแนวนอนได้บนจอมือถือ ไม่บีบข้อความจนอ่านไม่ออก ── */
+      case "table":
+        return (
+          <div className={`${container} flex flex-col gap-3`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+
+            <div className="border-line bg-surface overflow-x-auto rounded-2xl border">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead className="bg-surface-raised">
+                  <tr>
+                    {block.columns.map((column, index) => (
+                      <th
+                        key={`col-${index}`}
+                        scope="col"
+                        className="text-fg border-line border-b px-4 py-3 font-semibold whitespace-nowrap"
+                      >
+                        {text(column, language)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row) => (
+                    <tr key={row.id} className="border-line border-b last:border-0">
+                      {row.cells.map((cell, cellIndex) =>
+                        block.firstColumnHeader && cellIndex === 0 ? (
+                          <th key={`cell-${cellIndex}`} scope="row" className="text-fg px-4 py-3 text-left align-top font-semibold">
+                            {text(cell, language)}
+                          </th>
+                        ) : (
+                          <td key={`cell-${cellIndex}`} className="text-fg-muted px-4 py-3 align-top">
+                            {text(cell, language)}
+                          </td>
+                        ),
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {hasText(block.caption) ? (
+              <p className="text-fg-muted text-xs" {...editAttrs(editable, "caption")}>
+                {text(block.caption, language)}
+              </p>
+            ) : null}
+          </div>
+        );
+
+      /* ── แผนที่ (รอบที่ 86) — ภาพแผนที่ + คำบรรยาย + ลิงก์เปิดแผนที่ (ไม่ฝัง iframe/พิกัด) ── */
+      case "map": {
+        const media = image(block.image, language, "border-line bg-bg-subtle w-full rounded-2xl border object-cover");
+        return (
+          <div className={`${container} flex flex-col gap-3`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+
+            {media === null ? null : (
+              <figure className="flex flex-col gap-2">
+                <span {...editAttrs(editable, "image", { media: true })}>{media}</span>
+                {hasText(block.caption) ? (
+                  <figcaption className="text-fg-muted text-xs" {...editAttrs(editable, "caption")}>
+                    {text(block.caption, language)}
+                  </figcaption>
+                ) : null}
+              </figure>
+            )}
+
+            {block.linkHref.trim() !== "" && hasText(block.linkLabel) ? (
+              <a
+                href={block.linkHref}
+                target="_blank"
+                rel="noreferrer"
+                className="text-link focus-visible:ring-ring w-fit text-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+                {...editAttrs(editable, "linkLabel")}
+              >
+                {text(block.linkLabel, language)}
+              </a>
+            ) : null}
+          </div>
+        );
+      }
+
+      /* ── ฟอร์ม (รอบที่ 86) — ฝังฟอร์มจริงของเว็บ (ระบบเดิม: DB · กับดักบอต · PDPA) ── */
+      case "form":
+        return (
+          <div className={`${container} flex flex-col gap-3`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+            {hasText(block.body) ? (
+              <p className="text-fg-muted text-sm" {...editAttrs(editable, "body")}>
+                {text(block.body, language)}
+              </p>
+            ) : null}
+
+            {block.kind === "newsletter" ? (
+              <div className="mt-2 max-w-3xl">
+                <NewsletterForm labels={strings.form.newsletter} />
+              </div>
+            ) : block.kind === "contact" ? (
+              <SubmitForm
+                formKind="contact"
+                className="mt-2 max-w-3xl"
+                strings={strings.form.contact.submit}
+                notice={
+                  <p className="border-line bg-surface text-fg-muted rounded-2xl border px-4 py-3 text-xs leading-relaxed">
+                    {strings.form.contact.notice}
+                  </p>
+                }
+              >
+                <ContactFormFields strings={strings.form.contact.fields} />
+              </SubmitForm>
+            ) : (
+              <SubmitForm formKind="careers" className="mt-2 max-w-3xl" strings={strings.form.careers.submit}>
+                <CareerFormFields strings={strings.form.careers.fields} />
+              </SubmitForm>
+            )}
+          </div>
+        );
+
+      /* ── แกลเลอรี + lightbox (รอบที่ 86) — เขียนเอง ไม่เพิ่ม dependency ── */
+      case "gallery": {
+        const visible = block.items.flatMap((item) => {
+          if (item.image === null || item.image.path === "") return [];
+          const alt = language === "en" ? (item.image.altEn.trim() === "" ? item.image.altTh : item.image.altEn) : item.image.altTh;
+          return [
+            {
+              id: item.id,
+              path: item.image.path,
+              alt,
+              caption: hasText(item.caption) ? text(item.caption, language) : "",
+            },
+          ];
+        });
+
+        return (
+          <div className={`${container} flex flex-col gap-4`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+            {visible.length === 0 ? null : (
+              <GalleryLightbox items={visible} columns={block.columns} strings={strings.gallery} />
+            )}
+          </div>
+        );
+      }
+
       /*
         แถว (คอลัมน์) — X1.1
         - เดสก์ท็อป: กริด 12 ช่อง แต่ละคอลัมน์เลือกความกว้างจากพรีเซ็ตแบรนด์ได้
@@ -332,6 +499,7 @@ function BlockView({
                     language={language}
                     editable={editable}
                     selectedBlockId={selectedBlockId}
+                    strings={strings}
                     nested
                   />
                 ))}
@@ -377,10 +545,19 @@ export function BlockDocumentView({
 }) {
   if (document.blocks.length === 0) return null;
 
+  const strings = blockRenderStringsFor(language);
+
   return (
     <div className="bg-bg text-fg">
       {document.blocks.map((block) => (
-        <BlockView key={block.id} block={block} language={language} editable={editable} selectedBlockId={selectedBlockId} />
+        <BlockView
+          key={block.id}
+          block={block}
+          language={language}
+          editable={editable}
+          selectedBlockId={selectedBlockId}
+          strings={strings}
+        />
       ))}
     </div>
   );

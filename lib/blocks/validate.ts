@@ -161,6 +161,65 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
     case "divider":
       return;
 
+    case "table":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.caption, `${path}.caption`, { required: false, englishRequired: false }, issues);
+
+      if (block.columns.length === 0) {
+        issues.push(issue("error", "table-without-columns", `${path}.columns`, "ตารางต้องมีอย่างน้อย 1 คอลัมน์"));
+      }
+      block.columns.forEach((column, index) => {
+        checkText(column, `${path}.columns[${index}]`, { required: true, englishRequired: true }, issues);
+      });
+
+      if (block.rows.length === 0) {
+        issues.push(issue("warning", "table-empty", `${path}.rows`, "ตารางยังไม่มีแถวข้อมูล"));
+      }
+      block.rows.forEach((row, rowIndex) => {
+        row.cells.forEach((cell, cellIndex) => {
+          checkText(cell, `${path}.rows[${rowIndex}].cells[${cellIndex}]`, { required: false, englishRequired: false }, issues);
+        });
+      });
+      return;
+
+    case "map":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.caption, `${path}.caption`, { required: false, englishRequired: false }, issues);
+      checkText(block.linkLabel, `${path}.linkLabel`, { required: false, englishRequired: false }, issues);
+      checkMedia(block.image, `${path}.image`, issues);
+      checkHref(block.linkHref, `${path}.linkHref`, issues);
+      if (block.image === null) {
+        issues.push(issue("warning", "map-without-image", `${path}.image`, "บล็อกแผนที่ยังไม่มีภาพ"));
+      }
+      if (block.linkHref.trim() !== "" && block.linkLabel.th.trim() === "" && block.linkLabel.en.trim() === "") {
+        issues.push(issue("warning", "map-link-without-label", `${path}.linkLabel`, "มีลิงก์เปิดแผนที่แต่ยังไม่มีข้อความบนปุ่ม"));
+      }
+      return;
+
+    case "form":
+      /*
+        ฟอร์มใช้ระบบฟอร์มจริงของเว็บ (ตรวจค่า/กันสแปม/ยินยอม PDPA ที่ Server Action เดิม)
+        ⇒ ที่นี่ตรวจแค่ข้อความหัว/คำอธิบาย (ไม่บังคับ) — ไม่มีอะไรให้บล็อกการเผยแพร่
+      */
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);
+      return;
+
+    case "gallery":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      if (block.items.length === 0) {
+        issues.push(issue("warning", "gallery-empty", `${path}.items`, "แกลเลอรีนี้ยังไม่มีภาพ"));
+      }
+      block.items.forEach((item, index) => {
+        const itemPath = `${path}.items[${index}]`;
+        checkMedia(item.image, `${itemPath}.image`, issues);
+        if (item.image === null) {
+          issues.push(issue("warning", "gallery-item-without-image", `${itemPath}.image`, "ภาพนี้ยังไม่ได้เลือกไฟล์"));
+        }
+        checkText(item.caption, `${itemPath}.caption`, { required: false, englishRequired: false }, issues);
+      });
+      return;
+
     case "row": {
       /* แถว: ตรวจโครงคอลัมน์ (ตัวบล็อกลูกถูกเดินตรวจด้านล่างผ่าน walkBlocks) */
       if (block.columns.length === 0) {

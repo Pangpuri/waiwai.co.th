@@ -18,8 +18,15 @@ import { documentDiff } from "@/lib/blocks/diff";
 import {
   addCard,
   addColumn,
+  addGalleryItem,
+  addTableColumn,
+  addTableRow,
   canAddCard,
+  canAddGalleryItem,
+  canAddTableColumn,
+  canAddTableRow,
   canRemoveColumn,
+  canRemoveTableColumn,
   duplicateBlock,
   insertBlockAt,
   insertPresetBlock,
@@ -29,6 +36,9 @@ import {
   removeBlock,
   removeCard,
   removeColumn,
+  removeGalleryItem,
+  removeTableColumn,
+  removeTableRow,
   replaceBlockWithPreset,
   setBlockChoice,
   setBlockImage,
@@ -40,6 +50,11 @@ import {
   setCardString,
   setCardText,
   setColumnWidth,
+  setGalleryItemCaption,
+  setGalleryItemImage,
+  setTableCellText,
+  setTableColumnText,
+  setTableFirstColumnHeader,
 } from "@/lib/blocks/edit";
 import { STYLE_CHOICES } from "@/lib/blocks/style";
 import type { BlockPreset } from "@/lib/blocks/presets";
@@ -50,6 +65,9 @@ import {
   MAX_BLOCKS_PER_COLUMN,
   MAX_CARDS,
   MAX_COLUMNS,
+  MAX_GALLERY_ITEMS,
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
   countBlocks,
   isRowBlock,
   walkBlocks,
@@ -1035,6 +1053,225 @@ export function BlockBuilder({
           );
         case "divider":
           return <p className="text-fg-muted text-xs">{strings.optionalHint}</p>;
+
+        /* ── ตาราง (รอบที่ 86): หัวคอลัมน์ + แถวข้อมูล — แก้ช่องได้ในแผงนี้เลย ── */
+        case "table":
+          return (
+            <div className="flex flex-col gap-3">
+              <TextPair
+                idBase={`${base}-heading`}
+                label={`heading (${strings.optionalHint})`}
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-caption`}
+                label={`caption (${strings.optionalHint})`}
+                value={block.caption}
+                onChange={(language, next) => update(setBlockText(document, block.id, "caption", language, next))}
+              />
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-fg-muted text-xs font-semibold">
+                    {fillTemplate(strings.blockTableColumns, { n: block.columns.length, max: MAX_TABLE_COLUMNS })}
+                  </p>
+                  <TinyButton
+                    label={strings.blockAddColumn}
+                    disabled={!canAddTableColumn(document, block.id)}
+                    onClick={() => update(addTableColumn(document, block.id))}
+                  />
+                </div>
+
+                {block.columns.map((column, index) => (
+                  <div key={`col-${index}`} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-fg-muted text-xs font-semibold">{`C${index + 1}`}</p>
+                      <TinyButton
+                        label={strings.blockRemoveColumn}
+                        disabled={!canRemoveTableColumn(document, block.id)}
+                        onClick={() => update(removeTableColumn(document, block.id, index))}
+                      />
+                    </div>
+                    <TextPair
+                      idBase={`${base}-col-${index}`}
+                      label="header"
+                      value={column}
+                      onChange={(language, next) => update(setTableColumnText(document, block.id, index, language, next))}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={block.firstColumnHeader}
+                  onChange={(event) => update(setTableFirstColumnHeader(document, block.id, event.target.checked))}
+                  className="border-line accent-brand-red size-4 rounded border"
+                />
+                {strings.blockFirstColumnHeader}
+              </label>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-fg-muted text-xs font-semibold">
+                    {fillTemplate(strings.blockTableRows, { n: block.rows.length, max: MAX_TABLE_ROWS })}
+                  </p>
+                  <TinyButton
+                    label={strings.blockAddRow}
+                    disabled={!canAddTableRow(document, block.id)}
+                    onClick={() => update(addTableRow(document, block.id))}
+                  />
+                </div>
+
+                {block.rows.map((row, rowIndex) => (
+                  <div key={row.id} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-fg-muted text-xs font-semibold">{`R${rowIndex + 1}`}</p>
+                      <TinyButton label={strings.blockRemoveRow} onClick={() => update(removeTableRow(document, block.id, rowIndex))} />
+                    </div>
+                    {row.cells.map((cell, cellIndex) => (
+                      <TextPair
+                        key={`cell-${cellIndex}`}
+                        idBase={`${base}-r${rowIndex}c${cellIndex}`}
+                        label={`C${cellIndex + 1}`}
+                        value={cell}
+                        onChange={(language, next) => update(setTableCellText(document, block.id, rowIndex, cellIndex, language, next))}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+
+        /* ── แผนที่ (รอบที่ 86): ภาพ + คำบรรยาย + ลิงก์เปิดแผนที่ ── */
+        case "map":
+          return (
+            <>
+              <TextPair
+                idBase={`${base}-heading`}
+                label={`heading (${strings.optionalHint})`}
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-caption`}
+                label={`caption (${strings.optionalHint})`}
+                value={block.caption}
+                onChange={(language, next) => update(setBlockText(document, block.id, "caption", language, next))}
+              />
+              <SingleField
+                idBase={`${base}-link-href`}
+                label={strings.blockMapLink}
+                value={block.linkHref}
+                onChange={(next) => update(setBlockString(document, block.id, "linkHref", next))}
+              />
+              <TextPair
+                idBase={`${base}-link-label`}
+                label={strings.blockMapLinkText}
+                value={block.linkLabel}
+                onChange={(language, next) => update(setBlockText(document, block.id, "linkLabel", language, next))}
+              />
+              <div id={`${base}-image`}>
+                <ImageDrop
+                  strings={strings}
+                  label={strings.blockImageLabel}
+                  value={block.image}
+                  onChange={(patch) => update(setBlockImage(document, block.id, patch))}
+                />
+              </div>
+            </>
+          );
+
+        /* ── ฟอร์ม (รอบที่ 86): เลือกฟอร์มจริงของเว็บที่จะฝัง ── */
+        case "form":
+          return (
+            <>
+              <SelectField
+                idBase={`${base}-kind`}
+                label={strings.blockFormKind}
+                value={block.kind}
+                options={[
+                  { value: "contact", label: strings.blockFormContact },
+                  { value: "newsletter", label: strings.blockFormNewsletter },
+                  { value: "careers", label: strings.blockFormCareers },
+                ]}
+                onChange={(next) => update(setBlockChoice(document, block.id, "kind", next))}
+              />
+              <TextPair
+                idBase={`${base}-heading`}
+                label={`heading (${strings.optionalHint})`}
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-body`}
+                label={`body (${strings.optionalHint})`}
+                value={block.body}
+                onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
+              />
+              <p className="text-fg-muted text-xs">{strings.blockFormHint}</p>
+            </>
+          );
+
+        /* ── แกลเลอรี (รอบที่ 86): ชุดภาพ + lightbox ── */
+        case "gallery":
+          return (
+            <div className="flex flex-col gap-3">
+              <TextPair
+                idBase={`${base}-heading`}
+                label={`heading (${strings.optionalHint})`}
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <SelectField
+                idBase={`${base}-columns`}
+                label={strings.blockGalleryColumns}
+                value={block.columns}
+                options={[2, 3, 4].map((value) => ({ value, label: String(value) }))}
+                onChange={(next) => update(setBlockChoice(document, block.id, "columns", Number(next)))}
+              />
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-fg-muted text-xs font-semibold">
+                    {fillTemplate(strings.blockGalleryItems, { n: block.items.length, max: MAX_GALLERY_ITEMS })}
+                  </p>
+                  <TinyButton
+                    label={strings.blockAddImage}
+                    disabled={!canAddGalleryItem(document, block.id)}
+                    onClick={() => update(addGalleryItem(document, block.id))}
+                  />
+                </div>
+
+                {block.items.map((item, index) => (
+                  <div key={item.id} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-fg-muted text-xs font-semibold">{fillTemplate(strings.blockItemNumber, { n: index + 1 })}</p>
+                      <TinyButton label={strings.blockRemoveImage} onClick={() => update(removeGalleryItem(document, block.id, index))} />
+                    </div>
+                    <div id={`${base}-img-${index}`}>
+                      <ImageDrop
+                        strings={strings}
+                        compact
+                        label={strings.blockImageLabel}
+                        value={item.image}
+                        onChange={(patch) => update(setGalleryItemImage(document, block.id, index, patch))}
+                      />
+                    </div>
+                    <TextPair
+                      idBase={`${base}-cap-${index}`}
+                      label={`caption (${strings.optionalHint})`}
+                      value={item.caption}
+                      onChange={(language, next) => update(setGalleryItemCaption(document, block.id, index, language, next))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
 
         /*
           แถว (คอลัมน์) — X1.1
