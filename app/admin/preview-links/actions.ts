@@ -14,7 +14,7 @@ import { createPreviewLink, revokePreviewLink } from "@/lib/preview-link/reposit
  * Server Actions ของ "ลิงก์พรีวิวชั่วคราว" (X2.6)
  *
  * กติกาความปลอดภัย
- * - ทุก action เริ่มด้วย `requireAdminUser()` (ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง UI)
+ * - ทุก action เริ่มด้วย `requireAdminUser("<permission>")` (ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง UI)
  * - `page` ต้องอยู่ในรายการที่พรีวิวได้ (`isPreviewablePage`) · `locale` ต้องเป็นภาษาที่รองรับ
  *   ⇒ ยิงค่าอะไรเข้ามาก็สร้างลิงก์ให้เฉพาะหน้าที่อนุญาต
  * - **โทเคนดิบคืนกลับไปแค่ครั้งเดียว** (พาธเท่านั้น) · ไม่บันทึกลง audit log

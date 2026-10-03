@@ -11,7 +11,7 @@ import { eraseSubject } from "@/lib/privacy/repository";
 /**
  * Server Actions ของ "กล่องข้อความ" (X1.9)
  *
- * ⚠️ ข้อมูลส่วนบุคคล (PDPA) ⇒ ทุก action เริ่มด้วย `requireAdminUser()` เสมอ
+ * ⚠️ ข้อมูลส่วนบุคคล (PDPA) ⇒ ทุก action เริ่มด้วย `requireAdminUser("<permission>")` เสมอ
  * ⚠️ ใช้ฟอร์มธรรมดา + server action (ไม่มี JS ฝั่งไคลเอนต์) ⇒ ทำงานได้ทุกเบราว์เซอร์
  */
 

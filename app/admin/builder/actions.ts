@@ -26,7 +26,7 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
  * Server Actions ของหน้าจอสร้างหน้าเว็บ (บล็อกอิสระ)
  *
  * ลำดับเดียวกันทุก action
- *   1. **ตรวจสิทธิ์ก่อนเสมอ** (`requireAdminUser()`)
+ *   1. **ตรวจสิทธิ์ก่อนเสมอ** (`requireAdminUser("<permission>")`)
  *   2. แปลงข้อมูลที่ส่งมาแบบไม่เชื่อใจ (`parseBlockDocument`)
  *   3. ตรวจเนื้อหาด้วย validator ของบล็อก (error = หยุด · warning = เตือนแต่ไปต่อ)
  *   4. เขียน DB (draft / published + ประวัติ) พร้อมชื่อผู้ทำ

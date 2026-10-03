@@ -17,7 +17,7 @@ import type { TrashActionState } from "@/features/admin/trash-state";
  * Server Actions ของ "ถังขยะ" (X2.4)
  *
  * กติกาความปลอดภัย
- * - ทุก action เริ่มด้วย `requireAdminUser()` เสมอ (ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง UI)
+ * - ทุก action เริ่มด้วย `requireAdminUser("<permission>")` เสมอ (ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง UI)
  * - `kind` จากฟอร์ม **ต้องผ่าน `isTrashKind()` ก่อน** — ค่าที่ไม่รู้จักจบที่ `invalid` ไม่แตะฐานข้อมูล
  *   (ชั้นล่างยังมี `TABLES` แบบค่าคงที่ ⇒ ต่อให้หลุดมาก็ไม่กลายเป็น SQL)
  * - การลบถาวรทำได้เฉพาะของที่ **อยู่ในถังแล้ว** (เงื่อนไขอยู่ใน SQL ของ repository)

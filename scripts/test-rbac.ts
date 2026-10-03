@@ -284,3 +284,39 @@ test("rbac: ชนิดบทบาท/สิทธิ์ต้องมาจ�
   const route = sourceOf("app/admin/trash/thumbnail/[id]/route.ts");
   assert.ok(route.includes('can(user.role, "trash")'), "route ภาพในถังต้องตรวจสิทธิ์ trash");
 });
+
+test("rbac: ประตูต้อง 'บังคับ' ส่งสิทธิ์ และห้ามเหลือรูปแบบเก่าในโค้ด/คอมเมนต์ทั้งโปรเจกต์", () => {
+  /*
+    ทำไมต้องกันถึงคอมเมนต์ (บทเรียนที่เจอจริง 2 ครั้งในรอบนี้)
+    - ตอนเปลี่ยนลายเซ็นเป็น `requireAdminUser("<permission>")` มีคอมเมนต์เก่าที่เขียนว่า `requireAdminUser()`
+      หลงเหลืออยู่ ⇒ คน/เครื่องมือที่คัดลอกจากคอมเมนต์ (หรือไฟล์ที่ยังไม่รีเฟรชในเอดิเตอร์)
+      จะได้โค้ดที่ **ไม่ผ่าน typecheck** ทันที ("Expected 1 arguments, but got 0")
+    ⇒ ลบรูปแบบเก่าออกจากทุกไฟล์ (รวมคอมเมนต์) และกันไม่ให้กลับมา
+  */
+  const roots = ["app", "features", "lib"];
+  const offenders: string[] = [];
+
+  const walk = (directory: string): void => {
+    for (const name of readdirSync(join(ROOT, directory))) {
+      const relative = `${directory}/${name}`;
+      if (statSync(join(ROOT, relative)).isDirectory()) {
+        walk(relative);
+        continue;
+      }
+      if (!relative.endsWith(".ts") && !relative.endsWith(".tsx")) continue;
+      /* dal.ts = ที่ประกาศฟังก์ชัน (รูปแบบที่ถูกคือมีพารามิเตอร์ ไม่ใช่ `()`) */
+      if (relative === "lib/auth/dal.ts") continue;
+      if (sourceOf(relative).includes("requireAdminUser()")) offenders.push(relative);
+    }
+  };
+  for (const root of roots) walk(root);
+
+  assert.deepEqual(offenders, [], "ไฟล์เหล่านี้ยังมีรูปแบบเก่า `requireAdminUser()` — แก้เป็น `requireAdminUser(\"<permission>\")`");
+
+  const dal = sourceOf("lib/auth/dal.ts");
+  assert.ok(
+    dal.includes("export async function requireAdminUser(permission: AdminPermission)"),
+    "พารามิเตอร์สิทธิ์ต้องเป็นแบบบังคับ (ห้ามใส่ ? — จะทำให้ลืมส่งสิทธิ์ได้เงียบ ๆ)",
+  );
+  assert.ok(!dal.includes("permission?:"), "ห้ามทำสิทธิ์เป็น optional");
+});
