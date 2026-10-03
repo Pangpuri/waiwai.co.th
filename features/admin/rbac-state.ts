@@ -6,12 +6,14 @@ export type RbacActionCode =
   | "disabled"
   | "enabled"
   | "password-reset"
+  | "deleted"
   | "bad-email"
   | "bad-role"
   | "bad-password"
   | "duplicate"
   | "last-admin"
   | "self"
+  | "email-mismatch"
   | "no-database"
   | "failed";
 

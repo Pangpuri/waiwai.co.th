@@ -4,6 +4,7 @@ import { useActionState } from "react";
 
 import {
   createUserAction,
+  deleteUserAction,
   resetPasswordAction,
   setRoleAction,
   toggleUserAction,
@@ -64,6 +65,12 @@ export type RbacStrings = {
   readonly rbacEnvAccountNote: string;
   readonly rbacDbMissing: string;
   readonly rbacRoleUnknown: string;
+  readonly rbacDelete: string;
+  readonly rbacDeleteHint: string;
+  readonly rbacDeleteConfirmLabel: string;
+  readonly rbacDeleteAcknowledge: string;
+  readonly rbacDeletedDone: string;
+  readonly rbacEmailMismatch: string;
 };
 
 export type RbacRow = {
@@ -93,6 +100,10 @@ function messageOf(state: RbacActionState, strings: RbacStrings, minLength: numb
       return strings.rbacEnabledDone;
     case "password-reset":
       return strings.rbacResetDone;
+    case "deleted":
+      return strings.rbacDeletedDone;
+    case "email-mismatch":
+      return strings.rbacEmailMismatch;
     case "duplicate":
       return strings.rbacDuplicate;
     case "bad-email":
@@ -220,6 +231,7 @@ function UserRow({
   const [roleState, roleAction] = useActionState(setRoleAction, INITIAL_RBAC_STATE);
   const [toggleState, toggleActionResult] = useActionState(toggleUserAction, INITIAL_RBAC_STATE);
   const [resetState, resetAction] = useActionState(resetPasswordAction, INITIAL_RBAC_STATE);
+  const [deleteState, deleteActionResult] = useActionState(deleteUserAction, INITIAL_RBAC_STATE);
 
   return (
     <li className="border-line flex flex-col gap-2 rounded-xl border p-3">
@@ -274,9 +286,39 @@ function UserRow({
       </div>
 
       {isSelf ? <p className="text-fg-muted text-xs">{strings.rbacSelfBlocked}</p> : null}
+
+      {/*
+        ลบบัญชีถาวร (B3) — ซ่อนไว้ใน <details> + ต้องพิมพ์อีเมลให้ตรง + ติ๊กยืนยัน
+        (กู้คืนไม่ได้ ⇒ ต้องเป็นการกระทำที่ตั้งใจ ไม่ใช่กดพลาด)
+      */}
+      {isSelf ? null : (
+        <details className="border-line rounded-lg border p-2">
+          <summary className="text-brand-red cursor-pointer text-xs font-semibold">{strings.rbacDelete}</summary>
+          <form action={deleteActionResult} className="mt-2 flex flex-col gap-2">
+            <input type="hidden" name="id" value={row.id} />
+            <p className="text-fg-muted text-xs">{strings.rbacDeleteHint}</p>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-fg font-semibold">{strings.rbacDeleteConfirmLabel}</span>
+              <input name="confirmEmail" placeholder={row.email} className={FIELD_CLASS} />
+            </label>
+            <label className="text-fg-muted flex items-start gap-2 text-xs">
+              <input type="checkbox" name="acknowledge" value="1" className="border-line accent-brand-red mt-0.5 size-4 rounded border" />
+              {strings.rbacDeleteAcknowledge}
+            </label>
+            <button
+              type="submit"
+              className="bg-brand-red text-on-brand focus-visible:ring-ring self-start rounded-lg px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              {strings.rbacDelete}
+            </button>
+          </form>
+        </details>
+      )}
+
       <StatusLine state={roleState} strings={strings} minLength={minLength} />
       <StatusLine state={toggleState} strings={strings} minLength={minLength} />
       <StatusLine state={resetState} strings={strings} minLength={minLength} />
+      <StatusLine state={deleteState} strings={strings} minLength={minLength} />
     </li>
   );
 }

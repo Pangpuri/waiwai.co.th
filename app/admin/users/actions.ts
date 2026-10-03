@@ -8,6 +8,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { isAdminRoleId } from "@/lib/auth/roles";
 import {
   createAdminUser,
+  deleteAdminUser,
   isUsableAdminEmail,
   resetAdminUserPassword,
   setAdminUserDisabled,
@@ -102,6 +103,45 @@ export async function toggleUserAction(_previous: RbacActionState, formData: For
 
   revalidatePath(USERS_PATH);
   return { status: "ok", code: disabled ? "disabled" : "enabled", password: null, email: null };
+}
+
+/**
+ * **ลบบัญชีผู้ดูแลถาวร** (B3 · รอบที่ 90)
+ *
+ * ด่านยืนยัน 2 ชั้นที่ผู้ใช้ต้องผ่าน (นอกเหนือจากสิทธิ์ `users` และด่านใน repository)
+ * 1. พิมพ์อีเมลของบัญชีที่จะลบให้ตรง (ตรวจฝั่งเซิร์ฟเวอร์เทียบกับอีเมลจริงในฐานข้อมูล)
+ * 2. ติ๊กช่องยืนยันว่ารู้ว่ากู้คืนไม่ได้
+ *
+ * ⚠️ ไม่มี "ถังขยะ" สำหรับบัญชี (ตั้งใจ — บัญชีไม่ใช่เนื้อหา) · ร่องรอยอยู่ใน audit log 90 วัน
+ */
+export async function deleteUserAction(_previous: RbacActionState, formData: FormData): Promise<RbacActionState> {
+  const actor = await requireAdminUser("users");
+
+  const id = readField(formData, "id");
+  const confirmEmail = readField(formData, "confirmEmail");
+  const acknowledged = readField(formData, "acknowledge") === "1";
+
+  if (id === "") return { status: "failed", code: "failed", password: null, email: null };
+  if (id === actor.id) return { status: "failed", code: "self", password: null, email: null };
+  if (!acknowledged) return { status: "failed", code: "email-mismatch", password: null, email: null };
+
+  const result = await deleteAdminUser({ id, actor: actor.email, actorId: actor.id, confirmEmail });
+  if (!result.ok) {
+    const code =
+      result.reason === "self"
+        ? "self"
+        : result.reason === "last-admin"
+          ? "last-admin"
+          : result.reason === "email-mismatch"
+            ? "email-mismatch"
+            : result.reason === "no-database"
+              ? "no-database"
+              : "failed";
+    return { status: "failed", code, password: null, email: null };
+  }
+
+  revalidatePath(USERS_PATH);
+  return { status: "ok", code: "deleted", password: null, email: null };
 }
 
 export async function resetPasswordAction(

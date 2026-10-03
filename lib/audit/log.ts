@@ -52,6 +52,8 @@ export type AuditAction =
   | "admin-user-enable"
   /** ตั้งรหัสผ่านใหม่ให้บัญชีผู้ดูแล */
   | "admin-user-password"
+  /** **ลบบัญชีผู้ดูแลถาวร** (B3 รอบที่ 90) — ต่างจากการปิดบัญชี: ข้อมูลบัญชีหายไปจากตาราง */
+  | "admin-user-delete"
   /** บันทึกชุดสำเร็จของส่วนกลาง (W3b) — navbar/footer/ป้ายประกาศ */
   | "chrome-preset-save"
   /** ใช้ชุดสำเร็จของส่วนกลางกับฉบับร่าง (W3b) — ไม่แตะฉบับเผยแพร่ */
@@ -84,23 +86,86 @@ export type AuditRow = {
   readonly action: string;
   readonly actorEmail: string | null;
   readonly target: string | null;
+  /** รายละเอียดสั้น ๆ (เช่น บทบาทใหม่ · จำนวนที่ลบ) — ไม่มีข้อมูลอ่อนไหว (ดู `recordAudit`) */
+  readonly detail: string | null;
   readonly createdAt: string;
 };
 
-/** รายการล่าสุด (ใช้ในหน้าจอหลังบ้านในอนาคต) */
+const MAX_AUDIT_READ = 200;
+
+function clampLimit(limit: number): number {
+  return Math.max(1, Math.min(Math.trunc(limit), MAX_AUDIT_READ));
+}
+
+type RawAuditRow = {
+  readonly action: string;
+  readonly actor_email: string | null;
+  readonly target: string | null;
+  readonly detail: string | null;
+  readonly created_at: Date;
+};
+
+function toAuditRow(row: RawAuditRow): AuditRow {
+  return {
+    action: row.action,
+    actorEmail: row.actor_email,
+    target: row.target,
+    detail: row.detail,
+    createdAt: new Date(row.created_at).toISOString(),
+  };
+}
+
+/** รายการล่าสุดทั้งหมด (ใช้ในหน้าภาพรวมหลังบ้าน) */
 export async function listRecentAudit(limit = 50): Promise<readonly AuditRow[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const { rows } = await getPool().query<{ action: string; actor_email: string | null; target: string | null; created_at: Date }>(
-      "select action, actor_email, target, created_at from audit_log order by created_at desc limit $1",
-      [Math.max(1, Math.min(limit, 200))],
+    const { rows } = await getPool().query<RawAuditRow>(
+      "select action, actor_email, target, detail, created_at from audit_log order by created_at desc limit $1",
+      [clampLimit(limit)],
     );
-    return rows.map((row) => ({
-      action: row.action,
-      actorEmail: row.actor_email,
-      target: row.target,
-      createdAt: new Date(row.created_at).toISOString(),
-    }));
+    return rows.map(toAuditRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * ร่องรอยของ **คนคนเดียว** (หน้า "กิจกรรมของฉัน" — B3 รอบที่ 90)
+ * ⚠️ เทียบอีเมลแบบ `lower(btrim(...))` ทั้งสองฝั่ง — ตัวพิมพ์ใหญ่/ช่องว่างทำให้ "ดูกิจกรรมตัวเองไม่ครบ" ไม่ได้
+ */
+export async function listAuditForActor(actorEmail: string, limit = 50): Promise<readonly AuditRow[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const { rows } = await getPool().query<RawAuditRow>(
+      `select action, actor_email, target, detail, created_at
+         from audit_log
+        where lower(btrim(coalesce(actor_email, ''))) = lower(btrim($1))
+        order by created_at desc
+        limit $2`,
+      [actorEmail, clampLimit(limit)],
+    );
+    return rows.map(toAuditRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * ร่องรอยของ "กลุ่มเหตุการณ์" เช่น `admin-user-` (ประวัติบัญชีผู้ดูแล)
+ * `prefix` มาจากโค้ดเท่านั้น (ไม่ใช่จากผู้ใช้) — แต่ยังผูกเป็นพารามิเตอร์อยู่
+ */
+export async function listAuditForActionPrefix(prefix: string, limit = 50): Promise<readonly AuditRow[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const { rows } = await getPool().query<RawAuditRow>(
+      `select action, actor_email, target, detail, created_at
+         from audit_log
+        where action like $1
+        order by created_at desc
+        limit $2`,
+      [`${prefix}%`, clampLimit(limit)],
+    );
+    return rows.map(toAuditRow);
   } catch {
     return [];
   }

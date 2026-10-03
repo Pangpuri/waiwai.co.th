@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction, purgeRetentionNowAction } from "@/app/admin/actions";
+import { auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
@@ -27,36 +28,8 @@ export default async function AdminHomePage() {
 
   /* ร่องรอยการใช้งาน (X2.2) — เดิมตาราง audit_log แต่ว่างเปล่า ⇒ ตอนนี้เขียนทุกครั้งที่ล็อกอิน/เผยแพร่ */
   const audit = await listRecentAudit(8);
-  const actionLabel = (action: string): string => {
-    const map: Record<string, string | undefined> = {
-      "login-success": strings.auditLoginSuccess,
-      "login-failure": strings.auditLoginFailure,
-      logout: strings.auditLogout,
-      publish: strings.auditPublish,
-      "restore-revision": strings.auditRestore,
-      "preset-save": strings.auditPresetSave,
-      "pages-update": strings.auditPagesUpdate,
-      "migrate-blocks": strings.auditBlockMigrate,
-      "retention-purge": strings.auditRetentionPurge,
-      "erase-subject": strings.auditEraseSubject,
-      "trash-move": strings.auditTrashMove,
-      "trash-restore": strings.auditTrashRestore,
-      "trash-delete": strings.auditTrashDelete,
-      "trash-purge": strings.auditTrashPurge,
-      "preview-link-create": strings.auditPreviewLinkCreate,
-      "preview-link-revoke": strings.auditPreviewLinkRevoke,
-      "preview-link-purge": strings.auditPreviewLinkPurge,
-      "chrome-preset-save": strings.auditChromePresetSave,
-      "chrome-preset-apply": strings.auditChromePresetApply,
-      "chrome-preset-undo": strings.auditChromePresetUndo,
-      "admin-user-create": strings.auditAdminUserCreate,
-      "admin-user-role": strings.auditAdminUserRole,
-      "admin-user-disable": strings.auditAdminUserDisable,
-      "admin-user-enable": strings.auditAdminUserEnable,
-      "admin-user-password": strings.auditAdminUserPassword,
-    };
-    return map[action] ?? action;
-  };
+  /* แปลงรหัสเหตุการณ์เป็นข้อความ — ตรรกะอยู่ที่ `features/admin/audit-labels.ts` (ใช้ร่วมกับหน้าอื่น) */
+  const actionLabel = (action: string): string => auditActionLabel(strings, action);
 
   /*
     สิทธิ์ของการ์ด "เฉพาะทาง" (X1.10 · รอบที่ 85)
@@ -91,7 +64,7 @@ export default async function AdminHomePage() {
   };
 
   /* เวลาบนหน้าจอ — ตัดถึงนาที (รูปแบบเดียวกับรายการ audit ด้านล่าง) */
-  const stamp = (iso: string): string => iso.slice(0, 16).replace("T", " ");
+  const stamp = (iso: string): string => auditStamp(iso);
 
   /* สถานะโหมดปิดปรับปรุง (X2.5) — `unclear` = ตั้งค่าไม่ชัด จึงถือว่าปิด (ต้องเตือนให้รู้ ไม่ใช่เงียบ) */
   const maintenanceFlag = maintenanceFlagOf(process.env[MAINTENANCE_ENV_VAR]);

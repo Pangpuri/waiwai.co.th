@@ -265,14 +265,34 @@ test("rbac: บัญชีใน DB เก็บเฉพาะ hash · ตร�
   assert.ok(repo.includes("lower(email) = lower($1)"), "อีเมลเทียบแบบไม่สนตัวพิมพ์");
   assert.ok(repo.includes("on conflict (email) do nothing"), "กันสร้างอีเมลซ้ำที่ฐานข้อมูล");
 
-  /* กันล็อกตัวเองออก: ต้องเช็ค "ผู้ดูแลที่ยังใช้งานได้คนสุดท้าย" ทั้งตอนถอดบทบาทและตอนปิดบัญชี */
-  assert.equal(repo.split('return { ok: false, reason: "last-admin" }').length - 1, 2, "ต้องมีการกัน last-admin 2 จุด");
+  /*
+    กันล็อกตัวเองออก: ต้องเช็ค "ผู้ดูแลที่ยังใช้งานได้คนสุดท้าย" ทั้งตอนถอดบทบาท ตอนปิดบัญชี **และตอนลบบัญชีถาวร** (B3 รอบที่ 90)
+    3 จุด = ครบทุกเส้นทางที่ทำให้ผู้ดูแลระบบคนสุดท้ายหายไป
+  */
+  assert.equal(repo.split('return { ok: false, reason: "last-admin" }').length - 1, 3, "ต้องมีการกัน last-admin 3 จุด");
   assert.ok(repo.includes("countActiveAdmins("), "ต้องนับผู้ดูแลที่ยังใช้งานได้จริง");
 
   /* audit ทุกการเปลี่ยนบัญชี */
-  for (const action of ["admin-user-create", "admin-user-role", "admin-user-disable", "admin-user-enable", "admin-user-password"]) {
+  for (const action of [
+    "admin-user-create",
+    "admin-user-role",
+    "admin-user-disable",
+    "admin-user-enable",
+    "admin-user-password",
+    "admin-user-delete",
+  ]) {
     assert.ok(repo.includes(action), `ต้องลง audit "${action}"`);
   }
+
+  /*
+    ลบบัญชีถาวร (B3 · รอบที่ 90) — ด่านที่ต้องมี (เรียงตามความเสียหาย)
+    1. ห้ามลบตัวเอง (เทียบ id กับผู้กระทำ)
+    2. ต้องมี "พิมพ์อีเมลยืนยัน" ให้ตรงกับบัญชีจริง (เทียบแบบ normalize)
+    3. ต้องใช้ `delete` เท่านั้น (ไม่ใช่ update ธงลบ) ⇒ บัญชีหายจริงตามที่ผู้ใช้ยืนยัน
+  */
+  assert.ok(repo.includes("if (input.id === input.actorId) return { ok: false, reason: \"self\" }"), "ห้ามลบตัวเอง");
+  assert.ok(repo.includes("normalizeAdminEmail(input.confirmEmail) !== normalizeAdminEmail(target.email)"), "ต้องเทียบอีเมลยืนยันกับบัญชีจริง");
+  assert.ok(repo.includes("delete from admin_user where id = $1"), "ต้องลบแถวจริง (ไม่ใช่ปิดบัญชี)");
 
   /* อ่านบัญชีไม่คืนรหัสผ่านออกจากเลเยอร์ UI */
   const page = sourceOf("app/admin/users/page.tsx");

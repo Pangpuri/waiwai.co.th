@@ -60,4 +60,19 @@ export const adminRbac = {
   auditAdminUserDisable: "Disabled an admin account",
   auditAdminUserEnable: "Enabled an admin account",
   auditAdminUserPassword: "Reset an admin password",
+  auditAdminUserDelete: "Deleted an admin account",
+  /* Permanent account deletion (B3, round 90) */
+  rbacDelete: "Delete account permanently",
+  rbacDeleteHint: "Removes this account from the database for good — cannot be undone. To only block sign-in, use \"Disable\".",
+  rbacDeleteConfirmLabel: "Type this account's email to confirm",
+  rbacDeleteAcknowledge: "I understand this cannot be undone and the account will be deleted permanently",
+  rbacDeletedDone: "Account deleted permanently",
+  rbacEmailMismatch: "The typed email does not match this account, or the confirmation box was not ticked",
+  rbacHistoryTitle: "Recent account / role changes",
+  rbacHistoryEmpty: "No account changes recorded yet",
+  /* "My activity" page (B3, round 90) */
+  activityTitle: "My activity",
+  activityHint: "Trail of this account's actions (sign-ins, publishes, deletions) — kept for 90 days.",
+  activityEmpty: "No activity for this account yet",
+  activityTarget: "Target",
 };

@@ -48,7 +48,14 @@ import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/pr
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
-import { createDbUserStore, createAdminUser, resetAdminUserPassword, setAdminUserDisabled, setAdminUserRole } from "@/lib/auth/users-repository";
+import {
+  createAdminUser,
+  createDbUserStore,
+  deleteAdminUser,
+  resetAdminUserPassword,
+  setAdminUserDisabled,
+  setAdminUserRole,
+} from "@/lib/auth/users-repository";
 import { verifyPassword } from "@/lib/auth/password";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
@@ -1338,6 +1345,88 @@ async function checkAdminUsers(): Promise<void> {
       await pool.query("delete from admin_user where email like 'check-db-rbac-owner%'");
     }
 
+    /*
+      ── 5.5) ลบบัญชีถาวร (B3 · รอบที่ 90) — พิสูจน์ด่านครบทุกข้อบนฐานข้อมูลจริง ──
+      ลำดับ: ปฏิเสธก่อน (ตัวเอง · อีเมลไม่ตรง · ผู้ดูแลคนสุดท้าย) แล้วจึงลบจริง
+    */
+    const doomed = await createAdminUser({
+      email: "check-db-rbac-doomed@example.invalid",
+      displayName: "บัญชีที่จะถูกลบ",
+      role: "editor",
+      password: "check-db-Doomed-5",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(doomed.ok, true, "สร้างบัญชีสำหรับทดสอบลบต้องสำเร็จ");
+
+    if (doomed.ok) {
+      /* 1) ลบตัวเอง = ปฏิเสธ */
+      assert.equal(
+        (await deleteAdminUser({ id: doomed.user.id, actor: CHECK_ACTOR, actorId: doomed.user.id, confirmEmail: doomed.user.email })).ok,
+        false,
+        "ห้ามลบบัญชีตัวเอง",
+      );
+
+      /* 2) อีเมลยืนยันไม่ตรง = ปฏิเสธ (และบัญชีต้องยังอยู่) */
+      assert.equal(
+        (await deleteAdminUser({ id: doomed.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: "wrong@example.invalid" })).ok,
+        false,
+        "อีเมลยืนยันไม่ตรง ต้องไม่ลบ",
+      );
+      assert.equal(await countWhere("admin_user where id = $1", [doomed.user.id]), 1, "บัญชีต้องยังอยู่หลังการปฏิเสธ");
+
+      /* 3) ผู้ดูแลที่ยังใช้งานได้คนสุดท้าย = ปฏิเสธ */
+      const solo = await createAdminUser({
+        email: "check-db-rbac-solo@example.invalid",
+        displayName: "ผู้ดูแลเดี่ยว",
+        role: "admin",
+        password: "check-db-Solo-6",
+        actor: CHECK_ACTOR,
+      });
+      assert.equal(solo.ok, true, "สร้างผู้ดูแลเดี่ยวต้องสำเร็จ");
+      if (solo.ok) {
+        assert.equal(
+          (await deleteAdminUser({ id: solo.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: solo.user.email })).ok,
+          false,
+          "ห้ามลบผู้ดูแลคนสุดท้าย",
+        );
+
+        /* มีผู้ดูแลคนที่สองที่ยังใช้งานได้ ⇒ ลบได้ (ด่านไม่บล็อกเกินจำเป็น) */
+        const spare = await createAdminUser({
+          email: "check-db-rbac-spare@example.invalid",
+          displayName: "ผู้ดูแลสำรอง",
+          role: "admin",
+          password: "check-db-Spare-7",
+          actor: CHECK_ACTOR,
+        });
+        assert.equal(spare.ok, true, "สร้างผู้ดูแลสำรองต้องสำเร็จ");
+        assert.equal(
+          (await deleteAdminUser({ id: solo.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: solo.user.email })).ok,
+          true,
+          "มีผู้ดูแลคนอื่นแล้ว ⇒ ลบได้",
+        );
+      }
+
+      /* 4) ลบจริงสำเร็จ (อีเมลที่พิมพ์ต่างตัวพิมพ์ก็ต้องผ่าน — เทียบแบบ normalize) + บัญชีหายจากตาราง */
+      assert.equal(
+        (await deleteAdminUser({
+          id: doomed.user.id,
+          actor: CHECK_ACTOR,
+          actorId: "check-db-other",
+          confirmEmail: doomed.user.email.toUpperCase(),
+        })).ok,
+        true,
+        "ลบบัญชีถาวรต้องสำเร็จ",
+      );
+      assert.equal(await countWhere("admin_user where id = $1", [doomed.user.id]), 0, "บัญชีต้องหายจากตารางจริง");
+
+      /* 5) ร่องรอยการลบต้องอยู่ใน audit log */
+      const { rows: deleted } = await pool.query<{ readonly n: string }>(
+        "select count(*)::text as n from audit_log where actor_email = $1 and action = 'admin-user-delete'",
+        [CHECK_ACTOR],
+      );
+      assert.ok(Number.parseInt(deleted[0]?.n ?? "0", 10) >= 1, "การลบบัญชีต้องลง audit");
+    }
+
     /* ── 6) รีเซ็ตรหัสผ่าน: เก่าใช้ไม่ได้ ใหม่ใช้ได้ ── */
     assert.equal(
       (await resetAdminUserPassword({ id: accountId, password: "check-db-Password-9", actor: CHECK_ACTOR })).ok,
@@ -1357,11 +1446,11 @@ async function checkAdminUsers(): Promise<void> {
     assert.ok(Number.parseInt(audit[0]?.n ?? "0", 10) >= 4, "การเปลี่ยนบัญชีต้องลง audit ทุกครั้ง");
     done("บัญชีผู้ดูแลในฐานข้อมูล + บทบาท", "hash · ปิด/เปิด · กันล็อกตัวเองออก · รีเซ็ตรหัส · audit");
   } finally {
-    await pool.query("delete from admin_user where lower(email) = $1 or email like 'check-db-rbac-owner%'", [
-      RBAC_TEST_EMAIL,
-    ]);
+    /* ⚠️ ล้างทุกบัญชีทดสอบของรอบนี้ (owner · doomed · solo · spare) — ต้องไม่เหลือร่องรอยในฐานข้อมูล dev */
+    await pool.query("delete from admin_user where lower(email) = $1 or email like 'check-db-rbac-%'", [RBAC_TEST_EMAIL]);
     await pool.query("delete from audit_log where actor_email = $1 and action like 'admin-user-%'", [CHECK_ACTOR]);
     assert.equal(await countWhere("admin_user where lower(email) = $1", [RBAC_TEST_EMAIL]), 0, "ต้องไม่เหลือบัญชีทดสอบ");
+    assert.equal(await countWhere("admin_user where email like 'check-db-rbac-%'", []), 0, "ต้องไม่เหลือบัญชีทดสอบ (รวมบัญชีที่สร้างรอบที่ 90)");
   }
 }
 

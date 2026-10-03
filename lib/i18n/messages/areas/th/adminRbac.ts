@@ -59,6 +59,21 @@ export const adminRbac = {
   auditAdminUserDisable: "ปิดบัญชีผู้ดูแล",
   auditAdminUserEnable: "เปิดบัญชีผู้ดูแล",
   auditAdminUserPassword: "ตั้งรหัสผ่านใหม่ให้ผู้ดูแล",
+  auditAdminUserDelete: "ลบบัญชีผู้ดูแล",
+  /* ลบบัญชีถาวร (B3 · รอบที่ 90) */
+  rbacDelete: "ลบบัญชีถาวร",
+  rbacDeleteHint: "ลบบัญชีนี้ออกจากฐานข้อมูลถาวร — กู้คืนไม่ได้ · ถ้าต้องการแค่ห้ามเข้า ให้ใช้ \"ปิดบัญชี\"",
+  rbacDeleteConfirmLabel: "พิมพ์อีเมลของบัญชีนี้เพื่อยืนยัน",
+  rbacDeleteAcknowledge: "เข้าใจว่ากู้คืนไม่ได้ และบัญชีนี้จะถูกลบถาวร",
+  rbacDeletedDone: "ลบบัญชีถาวรแล้ว",
+  rbacEmailMismatch: "อีเมลที่พิมพ์ไม่ตรงกับบัญชีนี้ หรือยังไม่ได้ติ๊กยืนยัน",
+  rbacHistoryTitle: "ประวัติบัญชี/สิทธิ์ล่าสุด",
+  rbacHistoryEmpty: "ยังไม่มีประวัติการเปลี่ยนแปลงบัญชี",
+  /* หน้า "กิจกรรมของฉัน" (B3 · รอบที่ 90) */
+  activityTitle: "กิจกรรมของฉัน",
+  activityHint: "ร่องรอยการใช้งานของบัญชีนี้ (การล็อกอิน · การเผยแพร่ · การลบข้อมูล) — ระบบเก็บไว้ 90 วัน",
+  activityEmpty: "ยังไม่มีกิจกรรมของบัญชีนี้",
+  activityTarget: "เป้าหมาย",
 };
 
 export type AdminRbacMessages = typeof adminRbac;

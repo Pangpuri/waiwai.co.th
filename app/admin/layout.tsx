@@ -42,6 +42,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   */
   const links: readonly { readonly href: string; readonly label: string; readonly permission: AdminPermission }[] = [
     { href: "/admin", label: messages.admin.dashboardTitle, permission: "content" },
+    /* "กิจกรรมของฉัน" (B3 · รอบที่ 90) — ทุกบทบาทเข้าถึงได้ (ร่องรอยของตัวเอง) */
+    { href: "/admin/activity", label: messages.admin.activityTitle, permission: "content" },
     { href: "/admin/builder/chrome", label: messages.admin.chromeTitle, permission: "presets" },
     { href: "/admin/builder/home", label: messages.admin.builderTitle, permission: "content" },
     { href: "/admin/builder/mourning", label: messages.admin.mourningTitle, permission: "presets" },

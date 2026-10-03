@@ -250,6 +250,54 @@ export async function setAdminUserDisabled(input: {
   return { ok: true };
 }
 
+/**
+ * **ลบบัญชีผู้ดูแลถาวร** (B3 · รอบที่ 90) — ต่างจากการ "ปิดบัญชี"
+ *
+ * ด่านที่บังคับ (เรียงตามความเสียหายถ้าพลาด)
+ * 1. `no-database` — ไม่มีฐานข้อมูล = ทำไม่ได้
+ * 2. `self` — **ห้ามลบบัญชีตัวเอง** (กันล็อกตัวเองออกกลางทาง · ใช้ "ปิดบัญชี" ไม่ได้เช่นกัน)
+ * 3. `last-admin` — ห้ามลบผู้ดูแลระบบที่ยังใช้งานได้คนสุดท้าย
+ * 4. `not-found` — ไม่มีบัญชีนี้ในตาราง
+ *
+ * ⚠️ บัญชีจาก env (`ADMIN_EMAIL`) **ไม่ถูกแตะ** — ไม่ได้อยู่ในตารางนี้ (เป็นประตูหลังกันถูกล็อกออกโดยตั้งใจ)
+ * ⚠️ ลบแล้ว**กู้คืนไม่ได้ผ่าน UI** (ต่างจากถังขยะ) — ผู้เรียกต้องยืนยันให้ครบก่อนเรียกฟังก์ชันนี้
+ */
+export async function deleteAdminUser(input: {
+  readonly id: string;
+  readonly actor: string;
+  /** id ของผู้ที่กำลังทำรายการ (จากเซสชัน) — ใช้กัน "ลบตัวเอง" */
+  readonly actorId: string;
+  /** อีเมลที่ผู้ใช้พิมพ์ยืนยัน — ต้องตรงกับบัญชีปลายทาง (ด่านกันกดพลาด · ตรวจฝั่งเซิร์ฟเวอร์) */
+  readonly confirmEmail: string;
+}): Promise<UpdateAdminUserResult> {
+  if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
+  if (input.id === input.actorId) return { ok: false, reason: "self" };
+
+  const { rows } = await getPool().query<{ readonly role: string; readonly disabled: boolean; readonly email: string }>(
+    "select role, disabled, email from admin_user where id = $1",
+    [input.id],
+  );
+  const target = rows[0];
+  if (target === undefined) return { ok: false, reason: "not-found" };
+
+  /* ด่านยืนยัน: อีเมลที่พิมพ์ต้องตรงกับบัญชีจริง (เทียบแบบ normalize — ตัวพิมพ์ใหญ่/ช่องว่างไม่ช่วยให้ผ่าน) */
+  if (normalizeAdminEmail(input.confirmEmail) !== normalizeAdminEmail(target.email)) {
+    return { ok: false, reason: "email-mismatch" };
+  }
+
+  if (target.role === "admin" && !target.disabled) {
+    const remaining = await countActiveAdmins(input.id);
+    if (remaining === 0) return { ok: false, reason: "last-admin" };
+  }
+
+  const { rowCount } = await getPool().query("delete from admin_user where id = $1", [input.id]);
+  if (rowCount === 0) return { ok: false, reason: "not-found" };
+
+  /* อีเมลของบัญชีที่ถูกลบอยู่ใน detail — ร่องรอยว่า "ลบบัญชีใคร" (audit เก็บ 90 วัน) */
+  await recordAudit({ action: "admin-user-delete", actorEmail: input.actor, target: input.id, detail: target.email });
+  return { ok: true };
+}
+
 /** ตั้งรหัสผ่านใหม่ (ใช้ทั้งหน้าจอรีเซ็ตและ CLI) — คืนรหัสผ่านใหม่ให้แสดงครั้งเดียวที่ผู้เรียก */
 export async function resetAdminUserPassword(input: {
   readonly id: string;

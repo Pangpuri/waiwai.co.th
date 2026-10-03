@@ -1,9 +1,14 @@
 import { UserCreateForm, UserList, type RbacRow, type RbacStrings } from "@/features/admin/ui/user-manager";
+import { ACCOUNT_AUDIT_PREFIX, auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
 import { roleLabelOf } from "@/features/admin/rbac-labels";
 import { isDatabaseConfigured } from "@/db/pool";
+import { listAuditForActionPrefix } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { MIN_ADMIN_PASSWORD_LENGTH, listAdminUsers } from "@/lib/auth/users-repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+
+/** จำนวนบรรทัดประวัติบัญชีที่แสดง (พอเห็นภาพการเปลี่ยนแปลงล่าสุดโดยไม่ยาวเกิน) */
+const ACCOUNT_HISTORY_LIMIT = 10;
 
 /**
  * หน้าจอ **จัดการบัญชีผู้ดูแล** (X1.10 · RBAC) — เฉพาะบทบาท `admin`
@@ -21,6 +26,7 @@ export default async function AdminUsersPage() {
 
   const dbMissing = !isDatabaseConfigured();
   const users = dbMissing ? [] : await listAdminUsers();
+  const history = dbMissing ? [] : await listAuditForActionPrefix(ACCOUNT_AUDIT_PREFIX, ACCOUNT_HISTORY_LIMIT);
 
   const rbacStrings: RbacStrings = {
     rbacRoleLabel: strings.rbacRoleLabel,
@@ -66,6 +72,12 @@ export default async function AdminUsersPage() {
     rbacEnvAccountNote: strings.rbacEnvAccountNote,
     rbacDbMissing: strings.rbacDbMissing,
     rbacRoleUnknown: strings.rbacRoleUnknown,
+    rbacDelete: strings.rbacDelete,
+    rbacDeleteHint: strings.rbacDeleteHint,
+    rbacDeleteConfirmLabel: strings.rbacDeleteConfirmLabel,
+    rbacDeleteAcknowledge: strings.rbacDeleteAcknowledge,
+    rbacDeletedDone: strings.rbacDeletedDone,
+    rbacEmailMismatch: strings.rbacEmailMismatch,
   };
 
   const rows: readonly RbacRow[] = users.map((user) => ({
@@ -89,6 +101,32 @@ export default async function AdminUsersPage() {
       <UserCreateForm strings={rbacStrings} dbMissing={dbMissing} minLength={MIN_ADMIN_PASSWORD_LENGTH} />
 
       {dbMissing ? null : <UserList rows={rows} selfId={actor.id} strings={rbacStrings} minLength={MIN_ADMIN_PASSWORD_LENGTH} />}
+
+      {/*
+        ประวัติการเปลี่ยนบัญชี/สิทธิ์ (B3 · รอบที่ 90) — มาจาก audit log ที่ระบบเขียนอยู่แล้ว
+        ⚠️ ไม่มีตารางใหม่: audit log คือ "ประวัติย้อนหลัง" ที่ตรวจสอบได้ (เก็บ 90 วันตามนโยบาย)
+      */}
+      <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-5">
+        <h2 className="text-fg text-lg font-semibold">{strings.rbacHistoryTitle}</h2>
+        {history.length === 0 ? (
+          <p className="text-fg-muted text-sm">{strings.rbacHistoryEmpty}</p>
+        ) : (
+          <ul className="flex flex-col gap-2 text-xs">
+            {history.map((entry, index) => (
+              <li
+                key={`${entry.createdAt}-${index}`}
+                className="border-line flex flex-wrap items-baseline gap-2 border-b pb-1.5 last:border-0"
+              >
+                <span className="text-fg font-semibold">{auditActionLabel(strings, entry.action)}</span>
+                <span className="text-fg-muted font-mono">{entry.target ?? "-"}</span>
+                <span className="text-fg-muted">{entry.detail ?? ""}</span>
+                <span className="text-fg-muted">{entry.actorEmail ?? "-"}</span>
+                <span className="text-fg-muted ml-auto">{auditStamp(entry.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }
