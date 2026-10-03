@@ -25,6 +25,7 @@ import {
   type BlockCard,
   type BlockColumnWidth,
   type BlockDocument,
+  type BlockDocumentLanguage,
   type BlockLocation,
   type BlockStyle,
   type BlockType,
@@ -49,7 +50,7 @@ type DeepMutable<T> = T extends readonly (infer U)[]
     : T;
 
 type MutableBlock = DeepMutable<Block>;
-type MutableDocument = { page: string; blocks: MutableBlock[]; layout?: PageLayout };
+type MutableDocument = { page: string; blocks: MutableBlock[]; layout?: PageLayout; layoutEn?: PageLayout };
 
 export type BlockLanguage = "th" | "en";
 
@@ -924,12 +925,31 @@ export function setRosterColumns(document: BlockDocument, id: string, columns: n
  * - ตั้ง `full` = **ลบฟิลด์ออก** (ค่าเริ่มต้น) ⇒ เอกสารกลับไปรูปทรงเดิมเป๊ะ ๆ
  *   และทำให้ `documentDiff` ไม่เห็น "ความต่างหลอก" กับเอกสารเดิมที่ไม่มีฟิลด์นี้
  * - ค่าอื่นเก็บใน `document.layout` (อยู่ใน JSONB เดิม — ไม่มี migration)
+ * - `language = "th" | "en"` (X1.8 ต่อ · รอบที่ 92): เลย์เอาต์หน้าอังกฤษแยกได้
+ *   ⚠️ canonical: ค่าอังกฤษที่เท่ากับค่าไทย = **ลบฟิลด์** (ไม่เก็บค่าซ้ำ)
  */
-export function setPageLayout(document: BlockDocument, layout: PageLayout): BlockDocument {
-  if (layoutOf(document) === layout) return document;
+export function setPageLayout(
+  document: BlockDocument,
+  layout: PageLayout,
+  language: BlockDocumentLanguage = "th",
+): BlockDocument {
+  if (layoutOf(document, language) === layout) return document;
 
   const next = clone(document);
+
+  if (language === "en") {
+    if (layout === layoutOf(document, "th")) delete next.layoutEn;
+    else next.layoutEn = layout;
+    return next as unknown as BlockDocument;
+  }
+
   if (layout === DEFAULT_PAGE_LAYOUT) delete next.layout;
   else next.layout = layout;
+
+  /* ค่าอังกฤษที่เท่ากับค่าไทยใหม่ = ไม่ต้องเก็บแยกอีก */
+  if (next.layoutEn !== undefined && next.layoutEn === layoutOf(next as unknown as BlockDocument, "th")) {
+    delete next.layoutEn;
+  }
+
   return next as unknown as BlockDocument;
 }

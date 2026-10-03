@@ -1607,8 +1607,25 @@ export function BlockBuilder({
             </label>
             <select
               id="builder-layout"
-              value={layoutOf(document)}
-              onChange={(event) => update(setPageLayout(document, event.target.value as PageLayout))}
+              value={layoutOf(document, "th")}
+              onChange={(event) => update(setPageLayout(document, event.target.value as PageLayout, "th"))}
+              className="border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {LAYOUT_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+
+            {/* เลย์เอาต์ของหน้าอังกฤษแยกได้ (รอบที่ 92) — ค่าเริ่มต้น = ใช้ค่าเดียวกับไทย */}
+            <label htmlFor="builder-layout-en" className="text-fg-muted text-xs">
+              {strings.layoutLabelEn}
+            </label>
+            <select
+              id="builder-layout-en"
+              value={layoutOf(document, "en")}
+              onChange={(event) => update(setPageLayout(document, event.target.value as PageLayout, "en"))}
               className="border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
             >
               {LAYOUT_CHOICES.map((choice) => (

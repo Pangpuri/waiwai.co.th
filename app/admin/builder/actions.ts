@@ -271,8 +271,11 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
     const current = await loadDocumentRow(page, "draft");
     if (current !== null) {
       const currentParsed = parseBlockDocument(page, current.raw);
-      if (currentParsed.ok && currentParsed.document.layout !== undefined) {
-        nextDocument = { ...parsed.document, layout: currentParsed.document.layout };
+      if (currentParsed.ok) {
+        /* คัดเฉพาะฟิลด์เลย์เอาต์ที่มีจริง (ทั้งไทยและอังกฤษ — รอบที่ 92) */
+        const { layout, layoutEn } = currentParsed.document;
+        if (layout !== undefined) nextDocument = { ...nextDocument, layout };
+        if (layoutEn !== undefined) nextDocument = { ...nextDocument, layoutEn };
       }
     }
   } catch {

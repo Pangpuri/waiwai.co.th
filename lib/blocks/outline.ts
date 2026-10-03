@@ -25,8 +25,11 @@ export type OutlineEntry = {
   readonly level: OutlineLevel;
 };
 
-/** จำนวนรายการสารบัญสูงสุด (กันสารบัญยาวจนอ่านไม่ไหวในหน้าเนื้อหาเยอะผิดปกติ) */
-export const MAX_OUTLINE_ENTRIES = 20;
+/**
+ * จำนวนรายการสารบัญสูงสุด (กันสารบัญยาวจนอ่านไม่ไหวในหน้าเนื้อหาเยอะผิดปกติ)
+ * ⚠️ รอบที่ 92: ยกจาก 20 → 60 (20 ตัดหน้าเนื้อหาปกติทิ้ง — หน้าที่มีหัวข้อเยอะจะได้สารบัญไม่ครบ)
+ */
+export const MAX_OUTLINE_ENTRIES = 60;
 
 function localizedLabel(value: LocalizedValue, language: "th" | "en"): string {
   const primary = value[language].trim();

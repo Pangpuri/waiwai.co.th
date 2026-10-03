@@ -674,7 +674,8 @@ export function BlockDocumentView({
   if (document.blocks.length === 0) return null;
 
   const strings = blockRenderStringsFor(language);
-  const layout = layoutOf(document);
+  /* เลย์เอาต์อ่านตามภาษาของหน้านี้ (X1.8 ต่อ · รอบที่ 92) — หน้าอังกฤษแยกเลย์เอาต์ได้ */
+  const layout = layoutOf(document, language);
 
   const renderBlocks = (blocks: readonly Block[]) =>
     blocks.map((block) => (

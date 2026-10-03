@@ -243,17 +243,28 @@ export function documentDiff(base: BlockDocument, next: BlockDocument): Document
     });
   }
 
-  /* เลย์เอาต์ของทั้งหน้า (X1.8) — ความต่างระดับหน้า ไม่ผูกกับบล็อกใด ๆ */
-  const baseLayout = layoutOf(base);
-  const nextLayout = layoutOf(next);
-  if (baseLayout !== nextLayout) {
+  /*
+    เลย์เอาต์ของทั้งหน้า (X1.8 · X1.8 ต่อ รอบที่ 92) — ความต่างระดับหน้า ไม่ผูกกับบล็อกใด ๆ
+    ⚠️ ตรวจ **ทั้งสองภาษา**: ตั้งเลย์เอาต์อังกฤษแยก (layoutEn) ก็ต้องนับเป็นความต่าง
+  */
+  const layoutFields: DiffFieldChange[] = [];
+  for (const [language, path] of [
+    ["th", "layout"],
+    ["en", "layoutEn"],
+  ] as const) {
+    const before = layoutOf(base, language);
+    const after = layoutOf(next, language);
+    if (before !== after) layoutFields.push({ path, before, after });
+  }
+
+  if (layoutFields.length > 0) {
     rawEntries.push({
       kind: "changed",
       blockId: "",
       blockType: LAYOUT_DIFF_BLOCK_TYPE,
       index: 0,
       columnIndex: null,
-      fields: [{ path: "layout", before: baseLayout, after: nextLayout }],
+      fields: layoutFields,
       truncated: false,
     });
   }

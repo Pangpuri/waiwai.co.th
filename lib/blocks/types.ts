@@ -412,10 +412,25 @@ export type BlockDocument = {
    * ดูความหมายของแต่ละแบบที่ `PAGE_LAYOUTS`
    */
   readonly layout?: PageLayout;
+  /**
+   * เลย์เอาต์เฉพาะ **หน้าภาษาอังกฤษ** (X1.8 ต่อ · รอบที่ 92) — ไม่ระบุ = ใช้ค่าเดียวกับไทย
+   *
+   * เหตุผล: หน้าเดียวกันสองภาษามีความยาวเนื้อหาไม่เท่ากัน (อังกฤษมักยาวกว่า) ⇒ "สารบัญด้านข้าง"
+   * อาจเหมาะกับภาษาหนึ่งและไม่เหมาะกับอีกภาษาหนึ่ง
+   * ⚠️ canonical: ค่าที่เท่ากับค่าไทย = **ไม่เก็บฟิลด์** (เอกสารเดิม/หน้าเว็บไม่เปลี่ยนรูป)
+   */
+  readonly layoutEn?: PageLayout;
 };
 
-/** เลย์เอาต์ที่ใช้จริงของเอกสาร (ไม่ระบุ = `full`) — ใช้ทั้งตัวเรนเดอร์และ validator */
-export function layoutOf(document: BlockDocument): PageLayout {
+/** ภาษาที่เลย์เอาต์แยกได้ (ใช้เป็นพารามิเตอร์ของ `layoutOf`/`setPageLayout`) */
+export type BlockDocumentLanguage = "th" | "en";
+
+/**
+ * เลย์เอาต์ที่ใช้จริงของเอกสาร (ไม่ระบุ = `full`) — ใช้ทั้งตัวเรนเดอร์และ validator
+ * `language` = "en" จะอ่านค่าที่แยกไว้ก่อน แล้วถอยไปใช้ค่าไทย
+ */
+export function layoutOf(document: BlockDocument, language: BlockDocumentLanguage = "th"): PageLayout {
+  if (language === "en") return document.layoutEn ?? document.layout ?? DEFAULT_PAGE_LAYOUT;
   return document.layout ?? DEFAULT_PAGE_LAYOUT;
 }
 

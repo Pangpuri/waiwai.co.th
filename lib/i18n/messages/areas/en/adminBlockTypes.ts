@@ -52,4 +52,6 @@ export const adminBlockTypes = {
   layoutLabel: "Page layout",
   layoutHint:
     "Full width = blocks stacked as usual · Sidebar = a table of contents built automatically from page headings · Landing = first block as configured, the rest in a narrow centred column",
+  /* Per-language layout (round 92) */
+  layoutLabelEn: "English page layout (unset = same as Thai)",
 };

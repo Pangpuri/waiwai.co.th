@@ -741,14 +741,24 @@ function readBlockList(
  * - ไม่ระบุ หรือ `full` ⇒ **ไม่ใส่ฟิลด์** (ค่าเริ่มต้น ⇒ รูปทรงข้อมูลเดิม เอกสารเดิมไม่เปลี่ยนรูป)
  * - ค่าที่ไม่รู้จัก ⇒ รายงานปัญหา + ถือว่า `full` (ไม่เดา ไม่ทำให้ทั้งหน้าพัง)
  */
-function readLayout(source: Record<string, unknown>, problems: string[]): PageLayout | undefined {
-  const value = source["layout"];
+function readLayout(
+  source: Record<string, unknown>,
+  problems: string[],
+  field = "layout",
+  keepDefault = false,
+): PageLayout | undefined {
+  const value = source[field];
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string" || !isPageLayout(value)) {
-    problems.push(`layout: ต้องเป็นหนึ่งใน ${PAGE_LAYOUTS.join(" | ")}`);
+    problems.push(`${field}: ต้องเป็นหนึ่งใน ${PAGE_LAYOUTS.join(" | ")}`);
     return undefined;
   }
-  return value === DEFAULT_PAGE_LAYOUT ? undefined : value;
+  /*
+    `full` = ค่าเริ่มต้น ⇒ ไม่เก็บฟิลด์ **สำหรับ `layout` (ไทย)**
+    ⚠️ แต่สำหรับ `layoutEn` ค่า `full` มีความหมาย (ไทยเป็น sidebar แต่อังกฤษเต็มความกว้าง) ⇒ ต้องเก็บ
+  */
+  if (value === DEFAULT_PAGE_LAYOUT && !keepDefault) return undefined;
+  return value;
 }
 
 export function parseBlockDocument(page: string, raw: unknown): BlockParseOutcome {
@@ -776,12 +786,28 @@ export function parseBlockDocument(page: string, raw: unknown): BlockParseOutcom
   }
 
   const layout = readLayout(source, problems);
+  /*
+    เลย์เอาต์ของหน้าอังกฤษ (X1.8 ต่อ · รอบที่ 92)
+    ⚠️ canonical: เท่ากับค่าไทย (หรือไม่ระบุ) = **ไม่เก็บฟิลด์** ⇒ เอกสารเดิมไม่เปลี่ยนรูป
+  */
+  const layoutEnRaw = readLayout(source, problems, "layoutEn", true);
+  const layoutEn = layoutEnRaw === (layout ?? DEFAULT_PAGE_LAYOUT) ? undefined : layoutEnRaw;
 
   if (problems.length > 0) {
     return { ok: false, problems };
   }
 
-  return { ok: true, document: layout === undefined ? { page, blocks } : { page, blocks, layout } };
+  return { ok: true, document: withLayouts({ page, blocks }, layout, layoutEn) };
+}
+
+/** ประกอบเอกสารโดยใส่เฉพาะฟิลด์เลย์เอาต์ที่มีค่าจริง (ไม่ใส่คีย์ที่ไม่มีค่า) */
+function withLayouts(
+  base: { readonly page: string; readonly blocks: readonly Block[] },
+  layout: PageLayout | undefined,
+  layoutEn: PageLayout | undefined,
+): BlockDocument {
+  if (layout === undefined) return layoutEn === undefined ? base : { ...base, layoutEn };
+  return layoutEn === undefined ? { ...base, layout } : { ...base, layout, layoutEn };
 }
 
 /** แปลงเอกสารกลับเป็นค่าที่ส่งเป็น JSON ได้ (ใช้กับฟอร์ม/PG jsonb) */

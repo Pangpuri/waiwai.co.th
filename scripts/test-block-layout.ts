@@ -81,6 +81,86 @@ test("layout: เอกสารที่มีเลย์เอาต์ไป
   assert.deepEqual(outcome.document, doc);
 });
 
+/* ── 1.5) เลย์เอาต์แยกตามภาษา (X1.8 ต่อ · รอบที่ 92) ─────────────────────────── */
+
+test("layout: หน้าอังกฤษใช้ค่าไทยเมื่อไม่ได้ตั้งแยก", () => {
+  const doc: BlockDocument = { page: "home", blocks: [], layout: "sidebar" };
+  assert.equal(layoutOf(doc, "th"), "sidebar");
+  assert.equal(layoutOf(doc, "en"), "sidebar", "ไม่ตั้งแยก = ตามไทย");
+
+  const split: BlockDocument = { page: "home", blocks: [], layout: "sidebar", layoutEn: "full" };
+  assert.equal(layoutOf(split, "th"), "sidebar");
+  assert.equal(layoutOf(split, "en"), "full", "ตั้งแยกแล้วต้องใช้ค่าอังกฤษจริง");
+});
+
+test("layout: parse เก็บ layoutEn เฉพาะเมื่อต่างจากค่าไทย (canonical)", () => {
+  const sameAsThai = parseBlockDocument("home", { layout: "sidebar", layoutEn: "sidebar", blocks: [] });
+  assert.ok(sameAsThai.ok);
+  assert.equal("layoutEn" in sameAsThai.document, false, "เท่ากับไทย = ไม่เก็บฟิลด์");
+
+  const different = parseBlockDocument("home", { layout: "sidebar", layoutEn: "full", blocks: [] });
+  assert.ok(different.ok);
+  assert.equal(different.document.layout, "sidebar");
+  assert.equal(different.document.layoutEn, "full");
+
+  const enOnly = parseBlockDocument("home", { layoutEn: "sidebar", blocks: [] });
+  assert.ok(enOnly.ok);
+  assert.equal(enOnly.document.layout, undefined, "ไทยไม่ตั้ง = ค่าเริ่มต้น full");
+  assert.equal(enOnly.document.layoutEn, "sidebar");
+
+  const bad = parseBlockDocument("home", { layoutEn: "grid", blocks: [] });
+  assert.equal(bad.ok, false);
+  assert.ok(!bad.ok);
+  assert.ok(bad.problems.some((problem) => problem.includes("layoutEn")));
+});
+
+test("layout: setPageLayout แยกภาษาได้ และลบค่าซ้ำอัตโนมัติ", () => {
+  const base: BlockDocument = { page: "home", blocks: [headingBlock("block-1", "หัวข้อ", "Heading")] };
+
+  const enSidebar = setPageLayout(base, "sidebar", "en");
+  assert.equal(layoutOf(enSidebar, "en"), "sidebar");
+  assert.equal(layoutOf(enSidebar, "th"), "full", "ตั้งของอังกฤษไม่กระทบไทย");
+
+  /* ตั้งอังกฤษเท่ากับไทย = ไม่เก็บค่าซ้ำ */
+  const sameAsThai = setPageLayout(setPageLayout(base, "sidebar", "th"), "sidebar", "en");
+  assert.equal("layoutEn" in sameAsThai, false);
+
+  /* ไทยเปลี่ยนไปเท่าค่าอังกฤษเดิม ⇒ ลบค่าอังกฤษที่ซ้ำออก */
+  const thMovesToEn = setPageLayout(setPageLayout(base, "landing", "en"), "landing", "th");
+  assert.equal("layoutEn" in thMovesToEn, false);
+  assert.equal(layoutOf(thMovesToEn, "en"), "landing");
+
+  /* ค่าเดิม = ไม่แตะเอกสาร (ไม่ re-render เปล่า) */
+  assert.equal(setPageLayout(base, "full", "en"), base);
+  assert.equal(setPageLayout(enSidebar, "sidebar", "en"), enSidebar);
+});
+
+test("layout: เปลี่ยนเลย์เอาต์อังกฤษอย่างเดียวต้องนับเป็นความต่าง", () => {
+  const base: BlockDocument = { page: "home", blocks: [headingBlock("block-1", "หัวข้อ", "Heading")] };
+  const diff = documentDiff(base, setPageLayout(base, "landing", "en"));
+
+  assert.equal(diff.identical, false);
+  assert.equal(diff.summary.total, 1);
+  assert.equal(diff.entries[0]?.blockType, LAYOUT_DIFF_BLOCK_TYPE);
+  assert.deepEqual(diff.entries[0]?.fields, [{ path: "layoutEn", before: "full", after: "landing" }]);
+});
+
+test("layout: sidebar เตือนเมื่อหัวข้อภาษาใดภาษาหนึ่งน้อยกว่า 2 (ตรวจทั้งสองภาษา)", () => {
+  /* ตั้ง "sidebar" เฉพาะหน้าอังกฤษ แต่หน้านี้ไม่มีหัวข้อเลย ⇒ ต้องเตือน (ไทยเป็นเต็มความกว้างจึงไม่เกี่ยว) */
+  const doc: BlockDocument = { page: "home", blocks: [createBlock("divider", "block-1")], layoutEn: "sidebar" };
+  const warnings = documentWarningsOf(validateDocument(doc)).map((entry) => entry.code);
+
+  assert.ok(warnings.includes("layout-sidebar-few-headings"), "อังกฤษเป็น sidebar และไม่มีหัวข้อ ⇒ ต้องเตือน");
+
+  /* อังกฤษมีหัวข้อพอ ⇒ ไม่เตือน (ไทยยังเป็นค่าเริ่มต้น) */
+  const enough: BlockDocument = {
+    page: "home",
+    blocks: [headingBlock("block-1", "หนึ่ง", "One"), headingBlock("block-2", "สอง", "Two")],
+    layoutEn: "sidebar",
+  };
+  assert.ok(!documentWarningsOf(validateDocument(enough)).some((entry) => entry.code === "layout-sidebar-few-headings"));
+});
+
 /* ── 2) แก้เลย์เอาต์ ───────────────────────────────────────────────────────── */
 
 test("layout: setPageLayout เปลี่ยนค่าได้ · ตั้ง full = ลบฟิลด์ · ค่าเดิม = ไม่แตะเอกสาร", () => {
@@ -180,7 +260,14 @@ test("layout: เปลี่ยนเลย์เอาต์ต้องนั
   assert.equal(diff.identical, false, "ต้องไม่ถือว่าเหมือนกัน");
   assert.equal(diff.summary.total, 1);
   assert.equal(diff.entries[0]?.blockType, LAYOUT_DIFF_BLOCK_TYPE);
-  assert.deepEqual(diff.entries[0]?.fields, [{ path: "layout", before: "full", after: "sidebar" }]);
+  /*
+    ตั้งเลย์เอาต์ไทย = มีผลกับ **ทั้งสองภาษา** ที่ยังไม่ได้ตั้งแยก (อังกฤษถอยไปใช้ค่าไทย)
+    ⇒ รายงาน 2 บรรทัด: `layout` (ไทย) และ `layoutEn` (อังกฤษที่ใช้ค่าตาม) — ตรงกับผลจริงบนหน้าเว็บ
+  */
+  assert.deepEqual(diff.entries[0]?.fields, [
+    { path: "layout", before: "full", after: "sidebar" },
+    { path: "layoutEn", before: "full", after: "sidebar" },
+  ]);
 
   /* ไม่เปลี่ยนอะไร = ยังเหมือนเดิมเป๊ะ (ไม่สร้างความต่างหลอก) */
   const noChange = documentDiff(base, docOf([headingBlock("block-1", "หัวข้อ", "Heading")]));

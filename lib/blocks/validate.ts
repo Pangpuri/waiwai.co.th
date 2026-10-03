@@ -306,8 +306,12 @@ export function validateDocument(document: BlockDocument): readonly BlockIssue[]
   /*
     เลย์เอาต์ "สารบัญด้านข้าง" (X1.8) ต้องมีหัวข้อพอให้สร้างสารบัญ
     ⇒ น้อยกว่า 2 = เตือน (ไม่บล็อกการเผยแพร่ เพราะหน้าเว็บยังแสดงเนื้อหาครบ แค่ไม่มีสารบัญ)
+    ⚠️ ตรวจ **ทั้งสองภาษา** (X1.8 ต่อ · รอบที่ 92): ภาษาหนึ่งอาจตั้ง sidebar ไว้อีกภาษาหนึ่งไม่ตั้ง
   */
-  if (layoutOf(document) === "sidebar" && pageOutline(document, "th").length < 2) {
+  if (
+    (layoutOf(document, "th") === "sidebar" && pageOutline(document, "th").length < 2) ||
+    (layoutOf(document, "en") === "sidebar" && pageOutline(document, "en").length < 2)
+  ) {
     issues.push(
       issue(
         "warning",
