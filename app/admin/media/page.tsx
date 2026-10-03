@@ -45,7 +45,7 @@ export default async function AdminMediaPage({
 }: {
   readonly searchParams: Promise<{ readonly q?: string }>;
 }) {
-  await requireAdminUser();
+  await requireAdminUser("media");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

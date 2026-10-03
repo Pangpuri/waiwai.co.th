@@ -43,7 +43,7 @@ export default async function PreviewPage({
   readonly params: Promise<{ readonly lang: string; readonly page: string }>;
   readonly searchParams: Promise<{ readonly mode?: string; readonly parts?: string }>;
 }) {
-  await requireAdminUser();
+  await requireAdminUser("content");
 
   const { lang, page } = await params;
   if (!isLocale(lang)) notFound();

@@ -23,10 +23,10 @@ const CHROME_PATH = "/admin/builder/chrome";
 const CHROME_KEYS: readonly string[] = [NAVBAR_PAGE_KEY, MOURNING_PAGE_KEY];
 
 export async function publishChromeAction(): Promise<void> {
-  await requireAdminUser();
+  await requireAdminUser("presets");
   if (!isDatabaseConfigured()) return;
 
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
 
   for (const key of CHROME_KEYS) {
     const draft = await loadDocumentRow(key, "draft");

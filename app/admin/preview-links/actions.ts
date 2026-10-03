@@ -27,7 +27,7 @@ export async function createPreviewLinkAction(
   _previous: PreviewLinkActionState,
   formData: FormData,
 ): Promise<PreviewLinkActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("preview");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database", path: null };
 
   const page = String(formData.get("page") ?? "").trim();
@@ -48,7 +48,7 @@ export async function revokePreviewLinkAction(
   _previous: PreviewLinkActionState,
   formData: FormData,
 ): Promise<PreviewLinkActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("preview");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database", path: null };
 
   const id = String(formData.get("id") ?? "").trim();

@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 
 import "../globals.css";
 
+import { roleLabelOf } from "@/features/admin/rbac-labels";
 import { getSessionUser } from "@/lib/auth/dal";
+import { can, type AdminPermission } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 
 /**
@@ -33,17 +35,23 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const messages = await getMessagesFor("th");
   const user = await getSessionUser();
 
-  const links = [
-    { href: "/admin", label: messages.admin.dashboardTitle },
-    { href: "/admin/builder/chrome", label: messages.admin.chromeTitle },
-    { href: "/admin/builder/home", label: messages.admin.builderTitle },
-    { href: "/admin/builder/mourning", label: messages.admin.mourningTitle },
-    { href: "/admin/content/home", label: messages.admin.contentTitle },
-    { href: "/admin/inbox", label: messages.admin.inboxTitle },
-    { href: "/admin/media", label: messages.admin.mediaTitle },
-    { href: "/admin/trash", label: messages.admin.trashTitle },
-    { href: "/admin/preview-links", label: messages.admin.previewLinkTitle },
-    { href: "/admin/settings", label: messages.admin.settingsTitle },
+  /*
+    เมนูหลังบ้าน (X1.10 · RBAC) — **แต่ละลิงก์ผูกกับสิทธิ์**
+    ⇒ บทบาทที่เข้าไม่ได้จะไม่เห็นลิงก์นั้น (และถึงพิมพ์ URL เองก็ถูกประตู `requireAdminUser(permission)` กันไว้)
+    ⚠️ การซ่อนเมนูไม่ใช่มาตรการความปลอดภัย — เป็นเพียงไม่ชวนให้กดผิด (การบังคับจริงอยู่ฝั่งเซิร์ฟเวอร์)
+  */
+  const links: readonly { readonly href: string; readonly label: string; readonly permission: AdminPermission }[] = [
+    { href: "/admin", label: messages.admin.dashboardTitle, permission: "content" },
+    { href: "/admin/builder/chrome", label: messages.admin.chromeTitle, permission: "presets" },
+    { href: "/admin/builder/home", label: messages.admin.builderTitle, permission: "content" },
+    { href: "/admin/builder/mourning", label: messages.admin.mourningTitle, permission: "presets" },
+    { href: "/admin/content/home", label: messages.admin.contentTitle, permission: "content" },
+    { href: "/admin/inbox", label: messages.admin.inboxTitle, permission: "inbox" },
+    { href: "/admin/media", label: messages.admin.mediaTitle, permission: "media" },
+    { href: "/admin/trash", label: messages.admin.trashTitle, permission: "trash" },
+    { href: "/admin/preview-links", label: messages.admin.previewLinkTitle, permission: "preview" },
+    { href: "/admin/settings", label: messages.admin.settingsTitle, permission: "settings" },
+    { href: "/admin/users", label: messages.admin.rbacUsersTitle, permission: "users" },
   ];
 
   return (
@@ -53,16 +61,20 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <nav aria-label={messages.admin.dashboardTitle} className="border-line bg-surface border-b">
             <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2 px-4 py-2">
               <span className="text-fg-muted mr-1 text-xs font-semibold uppercase">{messages.admin.brand}</span>
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <span className="text-fg-muted ml-auto text-xs">{user.email}</span>
+              {links
+                .filter((link) => user !== null && can(user.role, link.permission))
+                .map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              <span className="text-fg-muted ml-auto text-xs">
+                {user.email} · {roleLabelOf(user.role, messages.admin)}
+              </span>
             </div>
           </nav>
         )}

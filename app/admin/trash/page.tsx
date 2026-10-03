@@ -22,7 +22,7 @@ import { listTrash, trashStats, type TrashEntry } from "@/lib/trash/repository";
  * ⚠️ ตัวเลขระยะเก็บดึงจาก `lib/retention/plan.ts` (ห้ามพิมพ์จำนวนวันในหน้านี้)
  */
 export default async function AdminTrashPage() {
-  await requireAdminUser();
+  await requireAdminUser("trash");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

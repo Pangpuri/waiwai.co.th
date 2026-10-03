@@ -25,7 +25,7 @@ const COLUMNS: readonly CsvColumn<SubmissionRow>[] = [
 ];
 
 export async function GET(): Promise<Response> {
-  await requireAdminUser();
+  await requireAdminUser("inbox");
 
   const rows = await listSubmissions({ limit: 500 });
   const csv = toCsv(rows, COLUMNS);

@@ -17,6 +17,7 @@ import { adminErasure } from "./areas/th/adminErasure.ts";
 import { adminTemplate } from "./areas/th/adminTemplate.ts";
 import { adminTrash } from "./areas/th/adminTrash.ts";
 import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
+import { adminRbac } from "./areas/th/adminRbac.ts";
 import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { previewLinkPage } from "./areas/th/previewLink.ts";
 import { pendingPages } from "./areas/th/pendingPages.ts";
@@ -73,6 +74,7 @@ export const th = {
     ...adminTrash,
     ...adminTemplate,
     ...adminPreviewLink,
+    ...adminRbac,
     ...adminChromePreset,
   },
 };

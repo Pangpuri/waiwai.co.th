@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { type LoginState } from "@/features/admin/login-state";
 import { getAdminUserStore, endSession, isAdminConfigured, requireAdminUser, startSession } from "@/lib/auth/dal";
+import { touchAdminLastLogin } from "@/lib/auth/users-repository";
 import { recordAudit } from "@/lib/audit/log";
 import { getSessionUser } from "@/lib/auth/dal";
 import { loginRateLimit, recordLoginAttempt } from "@/lib/auth/attempts";
@@ -92,6 +93,10 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
   await recordLoginAttempt(email, true);
   await recordAudit({ action: "login-success", actorEmail: email, target: "login", detail: null });
 
+  /* บันทึกเวลาล็อกอินล่าสุด (X1.10) — ใช้ดูว่าบัญชีไหนยังใช้อยู่จริงก่อนปิด/ลบ
+     ⚠️ บัญชีโหมด env ไม่มีแถวในตาราง ⇒ ฟังก์ชันนี้ข้ามให้เอง · ล้มเหลวก็ไม่ทำให้ล็อกอินล้ม */
+  await touchAdminLastLogin(outcome.user.id);
+
   /*
     ลบข้อมูลส่วนบุคคลที่หมดอายุ (X2b · PDPA) — ทำตอนล็อกอินเพราะโปรเจกต์ไม่มี cron/worker
     · ตัวมันเองกันซ้ำ 24 ชม. (`shouldRunPurge`) ⇒ ไม่ได้ลบทุกครั้งที่เข้า
@@ -117,7 +122,8 @@ export async function logoutAction(): Promise<void> {
  * - ลบถาวร: ใบสมัครที่หมดอายุ + ไฟล์เรซูเม่ของใบนั้น (cascade) — ปุ่มมีคำเตือนบนหน้าจอแล้ว
  */
 export async function purgeRetentionNowAction(): Promise<void> {
-  const user = await requireAdminUser();
+  /* ลบข้อมูลส่วนบุคคลถาวร = สิทธิ์ระดับผู้ดูแลระบบเท่านั้น (X1.10) */
+  const user = await requireAdminUser("retention");
   await purgeNow({ actorEmail: user.email });
   revalidatePath("/admin");
 }

@@ -62,7 +62,7 @@ async function prepare(formData: FormData): Promise<Prepared> {
 }
 
 export async function saveNavbarDraftAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 
@@ -77,7 +77,7 @@ export async function saveNavbarDraftAction(_previous: BuilderState, formData: F
 }
 
 export async function publishNavbarAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 

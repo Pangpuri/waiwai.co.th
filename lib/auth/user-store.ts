@@ -87,3 +87,23 @@ export function createEnvUserStore(input: EnvUserStoreInput): AdminUserStore | n
     },
   };
 }
+
+/**
+ * ต่อ store สองตัวเป็นตัวเดียว: **ลองตัวแรกก่อน แล้วค่อยตัวสำรอง** (X1.10 · รอบที่ 84)
+ *
+ * ทำไมต้องมี: หลังย้ายบัญชีไปฐานข้อมูลแล้ว ต้องไม่ทิ้ง **บัญชีผู้ดูแลระบบจาก env**
+ * เพราะถ้าฐานข้อมูลว่าง (หรือตั้งค่าผิด) จะไม่มีใครล็อกอินเข้าไปสร้างบัญชีแรกได้เลย = ล็อกตัวเองออก
+ * ⇒ `admin_user` = บัญชีงานประจำ · env = บัญชี "ประตูหลัง" สำหรับกู้สถานการณ์
+ *
+ * ⚠️ ลำดับสำคัญ: ตัวแรกที่พบบัญชีเป็นผู้ตัดสิน (ไม่รวมสิทธิ์ของสองบัญชีเข้าด้วยกัน)
+ */
+export function createFallbackUserStore(primary: AdminUserStore, fallback: AdminUserStore): AdminUserStore {
+  return {
+    async findByEmail(email: string): Promise<AdminAccount | null> {
+      return (await primary.findByEmail(email)) ?? (await fallback.findByEmail(email));
+    },
+    async findById(id: string): Promise<AdminAccount | null> {
+      return (await primary.findById(id)) ?? (await fallback.findById(id));
+    },
+  };
+}

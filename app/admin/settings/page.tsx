@@ -10,7 +10,7 @@ import { loadSiteSettingsForEditing } from "@/lib/site-settings/loader";
  * ⚠️ ค่าที่ใช้จริงบนหน้าเว็บคือ **ฉบับเผยแพร่** (loader อ่านเฉพาะ published) — ไม่ตั้งค่า = ของเดิม
  */
 export default async function AdminSettingsPage() {
-  await requireAdminUser();
+  await requireAdminUser("settings");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

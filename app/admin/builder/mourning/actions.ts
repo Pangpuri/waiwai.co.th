@@ -67,7 +67,7 @@ async function prepare(formData: FormData): Promise<Prepared> {
 }
 
 export async function saveMourningDraftAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 
@@ -82,7 +82,7 @@ export async function saveMourningDraftAction(_previous: BuilderState, formData:
 }
 
 export async function publishMourningAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 
@@ -100,7 +100,7 @@ export async function publishMourningAction(_previous: BuilderState, formData: F
 
 /** คืนค่าเริ่มต้นจากโค้ด/พจนานุกรม (ใช้เมื่ออยากเริ่มใหม่ ไม่แตะฉบับที่เผยแพร่อยู่จนกว่าจะกดเผยแพร่) */
 export async function resetMourningToDefaultsAction(): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const messages = await getMessagesFor("th");
   await saveJsonDraft(MOURNING_PAGE_KEY, defaultMourningConfig(messages), user.email);
   revalidatePath(MOURNING_PATH);
@@ -120,7 +120,7 @@ async function loadDraftConfig() {
 
 /** เปิด/ปิดป้ายประกาศจากหน้าอื่น (บันทึกเป็นฉบับร่าง) */
 export async function setNoticeEnabledAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const next = formData.get("enabled") === "1";
 
   const config = await loadDraftConfig();
@@ -132,7 +132,7 @@ export async function setNoticeEnabledAction(formData: FormData): Promise<void> 
 
 /** เผยแพร่ป้ายประกาศตามค่าล่าสุดที่บันทึกไว้ (ไม่ต้องส่งข้อมูลจากหน้าจอ) */
 export async function publishNoticeAction(): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   await publishDraft(MOURNING_PAGE_KEY, user.email, null);
 
   revalidatePath(MOURNING_PATH);

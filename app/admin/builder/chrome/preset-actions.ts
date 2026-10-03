@@ -49,7 +49,7 @@ export async function saveChromePresetAction(
   _previous: ChromePresetActionState,
   formData: FormData,
 ): Promise<ChromePresetActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database" };
 
   const kind = String(formData.get("kind") ?? "").trim();
@@ -78,7 +78,7 @@ export async function applyChromePresetAction(
   _previous: ChromePresetActionState,
   formData: FormData,
 ): Promise<ChromePresetActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database" };
 
   const kind = String(formData.get("kind") ?? "").trim();
@@ -99,7 +99,7 @@ export async function deleteChromePresetAction(
   _previous: ChromePresetActionState,
   formData: FormData,
 ): Promise<ChromePresetActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database" };
 
   const id = String(formData.get("id") ?? "").trim();
@@ -122,7 +122,7 @@ export async function undoChromePresetAction(
   _previous: ChromePresetActionState,
   formData: FormData,
 ): Promise<ChromePresetActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   if (!isDatabaseConfigured()) return { status: "failed", code: "no-database" };
 
   const kind = String(formData.get("kind") ?? "").trim();

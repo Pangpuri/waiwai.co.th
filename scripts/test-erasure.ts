@@ -126,7 +126,7 @@ test("erasure: การลบจริงต้องอยู่ใน transac
 test("erasure: server action ต้องตรวจสิทธิ์ + ตรวจคำขอก่อนลบ", () => {
   const action = sourceOf("app/admin/inbox/actions.ts");
 
-  assert.ok(action.includes("requireAdminUser()"), "ทุก action หลังบ้านต้องตรวจสิทธิ์ก่อน");
+  assert.ok(/requireAdminUser\("(retention|users|content|media|inbox)"\)/.test(action), "ทุก action หลังบ้านต้องตรวจสิทธิ์ (พร้อมระบุสิทธิ์ — X1.10)");
   assert.ok(action.includes("checkErasureRequest("), "ต้องผ่านการตรวจ 3 ด่านก่อนลบ");
   /* ลำดับ: ตรวจ → ถ้าไม่ผ่านต้อง return ก่อนถึงบรรทัดที่ลบ */
   const checkIndex = action.indexOf("checkErasureRequest(");

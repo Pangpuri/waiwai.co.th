@@ -37,7 +37,7 @@ function stamp(iso: string): string {
 }
 
 export default async function AdminPreviewLinksPage() {
-  await requireAdminUser();
+  await requireAdminUser("preview");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

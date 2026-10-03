@@ -63,7 +63,7 @@ async function prepare(formData: FormData): Promise<{ readonly ok: true; readonl
 }
 
 export async function saveSettingsAction(_previous: SettingsState, formData: FormData): Promise<SettingsState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("settings");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 
@@ -78,7 +78,7 @@ export async function saveSettingsAction(_previous: SettingsState, formData: For
 }
 
 export async function publishSettingsAction(_previous: SettingsState, formData: FormData): Promise<SettingsState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("settings");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 

@@ -58,7 +58,7 @@ async function prepare(formData: FormData): Promise<Prepared> {
 }
 
 export async function saveFooterDraftAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 
@@ -73,7 +73,7 @@ export async function saveFooterDraftAction(_previous: BuilderState, formData: F
 }
 
 export async function publishFooterAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("presets");
   const prepared = await prepare(formData);
   if (!prepared.ok) return prepared.state;
 

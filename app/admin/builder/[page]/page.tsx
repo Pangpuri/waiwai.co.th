@@ -65,7 +65,7 @@ function coveragePartLabel(
 }
 
 export default async function AdminBuilderPage({ params }: { readonly params: Promise<{ readonly page: string }> }) {
-  await requireAdminUser();
+  await requireAdminUser("content");
   const { page } = await params;
 
   const messages = await getMessagesFor("th");

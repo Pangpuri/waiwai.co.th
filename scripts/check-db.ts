@@ -48,6 +48,8 @@ import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/pr
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
+import { createDbUserStore, createAdminUser, resetAdminUserPassword, setAdminUserDisabled, setAdminUserRole } from "@/lib/auth/users-repository";
+import { verifyPassword } from "@/lib/auth/password";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { th } from "@/lib/i18n/messages/th";
@@ -207,6 +209,9 @@ async function main(): Promise<void> {
 
   /* 15) ตัวสร้างหลายหน้า (S2): เทมเพลต → บันทึกฉบับร่าง → เผยแพร่ → สวิตช์ "ใช้กับเว็บจริง" รายหน้า (รอบที่ 82) */
   await checkPageTemplates();
+
+  /* 16) บัญชีผู้ดูแลในฐานข้อมูล + บทบาท (X1.10 · RBAC · รอบที่ 84) */
+  await checkAdminUsers();
 
   await closePool();
 
@@ -1211,6 +1216,155 @@ async function checkPageTemplates(): Promise<void> {
     }
   }
 }
+
+/**
+ * 16) บัญชีผู้ดูแลในฐานข้อมูล (X1.10 · RBAC · รอบที่ 84)
+ *
+ * พิสูจน์กับ DB จริง (ไม่ใช่แค่อ่านซอร์ส)
+ * 1. สร้างบัญชี → hash ถูกเก็บจริง · รหัสผ่านที่ถูกต้องผ่าน · รหัสผิดไม่ผ่าน
+ * 2. อีเมลซ้ำ (ต่างตัวพิมพ์) ถูกปฏิเสธ
+ * 3. ปิดบัญชี → `attemptLogin` ต้องไม่ผ่าน · เปิดกลับ → ผ่าน
+ * 4. เปลี่ยนบทบาทแล้วค่ามีผลจริง (และผู้ใช้ที่ถูกเปลี่ยนต้องไม่ใช่แถวของ "ผู้ดูแลคนสุดท้าย")
+ * 5. **กันล็อกตัวเองออก**: ปิด/ถอดบทบาทผู้ดูแลที่ยังใช้งานได้คนสุดท้ายต้องถูกปฏิเสธ
+ * 6. เปลี่ยนรหัสผ่าน → รหัสเก่าใช้ไม่ได้ รหัสใหม่ใช้ได้
+ *
+ * ⚠️ ล้างบัญชีทดสอบทั้งหมดในตอนจบเสมอ (ทั้งกรณีผ่านและล้มเหลว)
+ */
+const RBAC_TEST_EMAIL = "check-db-rbac@example.invalid";
+/** ผู้ทำรายการของด่านนี้ (แยกจากผู้ใช้อื่น เพื่อล้าง audit ได้ตรง) */
+const CHECK_ACTOR = "check-db@example.invalid";
+
+async function checkAdminUsers(): Promise<void> {
+  const pool = getPool();
+  const { equalizeTiming } = await import("@/lib/auth/user-store");
+  const { attemptLogin } = await import("@/lib/auth/login");
+
+  /* กันร่องรอยจากรอบก่อน */
+  await pool.query("delete from admin_user where lower(email) = $1", [RBAC_TEST_EMAIL]);
+  await pool.query("delete from audit_log where target like 'usr_%' and actor_email = $1", [CHECK_ACTOR]);
+
+  const created = await createAdminUser({
+    email: RBAC_TEST_EMAIL,
+    displayName: "ทดสอบ RBAC",
+    role: "editor",
+    password: "check-db-Password-1",
+    actor: CHECK_ACTOR,
+  });
+  assert.equal(created.ok, true, "สร้างบัญชีในฐานข้อมูลต้องสำเร็จ");
+  if (!created.ok) return;
+
+  const accountId = created.user.id;
+  const store = createDbUserStore();
+  assert.ok(store !== null, "ต้องได้ store ที่อ่านจากฐานข้อมูล");
+
+  try {
+    /* ── 1) เก็บเฉพาะ hash + ตรวจรหัสผ่านได้จริง ── */
+    const { rows: raw } = await pool.query<{ readonly password_hash: string }>(
+      "select password_hash from admin_user where id = $1",
+      [accountId],
+    );
+    const hash = raw[0]?.password_hash ?? "";
+    assert.ok(hash.startsWith("scrypt:"), "ต้องเก็บ hash แบบ scrypt (ไม่ใช่รหัสผ่านตรง ๆ)");
+    assert.ok(!hash.includes("check-db-Password-1"), "ห้ามมีรหัสผ่านอยู่ในค่าที่เก็บ");
+
+    const deps = { store, verify: verifyPassword, equalize: equalizeTiming };
+    const good = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-1" }, deps);
+    assert.equal(good.kind, "ok", "รหัสผ่านที่ถูกต้องต้องล็อกอินผ่าน");
+    const wrong = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "wrong-password-1" }, deps);
+    assert.equal(wrong.kind, "invalid", "รหัสผ่านผิดต้องไม่ผ่าน");
+
+    /* ── 2) อีเมลซ้ำ (ต่างตัวพิมพ์) ต้องถูกปฏิเสธ ── */
+    const duplicate = await createAdminUser({
+      email: RBAC_TEST_EMAIL.toUpperCase(),
+      displayName: "ซ้ำ",
+      role: "editor",
+      password: "another-Password-2",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(duplicate.ok, false, "อีเมลซ้ำต้องสร้างไม่ได้ (ไม่สนตัวพิมพ์)");
+
+    /* ── 3) ปิดบัญชี → เข้าไม่ได้ · เปิดกลับ → เข้าได้ ── */
+    assert.equal(
+      (await setAdminUserDisabled({ id: accountId, disabled: true, actor: CHECK_ACTOR })).ok,
+      true,
+      "ปิดบัญชีต้องสำเร็จ",
+    );
+    const afterDisable = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-1" }, deps);
+    assert.equal(afterDisable.kind, "invalid", "บัญชีที่ถูกปิดต้องล็อกอินไม่ได้");
+    assert.equal(
+      (await setAdminUserDisabled({ id: accountId, disabled: false, actor: CHECK_ACTOR })).ok,
+      true,
+      "เปิดบัญชีกลับต้องสำเร็จ",
+    );
+
+    /* ── 4) เปลี่ยนบทบาทมีผลจริง ── */
+    assert.equal(
+      (await setAdminUserRole({ id: accountId, role: "publisher", actor: CHECK_ACTOR })).ok,
+      true,
+      "เปลี่ยนบทบาทต้องสำเร็จ",
+    );
+    const reloaded = await store?.findById(accountId);
+    assert.equal(reloaded?.role, "publisher", "บทบาทที่อ่านสดต้องเป็นค่าใหม่ ⇒ เปลี่ยนแล้วมีผลทันที");
+
+    /* ── 5) กันล็อกตัวเองออก: ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ ── */
+    const owner = await createAdminUser({
+      email: "check-db-rbac-owner@example.invalid",
+      displayName: "ผู้ดูแลทดสอบ",
+      role: "admin",
+      password: "check-db-Owner-3",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(owner.ok, true, "สร้างผู้ดูแลทดสอบต้องสำเร็จ");
+    if (owner.ok) {
+      /* มีผู้ดูแลที่ยังใช้งานได้ 1 คน (คนนี้) ⇒ ถอดบทบาท/ปิด ต้องถูกปฏิเสธ */
+      const demote = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
+      assert.equal(demote.ok, false, "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+      const disable = await setAdminUserDisabled({ id: owner.user.id, disabled: true, actor: CHECK_ACTOR });
+      assert.equal(disable.ok, false, "ปิดผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+
+      /* มีผู้ดูแลคนที่สองแล้ว ⇒ ครั้งนี้ทำได้ */
+      const second = await createAdminUser({
+        email: "check-db-rbac-owner2@example.invalid",
+        displayName: "ผู้ดูแลทดสอบ 2",
+        role: "admin",
+        password: "check-db-Owner-4",
+        actor: CHECK_ACTOR,
+      });
+      assert.equal(second.ok, true, "สร้างผู้ดูแลคนที่สองต้องสำเร็จ");
+      if (second.ok) {
+        const demoteNow = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
+        assert.equal(demoteNow.ok, true, "มีผู้ดูแลคนอื่นแล้ว ⇒ ถอดบทบาทได้");
+      }
+      await pool.query("delete from admin_user where email like 'check-db-rbac-owner%'");
+    }
+
+    /* ── 6) รีเซ็ตรหัสผ่าน: เก่าใช้ไม่ได้ ใหม่ใช้ได้ ── */
+    assert.equal(
+      (await resetAdminUserPassword({ id: accountId, password: "check-db-Password-9", actor: CHECK_ACTOR })).ok,
+      true,
+      "รีเซ็ตรหัสผ่านต้องสำเร็จ",
+    );
+    const oldPassword = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-1" }, deps);
+    assert.equal(oldPassword.kind, "invalid", "รหัสผ่านเก่าต้องใช้ไม่ได้หลังรีเซ็ต");
+    const newPassword = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-9" }, deps);
+    assert.equal(newPassword.kind, "ok", "รหัสผ่านใหม่ต้องใช้ได้");
+
+    /* ── audit: ต้องมีร่องรอยการเปลี่ยนบัญชี ── */
+    const { rows: audit } = await pool.query<{ readonly n: string }>(
+      "select count(*)::text as n from audit_log where actor_email = $1 and action like 'admin-user-%'",
+      [CHECK_ACTOR],
+    );
+    assert.ok(Number.parseInt(audit[0]?.n ?? "0", 10) >= 4, "การเปลี่ยนบัญชีต้องลง audit ทุกครั้ง");
+    done("บัญชีผู้ดูแลในฐานข้อมูล + บทบาท", "hash · ปิด/เปิด · กันล็อกตัวเองออก · รีเซ็ตรหัส · audit");
+  } finally {
+    await pool.query("delete from admin_user where lower(email) = $1 or email like 'check-db-rbac-owner%'", [
+      RBAC_TEST_EMAIL,
+    ]);
+    await pool.query("delete from audit_log where actor_email = $1 and action like 'admin-user-%'", [CHECK_ACTOR]);
+    assert.equal(await countWhere("admin_user where lower(email) = $1", [RBAC_TEST_EMAIL]), 0, "ต้องไม่เหลือบัญชีทดสอบ");
+  }
+}
+
 
 /** อ่านสวิตช์ตรงจากตาราง (ใช้ยืนยันว่าปิดจริงหลังทดสอบ) */
 async function loadPageLiveFlag(page: string): Promise<boolean> {

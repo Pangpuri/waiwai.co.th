@@ -25,7 +25,7 @@ import { errorsOf, validateContent, warningsOf } from "@/lib/content/validate";
 const CONTENT_PATH = "/admin/content/home";
 
 export async function saveHomeAction(_previous: SaveState, formData: FormData): Promise<SaveState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
 
   const payload = formData.get("payload");
   if (typeof payload !== "string" || payload.trim() === "") {
@@ -77,7 +77,7 @@ export async function saveHomeAction(_previous: SaveState, formData: FormData): 
 
 /** นำเข้าข้อความชุดตั้งต้น (จากพจนานุกรมเดิม) — ใช้เมื่อฐานข้อมูลยังว่าง */
 export async function importHomeSeedAction(): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   await importPageSeed(HOME_PAGE_SPEC, HOME_SEED, user.email);
   revalidatePath(CONTENT_PATH);
   redirect(CONTENT_PATH);

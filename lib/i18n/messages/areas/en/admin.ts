@@ -12,6 +12,7 @@ import type { adminErasure as thAdminErasure } from "@/lib/i18n/messages/areas/t
 import type { adminTrash as thAdminTrash } from "@/lib/i18n/messages/areas/th/adminTrash";
 import type { adminPreviewLink as thAdminPreviewLink } from "@/lib/i18n/messages/areas/th/adminPreviewLink";
 import type { adminChromePreset as thAdminChromePreset } from "@/lib/i18n/messages/areas/th/adminChromePreset";
+import type { adminRbac as thAdminRbac } from "@/lib/i18n/messages/areas/th/adminRbac";
 import type { adminTemplate as thAdminTemplate } from "@/lib/i18n/messages/areas/th/adminTemplate";
 
 /** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset) — ไฟล์นี้ไม่ต้องมีอีก */
@@ -25,7 +26,8 @@ type MovedKeys =
   | keyof typeof thAdminTrash
   | keyof typeof thAdminPreviewLink
   | keyof typeof thAdminChromePreset
-  | keyof typeof thAdminTemplate;
+  | keyof typeof thAdminTemplate
+  | keyof typeof thAdminRbac;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",

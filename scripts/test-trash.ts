@@ -147,14 +147,14 @@ test("trash: การลบถาวรมีเงื่อนไข 'ต้�
   }
 
   const actions = sourceOf("app/admin/trash/actions.ts");
-  const required = actions.match(/await requireAdminUser\(\)/g) ?? [];
+  const required = actions.match(/await requireAdminUser\("[a-z]+"\)/g) ?? [];
   const exported = actions.match(/export async function/g) ?? [];
   assert.equal(exported.length, 4, "ต้องมี 4 action (กู้คืน · ลบถาวร · ล้างถัง · ลบตามกำหนด)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
   assert.ok(actions.includes("isTrashKind("), "ต้องตรวจชนิดของก่อนแตะฐานข้อมูล");
 
   const page = sourceOf("app/admin/trash/page.tsx");
-  assert.ok(page.includes("requireAdminUser()"), "หน้าถังขยะต้องล็อกอินก่อน");
+  assert.ok(page.includes('requireAdminUser("trash")'), "หน้าถังขยะต้องมีสิทธิ์ถังขยะ (X1.10)");
   assert.ok(page.includes("TRASH_RETENTION_DAYS"), "หน้าต้องบอกระยะเก็บจากค่ากลาง");
 });
 
@@ -223,16 +223,17 @@ test("trash: พจนานุกรมต้องไม่ hardcode จำน
   }
 });
 
-test("trash: ตัวอย่างภาพของในถัง — ต้องเป็นเส้นทางหลังบ้านที่ล็อกอินเท่านั้น (ปิดหนี้ รอบที่ 81)", () => {
+test("trash: ตัวอย่างภาพของในถัง — ต้องล็อกอิน + มีสิทธิ์ถังขยะเท่านั้น (ปิดหนี้ รอบที่ 81 · เพิ่มสิทธิ์ X1.10)", () => {
   const route = sourceOf("app/admin/trash/thumbnail/[id]/route.ts");
 
   assert.ok(route.includes("getSessionUser()"), "ต้องตรวจเซสชันผู้ดูแล");
+  assert.ok(route.includes('can(user.role, "trash")'), "ต้องตรวจสิทธิ์ถังขยะด้วย (ไม่ใช่แค่ล็อกอิน — X1.10)");
   assert.ok(route.includes("getTrashedMediaBinary"), "ต้องอ่านผ่านฟังก์ชันที่เจาะจงของในถัง");
   assert.ok(route.includes('dynamic = "force-dynamic"'), "ห้ามแคชตัวอย่างของในถัง");
   assert.ok(route.includes('"cache-control": "no-store"'), "ต้องไม่ให้แคช");
   assert.ok(route.includes('"x-content-type-options": "nosniff"'), "ต้องกันเบราว์เซอร์ตีความผิด");
   assert.ok(!route.includes('"content-disposition"'), "ไม่ต้องส่งชื่อไฟล์ออกไป");
-  assert.ok(route.includes("if (user === null)"), "ไม่ล็อกอิน = 404 (ไม่เปิดเผยว่ามีของในถัง)");
+  assert.ok(route.includes("user === null || !can(user.role"), "ไม่มีเซสชัน/สิทธิ์ไม่พอ = 404 (ไม่เปิดเผยว่ามีของในถัง)");
 
   /* ฝั่งสาธารณะต้องไม่เปลี่ยน: ของในถังยัง 404 */
   const publicRoute = sourceOf("app/media/[id]/route.ts");

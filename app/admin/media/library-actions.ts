@@ -44,7 +44,7 @@ async function readUpload(formData: FormData, field: string): Promise<
 }
 
 export async function updateMediaAltAction(formData: FormData): Promise<void> {
-  await requireAdminUser();
+  await requireAdminUser("media");
 
   const id = String(formData.get("id") ?? "").trim();
   if (id === "") return;
@@ -63,7 +63,7 @@ export async function updateMediaAltAction(formData: FormData): Promise<void> {
  * ⇒ กู้คืนได้จาก `/admin/trash` จนพ้นระยะเก็บ · audit บันทึกใน `lib/trash/repository.ts` แล้ว
  */
 export async function deleteMediaAction(_previous: MediaActionState, formData: FormData): Promise<MediaActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("media");
 
   const id = String(formData.get("id") ?? "").trim();
   if (id === "") return { status: "invalid", message: ["missing-id"] };
@@ -84,7 +84,7 @@ export async function deleteMediaAction(_previous: MediaActionState, formData: F
 
 /** แทนไฟล์เดิม (คีย์เดิม) — พาธไม่เปลี่ยน ทุกที่ที่ใช้อยู่ได้รูปใหม่ทันที */
 export async function replaceMediaAction(_previous: MediaActionState, formData: FormData): Promise<MediaActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("media");
 
   const id = String(formData.get("id") ?? "").trim();
   if (id === "") return { status: "invalid", message: ["missing-id"] };
@@ -108,7 +108,7 @@ export async function replaceMediaAction(_previous: MediaActionState, formData: 
 
 /** อัปโหลดจากหน้าคลังภาพ (ใช้ตัวช่วยกลาง `storeImageFile` ตัวเดียวกับที่อื่น) */
 export async function uploadFromLibraryAction(_previous: MediaActionState, formData: FormData): Promise<MediaActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("media");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { status: "invalid", message: ["missing"] };

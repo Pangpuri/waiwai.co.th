@@ -25,7 +25,7 @@ function pathOf(page: string): string {
 
 /** บันทึกบล็อกที่เลือกเป็นพรีเซ็ต (รับเอกสารทั้งก้อนจากหน้าจอ + id ของบล็อก) */
 export async function savePresetAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   if (!isDatabaseConfigured()) return;
 
   const page = String(formData.get("page") ?? "").trim();
@@ -56,7 +56,7 @@ export async function savePresetAction(formData: FormData): Promise<void> {
 }
 
 export async function deletePresetAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   if (!isDatabaseConfigured()) return;
 
   const id = String(formData.get("id") ?? "").trim();

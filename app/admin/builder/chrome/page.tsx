@@ -37,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ChromePage() {
-  await requireAdminUser();
+  await requireAdminUser("presets");
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;

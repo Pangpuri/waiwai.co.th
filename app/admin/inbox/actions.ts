@@ -25,7 +25,7 @@ function readId(formData: FormData): number | null {
 }
 
 export async function setSubmissionStatusAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("inbox");
   const id = readId(formData);
   if (id === null) return;
 
@@ -38,7 +38,7 @@ export async function setSubmissionStatusAction(formData: FormData): Promise<voi
 }
 
 export async function deleteSubmissionAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("inbox");
   const id = readId(formData);
   if (id === null) return;
 
@@ -57,7 +57,7 @@ export async function deleteSubmissionAction(formData: FormData): Promise<void> 
  * (ขั้นตอนพิสูจน์ตัวตนเป็นงานของเจ้าหน้าที่ — ดู `PRODUCT_ROADMAP.md` § 9)
  */
 export async function eraseSubjectAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("inbox");
 
   const raw = (key: string): string => {
     const value = formData.get(key);

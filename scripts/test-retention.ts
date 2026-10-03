@@ -269,7 +269,7 @@ test("retention: ล็อกอินสำเร็จแล้วลบตา
 
   assert.ok(actions.includes("runScheduledPurge("), "ต้องเรียกตัวลบตามรอบจาก Server Action");
   assert.ok(actions.includes("purgeRetentionNowAction"), "ต้องมี action ให้ผู้ดูแลกดลบเอง");
-  assert.ok(actions.includes("requireAdminUser()"), "action ที่ลบข้อมูลต้องตรวจสิทธิ์ก่อนเสมอ");
+  assert.ok(actions.includes('requireAdminUser("retention")'), "action ที่ลบข้อมูลส่วนบุคคลต้องเป็นสิทธิ์ระดับผู้ดูแลระบบ (X1.10)");
 
   /* ลำดับ: บันทึก "ล็อกอินสำเร็จ" ก่อน แล้วจึงลบ — ไม่งั้นร่องรอยการเข้าใช้จะหายไปพร้อมข้อมูลเก่า */
   const auditIndex = actions.indexOf('action: "login-success"');

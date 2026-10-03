@@ -18,7 +18,7 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
  * หมายเหตุ: หน้านี้เป็น dynamic (อ่านคุกกี้ + DB) — ตั้งใจให้เป็นเช่นนั้น ไม่ใช่ static
  */
 export default async function AdminHomeContentPage() {
-  await requireAdminUser();
+  await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

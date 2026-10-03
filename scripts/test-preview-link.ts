@@ -167,7 +167,7 @@ test("preview-link: หน้าลิงก์ต้อง dynamic + noindex + 
 test("preview-link: ตัวสร้างต้องล็อกอิน และสร้างได้เฉพาะหน้าที่อนุญาต", () => {
   const actions = sourceOf("app/admin/preview-links/actions.ts");
 
-  const required = actions.match(/await requireAdminUser\(\)/g) ?? [];
+  const required = actions.match(/await requireAdminUser\("[a-z]+"\)/g) ?? [];
   const exported = actions.match(/export async function/g) ?? [];
   assert.equal(exported.length, 2, "ต้องมี 2 action (สร้าง · ยกเลิก)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
@@ -175,7 +175,7 @@ test("preview-link: ตัวสร้างต้องล็อกอิน �
   assert.ok(actions.includes("isLocale(locale)"), "ต้องตรวจภาษาก่อนสร้างพาธ");
 
   const page = sourceOf("app/admin/preview-links/page.tsx");
-  assert.ok(page.includes("requireAdminUser()"), "หน้าจอต้องล็อกอินก่อน");
+  assert.ok(page.includes('requireAdminUser("preview")'), "หน้าจอต้องมีสิทธิ์ลิงก์พรีวิว (X1.10)");
   assert.ok(page.includes("PREVIEW_LINK_TTL_HOURS"), "หน้าจอต้องบอกอายุจากค่ากลาง (ไม่พิมพ์เลขเอง)");
   assert.ok(page.includes("PREVIEW_LINK_MAX_ACTIVE"), "หน้าจอต้องใช้เพดานจากค่ากลาง");
 });

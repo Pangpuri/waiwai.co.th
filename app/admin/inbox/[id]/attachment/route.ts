@@ -11,7 +11,7 @@ import { findAttachment } from "@/lib/forms/repository";
  */
 
 export async function GET(_request: Request, context: { readonly params: Promise<{ readonly id: string }> }): Promise<Response> {
-  await requireAdminUser();
+  await requireAdminUser("inbox");
 
   const { id } = await context.params;
   const attachmentId = Number.parseInt(id, 10);

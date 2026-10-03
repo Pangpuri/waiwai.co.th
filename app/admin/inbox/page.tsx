@@ -39,7 +39,7 @@ export default async function AdminInboxPage({
 }: {
   readonly searchParams: Promise<{ readonly status?: string; readonly form?: string; readonly erase?: string }>;
 }) {
-  await requireAdminUser();
+  await requireAdminUser("inbox");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

@@ -15,7 +15,7 @@ import { updatePage, updatePageSeo } from "@/lib/pages/repository";
  * ⚠️ ชื่อหน้าถูกใช้เป็นป้ายเมนูของ navbar ด้วย (ดู lib/chrome/loader.ts) ⇒ แก้ที่เดียว ได้ทั้งเว็บ
  */
 export async function updatePageAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   if (!isDatabaseConfigured()) return;
 
   const id = String(formData.get("id") ?? "").trim();
@@ -41,7 +41,7 @@ export async function updatePageAction(formData: FormData): Promise<void> {
 
 /** บันทึกค่า SEO ของหน้า (W2) — ว่างได้ทุกช่อง = ใช้ค่าเดิมจากพจนานุกรม */
 export async function updatePageSeoAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   if (!isDatabaseConfigured()) return;
 
   const id = String(formData.get("id") ?? "").trim();

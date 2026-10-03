@@ -13,7 +13,7 @@ import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@
  * ค่าตั้งต้นที่ส่งให้หน้าจอ = **ฉบับร่าง** ถ้ามี · ถ้าไม่มี = ค่าเริ่มต้นจากโค้ด/พจนานุกรม (ยังไม่เขียนลง DB จนกว่าจะกดบันทึก)
  */
 export default async function AdminMourningPage() {
-  await requireAdminUser();
+  await requireAdminUser("presets");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 

@@ -35,7 +35,7 @@ function revalidateTrash(): void {
 
 /** กู้คืนของจากถัง (ภาพ/พรีเซ็ตกลับมาใช้งานตามเดิม) */
 export async function restoreTrashAction(_previous: TrashActionState, formData: FormData): Promise<TrashActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return { status: "failed", code: "db-missing", count: null };
 
   const kind = String(formData.get("kind") ?? "").trim();
@@ -51,7 +51,7 @@ export async function restoreTrashAction(_previous: TrashActionState, formData: 
 
 /** ลบถาวรทีละรายการ (กู้คืนไม่ได้) */
 export async function deleteTrashItemAction(_previous: TrashActionState, formData: FormData): Promise<TrashActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return { status: "failed", code: "db-missing", count: null };
 
   const kind = String(formData.get("kind") ?? "").trim();
@@ -67,7 +67,7 @@ export async function deleteTrashItemAction(_previous: TrashActionState, formDat
 
 /** ลบถาวรทุกอย่างในถัง (ผู้ดูแลสั่งเอง) — **ต้องติ๊กยืนยันก่อน** เพราะกู้คืนไม่ได้ */
 export async function emptyTrashAction(_previous: TrashActionState, formData: FormData): Promise<TrashActionState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return { status: "failed", code: "db-missing", count: null };
 
   /* ด่านยืนยันอยู่ที่เซิร์ฟเวอร์ (ไม่ใช่แค่ติ๊กในหน้าจอ) */
@@ -84,7 +84,7 @@ export async function emptyTrashAction(_previous: TrashActionState, formData: Fo
  * ⚠️ ไม่ใช้ `useActionState` ⇒ ไม่มีพารามิเตอร์ state (แบบเดียวกับปุ่มลบตามระยะเก็บบนหน้าภาพรวม)
  */
 export async function purgeTrashNowAction(): Promise<void> {
-  await requireAdminUser();
+  await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return;
 
   await purgeExpiredTrash();

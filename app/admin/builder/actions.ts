@@ -84,7 +84,7 @@ async function prepare(page: string, formData: FormData): Promise<Prepared> {
 }
 
 export async function saveDraftAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
   if (page === "") {
     return { status: "failed", errors: [], warnings: [], problems: ["ไม่รู้ว่าจะบันทึกหน้าไหน"], revision: null };
@@ -104,7 +104,7 @@ export async function saveDraftAction(_previous: BuilderState, formData: FormDat
 }
 
 export async function publishAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
   if (page === "") {
     return { status: "failed", errors: [], warnings: [], problems: ["ไม่รู้ว่าจะเผยแพร่หน้าไหน"], revision: null };
@@ -147,7 +147,7 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
 }
 
 export async function restoreRevisionAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
   const revision = Number.parseInt(String(formData.get("revision") ?? ""), 10);
 
@@ -182,7 +182,7 @@ export async function restoreRevisionAction(_previous: BuilderState, formData: F
  * - ไม่เขียนอะไรลงฐานข้อมูล — เป็นการอ่านล้วน (ผู้ใช้ยังต้องกด "กู้คืน" อีกครั้ง)
  */
 export async function compareRevisionAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  await requireAdminUser();
+  await requireAdminUser("content");
 
   const page = String(formData.get("page") ?? "").trim();
   const revision = Number.parseInt(String(formData.get("revision") ?? ""), 10);
@@ -250,7 +250,7 @@ async function readCurrentDraftForCompare(page: string, formData: FormData): Pro
  * ⚠️ หน้านี้ไม่มีเทมเพลต = ไม่เขียนอะไร แล้วกลับมาที่หน้าเดิม (UI ไม่แสดงปุ่มให้อยู่แล้ว)
  */
 export async function startFromTemplateAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
 
   if (!hasBlockTemplate(page)) redirect(pathOf(page));
@@ -272,7 +272,7 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
  * เปิด = หน้าเว็บสาธารณะเรนเดอร์เอกสารที่เผยแพร่แทนเลย์เอาต์ที่ออกแบบไว้ · ปิด = กลับไปใช้ของเดิมทันทีหลังสร้างใหม่
  */
 export async function setPageLiveAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
 
   const page = String(formData.get("page") ?? "").trim();
   if (page === "") return;
@@ -286,7 +286,7 @@ export async function setPageLiveAction(formData: FormData): Promise<void> {
 
 /** ใช้ในหน้าจอเพื่อแสดงสถานะสวิตช์ (อ่านอย่างเดียว) */
 export async function readPageLiveAction(page: string): Promise<boolean> {
-  await requireAdminUser();
+  await requireAdminUser("content");
   return isPageLive(page);
 }
 
@@ -298,7 +298,7 @@ export async function readPageLiveAction(page: string): Promise<boolean> {
  * ⚠️ ไม่แตะประวัติการเผยแพร่ — ประวัติคือภาพในอดีต ต้องคงไว้ตามจริง
  */
 export async function migrateBlocksAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
   if (page === "") {
     return { status: "failed", errors: [], warnings: [], problems: ["ไม่รู้ว่าจะย้ายข้อมูลของหน้าไหน"], revision: null };

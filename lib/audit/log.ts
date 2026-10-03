@@ -42,6 +42,16 @@ export type AuditAction =
   | "preview-link-revoke"
   /** เก็บกวาดลิงก์พรีวิวที่ปิดแล้วและพ้นอายุเก็บ (X2.6) */
   | "preview-link-purge"
+  /** สร้างบัญชีผู้ดูแล (X1.10 · RBAC) */
+  | "admin-user-create"
+  /** เปลี่ยนบทบาทผู้ดูแล */
+  | "admin-user-role"
+  /** ปิดบัญชีผู้ดูแล (พนักงานออก/เครื่องหาย) */
+  | "admin-user-disable"
+  /** เปิดบัญชีผู้ดูแลกลับ */
+  | "admin-user-enable"
+  /** ตั้งรหัสผ่านใหม่ให้บัญชีผู้ดูแล */
+  | "admin-user-password"
   /** บันทึกชุดสำเร็จของส่วนกลาง (W3b) — navbar/footer/ป้ายประกาศ */
   | "chrome-preset-save"
   /** ใช้ชุดสำเร็จของส่วนกลางกับฉบับร่าง (W3b) — ไม่แตะฉบับเผยแพร่ */

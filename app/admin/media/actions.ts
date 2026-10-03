@@ -17,7 +17,7 @@ function failure(reason: UploadState["reason"]): UploadState {
 }
 
 export async function uploadImageAction(_previous: UploadState, formData: FormData): Promise<UploadState> {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("media");
 
   if (!isDatabaseConfigured()) return failure("database");
 

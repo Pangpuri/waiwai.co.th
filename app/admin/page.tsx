@@ -20,7 +20,7 @@ import { trashStats } from "@/lib/trash/repository";
  * ⇒ เจ้าของเห็นทันทีว่ามีข้อมูลหมดอายุค้างอยู่ไหม และกดลบเองได้โดยไม่ต้องรอรอบอัตโนมัติ
  */
 export default async function AdminHomePage() {
-  const user = await requireAdminUser();
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 
@@ -48,6 +48,11 @@ export default async function AdminHomePage() {
       "chrome-preset-save": strings.auditChromePresetSave,
       "chrome-preset-apply": strings.auditChromePresetApply,
       "chrome-preset-undo": strings.auditChromePresetUndo,
+      "admin-user-create": strings.auditAdminUserCreate,
+      "admin-user-role": strings.auditAdminUserRole,
+      "admin-user-disable": strings.auditAdminUserDisable,
+      "admin-user-enable": strings.auditAdminUserEnable,
+      "admin-user-password": strings.auditAdminUserPassword,
     };
     return map[action] ?? action;
   };
