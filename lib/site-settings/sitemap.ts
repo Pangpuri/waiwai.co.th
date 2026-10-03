@@ -60,7 +60,8 @@ export function buildSitemapEntries(options: {
 /** ข้อมูล `robots.txt` (X1.4) — ห้ามให้เครื่องค้นหาเข้าไปในหลังบ้าน/พรีวิว */
 export type RobotsRules = {
   readonly rules: readonly { readonly userAgent: string; readonly allow: string; readonly disallow: readonly string[] }[];
-  readonly sitemap: string;
+  /** `null` = ไม่ต้องชี้ sitemap (ใช้ตอนปิดปรับปรุง — ยังไม่มีหน้าที่การันตีว่าใช้ได้) */
+  readonly sitemap: string | null;
 };
 
 export function buildRobots(options: { readonly siteUrl: string; readonly locales: readonly Locale[] }): RobotsRules {
@@ -76,5 +77,19 @@ export function buildRobots(options: { readonly siteUrl: string; readonly locale
       },
     ],
     sitemap: `${base}/sitemap.xml`,
+  };
+}
+
+/**
+ * `robots.txt` ตอนเปิดโหมดปิดปรับปรุง (X2.5)
+ *
+ * ทำไมต้องเปลี่ยน: ระหว่างปิดปรับปรุง ทุกหน้าเสิร์ฟข้อความชั่วคราว ⇒ ถ้าให้เครื่องค้นหาเก็บไป
+ * เราจะได้หน้าว่างติดดัชนี และตอนเปิดเว็บคืนต้องรอ crawler กลับมาใหม่
+ * ⇒ บอก "ห้ามเก็บอะไรเลย" + **ไม่ชี้ sitemap** (sitemap คือรายการหน้าที่การันตีว่าใช้ได้ ซึ่งตอนนี้ไม่จริง)
+ */
+export function buildMaintenanceRobots(): RobotsRules {
+  return {
+    rules: [{ userAgent: "*", allow: "", disallow: ["/"] }],
+    sitemap: null,
   };
 }

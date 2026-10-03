@@ -4,6 +4,7 @@ import { logoutAction, purgeRetentionNowAction } from "@/app/admin/actions";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { maintenanceFlagOf, MAINTENANCE_ENV_VAR } from "@/lib/maintenance/plan";
 import { describeRetention } from "@/lib/retention/format";
 import { type RetentionClass } from "@/lib/retention/plan";
 import { retentionOverview } from "@/lib/retention/purge";
@@ -55,6 +56,9 @@ export default async function AdminHomePage() {
 
   /* เวลาบนหน้าจอ — ตัดถึงนาที (รูปแบบเดียวกับรายการ audit ด้านล่าง) */
   const stamp = (iso: string): string => iso.slice(0, 16).replace("T", " ");
+
+  /* สถานะโหมดปิดปรับปรุง (X2.5) — `unclear` = ตั้งค่าไม่ชัด จึงถือว่าปิด (ต้องเตือนให้รู้ ไม่ใช่เงียบ) */
+  const maintenanceFlag = maintenanceFlagOf(process.env[MAINTENANCE_ENV_VAR]);
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
@@ -191,6 +195,39 @@ export default async function AdminHomePage() {
             </form>
           </>
         )}
+      </section>
+
+      <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.maintenanceTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.maintenanceHint}</p>
+        </div>
+
+        {/*
+          โหมดปิดปรับปรุง (X2.5) — สวิตช์อยู่ที่ env ไม่ใช่ปุ่มบนหลังบ้าน (เหตุผลใน lib/maintenance/plan.ts)
+          ⇒ การ์ดนี้ "บอกสถานะ + วิธีเปิด/ปิด" · อ่าน `process.env` ตรง ๆ ได้เพราะหน้านี้เรนเดอร์แบบ dynamic อยู่แล้ว
+        */}
+        <p
+          className={
+            maintenanceFlag === "on"
+              ? "text-fg text-sm font-semibold"
+              : maintenanceFlag === "unclear"
+                ? "text-brand-red text-sm font-semibold"
+                : "text-fg-muted text-sm font-semibold"
+          }
+        >
+          {maintenanceFlag === "on"
+            ? strings.maintenanceStateOn
+            : maintenanceFlag === "unclear"
+              ? strings.maintenanceStateUnclear
+              : strings.maintenanceStateOff}
+        </p>
+
+        <div className="border-line text-fg-muted flex flex-col gap-1 border-t pt-3 text-xs">
+          <p className="font-mono">{strings.maintenanceHowTo}</p>
+          <p>{strings.maintenanceBypass}</p>
+          <p>{strings.maintenanceEnvNote}</p>
+        </div>
       </section>
 
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">

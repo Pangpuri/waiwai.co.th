@@ -11,6 +11,8 @@ import { adminSettings } from "./areas/th/adminSettings.ts";
 import { adminDraft } from "./areas/th/adminDraft.ts";
 import { adminRetention } from "./areas/th/adminRetention.ts";
 import { privacyPage } from "./areas/th/privacy.ts";
+import { maintenancePage } from "./areas/th/maintenance.ts";
+import { adminMaintenance } from "./areas/th/adminMaintenance.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -50,7 +52,8 @@ export const th = {
   notFound,
   mourning,
   privacyPage,
-  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft, ...adminRetention },
+  maintenancePage,
+  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft, ...adminRetention, ...adminMaintenance },
 };
 
 /**
