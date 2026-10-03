@@ -17,7 +17,6 @@ export const adminPreviewLink = {
   previewLinkLocaleTh: "ไทย (/th)",
   previewLinkLocaleEn: "อังกฤษ (/en)",
   previewLinkPageLabel: "หน้า",
-  previewLinkPageHome: "หน้าแรก",
   previewLinkListTitle: "ลิงก์ที่สร้างไว้",
   previewLinkEmpty: "ยังไม่มีลิงก์ที่สร้างไว้",
   previewLinkColPage: "หน้า",

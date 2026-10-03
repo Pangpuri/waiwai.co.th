@@ -9,6 +9,8 @@ import { isDatabaseConfigured } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { PREVIEWABLE_PAGE_IDS } from "@/lib/pages/paths";
+import { defaultPages } from "@/lib/pages/model";
+import { listPages } from "@/lib/pages/repository";
 import {
   PREVIEW_LINK_MAX_ACTIVE,
   PREVIEW_LINK_TTL_HOURS,
@@ -43,13 +45,25 @@ export default async function AdminPreviewLinksPage() {
   const links = configured ? await listPreviewLinks() : [];
   const now = new Date();
 
+  /*
+    ตัวเลือก "หน้า" ของลิงก์พรีวิว (S2 · รอบที่ 82)
+    ⚠️ เดิมมีตัวเลือกเดียวคือหน้าแรก ⇒ หน้าอื่นพรีวิวผ่านลิงก์ไม่ได้ ทั้งที่มีเทมเพลตแล้ว
+    ⇒ ใช้ชื่อหน้าจากตาราง `page` (W1) ของหน้าที่พรีวิวได้เท่านั้น
+  */
+  const pageRecords = await listPages(defaultPages(messages));
+  const previewablePages = PREVIEWABLE_PAGE_IDS.map((id) => {
+    const record = pageRecords.find((entry) => entry.id === id);
+    return { id, label: record?.nameTh ?? id };
+  });
+  const pageLabelOf = (id: string): string => previewablePages.find((entry) => entry.id === id)?.label ?? id;
+
   const rows: PreviewLinkRow[] = links.map((link) => {
     const status = previewLinkStatus(link, now);
     const hoursLeft = hoursLeftInPreviewLink(link.expiresAt, now);
 
     return {
       id: link.id,
-      pageLabel: link.page === "home" ? strings.previewLinkPageHome : link.page,
+      pageLabel: pageLabelOf(link.page),
       createdLabel: stamp(link.createdAt),
       createdBy: link.createdBy,
       expiresLabel: stamp(link.expiresAt),
@@ -75,7 +89,6 @@ export default async function AdminPreviewLinksPage() {
     previewLinkCreated: strings.previewLinkCreated,
     previewLinkCreatedLabel: strings.previewLinkCreatedLabel,
     previewLinkPageLabel: strings.previewLinkPageLabel,
-    previewLinkPageHome: strings.previewLinkPageHome,
     previewLinkLocaleLabel: strings.previewLinkLocaleLabel,
     previewLinkLocaleTh: strings.previewLinkLocaleTh,
     previewLinkLocaleEn: strings.previewLinkLocaleEn,
@@ -124,7 +137,11 @@ export default async function AdminPreviewLinksPage() {
         <>
           <section className="flex flex-col gap-2">
             <h2 className="text-fg text-sm font-semibold">{strings.previewLinkCreate}</h2>
-            <PreviewLinkCreateForm strings={managerStrings} maxActive={PREVIEW_LINK_MAX_ACTIVE} />
+            <PreviewLinkCreateForm
+              strings={managerStrings}
+              maxActive={PREVIEW_LINK_MAX_ACTIVE}
+              pages={previewablePages}
+            />
           </section>
 
           <PreviewLinkTable rows={rows} strings={managerStrings} maxActive={PREVIEW_LINK_MAX_ACTIVE} />

@@ -203,6 +203,8 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   restoredOk: "Restored into the draft — press Publish to update the live site.",
   startFromTemplate: "Start from current content",
   startFromTemplateHint: "Pulls the same copy the live site uses as a starting point; edit it freely afterwards.",
+  templateMissingBody: "This page has no block template yet — keep editing it with the field-based content screen for now.",
+  templateMissingList: "Pages with a block template today: Home · About · Careers · Contact",
   emptyPage: "This page has no blocks yet — press \"Add block\" to start.",
   dbMissingShort: "Database is not configured — DATABASE_URL is required.",
   liveOn: "Live on the public site",

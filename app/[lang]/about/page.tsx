@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { BlockDocumentView } from "@/features/blocks/block-renderer";
+import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
+
 import { AboutHero } from "@/features/about/ui/about-hero";
 import { CompanyAwards } from "@/features/about/ui/company-awards";
 import { CompanyDirection } from "@/features/about/ui/company-direction";
@@ -51,6 +54,18 @@ export default async function AboutPage({ params }: PageProps<"/[lang]/about">) 
   // ภาษาที่ไม่รองรับ → 404 (ไม่ใช่ 500) เหมือนหน้าแรก
   if (!isLocale(lang)) notFound();
   const messages = await getMessages(lang);
+
+  /*
+    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 82) ────────────────────────────────
+    1. ถ้าหลังบ้าน **กดเผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง"** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
+       (ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
+    2. ถ้าไม่ ⇒ ใช้เลย์เอาต์ที่ออกแบบไว้ด้านล่างเหมือนเดิม **ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ**
+    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลดคืน null ให้เอง
+  */
+  const liveDocument = await loadLiveBlockDocument("about");
+  if (liveDocument !== null) {
+    return <BlockDocumentView document={liveDocument} language={lang} />;
+  }
 
   return (
     <>

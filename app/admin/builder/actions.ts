@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { documentDiff } from "@/lib/blocks/diff";
-import { buildHomeTemplate } from "@/lib/blocks/home-template";
+import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import {
   isPageLive,
@@ -243,14 +243,26 @@ async function readCurrentDraftForCompare(page: string, formData: FormData): Pro
   return parsed.ok ? parsed.document : null;
 }
 
-/** เริ่มจากเทมเพลต (ข้อความชุดเดียวกับหน้าเว็บปัจจุบัน) — ใช้เมื่อยังไม่มีฉบับร่าง */
+/**
+ * เริ่มจากเทมเพลตของหน้านั้น (ข้อความชุดเดียวกับหน้าเว็บปัจจุบัน) — ใช้เมื่อยังไม่มีฉบับร่าง
+ *
+ * ⭐ S2 (รอบที่ 82): อ่านเทมเพลตจาก **ทะเบียนกลาง** (`lib/blocks/templates.ts`) ⇒ ใช้ได้ทุกหน้าที่มีเทมเพลต
+ * ⚠️ หน้านี้ไม่มีเทมเพลต = ไม่เขียนอะไร แล้วกลับมาที่หน้าเดิม (UI ไม่แสดงปุ่มให้อยู่แล้ว)
+ */
 export async function startFromTemplateAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser();
   const page = String(formData.get("page") ?? "").trim();
-  if (page !== "home") redirect(`${BUILDER_BASE}/home`);
 
-  const template = buildHomeTemplate();
-  await saveDraft(page, { ...template, page }, user.email);
+  if (!hasBlockTemplate(page)) redirect(pathOf(page));
+
+  const template = buildBlockTemplate(page);
+  if (template === null) redirect(pathOf(page));
+
+  /* เทมเพลตต้องผ่าน parser ก่อนเขียนลงฐานข้อมูล (ที่เดียวที่สร้างเอกสารให้ผู้ใช้เริ่ม) */
+  const parsed = parseBlockDocument(page, template);
+  if (!parsed.ok) redirect(pathOf(page));
+
+  await saveDraft(page, parsed.document, user.email);
   revalidatePath(pathOf(page));
   redirect(pathOf(page));
 }

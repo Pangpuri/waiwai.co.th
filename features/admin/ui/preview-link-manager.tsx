@@ -30,7 +30,6 @@ export type PreviewLinkStrings = {
   readonly previewLinkCreated: string;
   readonly previewLinkCreatedLabel: string;
   readonly previewLinkPageLabel: string;
-  readonly previewLinkPageHome: string;
   readonly previewLinkLocaleLabel: string;
   readonly previewLinkLocaleTh: string;
   readonly previewLinkLocaleEn: string;
@@ -126,13 +125,18 @@ function StatusLine({
   );
 }
 
+/** ตัวเลือก "หน้า" ที่ลิงก์พรีวิวชี้ไปได้ (มาจากทะเบียนเทมเพลต — S2) */
+export type PreviewLinkPageOption = { readonly id: string; readonly label: string };
+
 /** ฟอร์มสร้างลิงก์ใหม่ (หน้า + ภาษา) */
 export function PreviewLinkCreateForm({
   strings,
   maxActive,
+  pages,
 }: {
   readonly strings: PreviewLinkStrings;
   readonly maxActive: number;
+  readonly pages: readonly PreviewLinkPageOption[];
 }) {
   const [state, action] = useActionState(createPreviewLinkAction, INITIAL_PREVIEW_LINK_STATE);
 
@@ -140,8 +144,12 @@ export function PreviewLinkCreateForm({
     <form action={action} className="border-line flex flex-wrap items-end gap-3 rounded-2xl border p-3">
       <label className="flex min-w-40 flex-col gap-1">
         <span className="text-fg-muted text-xs">{strings.previewLinkPageLabel}</span>
-        <select name="page" className={FIELD_CLASS} defaultValue="home">
-          <option value="home">{strings.previewLinkPageHome}</option>
+        <select name="page" className={FIELD_CLASS} defaultValue={pages[0]?.id ?? "home"}>
+          {pages.map((page) => (
+            <option key={page.id} value={page.id}>
+              {page.label}
+            </option>
+          ))}
         </select>
       </label>
       <label className="flex min-w-40 flex-col gap-1">

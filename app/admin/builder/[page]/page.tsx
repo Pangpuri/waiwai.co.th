@@ -7,12 +7,15 @@ import { PageSettings } from "@/features/admin/ui/page-settings";
 import { PageTabs } from "@/features/admin/ui/page-tabs";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { hasBlockTemplate } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
+import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readStoredVersions } from "@/lib/blocks/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/lib/content/repository";
+import { localePath } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 
 /**
@@ -91,16 +94,29 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
       {draftRow === null ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
           <h2 className="text-fg text-lg font-semibold">{strings.emptyPage}</h2>
-          <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
-          <form action={startFromTemplateAction}>
-            <input type="hidden" name="page" value={page} />
-            <button
-              type="submit"
-              className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              {strings.startFromTemplate}
-            </button>
-          </form>
+          {/*
+            S2 (รอบที่ 82): ปุ่มเทมเพลตแสดงเฉพาะหน้าที่มีเทมเพลตจริง (ทะเบียนกลาง `lib/blocks/templates.ts`)
+            หน้าที่ไม่มี = บอกตรง ๆ ว่ายังไม่มีเทมเพลต + ให้ใช้หน้าจอเนื้อหาแบบฟิลด์เดิม (ไม่ปล่อยให้กดแล้วเงียบ)
+          */}
+          {hasBlockTemplate(page) ? (
+            <>
+              <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
+              <form action={startFromTemplateAction}>
+                <input type="hidden" name="page" value={page} />
+                <button
+                  type="submit"
+                  className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                >
+                  {strings.startFromTemplate}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="text-fg-muted text-sm">{strings.templateMissingBody}</p>
+              <p className="text-fg-muted text-xs">{strings.templateMissingList}</p>
+            </>
+          )}
         </section>
       ) : (
         <BlockBuilder
@@ -112,6 +128,7 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
           publishedAt={publishedRow?.publishedAt ?? null}
           revisions={revisions}
           storedVersions={storedVersions}
+          previewLiveSrc={localePath("th", pathForPage(currentPage?.id ?? page))}
           strings={strings}
         />
       )}

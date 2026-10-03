@@ -1,3 +1,5 @@
+import { BLOCK_TEMPLATE_PAGE_IDS } from "@/lib/blocks/templates";
+
 /**
  * ที่อยู่ (path) ของแต่ละหน้า — **ที่เดียว** ที่รู้ว่า id ของหน้าไปอยู่ตรงไหนของเว็บ
  *
@@ -37,11 +39,11 @@ export function isKnownPagePath(id: string): boolean {
 /**
  * หน้าที่ **เปิดพรีวิวได้** (ทั้งพรีวิวในหลังบ้านและลิงก์พรีวิวชั่วคราว X2.6)
  *
- * ทำไมต้องมีรายการกลาง: เดิมหน้ารีพรีวิว (`app/[lang]/preview/[page]/page.tsx`) ถือ `["home"]` ไว้เอง
- * ⇒ ถ้าเพิ่มหน้าที่แปลงเป็นบล็อกแล้ว (S2) ต้องแก้สองที่ ⇒ ย้ายมาไว้ที่นี่ที่เดียว
- * ⚠️ เพิ่มได้เฉพาะหน้าที่มีเอกสารบล็อกจริง (ตาราง `page_document`) ไม่งั้นพรีวิวจะว่างเปล่า
+ * ⭐ S2 (รอบที่ 82): รายการนี้ **derive จากทะเบียนเทมเพลตบล็อก** (`lib/blocks/templates.ts`)
+ *    เพราะ "พรีวิวได้" = "มีเอกสารบล็อกให้ดู" ⇒ เพิ่มเทมเพลตหน้าใหม่ที่เดียว แล้วพรีวิว/ลิงก์พรีวิวตามมาเอง
+ * ⚠️ หน้าที่ไม่มีเทมเพลต = ยังไม่เปิดพรีวิว (จะเห็นหน้าว่าง ไม่มีประโยชน์)
  */
-export const PREVIEWABLE_PAGE_IDS: readonly string[] = ["home"];
+export const PREVIEWABLE_PAGE_IDS: readonly string[] = BLOCK_TEMPLATE_PAGE_IDS;
 
 export function isPreviewablePage(id: string): boolean {
   return PREVIEWABLE_PAGE_IDS.includes(id);

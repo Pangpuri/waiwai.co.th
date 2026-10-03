@@ -85,6 +85,11 @@ type PreviewMode = "draft" | "published" | "live";
 type Props = {
   readonly page: string;
   /**
+   * ที่อยู่ของหน้าเว็บจริงของหน้านี้ (ใช้ในโหมดพรีวิว "หน้าเว็บจริง")
+   * S2 (รอบที่ 82): เดิมตรึงเป็น `/th` ⇒ พรีวิวโหมดนี้แสดง "หน้าแรก" เสมอ แม้แก้หน้าอื่นอยู่
+   */
+  readonly previewLiveSrc: string;
+  /**
    * หน้าเว็บสาธารณะกำลังใช้เนื้อหาชุดนี้อยู่หรือไม่ (เซสชัน S1)
    * - **ไม่บังคับ** เพื่อกันกรณีหน้าจอใดลืมส่งค่า (เคยเกิด error ตอน build: "Property 'isLive' is missing")
    * - ถ้าไม่ส่งมา = **ไม่แสดงสวิตช์นี้เลย** (ดีกว่าแสดงผิดว่า "ยังไม่ใช้กับหน้าเว็บจริง" ทั้งที่ใช้อยู่)
@@ -359,7 +364,18 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
   );
 }
 
-export function BlockBuilder({ page, isLive, presets = [], initialDraft, draftUpdatedAt, publishedAt, revisions, storedVersions, strings }: Props) {
+export function BlockBuilder({
+  page,
+  previewLiveSrc,
+  isLive,
+  presets = [],
+  initialDraft,
+  draftUpdatedAt,
+  publishedAt,
+  revisions,
+  storedVersions,
+  strings,
+}: Props) {
   const [document, setDocument] = useState<BlockDocument>(initialDraft);
   const [selectedId, setSelectedId] = useState<string>(initialDraft.blocks[0]?.id ?? "");
   /** การ์ดที่กำลังแก้ (ลำดับในบล็อก) — null = ดูภาพรวมของบล็อก */
@@ -417,7 +433,7 @@ export function BlockBuilder({ page, isLive, presets = [], initialDraft, draftUp
   const [uploadState, uploadAction] = useActionState(uploadImageAction, INITIAL_UPLOAD_STATE);
 
   /* พรีวิวโหลดจาก "เส้นทางฝั่งเว็บจริง" จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม เหมือนหน้าจริง */
-  const previewSrc = previewMode === "live" ? "/th" : `/th/preview/${page}?mode=${previewMode}`;
+  const previewSrc = previewMode === "live" ? previewLiveSrc : `/th/preview/${page}?mode=${previewMode}`;
 
   /** ส่งฉบับร่างที่กำลังแก้เข้าพรีวิวทันที (ยังไม่ต้องบันทึก) */
   const postToFrame = useCallback(() => {

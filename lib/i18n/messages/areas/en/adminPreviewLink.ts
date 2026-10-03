@@ -21,7 +21,6 @@ export const adminPreviewLink: Pick<Messages["admin"], keyof typeof thAdminPrevi
   previewLinkLocaleTh: "Thai (/th)",
   previewLinkLocaleEn: "English (/en)",
   previewLinkPageLabel: "Page",
-  previewLinkPageHome: "Home",
   previewLinkListTitle: "Existing links",
   previewLinkEmpty: "No links created yet",
   previewLinkColPage: "Page",

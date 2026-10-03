@@ -45,6 +45,11 @@ import {
   undoChromePreset,
 } from "@/lib/chrome/preset-repository";
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
+import { countRawBlocks } from "@/lib/blocks/migrate";
+import { parseBlockDocument } from "@/lib/blocks/parse";
+import { buildBlockTemplate } from "@/lib/blocks/templates";
+import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
+import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { th } from "@/lib/i18n/messages/th";
 import {
   countActivePreviewLinks,
@@ -55,7 +60,14 @@ import {
   resolvePreviewLink,
   revokePreviewLink,
 } from "@/lib/preview-link/repository";
-import { loadDocumentRow, saveJsonDraft } from "@/lib/blocks/repository";
+import {
+  isPageLive,
+  loadDocumentRow,
+  publishDraft,
+  saveDraft,
+  saveJsonDraft,
+  setPageLive,
+} from "@/lib/blocks/repository";
 import {
   deleteTrashItemPermanently,
   listTrash,
@@ -192,6 +204,9 @@ async function main(): Promise<void> {
 
   /* 14) พรีเซ็ตของส่วนกลาง: เก็บชุด → ใช้ชุด (เฉพาะฉบับร่าง) → ลบเข้าถัง → กู้คืน (W3b · รอบที่ 80) */
   await checkChromePresets();
+
+  /* 15) ตัวสร้างหลายหน้า (S2): เทมเพลต → บันทึกฉบับร่าง → เผยแพร่ → สวิตช์ "ใช้กับเว็บจริง" รายหน้า (รอบที่ 82) */
+  await checkPageTemplates();
 
   await closePool();
 
@@ -1092,6 +1107,80 @@ async function checkChromePresets(): Promise<void> {
     );
     done("คืนสภาพตารางพรีเซ็ตส่วนกลางแล้ว", "ไม่เหลือรอยทดสอบ");
   }
+}
+
+/**
+ * 15) ตัวสร้างหลายหน้า (S2 · รอบที่ 82) — **วงจรจริงของหน้าที่เพิ่งแปลง**
+ *
+ * พิสูจน์ว่า "หน้าที่แปลงแล้วขึ้นจากฉบับเผยแพร่จริง" ไม่ใช่แค่มีเทมเพลตในโค้ด
+ * 1. เทมเพลตของหน้านั้นผ่าน parser + validator (ก่อนเขียนลงฐานข้อมูล)
+ * 2. บันทึกฉบับร่าง → เผยแพร่ → **สวิตช์ยังปิด = หน้าเว็บยังใช้ของเดิม** (`loadLiveBlockDocument` คืน null)
+ * 3. เปิดสวิตช์ → อ่านได้เอกสารที่เผยแพร่ (จำนวนบล็อกตรงกับเทมเพลต)
+ * 4. ปิดสวิตช์ → กลับเป็น null (ปิดแล้วกลับไปใช้เลย์เอาต์เดิมได้ทันที)
+ *
+ * ⚠️ ล้างทุกอย่างที่สร้างในตอนจบ (แถว draft/published + ประวัติ + audit ของหน้านี้)
+ *    และ **ไม่แตะหน้าแรก** (มีข้อมูลจริงของผู้ใช้อยู่)
+ */
+const TEMPLATE_TEST_PAGES = ["about", "careers", "contact"] as const;
+const TEMPLATE_TEST_ACTOR = "check-db-template@example.invalid";
+
+async function checkPageTemplates(): Promise<void> {
+  const pool = getPool();
+
+  for (const page of TEMPLATE_TEST_PAGES) {
+    /* ต้องเริ่มจาก "ว่าง" จริง ๆ ไม่งั้นเราไปทับข้อมูลของผู้ใช้ */
+    const existing = await countWhere("page_document where page = $1", [page]);
+    assert.equal(existing, 0, `${page}: ต้องไม่มีเอกสารค้างอยู่ก่อนทดสอบ (กันการทับข้อมูลจริง)`);
+
+    const template = buildBlockTemplate(page);
+    assert.ok(template !== null, `${page}: ต้องมีเทมเพลต`);
+
+    const parsed = parseBlockDocument(page, template);
+    assert.ok(parsed.ok, `${page}: เทมเพลตต้องผ่าน parser`);
+    if (!parsed.ok) continue;
+
+    const errors = documentErrorsOf(validateDocument(parsed.document));
+    assert.equal(errors.length, 0, `${page}: เทมเพลตต้องไม่มี error`);
+    const expectedBlocks = countRawBlocks(parsed.document);
+
+    try {
+      /* ── 1) บันทึกฉบับร่างจากเทมเพลต → เผยแพร่ ── */
+      await saveDraft(page, parsed.document, TEMPLATE_TEST_ACTOR);
+      const { revision } = await publishDraft(page, TEMPLATE_TEST_ACTOR, "check:db");
+      assert.ok(revision >= 1, `${page}: เผยแพร่ต้องได้เลขรุ่น`);
+
+      /* ── 2) สวิตช์ปิด ⇒ หน้าเว็บยังใช้เลย์เอาต์เดิม ── */
+      assert.equal(await isPageLive(page), false, `${page}: ค่าเริ่มต้นคือสวิตช์ปิด`);
+      assert.equal(await loadLiveBlockDocument(page), null, `${page}: ปิดสวิตช์แล้วต้องไม่ใช้เอกสารบล็อก`);
+
+      /* ── 3) เปิดสวิตช์ ⇒ ได้เอกสารที่เผยแพร่จริง ── */
+      await setPageLive(page, true, TEMPLATE_TEST_ACTOR);
+      const live = await loadLiveBlockDocument(page);
+      assert.ok(live !== null, `${page}: เปิดสวิตช์แล้วต้องได้เอกสาร`);
+      assert.equal(live?.page, page, `${page}: เอกสารต้องเป็นของหน้านั้น`);
+      assert.equal(live === null ? -1 : countRawBlocks(live), expectedBlocks, `${page}: จำนวนบล็อกต้องตรงกับเทมเพลต`);
+
+      /* ── 4) ปิดสวิตช์ ⇒ กลับไปใช้เลย์เอาต์เดิม ── */
+      await setPageLive(page, false, TEMPLATE_TEST_ACTOR);
+      assert.equal(await loadPageLiveFlag(page), false, `${page}: ปิดสวิตช์แล้วต้องเป็น false`);
+      assert.equal(await loadLiveBlockDocument(page), null, `${page}: ปิดสวิตช์แล้วต้องกลับไปใช้ของเดิม`);
+      done(`หน้า ${page}: เทมเพลต → เผยแพร่ → สวิตช์รายหน้า`, `${expectedBlocks} บล็อก`);
+    } finally {
+      await pool.query("delete from page_document_revision where page = $1", [page]);
+      await pool.query("delete from page_document where page = $1", [page]);
+      await pool.query("delete from audit_log where actor_email = $1", [TEMPLATE_TEST_ACTOR]);
+      assert.equal(await countWhere("page_document where page = $1", [page]), 0, `${page}: ต้องไม่เหลือร่องรอย`);
+    }
+  }
+}
+
+/** อ่านสวิตช์ตรงจากตาราง (ใช้ยืนยันว่าปิดจริงหลังทดสอบ) */
+async function loadPageLiveFlag(page: string): Promise<boolean> {
+  const { rows } = await getPool().query<{ readonly is_live: boolean | null }>(
+    "select is_live from page_document where page = $1 and status = 'published'",
+    [page],
+  );
+  return rows[0]?.is_live === true;
 }
 
 await main();
