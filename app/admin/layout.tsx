@@ -37,7 +37,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   /*
     เมนูหลังบ้าน (X1.10 · RBAC) — **แต่ละลิงก์ผูกกับสิทธิ์**
-    ⇒ บทบาทที่เข้าไม่ได้จะไม่เห็นลิงก์นั้น (และถึงพิมพ์ URL เองก็ถูกประตู `requireAdminUser(permission)` กันไว้)
+    ⇒ บทบาทที่เข้าไม่ได้จะไม่เห็นลิงก์นั้น (และถึงพิมพ์ URL เองก็ถูกประตู `requireAdminUser("<permission>")` กันไว้)
     ⚠️ การซ่อนเมนูไม่ใช่มาตรการความปลอดภัย — เป็นเพียงไม่ชวนให้กดผิด (การบังคับจริงอยู่ฝั่งเซิร์ฟเวอร์)
   */
   const links: readonly { readonly href: string; readonly label: string; readonly permission: AdminPermission }[] = [
