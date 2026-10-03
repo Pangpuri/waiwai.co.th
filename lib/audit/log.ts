@@ -27,7 +27,15 @@ export type AuditAction =
    * ลบข้อมูลทั้งหมดของเจ้าของข้อมูลตามคำขอใช้สิทธิ์ (PDPA · รอบที่ 77)
    * ⚠️ เก็บอีเมลแบบปิดบางส่วนเท่านั้น (`a***@domain`) — ดู `lib/privacy/erasure.ts`
    */
-  | "erase-subject";
+  | "erase-subject"
+  /** ย้ายของเข้าถังขยะ (X2.4) — ภาพในคลัง/พรีเซ็ตบล็อก */
+  | "trash-move"
+  /** กู้คืนของจากถังขยะ (X2.4) */
+  | "trash-restore"
+  /** ลบถาวรด้วยมือจากถังขยะ (X2.4) */
+  | "trash-delete"
+  /** ลบถาวรของในถังเมื่อพ้นระยะเก็บ (X2.4) */
+  | "trash-purge";
 
 export type AuditEntry = {
   readonly action: AuditAction;

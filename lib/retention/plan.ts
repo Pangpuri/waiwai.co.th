@@ -61,6 +61,16 @@ export const REVISION_RETENTION_CLASSES: readonly RetentionClass[] = ["blockRevi
 export const LOG_RETENTION_CLASSES: readonly RetentionClass[] = ["loginAttempt", "auditLog"];
 
 /**
+ * ระยะเก็บของ **"ถังขยะ"** (X2.4 · รอบที่ 78) = 30 วัน
+ *
+ * ⚠️ ต่างจากชั้นข้อมูลด้านบน: ของในถังคือ **ภาพ/พรีเซ็ตบล็อกที่ผู้ดูแลเป็นคนลบ** ไม่ใช่ข้อมูลส่วนบุคคล
+ *    ⇒ ไม่ถูกนับใน `RETENTION_CLASSES` และ **ไม่แสดงบนหน้า `/privacy`** (แต่ตัวเลขยังอยู่ที่ไฟล์นี้ที่เดียว
+ *    ตามกฎ "ห้ามพิมพ์ตัวเลขซ้ำที่อื่น" — มีเทสต์กันไว้)
+ * ⚠️ ของในถัง **ยังไม่หาย** จนกว่าจะพ้นระยะนี้ (กู้คืนได้ตลอด) — แล้วจึงถูกลบถาวรอัตโนมัติ
+ */
+export const TRASH_RETENTION_DAYS = 30;
+
+/**
  * จำนวนรุ่นล่าสุดของ **แต่ละหน้า** ที่เก็บไว้เสมอ แม้เก่ากว่าระยะเก็บ
  * ทำไมไม่ลบทิ้งหมด: ประวัติคือ "ตาข่ายกันพลาด" เวลามีคนแก้เนื้อหาผิด — เก็บรุ่นสุดท้ายไว้ 1 รุ่น
  * = ยังกู้คืนได้ และราคาที่จ่ายคือ 1 แถวต่อหน้า (ไม่ใช่ข้อมูลที่โตต่อเนื่อง)
@@ -98,6 +108,15 @@ export function cutoffFor(cls: RetentionClass, now: Date): Date {
 
 export function cutoffIsoFor(cls: RetentionClass, now: Date): string {
   return cutoffFor(cls, now).toISOString();
+}
+
+/** เวลาตัดของถังขยะ — รายการที่ถูกลบก่อนเวลานี้ = ถูกลบถาวร (X2.4) */
+export function trashCutoffFor(now: Date): Date {
+  return new Date(now.getTime() - TRASH_RETENTION_DAYS * MS_PER_DAY);
+}
+
+export function trashCutoffIsoFor(now: Date): string {
+  return trashCutoffFor(now).toISOString();
 }
 
 export function isExpired(createdAt: Date | string, cls: RetentionClass, now: Date): boolean {

@@ -72,7 +72,7 @@ export async function getMediaBinary(id: string): Promise<MediaBinary | null> {
     size_bytes: number;
     filename: string;
     created_at: Date;
-  }>(`select mime, data, size_bytes, filename, created_at from media where id = $1`, [id]);
+  }>(`select mime, data, size_bytes, filename, created_at from media where id = $1 and deleted_at is null`, [id]);
 
   const row = result.rows[0];
   if (row === undefined) return null;
@@ -99,7 +99,7 @@ export async function listMedia(limit = 40): Promise<readonly MediaListItem[]> {
     created_at: Date;
   }>(
     `select id, filename, mime, size_bytes, width, height, alt_th, alt_en, created_at
-       from media order by created_at desc limit $1`,
+       from media where deleted_at is null order by created_at desc limit $1`,
     [limit],
   );
 
@@ -120,10 +120,11 @@ export async function updateMediaAlt(id: string, altTh: string, altEn: string): 
   await getPool().query(`update media set alt_th = $2, alt_en = $3 where id = $1`, [id, altTh, altEn]);
 }
 
-export async function deleteMedia(id: string): Promise<boolean> {
-  const result = await getPool().query(`delete from media where id = $1`, [id]);
-  return (result.rowCount ?? 0) > 0;
-}
+/**
+ * ⚠️ **ไม่มีฟังก์ชันลบภาพแบบถาวรที่นี่โดยเจตนา (X2.4 · รอบที่ 78)**
+ * การ "ลบ" จากคลังภาพตอนนี้คือ **ย้ายเข้าถังขยะ** (`lib/trash/repository.ts`) แล้วให้ตัวลบตามกำหนด
+ * ลบถาวรเมื่อพ้นระยะเก็บ ⇒ เผลอกดลบจึงกู้คืนได้ภายใน 30 วัน
+ */
 
 /* ── คลังภาพ (X1.2) ───────────────────────────────────────────────────────── */
 
@@ -175,7 +176,8 @@ export async function searchMedia(query: string, limit = 60): Promise<readonly M
   }>(
     `select id, filename, mime, size_bytes, width, height, alt_th, alt_en, created_at
        from media
-      where $1 = '' or filename ilike '%' || $1 || '%' or alt_th ilike '%' || $1 || '%' or alt_en ilike '%' || $1 || '%'
+      where deleted_at is null
+        and ($1 = '' or filename ilike '%' || $1 || '%' or alt_th ilike '%' || $1 || '%' or alt_en ilike '%' || $1 || '%')
       order by created_at desc
       limit $2`,
     [trimmed, Math.max(1, Math.min(limit, 200))],
@@ -197,7 +199,7 @@ export async function searchMedia(query: string, limit = 60): Promise<readonly M
 /** สรุปตัวเลขของคลังภาพ */
 export async function mediaStats(): Promise<{ readonly count: number; readonly totalBytes: number }> {
   const result = await getPool().query<{ count: string; bytes: string | null }>(
-    `select count(*)::text as count, coalesce(sum(size_bytes), 0)::text as bytes from media`,
+    `select count(*)::text as count, coalesce(sum(size_bytes), 0)::text as bytes from media where deleted_at is null`,
   );
   const row = result.rows[0];
   return {

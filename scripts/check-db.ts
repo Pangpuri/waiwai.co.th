@@ -15,6 +15,8 @@
  */
 import assert from "node:assert/strict";
 
+import { buildHomeTemplate } from "@/lib/blocks/home-template";
+import { listBlockPresets, saveBlockPreset } from "@/lib/blocks/presets";
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 import { HOME_SEED } from "@/lib/content/home-seed";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
@@ -22,9 +24,19 @@ import { countPageRows, importPageSeed, loadPageContent, savePageContent } from 
 import { itemKeyOf } from "@/lib/content/sql";
 import { errorsOf, validateContent } from "@/lib/content/validate";
 import type { PageContent } from "@/lib/content/types";
+import { getMediaBinary, insertMedia, listMedia, mediaStats, searchMedia } from "@/lib/media/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
+import {
+  deleteTrashItemPermanently,
+  listTrash,
+  purgeExpiredTrash,
+  restoreTrashItem,
+  trashBlockPreset,
+  trashMedia,
+  trashStats,
+} from "@/lib/trash/repository";
 
 type MutableText = { th: string; en: string };
 type MutableItem = { order: number; fields: Record<string, MutableText>; media: Record<string, never> };
@@ -142,6 +154,9 @@ async function main(): Promise<void> {
 
   /* 11) คำขอใช้สิทธิ์: ลบข้อมูลของอีเมลหนึ่ง ต้องไม่แตะของอีเมลอื่น (PDPA · รอบที่ 77) */
   await checkErasure();
+
+  /* 12) ถังขยะ: ย้ายเข้า → ซ่อนจากหน้าเว็บ → กู้คืน → ลบถาวร → ลบตามกำหนด (X2.4 · รอบที่ 78) */
+  await checkTrash();
 
   await closePool();
 
@@ -520,6 +535,186 @@ async function checkErasure(): Promise<void> {
     };
     assert.deepEqual(after, { target: 0, bystander: 0, audit: 0 }, "ลบรอยทดสอบต้องไม่เหลืออะไรค้าง");
     done("คืนสภาพตารางคำขอใช้สิทธิ์แล้ว", "ไม่เหลือรอยทดสอบ");
+  }
+}
+
+/**
+ * 12) ถังขยะ (X2.4 · รอบที่ 78) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ 7 อย่างที่ผู้ใช้รู้สึกได้จริง
+ * 1. ย้ายภาพเข้าถัง → **หายจากทุกทางที่เว็บใช้** (ไบนารี/รายการ/ค้นหา/สถิติ) แต่ยังอยู่ในถัง
+ * 2. **กู้คืนแล้วกลับมาใช้ได้** (พาธ `/media/<id>` เดิม ⇒ บล็อกที่อ้างถึงไม่พัง)
+ * 3. กู้คืนซ้ำ = บอกว่าไม่พบ ไม่ใช่พัง
+ * 4. **ลบถาวรของที่ยังใช้งานอยู่ไม่ได้** (ด่านอยู่ใน SQL ไม่ใช่แค่ UI)
+ * 5. พรีเซ็ตบล็อกใช้กลไกเดียวกัน (ย้ายเข้า/กู้คืน)
+ * 6. **ตัวลบตามกำหนด** ลบเฉพาะของที่พ้นระยะเก็บ — ของที่เพิ่งลบยังอยู่
+ * 7. ลบถาวรแล้วแถวหายจริง
+ *
+ * ⚠️ ไม่เรียก `emptyTrash()` ในด่านนี้โดยเจตนา — คำสั่งนั้นล้างของจริงทุกชิ้นในถังของฐานข้อมูลที่รันอยู่
+ *    (การพิสูจน์เส้นทางนั้นใช้การสแกนซอร์สใน `scripts/test-trash.ts` แทน)
+ * ⚠️ รอยทดสอบใช้คำนำหน้า `check-db-trash` และถูกลบใน `finally` เสมอ
+ */
+const TRASH_TEST_PREFIX = "check-db-trash";
+
+async function checkTrash(): Promise<void> {
+  const pool = getPool();
+
+  const mediaId = `${TRASH_TEST_PREFIX}-media`;
+  const oldMediaId = `${TRASH_TEST_PREFIX}-media-old`;
+  const presetName = `${TRASH_TEST_PREFIX}-preset`;
+  const actor = "check-db@example.invalid";
+
+  const leftovers = {
+    media: await countWhere("media where id like $1", [`${TRASH_TEST_PREFIX}%`]),
+    preset: await countWhere("block_preset where name like $1", [`${TRASH_TEST_PREFIX}%`]),
+  };
+  assert.deepEqual(leftovers, { media: 0, preset: 0 }, "ต้องไม่มีรอยทดสอบถังขยะค้างจากรอบก่อน");
+
+  let presetId = "";
+
+  try {
+    /* ── เตรียมของทดสอบ: ภาพ 1 ใบ (ใช้อยู่) · ภาพเก่า 1 ใบ (อยู่ในถังมานาน) · พรีเซ็ต 1 ใบ ── */
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-trash.png",
+      mime: "image/png",
+      sizeBytes: 11,
+      width: 2,
+      height: 2,
+      data: Buffer.from("trash-bytes"),
+      altTh: "ภาพทดสอบถังขยะ",
+      altEn: "",
+      createdBy: "check-db",
+    });
+    await insertMedia({
+      id: oldMediaId,
+      filename: "check-db-trash-old.png",
+      mime: "image/png",
+      sizeBytes: 11,
+      width: 2,
+      height: 2,
+      data: Buffer.from("trash-old--"),
+      altTh: "ภาพทดสอบที่พ้นกำหนด",
+      altEn: "",
+      createdBy: "check-db",
+    });
+    /* ของ "เก่า": เข้าถังมานานเกินระยะเก็บ (จำลองด้วย SQL ตรง ๆ เพราะของจริงต้องรอ 30 วัน) */
+    await pool.query("update media set deleted_at = now() - interval '60 days', deleted_by = $2 where id = $1", [
+      oldMediaId,
+      actor,
+    ]);
+
+    const template = buildHomeTemplate();
+    const block = template.blocks[0];
+    assert.ok(block !== undefined, "ต้องมีบล็อกตั้งต้นของหน้าแรกให้บันทึกเป็นพรีเซ็ต");
+    await saveBlockPreset(presetName, block, "check-db");
+    const presetRow = await pool.query<{ id: string }>("select id from block_preset where lower(name) = lower($1)", [
+      presetName,
+    ]);
+    presetId = presetRow.rows[0]?.id ?? "";
+    assert.ok(presetId !== "", "ต้องสร้างพรีเซ็ตทดสอบได้");
+
+    /* ── 1) ของที่ยังใช้งานปกติต้องมองเห็นครบทุกทาง ── */
+    const before = {
+      binary: await getMediaBinary(mediaId),
+      inList: (await listMedia(200)).some((item) => item.id === mediaId),
+      inSearch: (await searchMedia("check-db-trash")).some((item) => item.id === mediaId),
+      stats: (await mediaStats()).count,
+      presets: (await listBlockPresets()).some((preset) => preset.id === presetId),
+    };
+    assert.ok(before.binary !== null, "อ่านไบนารีของภาพที่ใช้งานได้");
+    assert.equal(before.inList, true, "ภาพต้องอยู่ในรายการคลัง");
+    assert.equal(before.inSearch, true, "ค้นหาชื่อไฟล์ต้องเจอ");
+    assert.ok(before.stats >= 1, "สถิติคลังต้องนับภาพ");
+    assert.equal(before.presets, true, "พรีเซ็ตต้องอยู่ในรายการ");
+    done("ของที่ใช้งานปกติมองเห็นครบทุกทาง", `คลัง ${before.stats} ภาพ`);
+
+    /* ── 2) ด่านกันพลาด: ลบถาวรของที่ยังใช้งานอยู่ = ต้องไม่เกิด (A ยังไม่ได้เข้าถัง) ── */
+    assert.equal(await deleteTrashItemPermanently("media", mediaId, actor), false, "ลบถาวรของที่ยังใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.ok((await getMediaBinary(mediaId)) !== null, "ภาพที่ยังใช้งานต้องไม่หายไปจากการกดลบถาวร");
+    assert.equal(await restoreTrashItem("media", mediaId, actor), false, "กู้คืนของที่ไม่ได้อยู่ในถังต้องไม่สำเร็จ");
+
+    /* ── 3) ย้ายเข้าถัง: หายจากทางที่เว็บใช้ แต่ยังอยู่ในถัง ── */
+    assert.equal(await trashMedia(mediaId, actor), true, "ย้ายภาพเข้าถังต้องสำเร็จ");
+    const hidden = {
+      binary: await getMediaBinary(mediaId),
+      inList: (await listMedia(200)).some((item) => item.id === mediaId),
+      inSearch: (await searchMedia("check-db-trash")).some((item) => item.id === mediaId),
+      inTrash: (await listTrash()).some((entry) => entry.kind === "media" && entry.id === mediaId),
+      trashStats: (await trashStats()).media,
+    };
+    assert.equal(hidden.binary, null, "ภาพในถังต้องไม่ถูกเสิร์ฟบนเว็บ");
+    assert.equal(hidden.inList, false, "ภาพในถังต้องไม่โผล่ในคลัง");
+    assert.equal(hidden.inSearch, false, "ภาพในถังต้องไม่โผล่ในผลค้นหา");
+    assert.equal(hidden.inTrash, true, "ภาพต้องอยู่ในถังขยะ");
+    assert.ok(hidden.trashStats >= 2, `ถังต้องมีอย่างน้อย 2 ภาพ (ของใหม่ + ของเก่า) — พบ ${hidden.trashStats}`);
+    done("ย้ายเข้าถัง → หายจากหน้าเว็บ แต่ยังกู้คืนได้", `ในถัง ${hidden.trashStats} ภาพ`);
+
+    /* ── 4) กู้คืน → กลับมาใช้ได้ที่พาธเดิม ── */
+    assert.equal(await restoreTrashItem("media", mediaId, actor), true, "กู้คืนภาพต้องสำเร็จ");
+    const restored = await getMediaBinary(mediaId);
+    assert.ok(restored !== null, "หลังกู้คืนต้องอ่านไบนารีได้เหมือนเดิม");
+    assert.equal((await listMedia(200)).some((item) => item.id === mediaId), true, "หลังกู้คืนต้องกลับเข้าคลัง");
+    assert.equal(await restoreTrashItem("media", mediaId, actor), false, "กู้คืนซ้ำต้องบอกว่าไม่พบ ไม่ใช่พัง");
+    done("กู้คืนแล้วกลับมาใช้งานได้ที่พาธเดิม", `/media/${mediaId}`);
+
+    /* ── 5) พรีเซ็ตใช้กลไกเดียวกัน ── */
+    assert.equal(await trashBlockPreset(presetId, actor), true, "ย้ายพรีเซ็ตเข้าถังต้องสำเร็จ");
+    assert.equal(
+      await countWhere("block_preset where id = $1 and deleted_at is not null", [presetId]),
+      1,
+      "พรีเซ็ตต้องถูกทำเครื่องหมายว่าอยู่ในถัง",
+    );
+    assert.equal(
+      (await listBlockPresets()).some((preset) => preset.id === presetId),
+      false,
+      "พรีเซ็ตในถังต้องไม่โผล่ในคลังพรีเซ็ต",
+    );
+    assert.equal(await restoreTrashItem("preset", presetId, actor), true, "กู้คืนพรีเซ็ตต้องสำเร็จ");
+    assert.equal(
+      (await listBlockPresets()).some((preset) => preset.id === presetId),
+      true,
+      "หลังกู้คืนพรีเซ็ตต้องกลับเข้าคลัง",
+    );
+    done("พรีเซ็ตบล็อกใช้กลไกถังขยะเดียวกัน", "ย้ายเข้า → กู้คืน ครบวงจร");
+
+    /* ── 6) ตัวลบตามกำหนด: ของเก่า (B) หาย · ของใหม่ (A) ยังอยู่ในถัง ── */
+    assert.equal(await trashMedia(mediaId, actor), true, "ย้ายภาพ A เข้าถังอีกครั้งเพื่อทดสอบตัวลบตามกำหนด");
+    const dryTrash = await purgeExpiredTrash({ dryRun: true });
+    assert.ok(dryTrash !== null, "dry run ต้องได้ผลลัพธ์เมื่อมี DATABASE_URL");
+    assert.ok(dryTrash.counts.media >= 1, `ต้องนับภาพที่พ้นกำหนด (พบ ${dryTrash.counts.media})`);
+
+    const purgedTrash = await purgeExpiredTrash();
+    assert.ok(purgedTrash !== null, "ลบจริงต้องได้รายงาน");
+    assert.ok(purgedTrash.counts.media >= 1, "ต้องลบภาพที่พ้นกำหนดจริง");
+    assert.equal(await countWhere("media where id = $1", [oldMediaId]), 0, "ภาพที่พ้นกำหนดต้องถูกลบถาวร");
+    assert.equal(
+      await countWhere("media where id = $1 and deleted_at is not null", [mediaId]),
+      1,
+      "ภาพที่เพิ่งลบต้องยังอยู่ในถัง (ไม่ถูกลบก่อนกำหนด)",
+    );
+    done("ตัวลบตามกำหนดลบเฉพาะของที่พ้นระยะเก็บ", `ลบ ${purgedTrash.counts.media} แถว`);
+
+    /* ── 7) ลบถาวรแล้วแถวหายจริง ── */
+    assert.equal(await deleteTrashItemPermanently("media", mediaId, actor), true, "ลบถาวรของในถังต้องสำเร็จ");
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "แถวต้องหายจากฐานข้อมูล");
+    assert.equal(await getMediaBinary(mediaId), null, "ลบถาวรแล้วต้องอ่านไม่ได้");
+    done("ลบถาวรจากถังแล้วแถวหายจริง", "ภาพทดสอบ");
+  } finally {
+    /* คืนสภาพ: ลบรอยทดสอบทั้งหมด (ทั้งที่ยังอยู่ในถังและที่กู้คืนแล้ว) */
+    await pool.query("delete from media where id like $1", [`${TRASH_TEST_PREFIX}%`]);
+    await pool.query("delete from block_preset where lower(name) like $1", [`${TRASH_TEST_PREFIX}%`]);
+    await pool.query("delete from audit_log where target like $1 or actor_email = $2", [
+      `${TRASH_TEST_PREFIX}%`,
+      actor,
+    ]);
+
+    const after = {
+      media: await countWhere("media where id like $1", [`${TRASH_TEST_PREFIX}%`]),
+      preset: await countWhere("block_preset where name like $1", [`${TRASH_TEST_PREFIX}%`]),
+    };
+    assert.deepEqual(after, { media: 0, preset: 0 }, "ลบรอยทดสอบถังขยะต้องไม่เหลืออะไรค้าง");
+    done("คืนสภาพตารางถังขยะแล้ว", "ไม่เหลือรอยทดสอบ");
   }
 }
 

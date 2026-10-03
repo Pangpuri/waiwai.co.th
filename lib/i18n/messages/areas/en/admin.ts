@@ -9,15 +9,17 @@ import type { adminDraft as thAdminDraft } from "@/lib/i18n/messages/areas/th/ad
 import type { adminRetention as thAdminRetention } from "@/lib/i18n/messages/areas/th/adminRetention";
 import type { adminMaintenance as thAdminMaintenance } from "@/lib/i18n/messages/areas/th/adminMaintenance";
 import type { adminErasure as thAdminErasure } from "@/lib/i18n/messages/areas/th/adminErasure";
+import type { adminTrash as thAdminTrash } from "@/lib/i18n/messages/areas/th/adminTrash";
 
-/** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure) — ไฟล์นี้ไม่ต้องมีอีก */
+/** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash) — ไฟล์นี้ไม่ต้องมีอีก */
 type MovedKeys =
   | keyof typeof thAdminMedia
   | keyof typeof thAdminSettings
   | keyof typeof thAdminDraft
   | keyof typeof thAdminRetention
   | keyof typeof thAdminMaintenance
-  | keyof typeof thAdminErasure;
+  | keyof typeof thAdminErasure
+  | keyof typeof thAdminTrash;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",

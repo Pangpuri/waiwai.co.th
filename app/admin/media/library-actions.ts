@@ -5,17 +5,23 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { MAX_UPLOAD_BYTES, readImageInfo, type AllowedImageMime } from "@/lib/media/image-info";
-import { deleteMedia, findMediaUsage, listMedia, replaceMediaData, updateMediaAlt } from "@/lib/media/repository";
+import { findMediaUsage, listMedia, replaceMediaData, updateMediaAlt } from "@/lib/media/repository";
 import { storeImageFile } from "@/lib/media/upload";
+import { trashMedia } from "@/lib/trash/repository";
 
 /**
  * Server Actions ของ "คลังภาพ" (X1.2)
  *
  * กฎสำคัญ: **ห้ามลบภาพที่ยังถูกใช้** — ตรวจก่อนลบทุกครั้ง และถ้าถูกใช้จะไม่ลบ + แจ้งว่าใช้ที่ไหน
  * (เหตุผล: หน้าเว็บจะพังทันทีถ้าลบภาพที่ยังอ้างถึง — บทเรียนจากเอกสารอ้างอิง เฟส 4.6)
+ *
+ * ⚠️ X2.4 (รอบที่ 78): "ลบ" ไม่ใช่ลบถาวรอีกต่อไป — **ย้ายเข้าถังขยะ** (`trashMedia`)
+ * แล้วตัวลบตามกำหนดจึงลบถาวรเมื่อพ้นระยะเก็บ ⇒ เผลอกดลบกู้คืนได้จาก `/admin/trash`
  */
 
 const MEDIA_PATH = "/admin/media";
+/** หน้าถังขยะ — ต้อง revalidate ด้วยทุกครั้งที่ของย้ายเข้า/ออก (ทั้งสองหน้าอ่าน DB เดียวกัน) */
+const TRASH_PATH = "/admin/trash";
 
 export type MediaActionState = {
   readonly status: "idle" | "ok" | "blocked" | "invalid" | "failed";
@@ -52,6 +58,10 @@ export async function updateMediaAltAction(formData: FormData): Promise<void> {
   revalidatePath(MEDIA_PATH);
 }
 
+/**
+ * "ลบ" ภาพ = **ย้ายเข้าถังขยะ** (X2.4) · ยังไม่ลบถาวร
+ * ⇒ กู้คืนได้จาก `/admin/trash` จนพ้นระยะเก็บ · audit บันทึกใน `lib/trash/repository.ts` แล้ว
+ */
 export async function deleteMediaAction(_previous: MediaActionState, formData: FormData): Promise<MediaActionState> {
   const user = await requireAdminUser();
 
@@ -64,12 +74,12 @@ export async function deleteMediaAction(_previous: MediaActionState, formData: F
     return { status: "blocked", message: usage.map((entry) => `${entry.kind}:${entry.target}`) };
   }
 
-  const removed = await deleteMedia(id);
-  if (!removed) return { status: "failed", message: ["not-found"] };
+  const moved = await trashMedia(id, user.email);
+  if (!moved) return { status: "failed", message: ["not-found"] };
 
-  await recordAudit({ action: "pages-update", actorEmail: user.email, target: `media:${id}`, detail: "deleted" });
   revalidatePath(MEDIA_PATH);
-  return { status: "ok", message: ["deleted"] };
+  revalidatePath(TRASH_PATH);
+  return { status: "ok", message: ["trashed"] };
 }
 
 /** แทนไฟล์เดิม (คีย์เดิม) — พาธไม่เปลี่ยน ทุกที่ที่ใช้อยู่ได้รูปใหม่ทันที */

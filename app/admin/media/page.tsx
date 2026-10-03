@@ -63,6 +63,16 @@ export default async function AdminMediaPage({
         <p className="text-fg-muted text-xs">
           {fillTemplate(strings.mediaStats, { count: stats.count, size: formatBytes(stats.totalBytes), unused })}
         </p>
+        {/* X2.4 — บอกให้ชัดว่า "ลบ" = ย้ายเข้าถังขยะ + ทางไปกู้คืน */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-fg-muted text-xs">{strings.mediaTrashHint}</span>
+          <Link
+            href="/admin/trash"
+            className="text-link focus-visible:ring-ring w-fit text-xs font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {strings.mediaTrashLink}
+          </Link>
+        </div>
       </header>
 
       <MediaUpload strings={actionStrings} />

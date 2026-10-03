@@ -14,11 +14,15 @@
  *   ข้อมูลจะค้าง  ⇒ สคริปต์นี้ใช้ตั้ง `cron` บนเซิร์ฟเวอร์ที่เช่าเอง เพื่อให้ลบตรงเวลาเสมอ
  *
  * ตรรกะทั้งหมดอยู่ใน `lib/retention/plan.ts` (บริสุทธิ์) + `lib/retention/purge.ts` (แตะ DB)
+ * ⚠️ รอบเดียวกันนี้ลบ **ของในถังขยะที่พ้นกำหนด** ด้วย (X2.4) — ระยะเก็บของถังอยู่ที่ไฟล์นโยบายเดียวกัน
+ *    (`TRASH_RETENTION_DAYS` · ภาพ/พรีเซ็ตที่ผู้ดูแลลบ ไม่นับเป็นข้อมูลส่วนบุคคล จึงไม่ขึ้นหน้า /privacy)
  */
 import { closePool, isDatabaseConfigured } from "@/db/pool";
 import { describeRetention } from "@/lib/retention/format";
-import { RETENTION_CLASSES, retentionDaysFor, summarizePurge } from "@/lib/retention/plan";
+import { RETENTION_CLASSES, TRASH_RETENTION_DAYS, retentionDaysFor, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, purgeNow, type PurgeReport } from "@/lib/retention/purge";
+import { summarizeTrash } from "@/lib/trash/plan";
+import { purgeExpiredTrash, type TrashPurgeReport } from "@/lib/trash/repository";
 
 type Options = {
   readonly dryRun: boolean;
@@ -61,7 +65,16 @@ function printRetentionTable(): void {
     const days = retentionDaysFor(cls);
     process.stdout.write(`    · ${cls.padEnd(13)} ${describeRetention(days, "th")} (${days} วัน)\n`);
   }
+  /* ถังขยะ (X2.4) — คนละนโยบายกับข้อมูลส่วนบุคคล แต่ถูกลบในรอบเดียวกัน */
+  process.stdout.write(
+    `    · ${"trash (ถังขยะ)".padEnd(13)} ${describeRetention(TRASH_RETENTION_DAYS, "th")} (${TRASH_RETENTION_DAYS} วัน) — ภาพ/พรีเซ็ตที่ผู้ดูแลลบ\n`,
+  );
   process.stdout.write("\n");
+}
+
+/** นับของในถังที่พ้นกำหนด "ก่อน" ลบ — ตัวเลขบนจอจะตรงกับสิ่งที่รอบนี้ลบไปจริง */
+async function trashDueNow(dryRun: boolean): Promise<TrashPurgeReport | null> {
+  return purgeExpiredTrash({ dryRun });
 }
 
 async function main(): Promise<void> {
@@ -73,6 +86,9 @@ async function main(): Promise<void> {
   }
 
   let report: PurgeReport | null;
+
+  /* นับของในถังที่พ้นกำหนดก่อน (โหมดลบจริง purgeNow จะลบให้เองในรอบเดียวกัน) */
+  const trash = await trashDueNow(true);
 
   if (options.dryRun) {
     report = await purgeExpired({ dryRun: true });
@@ -88,7 +104,17 @@ async function main(): Promise<void> {
 
   if (options.json) {
     process.stdout.write(
-      `${JSON.stringify({ dryRun: report.dryRun, at: report.at, total: report.total, counts: report.counts }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          dryRun: report.dryRun,
+          at: report.at,
+          total: report.total,
+          counts: report.counts,
+          trash: { total: trash?.total ?? 0, counts: trash?.counts ?? null },
+        },
+        null,
+        2,
+      )}\n`,
     );
   } else {
     const title = report.dryRun ? "ผลตรวจ (ยังไม่ลบ — dry run)" : "ลบข้อมูลที่หมดอายุแล้ว";
@@ -97,7 +123,10 @@ async function main(): Promise<void> {
       process.stdout.write(`    · ${cls.padEnd(13)} ลบ ${report.counts[cls]} แถว\n`);
     }
     process.stdout.write(`    รวม ${report.total} แถว\n`);
-    if (report.total === 0) {
+    if (trash !== null) {
+      process.stdout.write(`    · ${"trash".padEnd(13)} ลบ ${trash.total} รายการ (${summarizeTrash(trash.counts)})\n`);
+    }
+    if (report.total === 0 && (trash?.total ?? 0) === 0) {
       process.stdout.write("    (ยังไม่มีข้อมูลที่หมดอายุ — ไม่มีอะไรต้องทำ)\n");
     }
     process.stdout.write(`\n  audit: ${summarizePurge(report.counts)}\n`);

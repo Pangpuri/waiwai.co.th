@@ -8,6 +8,7 @@ import { maintenanceFlagOf, MAINTENANCE_ENV_VAR } from "@/lib/maintenance/plan";
 import { describeRetention } from "@/lib/retention/format";
 import { type RetentionClass } from "@/lib/retention/plan";
 import { retentionOverview } from "@/lib/retention/purge";
+import { trashStats } from "@/lib/trash/repository";
 
 /**
  * ภาพรวมหลังบ้าน — หน้าที่ "ต้องล็อกอินก่อน" หน้าที่แรก
@@ -37,6 +38,10 @@ export default async function AdminHomePage() {
       "migrate-blocks": strings.auditBlockMigrate,
       "retention-purge": strings.auditRetentionPurge,
       "erase-subject": strings.auditEraseSubject,
+      "trash-move": strings.auditTrashMove,
+      "trash-restore": strings.auditTrashRestore,
+      "trash-delete": strings.auditTrashDelete,
+      "trash-purge": strings.auditTrashPurge,
     };
     return map[action] ?? action;
   };
@@ -47,6 +52,12 @@ export default async function AdminHomePage() {
     คืน null = ยังไม่ได้ตั้ง DATABASE_URL (หน้าจอต้องไม่พังเพราะเรื่องนี้)
   */
   const retention = await retentionOverview();
+
+  /*
+    ถังขยะ (X2.4) — นับของที่รอกู้คืน/ลบถาวร
+    อ่านล้วน + คืน 0 เมื่อไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
+  */
+  const trash = await trashStats();
   const labelByClass: Readonly<Record<RetentionClass, string>> = {
     contact: strings.retentionLabelContact,
     newsletter: strings.retentionLabelNewsletter,
@@ -198,6 +209,30 @@ export default async function AdminHomePage() {
             </form>
           </>
         )}
+      </section>
+
+      {/* ── ถังขยะ (X2.4) ─────────────────────────────────────────────────────── */}
+      <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-5 sm:p-6">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.trashCardTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.trashCardHint}</p>
+        </div>
+        <p className="text-fg text-sm font-semibold">
+          {trash.total === 0 ? strings.trashCardEmpty : strings.trashCardCount.replace("{count}", String(trash.total))}
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/trash"
+            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring w-fit rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {strings.trashTitle}
+          </Link>
+          <span className="text-fg-muted text-xs">
+            {strings.trashStats
+              .replace("{media}", String(trash.media))
+              .replace("{preset}", String(trash.preset))}
+          </span>
+        </div>
       </section>
 
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">

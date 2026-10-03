@@ -62,9 +62,13 @@ function toPreset(row: PresetRow): BlockPreset | null {
   };
 }
 
+/**
+ * รายการพรีเซ็ตที่ใช้งานอยู่ — ⚠️ **ไม่รวมของในถังขยะ** (X2.4)
+ * ของที่ถูกลบจะกลับมาเมื่อ "กู้คืน" จาก `/admin/trash` หรือเมื่อบันทึกพรีเซ็ตชื่อเดิมทับอีกครั้ง
+ */
 export async function listBlockPresets(): Promise<readonly BlockPreset[]> {
   const { rows } = await getPool().query<PresetRow>(
-    "select id, name, block_type, block, created_at from block_preset order by created_at desc limit $1",
+    "select id, name, block_type, block, created_at from block_preset where deleted_at is null order by created_at desc limit $1",
     [MAX_PRESETS],
   );
 
@@ -72,11 +76,17 @@ export async function listBlockPresets(): Promise<readonly BlockPreset[]> {
 }
 
 export async function countBlockPresets(): Promise<number> {
-  const { rows } = await getPool().query<{ readonly count: string }>("select count(*)::text as count from block_preset");
+  const { rows } = await getPool().query<{ readonly count: string }>(
+    "select count(*)::text as count from block_preset where deleted_at is null",
+  );
   return Number.parseInt(rows[0]?.count ?? "0", 10);
 }
 
-/** บันทึกพรีเซ็ตใหม่ · ชื่อซ้ำ (ไม่สนตัวพิมพ์) = เขียนทับของเดิม (ตั้งใจให้แก้ชื่อเดิมได้ง่าย) */
+/**
+ * บันทึกพรีเซ็ตใหม่ · ชื่อซ้ำ (ไม่สนตัวพิมพ์) = เขียนทับของเดิม (ตั้งใจให้แก้ชื่อเดิมได้ง่าย)
+ * 🔑 X2.4: ชื่อซ้ำกับของที่อยู่ในถัง ⇒ **กู้คืนกลับมาใช้อัตโนมัติ** (`deleted_at = null`)
+ *    เพราะดัชนี unique เป็นระดับชื่อ ⇒ ถ้าไม่ล้าง `deleted_at` พรีเซ็ตจะ "บันทึกแล้วแต่ยังอยู่ในถัง" (งงเงียบ ๆ)
+ */
 export async function saveBlockPreset(name: string, block: Block, actor: string): Promise<void> {
   await getPool().query(
     `insert into block_preset (id, name, block_type, block, created_by)
@@ -86,11 +96,14 @@ export async function saveBlockPreset(name: string, block: Block, actor: string)
        block_type = excluded.block_type,
        block = excluded.block,
        updated_at = now(),
-       created_by = excluded.created_by`,
+       created_by = excluded.created_by,
+       deleted_at = null,
+       deleted_by = null`,
     [newPresetId(), name, block.type, JSON.stringify(block), actor],
   );
 }
 
-export async function deleteBlockPreset(id: string): Promise<void> {
-  await getPool().query("delete from block_preset where id = $1", [id]);
-}
+/**
+ * ⚠️ **การลบพรีเซ็ตย้ายไปถังขยะแล้ว (X2.4)** — ใช้ `trashBlockPreset()` ใน `lib/trash/repository.ts`
+ * (ของเดิม `deleteBlockPreset()` ลบทันทีถาวร — ถอดออกเพื่อไม่ให้มีทางลบถาวรโดยไม่ผ่านถัง)
+ */

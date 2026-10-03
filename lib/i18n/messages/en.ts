@@ -14,6 +14,7 @@ import { privacyPage } from "./areas/en/privacy.ts";
 import { maintenancePage } from "./areas/en/maintenance.ts";
 import { adminMaintenance } from "./areas/en/adminMaintenance.ts";
 import { adminErasure } from "./areas/en/adminErasure.ts";
+import { adminTrash } from "./areas/en/adminTrash.ts";
 
 import type { Messages } from "./th";
 
@@ -63,5 +64,6 @@ export const en: Messages = {
     ...adminRetention,
     ...adminMaintenance,
     ...adminErasure,
+    ...adminTrash,
   },
 };

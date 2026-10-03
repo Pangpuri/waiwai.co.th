@@ -54,7 +54,7 @@ function StatusLine({ state, strings }: { readonly state: MediaActionState; read
   if (state.status === "ok") {
     return (
       <span className="text-fg-muted text-[11px]">
-        {state.message[0] === "deleted" ? strings.mediaDeleted : state.message[0] === "replaced" ? "✓" : state.message[0]}
+        {state.message[0] === "trashed" ? strings.mediaDeleted : state.message[0] === "replaced" ? "✓" : state.message[0]}
       </span>
     );
   }

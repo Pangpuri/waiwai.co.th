@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { getPool, withTransaction } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
 import { isDatabaseConfigured } from "@/lib/content/repository";
+import { purgeExpiredTrash } from "@/lib/trash/repository";
 import {
   PURGE_AUDIT_ACTION,
   RETENTION_CLASSES,
@@ -212,6 +213,13 @@ export async function retentionOverview(options: { readonly now?: Date } = {}): 
 async function purgeAndRecord(options: { readonly now: Date; readonly actorEmail: string | null }): Promise<PurgeReport | null> {
   const report = await purgeExpired({ now: options.now });
   if (report === null) return null;
+
+  /*
+    ถังขยะ (X2.4) — ลบถาวรของที่พ้นระยะเก็บในรอบเดียวกัน
+    ⚠️ ไม่รวมใน `report.counts` เพราะไม่ใช่ข้อมูลส่วนบุคคล (คนละนโยบายกับตารางด้านบน)
+       ⇒ `lib/trash/repository.ts` บันทึก audit ของตัวเอง (`trash-purge`) เมื่อมีของถูกลบจริง
+  */
+  await purgeExpiredTrash({ now: options.now });
 
   /* บันทึกทุกครั้งที่รัน (แม้ลบ 0 แถว) — แถวนี้คือ "หมุดเวลา" ที่ทำให้รอบถัดไปไม่ยิงซ้ำทันที */
   await recordAudit({

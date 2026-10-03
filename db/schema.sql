@@ -159,10 +159,14 @@ create table if not exists media (
   alt_th     text        not null default '',
   alt_en     text        not null default '',
   created_by text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- ถังขยะ (X2.4 · migration 0008): null = ใช้งานปกติ · มีค่า = อยู่ในถัง (ลบถาวรอัตโนมัติเมื่อพ้นระยะเก็บ)
+  deleted_at timestamptz,
+  deleted_by text
 );
 
-create index if not exists media_created_idx on media (created_at desc);
+create index if not exists media_alive_created_idx on media (created_at desc) where deleted_at is null;
+create index if not exists media_trash_idx on media (deleted_at) where deleted_at is not null;
 
 -- ── พรีเซ็ตบล็อก (คลังแบบสำเร็จ) ──────────────────────────────────────────────
 -- ผู้ใช้สั่ง รอบที่ 52: "บันทึกบล็อก/แบนเนอร์ที่ทำไว้เป็นพรีเซ็ต แล้วดึงมาวาง/ทับของเดิม"
@@ -175,11 +179,89 @@ create table if not exists block_preset (
   block      jsonb       not null,
   created_by text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- ถังขยะ (X2.4): กดลบ = ย้ายเข้าถัง · บันทึกชื่อเดิมทับ = กู้คืนอัตโนมัติ (deleted_at = null)
+  deleted_at timestamptz,
+  deleted_by text
 );
 
 create unique index if not exists block_preset_name_idx on block_preset (lower(name));
-create index if not exists block_preset_created_idx on block_preset (created_at desc);
+create index if not exists block_preset_alive_created_idx on block_preset (created_at desc) where deleted_at is null;
+create index if not exists block_preset_trash_idx on block_preset (deleted_at) where deleted_at is not null;
+
+-- ── หน้าเป็นวัตถุ (W1 · migration 0004) ──────────────────────────────────────
+-- "หน้า" กลายเป็นวัตถุจริง (แบบ WordPress: Posts/Pages) · ชื่อหน้า = ชื่อเมนูของหน้านั้น
+-- seed 9 หน้าให้ตรงเมนูปัจจุบัน — ทำใน migration 0004 (ไฟล์นี้ไม่ใส่ seed เพื่อไม่ทับของจริง)
+-- หมายเหตุ: migration 0005 เพิ่มคอลัมน์ SEO ต่อหน้า ⇒ รวมไว้ในตารางนี้แล้ว (บรรทัด seo_*)
+create table if not exists page (
+  id                 text        primary key,
+  name_th            text        not null,
+  name_en            text        not null default '',
+  menu_order         integer     not null default 0,
+  in_menu            boolean     not null default true,
+  -- blocks = แก้ด้วยบล็อกได้ (มีเอกสารใน page_document) · designed = ใช้เลย์เอาต์ในโค้ด
+  editor             text        not null default 'designed' check (editor in ('blocks', 'designed')),
+  seo_title_th       text        not null default '',
+  seo_title_en       text        not null default '',
+  seo_description_th text        not null default '',
+  seo_description_en text        not null default '',
+  og_image_path      text        not null default '',   -- พาธในเว็บ (มติ D9) เช่น /media/<id>
+  seo_noindex        boolean     not null default false,
+  updated_at         timestamptz not null default now(),
+  updated_by         text
+);
+
+create index if not exists page_menu_order_idx on page (menu_order, id);
+
+-- ── ความพยายามล็อกอิน (X2.1 rate limit · migration 0006) ──────────────────────
+-- PDPA: ข้อมูลส่วนบุคคล ⇒ ต้องลบตามระยะเก็บ (30 วัน · lib/retention/plan.ts)
+create table if not exists login_attempt (
+  id         bigint      generated always as identity primary key,
+  email      text        not null,
+  succeeded  boolean     not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists login_attempt_email_idx on login_attempt (lower(email), created_at desc);
+create index if not exists login_attempt_created_idx on login_attempt (created_at desc);
+
+-- ── ผู้ติดต่อ/ผู้สมัครจากฟอร์มหน้าเว็บ (X1.9 · migration 0007) ─────────────────
+-- มติผู้ใช้ รอบที่ 64: เก็บลงฐานข้อมูลเป็นหลัก (ฟอร์มที่ส่งอีเมลเท่านั้น = ข้อมูลหายได้)
+-- PDPA: ต้องลบตามระยะเก็บ (ติดต่อ/ข่าวสาร 1 ปี · ใบสมัครงาน 6 เดือน)
+create table if not exists form_submission (
+  id         bigint      generated always as identity primary key,
+  form       text        not null check (form in ('contact', 'newsletter', 'careers')),
+  email      text        not null,
+  name       text        not null default '',
+  phone      text        not null default '',
+  topic      text        not null default '',
+  subject    text        not null default '',
+  message    text        not null default '',
+  payload    jsonb       not null default '{}'::jsonb,
+  status     text        not null default 'new' check (status in ('new', 'handled', 'spam')),
+  consent    boolean     not null default false,
+  created_at timestamptz not null default now(),
+  handled_at timestamptz,
+  handled_by text
+);
+
+create index if not exists form_submission_status_idx on form_submission (status, created_at desc);
+create index if not exists form_submission_form_idx on form_submission (form, created_at desc);
+create index if not exists form_submission_recent_idx on form_submission (lower(email), created_at desc);
+
+-- ไฟล์แนบ (ใบสมัครงาน) — เก็บไบต์ในฐานข้อมูลเหมือนภาพ (มติ D11: pg_dump พาไปได้ทั้งเว็บ)
+-- ลบตามใบสมัครอัตโนมัติ (on delete cascade)
+create table if not exists form_attachment (
+  id            bigint      generated always as identity primary key,
+  submission_id bigint      not null references form_submission (id) on delete cascade,
+  filename      text        not null,
+  mime          text        not null,
+  size_bytes    integer     not null,
+  data          bytea       not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists form_attachment_submission_idx on form_attachment (submission_id);
 
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

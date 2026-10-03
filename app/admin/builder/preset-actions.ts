@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminUser } from "@/lib/auth/dal";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { deleteBlockPreset, normalizePresetName, saveBlockPreset } from "@/lib/blocks/presets";
+import { normalizePresetName, saveBlockPreset } from "@/lib/blocks/presets";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { isDatabaseConfigured } from "@/lib/content/repository";
+import { trashBlockPreset } from "@/lib/trash/repository";
 
 /**
  * Server Actions ของ "พรีเซ็ตบล็อก" (ผู้ใช้สั่ง รอบที่ 52)
@@ -55,13 +56,14 @@ export async function savePresetAction(formData: FormData): Promise<void> {
 }
 
 export async function deletePresetAction(formData: FormData): Promise<void> {
-  await requireAdminUser();
+  const user = await requireAdminUser();
   if (!isDatabaseConfigured()) return;
 
   const id = String(formData.get("id") ?? "").trim();
   const page = String(formData.get("page") ?? "").trim();
   if (id === "") return;
 
-  await deleteBlockPreset(id);
+  /* X2.4 — "ลบ" พรีเซ็ต = ย้ายเข้าถังขยะ (กู้คืนได้ 30 วัน) ไม่ใช่ลบถาวรทันที */
+  await trashBlockPreset(id, user.email);
   if (page !== "") revalidatePath(pathOf(page));
 }

@@ -14,6 +14,7 @@ import { privacyPage } from "./areas/th/privacy.ts";
 import { maintenancePage } from "./areas/th/maintenance.ts";
 import { adminMaintenance } from "./areas/th/adminMaintenance.ts";
 import { adminErasure } from "./areas/th/adminErasure.ts";
+import { adminTrash } from "./areas/th/adminTrash.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -62,6 +63,7 @@ export const th = {
     ...adminRetention,
     ...adminMaintenance,
     ...adminErasure,
+    ...adminTrash,
   },
 };
 
