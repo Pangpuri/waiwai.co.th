@@ -32,6 +32,11 @@ export const RETENTION_DAYS = {
   loginAttempt: 30,
   /** บันทึกว่าผู้ดูแลทำอะไร (audit log) */
   auditLog: 90,
+  /**
+   * เซสชันหลังบ้าน (`admin_session`) — นับจาก **เวลาหมดอายุ/ถูกเพิกถอน** ไม่ใช่เวลาสร้าง (รอบที่ 95)
+   * เก็บ 30 วัน: พอให้ตรวจย้อนหลังว่า "เครื่องไหนเข้าเมื่อไร" โดยไม่สะสมข้อมูลอุปกรณ์ไว้ยาว
+   */
+  adminSession: 30,
   /** ประวัติเอกสารบล็อก (`page_document_revision`) — เก็บ 1 ปี ตามมติรอบที่ 77 */
   blockRevision: 365,
   /** ประวัติเนื้อหาแบบฟิลด์ (`content_revision`) — เก็บ 1 ปี ตามมติรอบที่ 77 */
@@ -49,6 +54,7 @@ export const RETENTION_CLASSES: readonly RetentionClass[] = [
   "contentRevision",
   "loginAttempt",
   "auditLog",
+  "adminSession",
 ];
 
 /** ชั้นข้อมูลที่มาจากฟอร์มหน้าเว็บ (ตาราง `form_submission`) */
@@ -58,7 +64,7 @@ export const FORM_RETENTION_CLASSES: readonly RetentionClass[] = ["contact", "ne
 export const REVISION_RETENTION_CLASSES: readonly RetentionClass[] = ["blockRevision", "contentRevision"];
 
 /** ชั้นข้อมูลที่เป็นร่องรอยการใช้งาน (เฉพาะเจ้าหน้าที่) */
-export const LOG_RETENTION_CLASSES: readonly RetentionClass[] = ["loginAttempt", "auditLog"];
+export const LOG_RETENTION_CLASSES: readonly RetentionClass[] = ["loginAttempt", "auditLog", "adminSession"];
 
 /**
  * ระยะเก็บของ **"ถังขยะ"** (X2.4 · รอบที่ 78) = 30 วัน

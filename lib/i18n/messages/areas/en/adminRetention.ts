@@ -27,5 +27,6 @@ export const adminRetention = {
   retentionLabelContentRevision: "Field revision history (latest kept)",
   retentionLabelLoginAttempt: "Sign-in attempts",
   retentionLabelAuditLog: "Content change log",
+  retentionLabelAdminSession: "Back-office sessions",
   auditRetentionPurge: "Retention deletion",
 };

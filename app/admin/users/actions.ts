@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import type { RbacActionState } from "@/features/admin/rbac-state";
 import { generatePassword } from "@/lib/auth/credentials";
-import { requireAdminUser } from "@/lib/auth/dal";
+import { currentSessionId, requireAdminUser } from "@/lib/auth/dal";
 import { isAdminRoleId } from "@/lib/auth/roles";
+import { revokeAdminSessions, revokeSessionsForUser } from "@/lib/auth/sessions-repository";
 import {
   createAdminUser,
   deleteAdminUser,
@@ -162,4 +163,51 @@ export async function resetPasswordAction(
 
   revalidatePath(USERS_PATH);
   return { status: "ok", code: "password-reset", password, email: null };
+}
+
+/**
+ * ตัดเซสชัน (รอบที่ 95)
+ *
+ * - ส่ง `hash` มา = ตัดเซสชันนั้น (sha256 ของ sid — ค่าที่หน้าจอเห็น ไม่ใช่รหัสลับที่เอาไปสวมรอยได้)
+ * - ส่งแค่ `userId` = ตัด **ทุกเซสชันของบัญชีนั้น** (ใช้ตอนสงสัยว่าเครื่องหาย)
+ * - ไม่ส่งทั้งสอง = **"ตัดเซสชันอื่นทั้งหมดของตัวเอง"** (คงเซสชันที่กำลังใช้อยู่ไว้)
+ *   ⚠️ กรณีนี้ใช้สิทธิ์ `content` (มีทุกบทบาท) เพราะเป็นการจัดการเซสชันของตัวเอง — ไม่ใช่ของคนอื่น
+ */
+export async function revokeSessionsAction(_previous: RbacActionState, formData: FormData): Promise<RbacActionState> {
+  const actor = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "failed", code: "no-database", password: null, email: null };
+
+  const hash = readField(formData, "hash");
+  const userId = readField(formData, "userId");
+
+  if (hash === "" && userId === "") {
+    /* ตัดของตัวเองทั้งหมด (ยกเว้นเซสชันนี้) */
+    const sid = await currentSessionId();
+    const revoked = await revokeSessionsForUser({
+      userId: actor.id,
+      actor: actor.email,
+      exceptSid: sid,
+      detail: "self-revoke-others",
+    });
+    revalidatePath(USERS_PATH);
+    return revoked > 0
+      ? { status: "ok", code: "sessions-revoked", password: null, email: null }
+      : { status: "failed", code: "sessions-none", password: null, email: null };
+  }
+
+  if (hash === "") {
+    const revoked = await revokeSessionsForUser({ userId, actor: actor.email, detail: "by-admin" });
+    revalidatePath(USERS_PATH);
+    return revoked > 0
+      ? { status: "ok", code: "sessions-revoked", password: null, email: null }
+      : { status: "failed", code: "sessions-none", password: null, email: null };
+  }
+
+  const result = await revokeAdminSessions({ hash, actor: actor.email });
+  if (!result.ok) return { status: "failed", code: "no-database", password: null, email: null };
+
+  revalidatePath(USERS_PATH);
+  return result.revoked > 0
+    ? { status: "ok", code: "sessions-revoked", password: null, email: null }
+    : { status: "failed", code: "sessions-none", password: null, email: null };
 }

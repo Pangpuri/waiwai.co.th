@@ -27,5 +27,6 @@ export const adminRetention = {
   retentionLabelContentRevision: "ประวัติเนื้อหาแบบฟิลด์ (เก็บรุ่นล่าสุด)",
   retentionLabelLoginAttempt: "ร่องรอยการพยายามล็อกอิน",
   retentionLabelAuditLog: "บันทึกการแก้ไขเนื้อหา",
+  retentionLabelAdminSession: "เซสชันการเข้าใช้หลังบ้าน",
   auditRetentionPurge: "ลบข้อมูลตามระยะเก็บ",
 };

@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { type LoginState } from "@/features/admin/login-state";
-import { getAdminUserStore, endSession, isAdminConfigured, requireAdminUser, startSession } from "@/lib/auth/dal";
+import { getAdminUserStore, currentSessionId, endSession, isAdminConfigured, requireAdminUser, startSession } from "@/lib/auth/dal";
 import { touchAdminLastLogin } from "@/lib/auth/users-repository";
+import { revokeSessionsForUser } from "@/lib/auth/sessions-repository";
 import { recordAudit } from "@/lib/audit/log";
 import { getSessionUser } from "@/lib/auth/dal";
 import { loginRateLimit, recordLoginAttempt } from "@/lib/auth/attempts";
@@ -113,6 +114,21 @@ export async function logoutAction(): Promise<void> {
   if (user !== null) await recordAudit({ action: "logout", actorEmail: user.email, target: "login", detail: null });
   await endSession();
   redirect(ADMIN_LOGIN_PATH);
+}
+
+/**
+ * **ตัดเซสชันอื่นทั้งหมดของตัวเอง** (รอบที่ 95) — ใช้จากหน้า "กิจกรรมของฉัน"
+ *
+ * - ใช้ `<form action={...}>` ธรรมดา ⇒ ทำงานได้แม้ปิด JavaScript
+ * - คงเซสชันที่กำลังใช้อยู่ไว้ (ไม่ใช่ "ออกจากระบบ")
+ * - ใช้สิทธิ์ `content` (มีทุกบทบาท) เพราะเป็นการจัดการเซสชันของตัวเอง ไม่ใช่ของคนอื่น
+ */
+export async function revokeOwnOtherSessionsAction(): Promise<void> {
+  const user = await requireAdminUser("content");
+  const sid = await currentSessionId();
+  await revokeSessionsForUser({ userId: user.id, actor: user.email, exceptSid: sid, detail: "self-revoke-others" });
+  revalidatePath("/admin/activity");
+  redirect("/admin/activity");
 }
 
 /**

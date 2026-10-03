@@ -5,7 +5,16 @@ import { connection } from "next/server";
 
 import { ADMIN_LOGIN_PATH } from "@/lib/auth/credentials";
 import { can, type AdminPermission } from "@/lib/auth/roles";
+import {
+  createAdminSession,
+  findAdminSession,
+  hashSessionId,
+  newSessionId,
+  revokeAdminSessions,
+  touchAdminSession,
+} from "@/lib/auth/sessions-repository";
 import { createDbUserStore } from "@/lib/auth/users-repository";
+import { isDatabaseConfigured } from "@/lib/content/repository";
 import {
   SESSION_COOKIE_NAME,
   createSessionToken,
@@ -28,6 +37,16 @@ import type { AdminUser } from "@/lib/auth/types";
  * - คุกกี้เซสชันตั้ง flag ที่เดียวใน `sessionCookieOptions()`
  * - ไม่มีค่าเริ่มต้นลับ ๆ: ถ้า `SESSION_SECRET` ไม่พอ/สั้นไป → ถือว่า "ยังตั้งค่าไม่ครบ" ไม่ใช่ปล่อยผ่าน
  */
+
+/** user-agent ของคำขอนี้ (ใช้เป็น "คำใบ้อุปกรณ์" ในรายการเซสชัน) — อ่านจาก headers แบบไม่โยน error */
+async function currentUserAgent(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    return (await headers()).get("user-agent");
+  } catch {
+    return null;
+  }
+}
 
 /** อ่าน env แบบรวม — ที่เดียว เพื่อให้ตรวจได้ว่าอะไรขาด */
 function readEnv(): {
@@ -121,6 +140,19 @@ export const getSessionUser = cache(async (): Promise<AdminUser | null> => {
   const account = await store.findById(payload.userId);
   if (account === null || account.disabled) return null;
 
+  /*
+    ตรวจ "เซสชันที่เพิกถอนได้" (รอบที่ 95)
+    - มีฐานข้อมูล ⇒ **ต้องมีแถวเซสชันที่ยังใช้งานได้** (คุกกี้เก่าที่ไม่มี `sid` = ใช้ไม่ได้ ⇒ ล็อกอินใหม่)
+    - ไม่มีฐานข้อมูล (เดโม) ⇒ ใช้แบบเดิม (ไม่มีที่ให้เพิกถอน — ดูคอมเมนต์ใน `session.ts`)
+  */
+  if (isDatabaseConfigured()) {
+    if (payload.sid === undefined) return null;
+    const session = await findAdminSession(payload.sid);
+    if (session === null || !session.active || session.userId !== account.id) return null;
+    /* อัปเดต "เห็นล่าสุด" แบบไม่ถี่ — ทำให้รายการเซสชันบนหน้าจอมีข้อมูลจริง */
+    await touchAdminSession(payload.sid);
+  }
+
   /* สิทธิ์ที่ใช้จริงต้องมาจาก "บัญชี" ไม่ใช่จากค่าที่อยู่ในโทเคน (โทเคนแก่กว่าได้) */
   return {
     id: account.id,
@@ -130,6 +162,16 @@ export const getSessionUser = cache(async (): Promise<AdminUser | null> => {
     disabled: account.disabled,
   };
 });
+
+/** รหัสเซสชันของคำขอนี้ (`null` = ไม่มี/อ่านไม่ได้) — ใช้ตอน "ตัดเซสชันอื่นทั้งหมด" ของตัวเอง */
+export async function currentSessionId(): Promise<string | null> {
+  const secret = readSecret();
+  if (secret === null) return null;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (token === undefined || token === "") return null;
+  const payload = parseSessionToken(token, secret, Date.now());
+  return payload?.sid ?? null;
+}
 
 /**
  * ประตูของหลังบ้าน — **ไม่ล็อกอิน = ไปหน้าล็อกอิน · สิทธิ์ไม่พอ = ไปหน้า "ไม่มีสิทธิ์"**
@@ -159,12 +201,38 @@ export async function startSession(user: AdminUser): Promise<void> {
   }
 
   const expiresAt = sessionExpiry(Date.now());
-  const token = createSessionToken({ userId: user.id, role: user.role, expiresAt }, secret);
+
+  /*
+    บันทึกเซสชันลงฐานข้อมูล (รอบที่ 95) เพื่อให้ "เพิกถอนได้"
+    - มีฐานข้อมูล: บันทึกไม่สำเร็จ = **ไม่ให้ล็อกอิน** (โยน error → action ตอบ "server")
+      เพราะเซสชันที่เพิกถอนไม่ได้คือช่องที่เรากำลังปิดอยู่ (fail-closed)
+    - ไม่มีฐานข้อมูล (เดโม): ล็อกอินได้ตามเดิม แต่คุกกี้จะไม่มี `sid` ⇒ เพิกถอนไม่ได้
+  */
+  let sid: string | undefined;
+  if (isDatabaseConfigured()) {
+    sid = newSessionId();
+    const recorded = await createAdminSession({
+      userId: user.id,
+      sid,
+      expiresAt: new Date(expiresAt),
+      userAgent: await currentUserAgent(),
+    });
+    if (!recorded) throw new Error("cannot record admin session");
+  }
+
+  const token = createSessionToken(
+    { userId: user.id, role: user.role, expiresAt, ...(sid === undefined ? {} : { sid }) },
+    secret,
+  );
 
   (await cookies()).set(SESSION_COOKIE_NAME, token, sessionCookieOptions(expiresAt, shouldUseSecureCookies()));
 }
 
-/** ลบคุกกี้เซสชัน (ออกจากระบบ) */
+/** ออกจากระบบ = **เพิกถอนเซสชันในฐานข้อมูลด้วย** (ไม่ใช่แค่ลบคุกกี้ที่เครื่องนี้) */
 export async function endSession(): Promise<void> {
+  const sid = await currentSessionId();
+  if (sid !== null) {
+    await revokeAdminSessions({ hash: hashSessionId(sid), actor: "self-logout" });
+  }
   (await cookies()).delete(SESSION_COOKIE_NAME);
 }

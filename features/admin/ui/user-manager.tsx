@@ -6,6 +6,7 @@ import {
   createUserAction,
   deleteUserAction,
   resetPasswordAction,
+  revokeSessionsAction,
   setRoleAction,
   toggleUserAction,
 } from "@/app/admin/users/actions";
@@ -71,6 +72,25 @@ export type RbacStrings = {
   readonly rbacDeleteAcknowledge: string;
   readonly rbacDeletedDone: string;
   readonly rbacEmailMismatch: string;
+  readonly rbacSessionsTitle: string;
+  readonly rbacSessionsEmpty: string;
+  readonly rbacSessionLastSeen: string;
+  readonly rbacSessionExpires: string;
+  readonly rbacSessionStarted: string;
+  readonly rbacSessionRevoke: string;
+  readonly rbacSessionRevokeAll: string;
+  readonly rbacSessionRevoked: string;
+  readonly rbacSessionRevokeNotFound: string;
+  readonly rbacSessionsCount: string;
+};
+
+/** แถวเซสชันที่แสดงบนหน้าจอ (id = sha256 ของ sid · ไม่ใช่รหัสลับที่เอาไปสวมรอยได้) */
+export type RbacSessionRow = {
+  readonly id: string;
+  readonly startedLabel: string;
+  readonly lastSeenLabel: string;
+  readonly expiresLabel: string;
+  readonly device: string;
 };
 
 export type RbacRow = {
@@ -81,6 +101,8 @@ export type RbacRow = {
   readonly roleLabel: string;
   readonly disabled: boolean;
   readonly lastLoginLabel: string;
+  /** เซสชันที่ใช้งานได้ของบัญชีนี้ (รอบที่ 95) */
+  readonly sessions: readonly RbacSessionRow[];
 };
 
 const FIELD_CLASS =
@@ -120,6 +142,10 @@ function messageOf(state: RbacActionState, strings: RbacStrings, minLength: numb
       return strings.rbacDbMissing;
     case "failed":
       return strings.rbacFailed;
+    case "sessions-revoked":
+      return strings.rbacSessionRevoked;
+    case "sessions-none":
+      return strings.rbacSessionRevokeNotFound;
   }
 }
 
@@ -232,6 +258,7 @@ function UserRow({
   const [toggleState, toggleActionResult] = useActionState(toggleUserAction, INITIAL_RBAC_STATE);
   const [resetState, resetAction] = useActionState(resetPasswordAction, INITIAL_RBAC_STATE);
   const [deleteState, deleteActionResult] = useActionState(deleteUserAction, INITIAL_RBAC_STATE);
+  const [sessionState, sessionAction] = useActionState(revokeSessionsAction, INITIAL_RBAC_STATE);
 
   return (
     <li className="border-line flex flex-col gap-2 rounded-xl border p-3">
@@ -284,6 +311,49 @@ function UserRow({
           </button>
         </form>
       </div>
+
+      {/* เซสชันที่ล็อกอินอยู่ (รอบที่ 95) — เห็นว่า "เครื่องไหน" และตัดได้ทันที */}
+      <details className="border-line rounded-lg border p-2">
+        <summary className="text-fg-muted cursor-pointer text-xs font-semibold">
+          {strings.rbacSessionsTitle} · {fillTemplate(strings.rbacSessionsCount, { n: row.sessions.length })}
+        </summary>
+        {row.sessions.length === 0 ? (
+          <p className="text-fg-muted mt-1 text-xs">{strings.rbacSessionsEmpty}</p>
+        ) : (
+          <ul className="mt-1 flex flex-col gap-1">
+            {row.sessions.map((session) => (
+              <li key={session.id} className="border-line flex flex-wrap items-center gap-2 border-b pb-1 text-[11px] last:border-0">
+                <span className="text-fg-muted">
+                  {strings.rbacSessionStarted} {session.startedLabel} · {strings.rbacSessionLastSeen} {session.lastSeenLabel} ·{' '}
+                  {strings.rbacSessionExpires} {session.expiresLabel}
+                </span>
+                <span className="text-fg-muted font-mono">{session.device}</span>
+                <form action={sessionAction} className="ml-auto">
+                  <input type="hidden" name="hash" value={session.id} />
+                  <button
+                    type="submit"
+                    className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-0.5 text-[11px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    {strings.rbacSessionRevoke}
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+        {row.sessions.length === 0 ? null : (
+          <form action={sessionAction} className="mt-1">
+            <input type="hidden" name="userId" value={row.id} />
+            <button
+              type="submit"
+              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-0.5 text-[11px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {strings.rbacSessionRevokeAll}
+            </button>
+          </form>
+        )}
+        <StatusLine state={sessionState} strings={strings} minLength={minLength} />
+      </details>
 
       {isSelf ? <p className="text-fg-muted text-xs">{strings.rbacSelfBlocked}</p> : null}
 

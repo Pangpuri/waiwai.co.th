@@ -82,17 +82,22 @@ create table if not exists admin_user (
   created_at    timestamptz not null default now()
 );
 
--- เซสชันเก็บเป็น **hash ของโทเคน** (ถ้าฐานข้อมูลรั่ว ก็เอาโทเคนไปใช้ต่อไม่ได้)
--- และมีไว้เพื่อ "เพิกถอนได้" ซึ่งเป็นเหตุผลที่เลือก opaque token แทน JWT
+-- เซสชันเก็บเป็น **hash ของรหัสเซสชัน (sid)** (ถ้าฐานข้อมูลรั่ว ก็เอาไปสวมรอยต่อไม่ได้)
+-- และมีไว้เพื่อ "เพิกถอนได้" ซึ่งเป็นเหตุผลที่เลือก opaque token แทน JWT (ทำจริงรอบที่ 95)
+-- ⚠️ ไม่เก็บ IP · เก็บ user-agent ที่ตัดความยาว · ระยะเก็บ 30 วันหลังหมดอายุ/เพิกถอน (`lib/retention/plan.ts`)
 create table if not exists admin_session (
-  token_hash text        primary key,
-  user_id    text        not null references admin_user (id) on delete cascade,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now(),
-  revoked_at timestamptz
+  token_hash   text        primary key,
+  user_id      text        not null references admin_user (id) on delete cascade,
+  created_at   timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  expires_at   timestamptz not null,
+  revoked_at   timestamptz,
+  revoked_by   text,
+  user_agent   text
 );
 
-create index if not exists admin_session_user_idx on admin_session (user_id);
+create index if not exists admin_session_user_idx on admin_session (user_id, created_at desc);
+create index if not exists admin_session_active_idx on admin_session (expires_at) where revoked_at is null;
 
 -- บันทึกว่า "ใครทำอะไร เมื่อไร" — ต้องมีทุกครั้งที่แตะข้อมูล (กติกา Security Baseline / PDPA)
 -- retention: 90 วัน (มติ Q16) → ต้องมีงานลบตามกำหนดในเฟส B6

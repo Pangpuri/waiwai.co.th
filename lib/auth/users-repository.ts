@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { isAdminRole, type AdminRole, type AdminUser } from "@/lib/auth/types";
 import type { AdminAccount, AdminUserStore } from "@/lib/auth/user-store";
 import { recordAudit } from "@/lib/audit/log";
+import { revokeSessionsForUser } from "@/lib/auth/sessions-repository";
 
 /**
  * บัญชีผู้ดูแลใน **ฐานข้อมูล** (X1.10 · รอบที่ 84)
@@ -247,6 +248,11 @@ export async function setAdminUserDisabled(input: {
     target: input.id,
     detail: null,
   });
+
+  /* ปิดบัญชี = ตัดเซสชันที่ค้างอยู่ทันที (รอบที่ 95) — ไม่งั้นเครื่องที่ล็อกอินค้างไว้ยังใช้ได้จนหมดอายุ */
+  if (input.disabled) {
+    await revokeSessionsForUser({ userId: input.id, actor: input.actor, detail: "disabled" });
+  }
   return { ok: true };
 }
 
@@ -315,6 +321,9 @@ export async function resetAdminUserPassword(input: {
   if (rowCount === 0) return { ok: false, reason: "not-found" };
 
   await recordAudit({ action: "admin-user-password", actorEmail: input.actor, target: input.id, detail: null });
+
+  /* ตั้งรหัสผ่านใหม่ = ตัดเซสชันเดิมทั้งหมด (มาตรฐานความปลอดภัย · รอบที่ 95) */
+  await revokeSessionsForUser({ userId: input.id, actor: input.actor, detail: "password-reset" });
   return { ok: true };
 }
 

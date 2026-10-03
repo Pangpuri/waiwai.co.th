@@ -3,6 +3,7 @@ import { ACCOUNT_AUDIT_PREFIX, auditActionLabel, auditStamp } from "@/features/a
 import { roleLabelOf } from "@/features/admin/rbac-labels";
 import { isDatabaseConfigured } from "@/db/pool";
 import { listAuditForActionPrefix } from "@/lib/audit/log";
+import { listActiveAdminSessions } from "@/lib/auth/sessions-repository";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { MIN_ADMIN_PASSWORD_LENGTH, listAdminUsers } from "@/lib/auth/users-repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -27,6 +28,8 @@ export default async function AdminUsersPage() {
   const dbMissing = !isDatabaseConfigured();
   const users = dbMissing ? [] : await listAdminUsers();
   const history = dbMissing ? [] : await listAuditForActionPrefix(ACCOUNT_AUDIT_PREFIX, ACCOUNT_HISTORY_LIMIT);
+  /* เซสชันที่ล็อกอินอยู่ (รอบที่ 95) — อ่านครั้งเดียวแล้วจัดกลุ่มตามบัญชี */
+  const sessions = dbMissing ? [] : await listActiveAdminSessions();
 
   const rbacStrings: RbacStrings = {
     rbacRoleLabel: strings.rbacRoleLabel,
@@ -78,6 +81,16 @@ export default async function AdminUsersPage() {
     rbacDeleteAcknowledge: strings.rbacDeleteAcknowledge,
     rbacDeletedDone: strings.rbacDeletedDone,
     rbacEmailMismatch: strings.rbacEmailMismatch,
+    rbacSessionsTitle: strings.rbacSessionsTitle,
+    rbacSessionsEmpty: strings.rbacSessionsEmpty,
+    rbacSessionLastSeen: strings.rbacSessionLastSeen,
+    rbacSessionExpires: strings.rbacSessionExpires,
+    rbacSessionStarted: strings.rbacSessionStarted,
+    rbacSessionRevoke: strings.rbacSessionRevoke,
+    rbacSessionRevokeAll: strings.rbacSessionRevokeAll,
+    rbacSessionRevoked: strings.rbacSessionRevoked,
+    rbacSessionRevokeNotFound: strings.rbacSessionRevokeNotFound,
+    rbacSessionsCount: strings.rbacSessionsCount,
   };
 
   const rows: readonly RbacRow[] = users.map((user) => ({
@@ -88,6 +101,13 @@ export default async function AdminUsersPage() {
     roleLabel: roleLabelOf(user.role, strings),
     disabled: user.disabled,
     lastLoginLabel: user.lastLoginAt === null ? strings.rbacNeverLoggedIn : user.lastLoginAt.slice(0, 16).replace("T", " "),
+    sessions: sessions.filter((session) => session.userId === user.id).map((session) => ({
+      id: session.id,
+      startedLabel: session.createdAt.slice(0, 16).replace("T", " "),
+      lastSeenLabel: session.lastSeenAt.slice(0, 16).replace("T", " "),
+      expiresLabel: session.expiresAt.slice(0, 16).replace("T", " "),
+      device: session.userAgent ?? "-",
+    })),
   }));
 
   return (

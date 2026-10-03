@@ -55,6 +55,8 @@ export const privacyPage = {
   retentionLabelContentRevision: "Field content edit history (latest revision always kept)",
   retentionLabelLoginAttempt: "Back-office sign-in attempts (staff only)",
   retentionLabelAuditLog: "Content change log (staff only)",
+  /* Back-office sessions (round 95) */
+  retentionLabelAdminSession: "Back-office sign-in sessions (staff only)",
   retentionNote:
     "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · the latest revision of each page is always kept so mistakes can be restored · if you want your data deleted earlier, contact us using the details below",
 

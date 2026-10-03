@@ -57,6 +57,16 @@ import {
   setAdminUserRole,
 } from "@/lib/auth/users-repository";
 import { verifyPassword } from "@/lib/auth/password";
+import {
+  createAdminSession,
+  findAdminSession,
+  hashSessionId,
+  listActiveAdminSessions,
+  newSessionId,
+  revokeAdminSessions,
+  revokeSessionsForUser,
+} from "@/lib/auth/sessions-repository";
+import { SESSION_TTL_MS } from "@/lib/auth/session";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { th } from "@/lib/i18n/messages/th";
@@ -1343,6 +1353,105 @@ async function checkAdminUsers(): Promise<void> {
         assert.equal(demoteNow.ok, true, "มีผู้ดูแลคนอื่นแล้ว ⇒ ถอดบทบาทได้");
       }
       await pool.query("delete from admin_user where email like 'check-db-rbac-owner%'");
+    }
+
+    /*
+      ── 5.4) เซสชันหลังบ้านที่เพิกถอนได้ (รอบที่ 95) ──
+      พิสูจน์วงจรจริง: สร้าง → อ่านได้ (ใช้งานได้) → เพิกถอน → ใช้ไม่ได้ · ตัดทั้งบัญชี (ยกเว้นเซสชันปัจจุบัน)
+      ⚠️ ตรวจว่า "เซสชันที่ยังใช้งานได้" ไม่ถูกลบโดยตัวลบกลาง และบันทึก audit ทุกครั้งที่เพิกถอน
+    */
+    /* ⚠️ try/finally: แม้ข้อใดพังกลางทาง ต้องล้างร่องรอยของตัวเอง (ไม่งั้นรอบถัดไปเจอ "รอยค้าง") */
+    try {
+      const ownerForSessions = await createAdminUser({
+        email: "check-db-rbac-session@example.invalid",
+        displayName: "ผู้ใช้ทดสอบเซสชัน",
+        role: "editor",
+        password: "check-db-Session-1",
+        actor: CHECK_ACTOR,
+      });
+      assert.equal(ownerForSessions.ok, true, "สร้างบัญชีสำหรับทดสอบเซสชันต้องสำเร็จ");
+
+      if (ownerForSessions.ok) {
+        const userId = ownerForSessions.user.id;
+        const sidA = newSessionId();
+        const sidB = newSessionId();
+        const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+
+        assert.equal(
+          await createAdminSession({ userId, sid: sidA, expiresAt, userAgent: "check-db/1.0" }),
+          true,
+          "บันทึกเซสชันต้องสำเร็จ",
+        );
+        assert.equal(await createAdminSession({ userId, sid: sidB, expiresAt, userAgent: null }), true);
+
+        /* อ่านกลับได้ + ใช้งานได้ */
+        const found = await findAdminSession(sidA);
+        assert.ok(found !== null, "ต้องอ่านเซสชันที่เพิ่งสร้างได้");
+        assert.equal(found?.userId, userId, "เซสชันต้องผูกกับบัญชีที่สร้าง");
+        assert.equal(found?.active, true, "เซสชันใหม่ต้องใช้งานได้");
+        assert.equal(await findAdminSession("sid-ที่ไม่มีอยู่จริง"), null, "sid มั่วต้องไม่เจอ");
+
+        /* เก็บเป็น hash: ค่าดิบต้องไม่ถูกเก็บลงตาราง */
+        assert.equal(await countWhere("admin_session where token_hash = $1", [sidA]), 0, "ห้ามเก็บ sid ดิบ");
+        assert.equal(await countWhere("admin_session where token_hash = $1", [hashSessionId(sidA)]), 1, "ต้องเก็บ hash");
+
+        /* รายการเซสชันของบัญชีนี้ต้องมี 2 รายการ */
+        const listA = await listActiveAdminSessions(userId);
+        assert.equal(listA.length, 2, "ต้องเห็นเซสชันที่ใช้งานได้ทั้งสอง");
+
+        /* เพิกถอนรายตัว */
+        const revoked = await revokeAdminSessions({ hash: hashSessionId(sidA), actor: CHECK_ACTOR });
+        assert.equal(revoked.ok, true);
+        assert.equal(revoked.ok ? revoked.revoked : 0, 1, "ต้องเพิกถอนได้ 1 รายการ");
+        assert.equal((await findAdminSession(sidA))?.active, false, "เซสชันที่ถูกเพิกถอนต้องใช้งานไม่ได้");
+        assert.equal((await findAdminSession(sidB))?.active, true, "เซสชันอื่นต้องไม่ถูกกระทบ");
+        assert.equal((await listActiveAdminSessions(userId)).length, 1, "เหลือเซสชันที่ใช้งานได้ 1 รายการ");
+
+        /* เพิกถอนทั้งบัญชี แต่ยกเว้นเซสชันปัจจุบัน */
+        const sidC = newSessionId();
+        await createAdminSession({ userId, sid: sidC, expiresAt, userAgent: null });
+        const revokedAll = await revokeSessionsForUser({ userId, actor: CHECK_ACTOR, exceptSid: sidC, detail: "check-db" });
+        assert.equal(revokedAll, 1, "ต้องเพิกถอน 1 รายการ (ยกเว้นเซสชันปัจจุบัน)");
+        assert.equal((await findAdminSession(sidC))?.active, true, "เซสชันที่ยกเว้นไว้ต้องยังใช้งานได้");
+
+        /* audit: ต้องมีร่องรอยการเพิกถอน */
+        assert.equal(
+          await countWhere("audit_log where actor_email = $1 and action = 'admin-session-revoke'", [CHECK_ACTOR]) >= 2,
+          true,
+          "การเพิกถอนต้องลง audit ทุกครั้ง",
+        );
+
+        /*
+          ตัวลบกลางต้องเก็บเฉพาะ "ที่หมดอายุหรือถูกเพิกถอนนานเกินระยะเก็บ"
+          ⚠️ ตัวลบวัดจาก coalesce(revoked_at, expires_at) ⇒ ต้องทดสอบทั้งสองทาง:
+             (ก) หมดอายุเองแล้วไม่มีใครเพิกถอน  (ข) ถูกเพิกถอนแล้วและเลยระยะเก็บมานาน
+        */
+        const sidExpired = newSessionId();
+        await createAdminSession({ userId, sid: sidExpired, expiresAt, userAgent: null });
+        await pool.query("update admin_session set expires_at = now() - interval '40 days' where token_hash = $1", [
+          hashSessionId(sidExpired),
+        ]);
+
+        const sidRevokedLongAgo = newSessionId();
+        await createAdminSession({ userId, sid: sidRevokedLongAgo, expiresAt, userAgent: null });
+        await pool.query(
+          "update admin_session set revoked_at = now() - interval '40 days', expires_at = now() - interval '41 days' where token_hash = $1",
+          [hashSessionId(sidRevokedLongAgo)],
+        );
+
+        const purge = await purgeExpired({ now: new Date() });
+        assert.ok(purge !== null);
+        assert.equal(await countWhere("admin_session where token_hash = $1", [hashSessionId(sidExpired)]), 0, "เซสชันที่หมดอายุนานแล้วต้องถูกลบ");
+        assert.equal(await countWhere("admin_session where token_hash = $1", [hashSessionId(sidRevokedLongAgo)]), 0, "เซสชันที่ถูกเพิกถอนนานแล้วต้องถูกลบ");
+        assert.equal(await countWhere("admin_session where token_hash = $1", [hashSessionId(sidC)]), 1, "เซสชันที่ยังใช้งานได้ต้องไม่ถูกลบ");
+        assert.equal(await countWhere("admin_session where token_hash = $1", [hashSessionId(sidA)]), 1, "เซสชันที่ถูกเพิกถอนเมื่อกี้ยังไม่พ้นระยะเก็บ");
+
+        /* ลบบัญชี = เซสชันหายตาม (foreign key cascade) */
+        await pool.query("delete from admin_user where id = $1", [userId]);
+        assert.equal(await countWhere("admin_session where user_id = $1", [userId]), 0, "ลบบัญชีต้องลบเซสชันตาม");
+      }
+    } finally {
+      await pool.query("delete from audit_log where actor_email = $1 and action = 'admin-session-revoke'", [CHECK_ACTOR]);
     }
 
     /*

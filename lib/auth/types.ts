@@ -24,6 +24,11 @@ export type SessionPayload = {
   readonly role: AdminRole;
   /** เวลาหมดอายุ (epoch ms) */
   readonly expiresAt: number;
+  /**
+   * รหัสเซสชันในตาราง `admin_session` (รอบที่ 95) — มีค่าเมื่อระบบมีฐานข้อมูล
+   * ไม่มี = โหมดไม่มีฐานข้อมูล (เดโม) ซึ่ง **เพิกถอนไม่ได้โดยตั้งใจ** ให้ยังเข้าได้ในโหมดสาธิต
+   */
+  readonly sid?: string;
 };
 
 export function isAdminRole(value: string): value is AdminRole {

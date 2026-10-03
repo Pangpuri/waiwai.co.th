@@ -51,6 +51,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "admin-user-enable": strings.auditAdminUserEnable,
     "admin-user-password": strings.auditAdminUserPassword,
     "admin-user-delete": strings.auditAdminUserDelete,
+    "admin-session-revoke": strings.auditAdminSessionRevoke,
   };
 
   return map[action] ?? action;

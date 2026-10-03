@@ -61,6 +61,7 @@ export default async function AdminHomePage() {
     contentRevision: strings.retentionLabelContentRevision,
     loginAttempt: strings.retentionLabelLoginAttempt,
     auditLog: strings.retentionLabelAuditLog,
+    adminSession: strings.retentionLabelAdminSession,
   };
 
   /* เวลาบนหน้าจอ — ตัดถึงนาที (รูปแบบเดียวกับรายการ audit ด้านล่าง) */

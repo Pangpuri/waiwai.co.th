@@ -63,10 +63,16 @@ function readPayloadPart(decoded: string): SessionPayload | null {
   }
   if (typeof parsed !== "object" || parsed === null) return null;
 
-  const candidate = parsed as { userId?: unknown; role?: unknown; expiresAt?: unknown };
+  const candidate = parsed as { userId?: unknown; role?: unknown; expiresAt?: unknown; sid?: unknown };
   if (typeof candidate.userId !== "string" || candidate.userId === "") return null;
   if (typeof candidate.role !== "string" || !isAdminRole(candidate.role)) return null;
   if (typeof candidate.expiresAt !== "number" || !Number.isFinite(candidate.expiresAt)) return null;
+
+  /*  เป็นทางเลือก (โหมดไม่มีฐานข้อมูล) — ถ้ามีต้องเป็นสตริงที่ไม่ว่างและไม่ยาวผิดปกติ */
+  if (candidate.sid !== undefined) {
+    if (typeof candidate.sid !== "string" || candidate.sid === "" || candidate.sid.length > 200) return null;
+    return { userId: candidate.userId, role: candidate.role, expiresAt: candidate.expiresAt, sid: candidate.sid };
+  }
 
   return { userId: candidate.userId, role: candidate.role, expiresAt: candidate.expiresAt };
 }

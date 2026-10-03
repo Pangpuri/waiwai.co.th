@@ -7,6 +7,8 @@ export type RbacActionCode =
   | "enabled"
   | "password-reset"
   | "deleted"
+  | "sessions-revoked"
+  | "sessions-none"
   | "bad-email"
   | "bad-role"
   | "bad-password"

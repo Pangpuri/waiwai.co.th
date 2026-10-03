@@ -61,7 +61,9 @@ export type AuditAction =
   /** ย้อนกลับฉบับร่างก่อนใช้ชุด (W3b ต่อ · รอบที่ 81) */
   | "chrome-preset-undo"
   /** นำเข้าชุดของส่วนกลางจากไฟล์ JSON (W3b ต่อ · รอบที่ 91) */
-  | "chrome-preset-import";
+  | "chrome-preset-import"
+  /** เพิกถอนเซสชันหลังบ้าน (รายตัว/ทั้งบัญชี · รอบที่ 95) */
+  | "admin-session-revoke";
 
 export type AuditEntry = {
   readonly action: AuditAction;

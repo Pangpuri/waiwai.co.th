@@ -60,6 +60,7 @@ const ZERO: PurgeCounts = {
   contentRevision: 0,
   loginAttempt: 0,
   auditLog: 0,
+  adminSession: 0,
 };
 
 function emptyCounts(): Record<RetentionClass, number> {
@@ -145,6 +146,25 @@ export async function purgeExpired(options: { readonly now?: Date; readonly dryR
         } else {
           const deleted = await client.query("delete from audit_log where created_at < $1", [step.cutoffIso]);
           result.auditLog = deleted.rowCount ?? 0;
+        }
+        continue;
+      }
+
+      /*
+        เซสชันหลังบ้าน (รอบที่ 95) — วัดเวลาจาก "หมดอายุ/ถูกเพิกถอน" ไม่ใช่เวลาสร้าง
+        ⚠️ เซสชันที่ยังใช้งานได้ (revoked_at null + expires_at อนาคต) **ต้องไม่ถูกลบ**
+      */
+      if (step.cls === "adminSession") {
+        const predicate = "coalesce(revoked_at, expires_at) < $1";
+        if (dryRun) {
+          const { rows } = await client.query<{ n: number }>(
+            `select count(*)::int as n from admin_session where ${predicate}`,
+            [step.cutoffIso],
+          );
+          result.adminSession = rows[0]?.n ?? 0;
+        } else {
+          const deleted = await client.query(`delete from admin_session where ${predicate}`, [step.cutoffIso]);
+          result.adminSession = deleted.rowCount ?? 0;
         }
         continue;
       }
