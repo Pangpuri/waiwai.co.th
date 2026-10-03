@@ -42,6 +42,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     { href: "/admin/inbox", label: messages.admin.inboxTitle },
     { href: "/admin/media", label: messages.admin.mediaTitle },
     { href: "/admin/trash", label: messages.admin.trashTitle },
+    { href: "/admin/preview-links", label: messages.admin.previewLinkTitle },
     { href: "/admin/settings", label: messages.admin.settingsTitle },
   ];
 

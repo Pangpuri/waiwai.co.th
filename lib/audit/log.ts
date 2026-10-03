@@ -35,7 +35,13 @@ export type AuditAction =
   /** ลบถาวรด้วยมือจากถังขยะ (X2.4) */
   | "trash-delete"
   /** ลบถาวรของในถังเมื่อพ้นระยะเก็บ (X2.4) */
-  | "trash-purge";
+  | "trash-purge"
+  /** สร้างลิงก์พรีวิวชั่วคราวให้ผู้จัดการ (X2.6) — ⚠️ ห้ามเก็บโทเคนใน detail */
+  | "preview-link-create"
+  /** ยกเลิกลิงก์พรีวิว (X2.6) */
+  | "preview-link-revoke"
+  /** เก็บกวาดลิงก์พรีวิวที่ปิดแล้วและพ้นอายุเก็บ (X2.6) */
+  | "preview-link-purge";
 
 export type AuditEntry = {
   readonly action: AuditAction;

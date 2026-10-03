@@ -13,6 +13,7 @@ import { loadFooterConfig, loadNavbarConfig } from "@/lib/chrome/loader";
 import { isLocale } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { isDatabaseConfigured } from "@/lib/content/repository";
+import { isPreviewablePage } from "@/lib/pages/paths";
 
 /**
  * พรีวิว "ในเปลือกหน้าเว็บจริง" — อยู่ใต้ `[lang]` จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม/โหมดมืด เหมือนหน้าจริงทุกอย่าง
@@ -27,8 +28,10 @@ import { isDatabaseConfigured } from "@/lib/content/repository";
  * (ซ่อนหัวเว็บของ layout ด้วย CSS ที่ผูกกับ `data-preview-chrome` ที่ตั้งก่อน paint) ⇒ แก้ navbar แล้วเห็นทันที
  */
 
-const PREVIEWABLE_PAGES: readonly string[] = ["home"];
-
+/**
+ * หน้าที่เปิดพรีวิวได้ — **รายการกลางอยู่ที่ `lib/pages/paths.ts`** (`PREVIEWABLE_PAGE_IDS`)
+ * (เดิมไฟล์นี้ถือ `["home"]` ไว้เอง ⇒ ลิงก์พรีวิว X2.6 จะต้องคัดลอกรายการซ้ำ)
+ */
 export async function generateMetadata(): Promise<Metadata> {
   return { title: "Preview", robots: { index: false, follow: false } };
 }
@@ -44,7 +47,7 @@ export default async function PreviewPage({
 
   const { lang, page } = await params;
   if (!isLocale(lang)) notFound();
-  if (!PREVIEWABLE_PAGES.includes(page)) notFound();
+  if (!isPreviewablePage(page)) notFound();
 
   const messages = await getMessagesFor(lang);
   const query = await searchParams;

@@ -15,6 +15,8 @@ import { maintenancePage } from "./areas/th/maintenance.ts";
 import { adminMaintenance } from "./areas/th/adminMaintenance.ts";
 import { adminErasure } from "./areas/th/adminErasure.ts";
 import { adminTrash } from "./areas/th/adminTrash.ts";
+import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
+import { previewLinkPage } from "./areas/th/previewLink.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -55,6 +57,7 @@ export const th = {
   mourning,
   privacyPage,
   maintenancePage,
+  previewLinkPage,
   admin: {
     ...admin,
     ...adminMedia,
@@ -64,6 +67,7 @@ export const th = {
     ...adminMaintenance,
     ...adminErasure,
     ...adminTrash,
+    ...adminPreviewLink,
   },
 };
 

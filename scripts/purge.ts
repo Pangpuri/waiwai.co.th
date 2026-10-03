@@ -23,6 +23,7 @@ import { RETENTION_CLASSES, TRASH_RETENTION_DAYS, retentionDaysFor, summarizePur
 import { purgeExpired, purgeNow, type PurgeReport } from "@/lib/retention/purge";
 import { summarizeTrash } from "@/lib/trash/plan";
 import { purgeExpiredTrash, type TrashPurgeReport } from "@/lib/trash/repository";
+import { PREVIEW_LINK_KEEP_DAYS } from "@/lib/preview-link/plan";
 
 type Options = {
   readonly dryRun: boolean;
@@ -68,6 +69,10 @@ function printRetentionTable(): void {
   /* ถังขยะ (X2.4) — คนละนโยบายกับข้อมูลส่วนบุคคล แต่ถูกลบในรอบเดียวกัน */
   process.stdout.write(
     `    · ${"trash (ถังขยะ)".padEnd(13)} ${describeRetention(TRASH_RETENTION_DAYS, "th")} (${TRASH_RETENTION_DAYS} วัน) — ภาพ/พรีเซ็ตที่ผู้ดูแลลบ\n`,
+  );
+  /* ลิงก์พรีวิว (X2.6) — เก็บกวาดหลังปิด/หมดอายุ · ไม่แตะลิงก์ที่ยังใช้ได้ */
+  process.stdout.write(
+    `    · ${"preview-link".padEnd(13)} ${PREVIEW_LINK_KEEP_DAYS} วันหลังปิดลิงก์ — ลิงก์พรีวิวชั่วคราว (X2.6)\n`,
   );
   process.stdout.write("\n");
 }

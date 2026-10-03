@@ -42,6 +42,9 @@ export default async function AdminHomePage() {
       "trash-restore": strings.auditTrashRestore,
       "trash-delete": strings.auditTrashDelete,
       "trash-purge": strings.auditTrashPurge,
+      "preview-link-create": strings.auditPreviewLinkCreate,
+      "preview-link-revoke": strings.auditPreviewLinkRevoke,
+      "preview-link-purge": strings.auditPreviewLinkPurge,
     };
     return map[action] ?? action;
   };

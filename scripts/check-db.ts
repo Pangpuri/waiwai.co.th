@@ -29,6 +29,15 @@ import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
 import {
+  countActivePreviewLinks,
+  createPreviewLink,
+  hashPreviewToken,
+  listPreviewLinks,
+  purgeExpiredPreviewLinks,
+  resolvePreviewLink,
+  revokePreviewLink,
+} from "@/lib/preview-link/repository";
+import {
   deleteTrashItemPermanently,
   listTrash,
   purgeExpiredTrash,
@@ -157,6 +166,9 @@ async function main(): Promise<void> {
 
   /* 12) ถังขยะ: ย้ายเข้า → ซ่อนจากหน้าเว็บ → กู้คืน → ลบถาวร → ลบตามกำหนด (X2.4 · รอบที่ 78) */
   await checkTrash();
+
+  /* 13) ลิงก์พรีวิวชั่วคราว: สร้าง → เปิดได้ → ปลอม/หมดอายุ/ยกเลิกใช้ไม่ได้ → เก็บกวาด (X2.6 · รอบที่ 79) */
+  await checkPreviewLinks();
 
   await closePool();
 
@@ -715,6 +727,106 @@ async function checkTrash(): Promise<void> {
     };
     assert.deepEqual(after, { media: 0, preset: 0 }, "ลบรอยทดสอบถังขยะต้องไม่เหลืออะไรค้าง");
     done("คืนสภาพตารางถังขยะแล้ว", "ไม่เหลือรอยทดสอบ");
+  }
+}
+
+/**
+ * 13) ลิงก์พรีวิวชั่วคราว (X2.6 · รอบที่ 79) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ 5 อย่างที่สำคัญที่สุดของ "ลิงก์ที่ไม่ต้องล็อกอิน"
+ * 1. สร้างแล้ว **โทเคนมีรูปแบบถูกต้อง** และเปิดได้จริง (คืนหน้าเป้าหมาย + นับการใช้งาน)
+ * 2. **โทเคนที่ถูกแก้/รูปแบบผิด = ใช้ไม่ได้** (ไม่ใช่แค่ซ่อนปุ่ม)
+ * 3. **หมดอายุแล้วใช้ไม่ได้**
+ * 4. **ยกเลิกแล้วใช้ไม่ได้ทันที** และยกเลิกซ้ำปลอดภัย
+ * 5. **รายการที่ส่งให้หน้าจอไม่มีโทเคน/hash** + **ตัวลบกลางเก็บกวาดเฉพาะลิงก์ที่พ้นอายุเก็บ**
+ *
+ * ⚠️ ล้างรอยทดสอบด้วย `created_by` ของด่านนี้เท่านั้น — **ไม่แตะลิงก์จริงของผู้ใช้**
+ */
+const PREVIEW_LINK_TEST_ACTOR = "check-db-preview@example.invalid";
+
+async function checkPreviewLinks(): Promise<void> {
+  const pool = getPool();
+
+  const before = await countWhere("preview_link where created_by = $1", [PREVIEW_LINK_TEST_ACTOR]);
+  assert.equal(before, 0, "ต้องไม่มีรอยทดสอบลิงก์พรีวิวค้างจากรอบก่อน");
+
+  try {
+    /* ── 1) สร้าง + เปิดได้ ── */
+    const created = await createPreviewLink({ page: "home", actorEmail: PREVIEW_LINK_TEST_ACTOR });
+    assert.equal(created.ok, true, "สร้างลิงก์ต้องสำเร็จ");
+    if (!created.ok) return;
+
+    assert.match(created.token, /^[A-Za-z0-9_-]{43}$/, "โทเคนต้องเป็น base64url 43 ตัวอักษร");
+    assert.ok(new Date(created.expiresAt).getTime() > Date.now(), "ลิงก์ใหม่ต้องยังไม่หมดอายุ");
+
+    const opened = await resolvePreviewLink(created.token);
+    assert.deepEqual(opened, { ok: true, page: "home" }, "เปิดลิงก์ที่ยังใช้ได้ต้องได้หน้าเป้าหมาย");
+
+    const listed = await listPreviewLinks();
+    const mine = listed.filter((link) => link.createdBy === PREVIEW_LINK_TEST_ACTOR);
+    assert.equal(mine.length, 1, "ลิงก์ที่สร้างต้องอยู่ในรายการ");
+    assert.ok(!Object.hasOwn(mine[0] ?? {}, "token"), "รายการต้องไม่มีฟิลด์โทเคน");
+    assert.ok(!Object.hasOwn(mine[0] ?? {}, "tokenHash"), "รายการต้องไม่มี hash ของโทเคน");
+    assert.ok((mine[0]?.useCount ?? 0) >= 1, "การเปิดลิงก์ต้องถูกนับ");
+
+    const active = await countActivePreviewLinks("home");
+    assert.ok(active >= 1, "ต้องนับลิงก์ที่ยังใช้ได้");
+    done("สร้างลิงก์พรีวิวแล้วเปิดได้ + นับการใช้งาน", `เปิด ${mine[0]?.useCount ?? 0} ครั้ง`);
+
+    /* ── 2) โทเคนปลอม/รูปแบบผิด = ใช้ไม่ได้ ── */
+    const tampered = `${created.token.slice(0, -1)}${created.token.endsWith("A") ? "B" : "A"}`;
+    assert.deepEqual(await resolvePreviewLink(tampered), { ok: false, page: null }, "โทเคนที่ถูกแก้ต้องใช้ไม่ได้");
+    assert.deepEqual(await resolvePreviewLink("too-short"), { ok: false, page: null }, "รูปแบบผิดต้องใช้ไม่ได้");
+    done("โทเคนปลอม/รูปแบบผิดใช้ไม่ได้", "ทั้งที่ถูกแก้และที่สั้นเกิน");
+
+    /* ── 3) หมดอายุ = ใช้ไม่ได้ (แถวหมดอายุ + แถวเก่าที่ควรถูกเก็บกวาด) ── */
+    const expiredToken = "e".repeat(43);
+    await pool.query(
+      `insert into preview_link (id, token_hash, page, expires_at, created_by) values
+        ($1, $2, 'home', now() - interval '1 hour', $3),
+        ($4, $5, 'home', now() - interval '60 days', $3)`,
+      [
+        "check-db-preview-expired",
+        hashPreviewToken(expiredToken),
+        PREVIEW_LINK_TEST_ACTOR,
+        "check-db-preview-old",
+        hashPreviewToken("o".repeat(43)),
+      ],
+    );
+    assert.deepEqual(await resolvePreviewLink(expiredToken), { ok: false, page: null }, "ลิงก์หมดอายุต้องใช้ไม่ได้");
+    done("ลิงก์ที่หมดอายุใช้ไม่ได้", "หมดอายุ 1 ชม. ที่แล้ว");
+
+    /* ── 4) ยกเลิกแล้วใช้ไม่ได้ทันที + ยกเลิกซ้ำปลอดภัย ── */
+    const id = mine[0]?.id ?? "";
+    assert.ok(id !== "", "ต้องได้ id ของลิงก์ที่สร้าง");
+    assert.equal(await revokePreviewLink(id, PREVIEW_LINK_TEST_ACTOR), true, "ยกเลิกต้องสำเร็จ");
+    assert.deepEqual(await resolvePreviewLink(created.token), { ok: false, page: null }, "ลิงก์ที่ยกเลิกแล้วต้องใช้ไม่ได้");
+    assert.equal(await revokePreviewLink(id, PREVIEW_LINK_TEST_ACTOR), false, "ยกเลิกซ้ำต้องบอกว่าไม่พบ ไม่ใช่พัง");
+    done("ยกเลิกลิงก์แล้วใช้ไม่ได้ทันที", `ลิงก์ ${id}`);
+
+    /* ── 5) ตัวลบกลางเก็บกวาด: ลิงก์เก่าหาย · ลิงก์ที่เพิ่งปิดยังอยู่ ── */
+    const dryLinks = await purgeExpiredPreviewLinks({ dryRun: true });
+    assert.ok(dryLinks !== null, "dry run ต้องได้ผลลัพธ์เมื่อมี DATABASE_URL");
+    assert.ok(dryLinks.deleted >= 1, `ต้องนับลิงก์ที่พ้นอายุเก็บ (พบ ${dryLinks.deleted})`);
+
+    const purgedLinks = await purgeExpiredPreviewLinks();
+    assert.ok(purgedLinks !== null && purgedLinks.deleted >= 1, "ต้องลบลิงก์ที่พ้นอายุเก็บจริง");
+    assert.equal(await countWhere("preview_link where id = $1", ["check-db-preview-old"]), 0, "ลิงก์เก่าต้องถูกลบ");
+    assert.equal(
+      await countWhere("preview_link where id = $1", ["check-db-preview-expired"]),
+      1,
+      "ลิงก์ที่เพิ่งหมดอายุต้องยังอยู่ (ยังไม่พ้นอายุเก็บ)",
+    );
+    assert.equal(await countWhere("preview_link where id = $1", [id]), 1, "ลิงก์ที่เพิ่งยกเลิกต้องยังอยู่");
+    done("เก็บกวาดเฉพาะลิงก์ที่พ้นอายุเก็บ", `ลบ ${purgedLinks.deleted} แถว`);
+  } finally {
+    /* คืนสภาพ: ลบเฉพาะลิงก์/ร่องรอยของด่านนี้ (ไม่แตะลิงก์จริงของผู้ใช้) */
+    await pool.query("delete from preview_link where created_by = $1", [PREVIEW_LINK_TEST_ACTOR]);
+    await pool.query("delete from audit_log where actor_email = $1", [PREVIEW_LINK_TEST_ACTOR]);
+
+    const after = await countWhere("preview_link where created_by = $1", [PREVIEW_LINK_TEST_ACTOR]);
+    assert.equal(after, 0, "ลบรอยทดสอบลิงก์พรีวิวต้องไม่เหลืออะไรค้าง");
+    done("คืนสภาพตารางลิงก์พรีวิวแล้ว", "ไม่เหลือรอยทดสอบ");
   }
 }
 

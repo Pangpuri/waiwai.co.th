@@ -263,5 +263,23 @@ create table if not exists form_attachment (
 
 create index if not exists form_attachment_submission_idx on form_attachment (submission_id);
 
+-- ── ลิงก์พรีวิวชั่วคราว (X2.6 · migration 0009) ────────────────────────────────
+-- ให้ผู้จัดการดูฉบับร่างโดยไม่ต้องมีบัญชี · ⚠️ เก็บเฉพาะ sha256 ของโทเคน (โทเคนดิบเห็นครั้งเดียว)
+-- มีวันหมดอายุ + ยกเลิกได้ + เก็บร่องรอยการใช้งาน · ตัวเลข TTL อยู่ที่ lib/preview-link/plan.ts
+create table if not exists preview_link (
+  id           text        primary key,
+  token_hash   text        not null unique,
+  page         text        not null,
+  expires_at   timestamptz not null,
+  created_at   timestamptz not null default now(),
+  created_by   text,
+  revoked_at   timestamptz,
+  last_used_at timestamptz,
+  use_count    integer     not null default 0 check (use_count >= 0)
+);
+
+create index if not exists preview_link_expires_idx on preview_link (expires_at);
+create index if not exists preview_link_page_idx on preview_link (page, created_at desc);
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

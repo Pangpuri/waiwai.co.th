@@ -4,6 +4,7 @@ import { getPool, withTransaction } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { purgeExpiredTrash } from "@/lib/trash/repository";
+import { purgeExpiredPreviewLinks } from "@/lib/preview-link/repository";
 import {
   PURGE_AUDIT_ACTION,
   RETENTION_CLASSES,
@@ -220,6 +221,12 @@ async function purgeAndRecord(options: { readonly now: Date; readonly actorEmail
        ⇒ `lib/trash/repository.ts` บันทึก audit ของตัวเอง (`trash-purge`) เมื่อมีของถูกลบจริง
   */
   await purgeExpiredTrash({ now: options.now });
+
+  /*
+    ลิงก์พรีวิวชั่วคราว (X2.6) — เก็บกวาดลิงก์ที่ปิดแล้วและพ้นอายุเก็บ
+    ⚠️ ลิงก์ที่ยังใช้ได้ไม่ถูกแตะ · ร่องรอยของเจ้าหน้าที่ (ไม่ขึ้นหน้า /privacy เช่นเดียวกับถังขยะ)
+  */
+  await purgeExpiredPreviewLinks({ now: options.now });
 
   /* บันทึกทุกครั้งที่รัน (แม้ลบ 0 แถว) — แถวนี้คือ "หมุดเวลา" ที่ทำให้รอบถัดไปไม่ยิงซ้ำทันที */
   await recordAudit({

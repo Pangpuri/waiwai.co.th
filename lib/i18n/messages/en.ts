@@ -15,6 +15,8 @@ import { maintenancePage } from "./areas/en/maintenance.ts";
 import { adminMaintenance } from "./areas/en/adminMaintenance.ts";
 import { adminErasure } from "./areas/en/adminErasure.ts";
 import { adminTrash } from "./areas/en/adminTrash.ts";
+import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
+import { previewLinkPage } from "./areas/en/previewLink.ts";
 
 import type { Messages } from "./th";
 
@@ -56,6 +58,7 @@ export const en: Messages = {
   mourning,
   privacyPage,
   maintenancePage,
+  previewLinkPage,
   admin: {
     ...admin,
     ...adminMedia,
@@ -65,5 +68,6 @@ export const en: Messages = {
     ...adminMaintenance,
     ...adminErasure,
     ...adminTrash,
+    ...adminPreviewLink,
   },
 };

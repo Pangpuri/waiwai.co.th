@@ -49,6 +49,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        /*
+          หน้าพรีวิว (ฉบับร่าง) — สั่งห้ามเครื่องค้นหาจัดทำดัชนี **ที่ระดับ header** ด้วย
+          ⇒ ต่อให้หน้าลืมตั้ง metadata ก็ยังไม่ถูกเก็บ (X2.6: ลิงก์พรีวิวใช้เส้นทางนี้)
+          ⚠️ ต้องวางก่อนกฎ catch-all เพื่อให้ส่วนหัวชุดนี้มีผลจริง
+        */
+        source: "/:lang(th|en)/preview/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
