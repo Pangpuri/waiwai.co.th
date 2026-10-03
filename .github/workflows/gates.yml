@@ -9,8 +9,8 @@
 # - ใช้ Node 22 ให้ตรงกับ `engines` ของโปรเจกต์ (และกับที่ผู้ใช้รันบนเครื่อง)
 # - **ไม่ตั้ง env ลับใด ๆ** — ค่าที่ใช้เป็นค่าเฉพาะของ CI (รหัสผ่านฐานข้อมูลชั่วคราว)
 #   ⚠️ ห้ามใส่ secret จริง (SESSION_SECRET/ADMIN_PASSWORD_HASH) ในไฟล์นี้เด็ดขาด
-# - `check:restore` รันได้เพราะมี `postgresql-client` (pg_dump/pg_restore/psql) ในเครื่องรัน
-#   ⇒ ตัวสคริปต์จึงไม่ต้องตั้ง `DB_TOOLS_PREFIX` (นั่นเป็นเรื่องของเครื่อง dev ที่มีแต่ Docker)
+# - `check:restore` ใช้เครื่องมือในกล่อง Postgres ผ่าน `DB_TOOLS_PREFIX` (วิธีเดียวกับเครื่อง dev)
+#   ⇒ ไม่ต้องพึ่ง postgresql-client บนเครื่องรัน (ubuntu-latest ไม่มีเวอร์ชัน 17 ใน repo มาตรฐาน)
 # - ถ้าเบราว์เซอร์/DB ไม่พร้อม ให้ "แดง" ดีกว่าเงียบ (ไม่มี continue-on-error)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -110,8 +110,21 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: ติดตั้งเครื่องมือ Postgres (pg_dump/pg_restore/psql)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
+      # ── เครื่องมือ pg_dump/pg_restore/psql ───────────────────────────────────
+      # วิธีเดียวกับเครื่อง dev ของโปรเจกต์: ใช้เครื่องมือ "ในกล่อง Postgres" ผ่าน DB_TOOLS_PREFIX
+      #   เหตุผล: ubuntu-latest ไม่มี postgresql-client-17 ใน repo มาตรฐาน (ต้องเพิ่ม PGDG repo ภายนอก)
+      #   และการ exec เข้ากล่องที่รันอยู่แล้วคือเส้นทางที่พิสูจน์แล้วว่ารองรับ (X2.3)
+      #   ⇒ สคริปต์สำรอง/กู้คืนจะต่อผ่าน unix socket ในกล่อง (ไม่ต้องใส่รหัสผ่านซ้ำ)
+      - name: เตรียมเครื่องมือ Postgres ในกล่อง (DB_TOOLS_PREFIX)
+        run: |
+          CONTAINER_ID="$(docker ps --filter "ancestor=postgres:17" --format "{{.ID}}" | head -n 1)"
+          if [ -z "$CONTAINER_ID" ]; then
+            echo "ไม่พบกล่อง Postgres ของ service — ตรวจ service ใน workflow"
+            exit 1
+          fi
+          echo "ใช้กล่อง ${CONTAINER_ID}"
+          docker exec -i "$CONTAINER_ID" pg_dump --version
+          echo "DB_TOOLS_PREFIX=docker exec -i ${CONTAINER_ID}" >> "$GITHUB_ENV"
 
       - name: Install dependencies (ตาม lockfile เท่านั้น)
         run: npm ci
