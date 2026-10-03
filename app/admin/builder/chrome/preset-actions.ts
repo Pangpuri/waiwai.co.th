@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { ChromePresetActionState } from "@/features/admin/chrome-preset-state";
+import type { ChromePresetActionState, ChromePresetImportState } from "@/features/admin/chrome-preset-state";
 import { requireAdminUser } from "@/lib/auth/dal";
-import { isChromePresetKind } from "@/lib/chrome/presets";
+import { isChromePresetKind, parseChromePresetExport } from "@/lib/chrome/presets";
 import {
   applyChromePreset,
+  importChromePresets,
   saveChromePresetFromRow,
   undoChromePreset,
   type ApplyChromePresetResult,
@@ -137,4 +138,38 @@ export async function undoChromePresetAction(
 
   revalidateChrome();
   return { status: "ok", code: "undo-done" };
+}
+
+/**
+ * นำเข้าชุดของส่วนกลางจากไฟล์ JSON (W3b ต่อ · รอบที่ 91)
+ *
+ * ลำดับเดียวกับ action อื่น: ตรวจสิทธิ์ → ตรวจค่าที่ส่งมา → เรียก repository → revalidate
+ * ⚠️ ไฟล์จากเบราว์เซอร์ = ข้อมูลที่ไม่เชื่อ ⇒ ผ่าน `parseChromePresetExport` เสมอ
+ *    (ตรวจรูปแบบ/เวอร์ชัน/รูปทรงของทุกชุด · ชุดที่เสียถูกข้ามและรายงานจำนวน)
+ */
+export async function importChromePresetsAction(
+  _previous: ChromePresetImportState,
+  formData: FormData,
+): Promise<ChromePresetImportState> {
+  const user = await requireAdminUser("presets");
+  if (!isDatabaseConfigured()) return { status: "failed", code: "no-database", imported: 0, skipped: 0 };
+
+  const payload = String(formData.get("payload") ?? "");
+  const messages = await getMessagesFor("th");
+
+  const parsed = parseChromePresetExport(payload, messages);
+  if (!parsed.ok) return { status: "failed", code: parsed.reason, imported: 0, skipped: 0 };
+
+  const result = await importChromePresets({ presets: parsed.presets, actor: user.email, messages });
+  if (!result.ok) {
+    return {
+      status: "failed",
+      code: result.reason === "too-many" ? "too-many" : "no-database",
+      imported: 0,
+      skipped: 0,
+    };
+  }
+
+  revalidateChrome();
+  return { status: "ok", code: "imported", imported: result.imported, skipped: result.skipped + parsed.skipped };
 }

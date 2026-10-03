@@ -6,12 +6,15 @@ import { useFormStatus } from "react-dom";
 import {
   applyChromePresetAction,
   deleteChromePresetAction,
+  importChromePresetsAction,
   saveChromePresetAction,
   undoChromePresetAction,
 } from "@/app/admin/builder/chrome/preset-actions";
 import {
+  INITIAL_CHROME_PRESET_IMPORT_STATE,
   INITIAL_CHROME_PRESET_STATE,
   type ChromePresetActionState,
+  type ChromePresetImportState,
 } from "@/features/admin/chrome-preset-state";
 import { fillTemplate } from "@/lib/i18n/template";
 
@@ -64,6 +67,19 @@ export type ChromePresetStrings = {
   readonly chromePresetUndoHint: string;
   readonly chromePresetUndoDone: string;
   readonly chromePresetUndoMissing: string;
+  /* ตัวอย่างชุด + ส่งออก/นำเข้า (W3b ต่อ · รอบที่ 91) */
+  readonly chromePresetPreview: string;
+  readonly chromePresetPreviewEmpty: string;
+  readonly chromePresetIoTitle: string;
+  readonly chromePresetIoHint: string;
+  readonly chromePresetExport: string;
+  readonly chromePresetImportLabel: string;
+  readonly chromePresetImport: string;
+  readonly chromePresetImported: string;
+  readonly chromePresetImportBadJson: string;
+  readonly chromePresetImportBadFormat: string;
+  readonly chromePresetImportEmpty: string;
+  readonly chromePresetImportTooMany: string;
 };
 
 export type ChromePresetRow = {
@@ -73,6 +89,12 @@ export type ChromePresetRow = {
   readonly name: string;
   readonly detail: string;
   readonly savedAt: string;
+  /** ตัวอย่างเนื้อหาในชุด (รอบที่ 91) — ให้เห็นก่อนกด "ใช้ชุดนี้" */
+  readonly preview: readonly {
+    readonly group: string | null;
+    readonly label: string;
+    readonly value: string;
+  }[];
 };
 
 function Submit({ label, primary = false }: { readonly label: string; readonly primary?: boolean }) {
@@ -158,6 +180,25 @@ function ChromePresetItem({
       <span className="text-fg-muted text-[11px]">
         {row.detail} · {fillTemplate(strings.chromePresetSavedAt, { time: row.savedAt })}
       </span>
+
+      {/* ตัวอย่างเนื้อหาในชุด (รอบที่ 91) — เห็นก่อนกดใช้ ⇒ ไม่ต้องกดแล้วค่อยย้อนกลับ */}
+      <details className="border-line rounded-lg border px-2 py-1">
+        <summary className="text-fg-muted cursor-pointer text-[11px] font-semibold">{strings.chromePresetPreview}</summary>
+        {row.preview.length === 0 ? (
+          <p className="text-fg-muted mt-1 text-[11px]">{strings.chromePresetPreviewEmpty}</p>
+        ) : (
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {row.preview.map((line, index) => (
+              <li key={`${line.label}-${index}`} className="flex flex-wrap items-baseline gap-1 text-[11px]">
+                {line.group === null ? null : <span className="text-fg-muted">{line.group} ·</span>}
+                <span className="text-fg">{line.label}</span>
+                {line.value.trim() === "" ? null : <span className="text-fg-muted font-mono">{line.value}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+
       <span className="flex flex-wrap items-center gap-1.5">
         <form action={applyAction}>
           <input type="hidden" name="kind" value={kind} />
@@ -172,6 +213,82 @@ function ChromePresetItem({
       <StatusLine state={applyState} strings={strings} maxPerKind={maxPerKind} />
       <StatusLine state={deleteState} strings={strings} maxPerKind={maxPerKind} />
     </li>
+  );
+}
+
+/** รหัสผลลัพธ์การนำเข้า → ข้อความ (รายงานจำนวนด้วย ⇒ ต้องมีเทมเพลตของพจนานุกรม) */
+function importMessageOf(state: ChromePresetImportState, strings: ChromePresetStrings, maxImport: number): string | null {
+  switch (state.code) {
+    case null:
+      return null;
+    case "imported":
+      return fillTemplate(strings.chromePresetImported, { imported: state.imported, skipped: state.skipped });
+    case "bad-json":
+      return strings.chromePresetImportBadJson;
+    case "bad-format":
+      return strings.chromePresetImportBadFormat;
+    case "empty":
+      return strings.chromePresetImportEmpty;
+    case "too-many":
+      return fillTemplate(strings.chromePresetImportTooMany, { max: maxImport });
+    case "no-database":
+      return strings.chromePresetDbMissing;
+  }
+}
+
+/**
+ * ส่งออก / นำเข้าชุดทั้งคลัง (W3b ต่อ · รอบที่ 91)
+ *
+ * - **ส่งออก** = ลิงก์ไป route handler ที่ตรวจสิทธิ์เอง (`/admin/builder/chrome/export`) — ดาวน์โหลดไฟล์ JSON
+ * - **นำเข้า** = วางเนื้อหาไฟล์แล้วส่งให้ Server Action (ตรวกรูปแบบ/รูปทรงครบก่อนเขียน)
+ * ⚠️ แสดง **ครั้งเดียวต่อหน้า** (ไม่ใช่ต่อส่วน) เพราะเป็นเรื่องของคลังทั้งก้อน
+ */
+export function ChromePresetIoPanel({
+  strings,
+  maxImport,
+  dbMissing = false,
+}: {
+  readonly strings: ChromePresetStrings;
+  readonly maxImport: number;
+  readonly dbMissing?: boolean;
+}) {
+  const [state, action] = useActionState(importChromePresetsAction, INITIAL_CHROME_PRESET_IMPORT_STATE);
+  const message = importMessageOf(state, strings, maxImport);
+
+  return (
+    <section className="border-line bg-surface-raised flex flex-col gap-2 rounded-xl border p-3">
+      <div className="flex flex-col gap-0.5">
+        <p className="text-fg text-xs font-semibold">{strings.chromePresetIoTitle}</p>
+        <p className="text-fg-muted text-[11px]">{strings.chromePresetIoHint}</p>
+      </div>
+
+      {dbMissing ? (
+        <p className="text-brand-red text-[11px]">{strings.chromePresetDbMissing}</p>
+      ) : (
+        <>
+          <a
+            href="/admin/builder/chrome/export"
+            download
+            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring self-start rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {strings.chromePresetExport}
+          </a>
+
+          <form action={action} className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-1">
+              <span className="text-fg-muted text-[11px]">{strings.chromePresetImportLabel}</span>
+              <textarea name="payload" rows={4} spellCheck={false} className={`${FIELD_CLASS} font-mono`} />
+            </label>
+            <span className="flex flex-wrap items-center gap-2">
+              <Submit label={strings.chromePresetImport} />
+              {message === null ? null : (
+                <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>{message}</span>
+              )}
+            </span>
+          </form>
+        </>
+      )}
+    </section>
   );
 }
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { publishChromeAction } from "@/app/admin/builder/chrome/actions";
 import { ChromeWorkspace } from "@/features/admin/ui/chrome-workspace";
 import {
+  ChromePresetIoPanel,
   ChromePresetPanel,
   type ChromePresetRow,
   type ChromePresetStrings,
@@ -12,7 +13,13 @@ import { MourningEditor } from "@/features/admin/ui/mourning-editor";
 import { NavbarEditor } from "@/features/admin/ui/navbar-editor";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { loadDocumentRow, listRevisions } from "@/lib/blocks/repository";
-import { MAX_CHROME_PRESETS_PER_KIND, chromePresetCounts, type ChromePreset } from "@/lib/chrome/presets";
+import {
+  MAX_CHROME_PRESETS_PER_KIND,
+  MAX_CHROME_PRESET_IMPORT,
+  chromePresetCounts,
+  chromePresetPreview,
+  type ChromePreset,
+} from "@/lib/chrome/presets";
 import { listChromePresets, readChromeDraftUndo } from "@/lib/chrome/preset-repository";
 import { FOOTER_PAGE_KEY, defaultFooterConfig, parseFooterConfig } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY, applyPageMenu, defaultNavbarConfig, parseNavbarConfig } from "@/lib/chrome/navbar";
@@ -123,6 +130,8 @@ export default async function ChromePage() {
     name: preset.name,
     detail: detailOf(preset),
     savedAt: preset.updatedAt.slice(0, 16).replace("T", " "),
+    /* ตัวอย่างเนื้อหาในชุด (รอบที่ 91) — เห็นรายการจริงก่อนกด "ใช้ชุดนี้" */
+    preview: chromePresetPreview(preset.payload),
   }));
 
   /* ข้อมูลย้อนกลับของแต่ละส่วน (มี/ไม่มี + ย้อนจากชุดไหนเมื่อไร) — แสดงเป็นข้อความจากค่ากลาง */
@@ -171,6 +180,18 @@ export default async function ChromePage() {
     chromePresetUndoHint: strings.chromePresetUndoHint,
     chromePresetUndoDone: strings.chromePresetUndoDone,
     chromePresetUndoMissing: strings.chromePresetUndoMissing,
+    chromePresetPreview: strings.chromePresetPreview,
+    chromePresetPreviewEmpty: strings.chromePresetPreviewEmpty,
+    chromePresetIoTitle: strings.chromePresetIoTitle,
+    chromePresetIoHint: strings.chromePresetIoHint,
+    chromePresetExport: strings.chromePresetExport,
+    chromePresetImportLabel: strings.chromePresetImportLabel,
+    chromePresetImport: strings.chromePresetImport,
+    chromePresetImported: strings.chromePresetImported,
+    chromePresetImportBadJson: strings.chromePresetImportBadJson,
+    chromePresetImportBadFormat: strings.chromePresetImportBadFormat,
+    chromePresetImportEmpty: strings.chromePresetImportEmpty,
+    chromePresetImportTooMany: strings.chromePresetImportTooMany,
   };
 
   return (
@@ -179,6 +200,9 @@ export default async function ChromePage() {
         <h1 className="text-fg text-lg font-semibold">{strings.chromeTitle}</h1>
         <p className="text-fg-muted text-xs">{strings.chromeIntro}</p>
       </header>
+
+      {/* ส่งออก/นำเข้าคลังชุดทั้งก้อน (รอบที่ 91) — แสดงครั้งเดียว ไม่ใช่ต่อส่วน */}
+      <ChromePresetIoPanel strings={presetStrings} maxImport={MAX_CHROME_PRESET_IMPORT} />
 
       <ChromeWorkspace
         strings={{

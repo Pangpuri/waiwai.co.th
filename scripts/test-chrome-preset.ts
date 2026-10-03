@@ -196,7 +196,7 @@ test("chrome-preset: ทุก action ตรวจสิทธิ์ และ�
 
   const exported = actions.match(/export async function/g) ?? [];
   const required = actions.match(/await requireAdminUser\("[a-z]+"\)/g) ?? [];
-  assert.equal(exported.length, 4, "ต้องมี 4 action (บันทึก · ใช้ชุด · ย้อนกลับ · ลบ)");
+  assert.equal(exported.length, 5, "ต้องมี 5 action (บันทึก · ใช้ชุด · ย้อนกลับ · ลบ · นำเข้าชุด)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
 
   assert.ok(actions.includes("isChromePresetKind(kind)"), "ต้องตรวจชนิดของส่วน");
@@ -285,11 +285,12 @@ test("chrome-preset: ใช้ชุดแล้วต้องเก็บฉ�
   const actions = sourceOf("app/admin/builder/chrome/preset-actions.ts");
   assert.ok(actions.includes("undoChromePresetAction"), "ต้องมี Server Action ของการย้อนกลับ");
   assert.ok(actions.includes("isChromePresetKind(kind)"), "ตรวจชนิดของส่วนก่อนทำงาน");
-  /* X1.10: ทุก action ต้องระบุสิทธิ์ ("presets") ไม่ใช่แค่ตรวจว่าล็อกอิน */
+  /* X1.10: ทุก action ต้องระบุสิทธิ์ ("presets") ไม่ใช่แค่ตรวจว่าล็อกอิน
+     (รอบที่ 91 เพิ่ม "นำเข้าชุด" ⇒ 5 action) */
   assert.equal(
     actions.split('requireAdminUser("presets")').length - 1,
-    4,
-    "action ทั้ง 4 ของพรีเซ็ตส่วนกลางต้องใช้สิทธิ์ presets",
+    5,
+    "action ทั้ง 5 ของพรีเซ็ตส่วนกลางต้องใช้สิทธิ์ presets",
   );
 
   const panel = sourceOf("features/admin/ui/chrome-preset-panel.tsx");

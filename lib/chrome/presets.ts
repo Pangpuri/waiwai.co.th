@@ -179,3 +179,158 @@ export type ChromePreset = {
 export function chromePresetsAreFull(count: number): boolean {
   return count >= MAX_CHROME_PRESETS_PER_KIND;
 }
+
+/* ── ตัวอย่างชุด ("ดูรายละเอียด" ก่อนกดใช้ — รอบที่ 91) ───────────────────────── */
+
+/**
+ * หนึ่งบรรทัดในตัวอย่างชุด
+ * ⚠️ เป็น **ข้อมูลล้วน** (ไม่มีข้อความพจนานุกรมในไฟล์นี้) — ป้าย/หัวข้อมาจากตัวข้อมูลของชุดเอง
+ */
+export type ChromePresetPreviewRow = {
+  /** ชื่อกลุ่ม (เช่น ชื่อกลุ่มของท้ายเว็บ) — `null` = ไม่อยู่ในกลุ่ม */
+  readonly group: string | null;
+  readonly label: string;
+  /** พาธ/ค่าที่ใช้จริง (ว่างได้) */
+  readonly value: string;
+};
+
+/** ป้ายที่แสดงในตัวอย่าง: ใช้ไทย ถ้าว่างถอยไปใช้ EN (เหมือนตัวเรนเดอร์เว็บ) */
+function previewText(value: { readonly th: string; readonly en: string }): string {
+  const th = value.th.trim();
+  return th === "" ? value.en.trim() : th;
+}
+
+/**
+ * ตัวอย่างเนื้อหาของชุด — ใช้ในแผงหลังบ้านก่อนกด "ใช้ชุดนี้"
+ *
+ * เหตุผล (หนี้ที่ค้างจาก W3b): เดิมแผงบอกแค่ตัวเลขสรุป ⇒ ผู้ใช้ต้องกดใช้แล้วดูพรีวิวทั้งหน้า
+ * ถึงจะรู้ว่าชุดนั้นข้างในเป็นอะไร (และถ้าไม่ชอบก็ต้องกดย้อนกลับ) ⇒ ตอนนี้เห็นรายการจริงก่อนกด
+ */
+export function chromePresetPreview(payload: ChromePresetPayload): readonly ChromePresetPreviewRow[] {
+  switch (payload.kind) {
+    case "navbar":
+      return [
+        ...payload.config.items.map((item) => ({ group: null, label: previewText(item.label), value: item.href })),
+        ...payload.config.buttons.map((button) => ({ group: null, label: previewText(button.label), value: button.href })),
+      ];
+    case "footer":
+      return [
+        ...payload.config.groups.flatMap((group) =>
+          group.links.map((link) => ({ group: previewText(group.title), label: previewText(link.label), value: link.href })),
+        ),
+        ...payload.config.socials.map((social) => ({ group: null, label: previewText(social.label), value: social.href })),
+      ];
+    case "mourning":
+      return payload.config.images.map((image) => ({
+        group: null,
+        label: previewText({ th: image.altTh, en: image.altEn }),
+        value: image.path,
+      }));
+  }
+}
+
+/* ── ส่งออก / นำเข้าชุด (ย้ายเครื่อง/สำรองชุด — รอบที่ 91) ─────────────────────── */
+
+/** รหัสรูปแบบไฟล์ + เวอร์ชัน — ไฟล์ของเวอร์ชันอื่นต้องไม่ถูกนำเข้าแบบเดา ๆ */
+export const CHROME_PRESET_EXPORT_FORMAT = "waiwai-chrome-presets";
+export const CHROME_PRESET_EXPORT_VERSION = 1;
+
+/** เพดานชุดที่รับได้ในไฟล์เดียว (กันไฟล์ยักษ์/การนำเข้าที่ทำให้คลังบวมเกินเพดาน) */
+export const MAX_CHROME_PRESET_IMPORT = MAX_CHROME_PRESETS_PER_KIND * CHROME_PRESET_KINDS.length;
+
+/** หนึ่งชุดในไฟล์ส่งออก (payload = `config` ดิบ ไม่ใช่ค่าที่ผ่านการตรวจ) */
+export type ChromePresetExportEntry = {
+  readonly kind: ChromePresetKind;
+  readonly name: string;
+  readonly config: unknown;
+};
+
+export type ChromePresetExportFile = {
+  readonly format: typeof CHROME_PRESET_EXPORT_FORMAT;
+  readonly version: number;
+  readonly exportedAt: string;
+  readonly count: number;
+  readonly presets: readonly ChromePresetExportEntry[];
+};
+
+/** สร้างเนื้อหาไฟล์ส่งออก (JSON อ่านได้ + ลงท้ายบรรทัด) */
+export function serializeChromePresetExport(presets: readonly ChromePreset[], exportedAt: string): string {
+  const file: ChromePresetExportFile = {
+    format: CHROME_PRESET_EXPORT_FORMAT,
+    version: CHROME_PRESET_EXPORT_VERSION,
+    exportedAt,
+    count: presets.length,
+    presets: presets.map((preset) => ({ kind: preset.kind, name: preset.name, config: preset.payload.config })),
+  };
+  return `${JSON.stringify(file, null, 2)}\n`;
+}
+
+/** ชุดที่ผ่านการตรวจแล้ว พร้อมบันทึก (ใช้โดย repository) */
+export type ChromePresetImportEntry = {
+  readonly kind: ChromePresetKind;
+  readonly name: string;
+  readonly payload: ChromePresetPayload;
+};
+
+export type ParseChromePresetExportResult =
+  | { readonly ok: true; readonly presets: readonly ChromePresetImportEntry[]; readonly skipped: number }
+  | { readonly ok: false; readonly reason: "bad-json" | "bad-format" | "empty" | "too-many" };
+
+/**
+ * อ่านไฟล์ส่งออก — **ไม่เชื่อไฟล์เลย**
+ * - รูปแบบ/เวอร์ชันต้องตรง (ไฟล์จากรุ่นอื่น = ปฏิเสธ ไม่เดา)
+ * - ชุดที่รูปทรงเสีย/ชื่อว่าง = **ข้าม** แล้วนับใน `skipped` (ชุดอื่นในไฟล์ยังนำเข้าได้)
+ * - เกินเพดาน = ปฏิเสธทั้งไฟล์ (ไม่ทำครึ่ง ๆ กลาง ๆ)
+ */
+export function parseChromePresetExport(raw: string, messages: Messages): ParseChromePresetExportResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, reason: "bad-json" };
+  }
+
+  if (typeof parsed !== "object" || parsed === null) return { ok: false, reason: "bad-format" };
+  const file = parsed as Record<string, unknown>;
+
+  if (file["format"] !== CHROME_PRESET_EXPORT_FORMAT) return { ok: false, reason: "bad-format" };
+  const version = file["version"];
+  if (typeof version !== "number" || !Number.isInteger(version) || version > CHROME_PRESET_EXPORT_VERSION) {
+    return { ok: false, reason: "bad-format" };
+  }
+
+  const list = file["presets"];
+  if (!Array.isArray(list) || list.length === 0) return { ok: false, reason: "empty" };
+  if (list.length > MAX_CHROME_PRESET_IMPORT) return { ok: false, reason: "too-many" };
+
+  const presets: ChromePresetImportEntry[] = [];
+  let skipped = 0;
+
+  for (const item of list) {
+    if (typeof item !== "object" || item === null) {
+      skipped += 1;
+      continue;
+    }
+    const entry = item as Record<string, unknown>;
+    const kind = entry["kind"];
+    const name = typeof entry["name"] === "string" ? normalizeChromePresetName(entry["name"]) : null;
+
+    if (typeof kind !== "string" || !isChromePresetKind(kind) || name === null) {
+      skipped += 1;
+      continue;
+    }
+
+    const payload = parseChromePresetPayload(kind, entry["config"], messages);
+    if (payload === null || validateChromePresetConfig(payload).length > 0) {
+      skipped += 1;
+      continue;
+    }
+
+    presets.push({ kind, name, payload });
+  }
+
+  /* ทุกชุดใช้ไม่ได้ = ไม่มีอะไรให้ทำ (บอกผู้ใช้ตรง ๆ ดีกว่า "นำเข้าสำเร็จ 0 ชุด") */
+  if (presets.length === 0) return { ok: false, reason: "empty" };
+
+  return { ok: true, presets, skipped };
+}

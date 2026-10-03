@@ -49,4 +49,19 @@ export const adminChromePreset: Pick<Messages["admin"], keyof typeof thAdminChro
   auditChromePresetUndo: "Reverted a site-wide preset",
   auditChromePresetSave: "Saved a site-wide preset",
   auditChromePresetApply: "Applied a site-wide preset",
+  auditChromePresetImport: "Imported site-wide presets",
+  /* Preset preview + export/import (W3b follow-up, round 91) */
+  chromePresetPreview: "View preset contents",
+  chromePresetPreviewEmpty: "This preset has nothing to show",
+  chromePresetIoTitle: "Export / import presets",
+  chromePresetIoHint:
+    "Download a JSON backup of every preset, or paste a file's contents to import (same name in the same part = overwrite)",
+  chromePresetExport: "Download all presets (JSON)",
+  chromePresetImportLabel: "Paste the JSON file contents here",
+  chromePresetImport: "Import presets",
+  chromePresetImported: "Imported {imported} presets (skipped {skipped})",
+  chromePresetImportBadJson: "That file is not readable JSON",
+  chromePresetImportBadFormat: "This is not a preset file from this site, or it is a newer version",
+  chromePresetImportEmpty: "No usable preset found in that file",
+  chromePresetImportTooMany: "The file has more presets than the limit allows ({max})",
 };

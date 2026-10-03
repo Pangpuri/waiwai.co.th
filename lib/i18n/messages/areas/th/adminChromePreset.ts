@@ -45,4 +45,19 @@ export const adminChromePreset = {
   auditChromePresetUndo: "ย้อนกลับพรีเซ็ตส่วนกลาง",
   auditChromePresetSave: "บันทึกพรีเซ็ตส่วนกลาง",
   auditChromePresetApply: "ใช้พรีเซ็ตส่วนกลาง",
+  auditChromePresetImport: "นำเข้าพรีเซ็ตส่วนกลาง",
+  /* ตัวอย่างชุด + ส่งออก/นำเข้า (W3b ต่อ · รอบที่ 91) */
+  chromePresetPreview: "ดูตัวอย่างชุด",
+  chromePresetPreviewEmpty: "ชุดนี้ไม่มีรายการให้แสดง",
+  chromePresetIoTitle: "ส่งออก / นำเข้าชุด",
+  chromePresetIoHint:
+    "ส่งออกเป็นไฟล์ JSON เก็บสำรองไว้ หรือวางเนื้อหาไฟล์เพื่อนำเข้า (ชื่อซ้ำในส่วนเดียวกัน = เขียนทับของเดิม)",
+  chromePresetExport: "ดาวน์โหลดชุดทั้งหมด (JSON)",
+  chromePresetImportLabel: "วางเนื้อหาไฟล์ JSON ที่นี่",
+  chromePresetImport: "นำเข้าชุด",
+  chromePresetImported: "นำเข้าสำเร็จ {imported} ชุด (ข้าม {skipped})",
+  chromePresetImportBadJson: "ไฟล์ไม่ใช่ JSON ที่อ่านได้",
+  chromePresetImportBadFormat: "ไฟล์นี้ไม่ใช่ไฟล์ชุดของเว็บนี้ หรือเป็นเวอร์ชันที่ใหม่กว่า",
+  chromePresetImportEmpty: "ไม่พบชุดที่ใช้ได้ในไฟล์นั้น",
+  chromePresetImportTooMany: "ชุดในไฟล์เกินเพดานที่รับได้ ({max} ชุด)",
 };

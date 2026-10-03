@@ -59,7 +59,9 @@ export type AuditAction =
   /** ใช้ชุดสำเร็จของส่วนกลางกับฉบับร่าง (W3b) — ไม่แตะฉบับเผยแพร่ */
   | "chrome-preset-apply"
   /** ย้อนกลับฉบับร่างก่อนใช้ชุด (W3b ต่อ · รอบที่ 81) */
-  | "chrome-preset-undo";
+  | "chrome-preset-undo"
+  /** นำเข้าชุดของส่วนกลางจากไฟล์ JSON (W3b ต่อ · รอบที่ 91) */
+  | "chrome-preset-import";
 
 export type AuditEntry = {
   readonly action: AuditAction;

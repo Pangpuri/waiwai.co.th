@@ -11,6 +11,7 @@ import {
   parseChromePresetPayload,
   validateChromePresetConfig,
   type ChromePreset,
+  type ChromePresetImportEntry,
   type ChromePresetKind,
   type ChromePresetPayload,
 } from "@/lib/chrome/presets";
@@ -158,6 +159,77 @@ export async function saveChromePresetFromRow(input: {
   });
 
   return { ok: true, id, replaced: sameName !== undefined, fromDefault };
+}
+
+export type ImportChromePresetsResult =
+  | { readonly ok: true; readonly imported: number; readonly skipped: number }
+  | { readonly ok: false; readonly reason: "no-database" | "too-many" };
+
+/**
+ * นำเข้าชุดจากไฟล์ (W3b ต่อ · รอบที่ 91) — ใช้กติกาเดียวกับการบันทึกด้วยมือ
+ *
+ * - ชุดที่ส่งเข้ามา **ต้องผ่านการตรวจมาแล้ว** (`parseChromePresetExport`) — ที่นี่ตรวจซ้ำอีกชั้นก่อนเขียน
+ * - ชื่อซ้ำในส่วนเดียวกัน = เขียนทับ + ดึงกลับจากถังขยะ (เหมือนกดบันทึกทับด้วยมือ)
+ * - เพดานต่อส่วนยังบังคับ: ชุดใหม่ที่ทำให้เกินเพดานจะถูก **ข้าม** (ไม่ทำให้ทั้งไฟล์ล้ม)
+ * - ลง audit **ครั้งเดียว** สรุปจำนวน (ไม่ทิ้งร่องรอยเป็นแถวละชุดจากการนำเข้าครั้งเดียว)
+ */
+export async function importChromePresets(input: {
+  readonly presets: readonly ChromePresetImportEntry[];
+  readonly actor: string;
+  readonly messages: Messages;
+}): Promise<ImportChromePresetsResult> {
+  if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
+
+  const existing = await listChromePresets(input.messages);
+  const activePerKind = new Map<ChromePresetKind, number>();
+  for (const kind of ["navbar", "footer", "mourning"] as const) {
+    activePerKind.set(kind, existing.filter((preset) => preset.kind === kind).length);
+  }
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const entry of input.presets) {
+    if (validateChromePresetConfig(entry.payload).length > 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const sameName = existing.find(
+      (preset) => preset.kind === entry.kind && preset.name.toLowerCase() === entry.name.toLowerCase(),
+    );
+    const active = activePerKind.get(entry.kind) ?? 0;
+    if (sameName === undefined && chromePresetsAreFull(active)) {
+      skipped += 1;
+      continue;
+    }
+
+    const id = sameName?.id ?? newChromePresetId();
+    await getPool().query(
+      `insert into chrome_preset (id, kind, name, payload, created_by)
+         values ($1, $2, $3, $4::jsonb, $5)
+       on conflict (kind, lower(name)) do update set
+         name = excluded.name,
+         payload = excluded.payload,
+         updated_at = now(),
+         created_by = excluded.created_by,
+         deleted_at = null,
+         deleted_by = null`,
+      [id, entry.kind, entry.name, JSON.stringify(entry.payload.config), input.actor],
+    );
+
+    if (sameName === undefined) activePerKind.set(entry.kind, active + 1);
+    imported += 1;
+  }
+
+  await recordAudit({
+    action: "chrome-preset-import",
+    actorEmail: input.actor,
+    target: `imported=${imported}`,
+    detail: `skipped=${skipped}`,
+  });
+
+  return { ok: true, imported, skipped };
 }
 
 export type ApplyChromePresetResult =

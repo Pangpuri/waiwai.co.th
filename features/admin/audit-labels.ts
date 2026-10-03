@@ -44,6 +44,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "chrome-preset-save": strings.auditChromePresetSave,
     "chrome-preset-apply": strings.auditChromePresetApply,
     "chrome-preset-undo": strings.auditChromePresetUndo,
+    "chrome-preset-import": strings.auditChromePresetImport,
     "admin-user-create": strings.auditAdminUserCreate,
     "admin-user-role": strings.auditAdminUserRole,
     "admin-user-disable": strings.auditAdminUserDisable,
