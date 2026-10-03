@@ -28,6 +28,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "login-failure": strings.auditLoginFailure,
     logout: strings.auditLogout,
     publish: strings.auditPublish,
+    /* เผยแพร่โดย "ถึงกำหนดเวลา" ไม่ใช่มีคนกด (X2.7) — คนละร่องรอยกับการกดเอง */
+    "publish-scheduled": strings.auditPublishScheduled,
     "restore-revision": strings.auditRestore,
     "preset-save": strings.auditPresetSave,
     "pages-update": strings.auditPagesUpdate,

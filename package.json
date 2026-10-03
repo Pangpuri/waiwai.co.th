@@ -20,6 +20,7 @@
     "db:status": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/migrate.ts --status",
     "check:migrations": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/check-migrations.ts",
     "db:purge": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/purge.ts",
+    "db:publish-scheduled": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/publish-scheduled.ts",
     "db:backup": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/backup.ts",
     "check:restore": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/restore-check.ts",
     "maintenance:on": "node --import ./scripts/alias-hook.mjs scripts/maintenance.ts on",

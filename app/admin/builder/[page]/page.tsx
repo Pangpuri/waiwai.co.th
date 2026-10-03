@@ -15,7 +15,7 @@ import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
-import { isPageLive, listRevisions, loadDocumentRow, readStoredVersions } from "@/lib/blocks/repository";
+import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/db/pool";
@@ -109,7 +109,7 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
     อ่านข้อมูลของหน้าแบบขนาน (4 คำสั่งไม่ขึ้นแก่กัน) + แถวที่เหลืออีกชุด
     ⚠️ ยังต้องมี DB จริง (ตรวจ `isDatabaseConfigured` ด้านบนแล้ว) — ถ้าไม่มี จะออกก่อนถึงบรรทัดนี้
   */
-  const [draftRow, publishedRow, revisions, storedVersions, isLive, presets] = await Promise.all([
+  const [draftRow, publishedRow, revisions, storedVersions, isLive, presets, schedule] = await Promise.all([
     loadDocumentRow(page, "draft"),
     loadDocumentRow(page, "published"),
     listRevisions(page),
@@ -117,6 +117,8 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
     readStoredVersions(page),
     isPageLive(page),
     listBlockPresets(),
+    /* กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7) — ยังไม่มีฉบับร่าง/ยังไม่ตั้ง = null */
+    readPublishSchedule(page),
   ]);
 
   const parsedDraft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
@@ -179,6 +181,7 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
             presets={presets}
             page={page}
             isLive={isLive}
+            schedule={schedule}
             initialDraft={initialDraft}
             draftUpdatedAt={draftRow?.updatedAt ?? null}
             publishedAt={publishedRow?.publishedAt ?? null}

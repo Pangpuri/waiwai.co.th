@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { compareRevisionAction, publishAction, migrateBlocksAction, restoreRevisionAction, saveDraftAction, setPageLiveAction } from "@/app/admin/builder/actions";
+import { compareRevisionAction, publishAction, migrateBlocksAction, restoreRevisionAction, saveDraftAction, schedulePublishAction, setPageLiveAction } from "@/app/admin/builder/actions";
 import { deletePresetAction, savePresetAction } from "@/app/admin/builder/preset-actions";
 import { uploadImageAction } from "@/app/admin/media/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
+import { INITIAL_SCHEDULE_STATE, type ScheduleProblem } from "@/features/admin/schedule-state";
 import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
@@ -136,6 +137,12 @@ type Props = {
    */
   readonly isLive?: boolean;
   /**
+   * กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7 ส่วนที่ 1)
+   * - **ไม่บังคับ**: `undefined` = หน้าจอไม่ได้ส่งค่า ⇒ ไม่แสดงแผงตั้งเวลาเลย
+   * - `null` = ส่งค่าแล้วแต่ยังไม่ได้ตั้ง (แสดงแผง + ช่องให้ตั้ง)
+   */
+  readonly schedule?: { readonly at: string; readonly by: string | null } | null;
+  /**
    * คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" (S2 รอบที่ 83) — ข้อความแปลแล้วจากฝั่งเซิร์ฟเวอร์
    * ⚠️ **ไม่บังคับ** (prop บังคับเคยทำให้ build พัง) — ไม่ส่ง = ไม่แสดงคำเตือน
    */
@@ -187,6 +194,35 @@ type PreviewSizeKey = (typeof PREVIEW_SIZES)[number]["key"];
 function issueLabel(strings: Messages["admin"], code: string): string {
   const labels = strings.issueLabels as Readonly<Record<string, string>>;
   return labels[code] ?? code;
+}
+
+/** เวลาของกำหนดเผยแพร่บนหน้าจอ — UTC ตัดวินาที (รูปแบบเดียวกับเวลาอื่นของหลังบ้าน) */
+function scheduleStamp(iso: string): string {
+  return iso.slice(0, 16).replace("T", " ");
+}
+
+/**
+ * แปลงรหัสเหตุผลที่ตั้งกำหนดเวลาไม่ได้ → ข้อความจากพจนานุกรม
+ * ⚠️ `switch` แบบ exhaustive ⇒ เพิ่มรหัสใน `features/admin/schedule-state.ts` แล้วลืมแปล = compile error
+ */
+function scheduleProblemLabel(strings: Messages["admin"], problem: ScheduleProblem | null): string {
+  switch (problem) {
+    case "missing":
+      return strings.scheduleProblemMissingTime;
+    case "invalid":
+      return strings.scheduleProblemInvalid;
+    case "past":
+      return strings.scheduleProblemPast;
+    case "too-far":
+      return strings.scheduleProblemTooFar;
+    case "missing-page":
+      return strings.scheduleProblemPage;
+    case "content":
+      return strings.scheduleProblemContent;
+    case "server":
+    case null:
+      return strings.scheduleProblemServer;
+  }
 }
 
 function SubmitButton({
@@ -414,6 +450,7 @@ export function BlockBuilder({
   previewLiveSrc,
   isLive,
   coverage,
+  schedule,
   presets = [],
   initialDraft,
   draftUpdatedAt,
@@ -477,6 +514,21 @@ export function BlockBuilder({
   const [migrateState, migrateAction] = useActionState(migrateBlocksAction, INITIAL_BUILDER_STATE);
   const [compareState, compareAction] = useActionState(compareRevisionAction, INITIAL_BUILDER_STATE);
   const [uploadState, uploadAction] = useActionState(uploadImageAction, INITIAL_UPLOAD_STATE);
+  /* ตั้งเวลาเผยแพร่ (X2.7) — ฟอร์มเดียวรองรับ "ตั้ง" กับ "ยกเลิก" ผ่านฟิลด์ intent */
+  const [scheduleState, scheduleAction] = useActionState(schedulePublishAction, INITIAL_SCHEDULE_STATE);
+  /** ค่าในช่อง `datetime-local` (เวลาท้องถิ่นของผู้ใช้) — ว่าง = ยังไม่เลือก */
+  const [scheduleInput, setScheduleInput] = useState("");
+
+  /*
+    กำหนดเวลาที่จะแสดง = ผลของ action ล่าสุด (ถ้ามี) · ไม่งั้นใช้ค่าที่อ่านจากฐานข้อมูล
+    คำนวณตอนเรนเดอร์ (ไม่ใช้ effect) ⇒ ไม่มี setState ซ้อน และไม่ต้องเถียงว่า action ไหนใหม่กว่า
+  */
+  const currentSchedule =
+    scheduleState.status === "scheduled" && scheduleState.at !== null
+      ? { at: scheduleState.at, by: scheduleState.by }
+      : scheduleState.status === "cleared"
+        ? null
+        : (schedule ?? null);
 
   /* พรีวิวโหลดจาก "เส้นทางฝั่งเว็บจริง" จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม เหมือนหน้าจริง */
   const previewSrc =
@@ -1548,6 +1600,79 @@ export function BlockBuilder({
       )}
 
       <StatusPanel state={publishState} strings={strings} />
+
+      {/*
+        ตั้งเวลาเผยแพร่ (X2.7 ส่วนที่ 1) — แสดงเฉพาะเมื่อหน้าจอส่งค่า `schedule` มา (แบบเดียวกับสวิตช์เว็บจริง)
+        · ช่องเวลาเป็น `datetime-local` ⇒ ผู้ใช้เห็น "เวลาท้องถิ่นของตัวเอง"
+          แล้วหน้าจอแปลงเป็น epoch ms ก่อนส่ง (ฝั่งเซิร์ฟเวอร์จึงไม่ต้องเดาเขตเวลา)
+        · กด "ตั้งกำหนด" = บันทึกฉบับร่างบนหน้าจอก่อน แล้วจึงตั้งกำหนด ⇒ สิ่งที่เห็น = สิ่งที่จะขึ้นเว็บ
+      */}
+      {schedule === undefined ? null : (
+        <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-fg text-sm font-semibold">{strings.scheduleTitle}</h2>
+            <p className={`text-xs font-semibold ${currentSchedule === null ? "text-fg-muted" : "text-fg"}`}>
+              {currentSchedule === null
+                ? strings.scheduleNone
+                : fillTemplate(strings.scheduleAt, { time: scheduleStamp(currentSchedule.at) })}
+            </p>
+            {currentSchedule === null || currentSchedule.by === null ? null : (
+              <p className="text-fg-muted text-xs">{fillTemplate(strings.scheduleBy, { email: currentSchedule.by })}</p>
+            )}
+            <p className="text-fg-muted text-xs">{strings.scheduleHint}</p>
+          </div>
+
+          {scheduleState.status === "failed" ? (
+            <p className="text-brand-red text-xs">{scheduleProblemLabel(strings, scheduleState.problem)}</p>
+          ) : null}
+          {scheduleState.status === "scheduled" ? <p className="text-fg text-xs">{strings.scheduleSaved}</p> : null}
+          {scheduleState.status === "cleared" ? <p className="text-fg-muted text-xs">{strings.scheduleCleared}</p> : null}
+
+          <div className="flex flex-wrap items-end gap-3">
+            <form action={scheduleAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="intent" value="set" />
+              <input type="hidden" name="page" value={page} />
+              <input type="hidden" name="payload" value={payload} />
+              {/*
+                epoch ms ของเวลาที่ผู้ใช้เลือก — คำนวณฝั่งเบราว์เซอร์เท่านั้น
+                (ค่าเริ่มต้นเป็นสตริงว่าง ⇒ เรนเดอร์ฝั่งเซิร์ฟเวอร์กับไฮเดรตได้ผลตรงกัน ไม่มี mismatch)
+              */}
+              <input
+                type="hidden"
+                name="at"
+                value={scheduleInput === "" ? "" : String(new Date(scheduleInput).getTime())}
+              />
+              <div className="flex flex-col gap-1">
+                <label htmlFor="builder-schedule-at" className="text-fg-muted text-xs">
+                  {strings.scheduleInputLabel}
+                </label>
+                <input
+                  id="builder-schedule-at"
+                  type="datetime-local"
+                  value={scheduleInput}
+                  onChange={(event) => setScheduleInput(event.target.value)}
+                  className="border-line bg-surface text-fg focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs focus-visible:ring-2 focus-visible:outline-none"
+                />
+              </div>
+              <SubmitButton label={strings.scheduleSet} pendingLabel={strings.scheduling} tone="outline" />
+            </form>
+
+            {currentSchedule === null ? null : (
+              <form action={scheduleAction}>
+                <input type="hidden" name="intent" value="clear" />
+                <input type="hidden" name="page" value={page} />
+                <button
+                  type="submit"
+                  className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {strings.scheduleClear}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
+
       <StatusPanel state={restoreState} strings={strings} />
       <StatusPanel state={migrateState} strings={strings} />
 

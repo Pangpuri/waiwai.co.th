@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
+import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { documentDiff } from "@/lib/blocks/diff";
 import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { parseScheduleEpoch } from "@/lib/blocks/schedule";
 import {
   isPageLive,
   loadDocumentRow,
@@ -17,6 +19,7 @@ import {
   restoreRevisionToDraft,
   saveDraft,
   setPageLive,
+  setPublishSchedule,
 } from "@/lib/blocks/repository";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import type { BlockDocument } from "@/lib/blocks/types";
@@ -144,6 +147,57 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
       revision: null,
     };
   }
+}
+
+/**
+ * ตั้ง/ยกเลิก "กำหนดเวลาเผยแพร่" ของหน้านี้ (X2.7 ส่วนที่ 1 · รอบที่ 100)
+ *
+ * - ฟอร์มเดียวรองรับสองเจตนาผ่านฟิลด์ `intent` (`set` | `clear`) ⇒ มี useActionState ตัวเดียวบนหน้าจอ
+ *   (สอง action แยกกันจะแย่งกันแสดงผลว่าอันไหนใหม่กว่า)
+ * - `set` = **บันทึกฉบับร่างบนหน้าจอก่อน** แล้วจึงตั้งกำหนด (เหมือน `publishAction`)
+ *   ⇒ "สิ่งที่เห็นตอนตั้งกำหนด = สิ่งที่จะขึ้นเว็บเมื่อถึงเวลา"
+ * - `clear` = ไม่ต้องแตะเนื้อหา ⇒ ตั้ง `publish_at = null` ตรง ๆ
+ * - เก็บเวลาที่ฝั่งเบราว์เซอร์แปลงเป็น epoch ของ **เขตเวลาผู้ใช้** แล้ว (ดู `parseScheduleEpoch`)
+ */
+export async function schedulePublishAction(_previous: ScheduleState, formData: FormData): Promise<ScheduleState> {
+  const user = await requireAdminUser("content");
+
+  const page = String(formData.get("page") ?? "").trim();
+  if (page === "") {
+    return { status: "failed", at: null, by: null, problem: "missing-page" };
+  }
+
+  if (formData.get("intent") === "clear") {
+    try {
+      await setPublishSchedule(page, null, user.email);
+    } catch {
+      return { status: "failed", at: null, by: null, problem: "server" };
+    }
+
+    revalidatePath(pathOf(page));
+    return { status: "cleared", at: null, by: null, problem: null };
+  }
+
+  const prepared = await prepare(page, formData);
+  if (!prepared.ok) {
+    return { status: "failed", at: null, by: null, problem: "content" };
+  }
+
+  const parsed = parseScheduleEpoch(formData.get("at"), new Date());
+  if (!parsed.ok) {
+    return { status: "failed", at: null, by: null, problem: parsed.problem };
+  }
+
+  const at = parsed.at.toISOString();
+  try {
+    await saveDraft(page, prepared.document, user.email);
+    await setPublishSchedule(page, at, user.email);
+  } catch {
+    return { status: "failed", at: null, by: null, problem: "server" };
+  }
+
+  revalidatePath(pathOf(page));
+  return { status: "scheduled", at, by: user.email, problem: null };
 }
 
 export async function restoreRevisionAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {

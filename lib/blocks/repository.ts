@@ -1,3 +1,5 @@
+import type { PoolClient } from "pg";
+
 import { getPool, withTransaction } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
 import { countRawBlocks, migrateDocumentValue, storedVersionSummary } from "@/lib/blocks/migrate";
@@ -109,31 +111,64 @@ async function publishDraftInTransaction(page: string, actor: string, note: stri
       throw new Error("ไม่มีฉบับร่างให้เผยแพร่");
     }
 
-    await client.query(
-      `insert into page_document (page, status, document, updated_at, updated_by, published_at)
-         values ($1, 'published', $2::jsonb, now(), $3, now())
-       on conflict (page, status) do update set
-         document = excluded.document,
-         updated_at = now(),
-         updated_by = excluded.updated_by,
-         published_at = now()`,
-      [page, JSON.stringify(draftRow.document), actor],
-    );
+    const revision = await writePublishedRevision(client, page, draftRow.document, actor, note);
 
-    const revisionResult = await client.query<{ next: number }>(
-      `select coalesce(max(revision), 0) + 1 as next from page_document_revision where page = $1`,
-      [page],
-    );
-    const revision = revisionResult.rows[0]?.next ?? 1;
-
-    await client.query(
-      `insert into page_document_revision (page, revision, document, note, created_by)
-         values ($1, $2, $3::jsonb, $4, $5)`,
-      [page, revision, JSON.stringify(draftRow.document), note, actor],
-    );
+    /* เผยแพร่แล้ว = ล้างกำหนดเวลาเดิมทิ้ง (ไม่ค้างเป็นกำหนดเก่าให้ยิงซ้ำ) — X2.7 */
+    await clearScheduleInTransaction(client, page);
 
     return { revision };
   });
+}
+
+/**
+ * หัวใจของการเผยแพร่ (ใช้ร่วมกันทั้ง "กดเผยแพร่เอง" และ "เผยแพร่ตามกำหนด" — X2.7)
+ *
+ * ทำไมแยกออกมาเป็นฟังก์ชันเดียว
+ * - เส้นทางการเขียนต้องมี **ที่เดียว** ⇒ พฤติกรรม (คัดลอกเอกสาร + เพิ่มประวัติ + เลขรุ่นเดินหน้า) ไม่หลุดจากกัน
+ * - การเผยแพร่ตามกำหนดต้อง "ยึดกำหนดเวลา" (claim) กับ "เขียนฉบับเผยแพร่" อยู่ใน **ทรานแซกชันเดียวกัน**
+ *   ⇒ สองตัวรันพร้อมกัน (ล็อกอิน + cron) เผยแพร่หน้าละครั้งเดียว และถ้าเขียนไม่สำเร็จกำหนดเวลายังอยู่ให้ลองใหม่
+ *
+ * ⚠️ รับ client เข้ามา (ไม่เปิด transaction เอง) เพื่อให้ผู้เรียกคุมขอบเขตทรานแซกชันได้
+ */
+async function writePublishedRevision(
+  client: PoolClient,
+  page: string,
+  document: unknown,
+  actor: string,
+  note: string | null,
+): Promise<number> {
+  await client.query(
+    `insert into page_document (page, status, document, updated_at, updated_by, published_at)
+       values ($1, 'published', $2::jsonb, now(), $3, now())
+     on conflict (page, status) do update set
+       document = excluded.document,
+       updated_at = now(),
+       updated_by = excluded.updated_by,
+       published_at = now()`,
+    [page, JSON.stringify(document), actor],
+  );
+
+  const revisionResult = await client.query<{ next: number }>(
+    `select coalesce(max(revision), 0) + 1 as next from page_document_revision where page = $1`,
+    [page],
+  );
+  const revision = revisionResult.rows[0]?.next ?? 1;
+
+  await client.query(
+    `insert into page_document_revision (page, revision, document, note, created_by)
+       values ($1, $2, $3::jsonb, $4, $5)`,
+    [page, revision, JSON.stringify(document), note, actor],
+  );
+
+  return revision;
+}
+
+/** ล้างกำหนดเวลาเผยแพร่ของฉบับร่าง (ใช้ในทรานแซกชันเดียวกับการเผยแพร่) */
+async function clearScheduleInTransaction(client: PoolClient, page: string): Promise<void> {
+  await client.query(
+    `update page_document set publish_at = null, scheduled_by = null where page = $1 and status = 'draft'`,
+    [page],
+  );
 }
 
 /** ประวัติการเผยแพร่ (ใหม่สุดก่อน) */
@@ -213,6 +248,129 @@ export async function setPageLive(page: string, live: boolean, actor: string): P
     'update page_document set is_live = $1, updated_by = $2, updated_at = now() where page = $3 and status = $4',
     [live, actor, page, 'published'],
   );
+}
+
+/* ── ตั้งเวลาเผยแพร่ (X2.7 · รอบที่ 100) ─────────────────────────────────────── */
+
+/**
+ * กำหนดเวลาเผยแพร่ของ **ฉบับร่าง** ของหน้านี้ (null = ยังไม่ได้ตั้ง)
+ * เก็บที่แถว draft เพราะ "สิ่งที่รอเผยแพร่" คือฉบับร่างเสมอ (มติเดียวกับ migration 0014)
+ */
+export type PublishSchedule = {
+  /** เวลาที่จะเผยแพร่ (ISO/UTC) */
+  readonly at: string;
+  /** ใครตั้งไว้ (null = ไม่รู้ เช่นข้อมูลจากรุ่นก่อน) */
+  readonly by: string | null;
+};
+
+/** อ่านกำหนดเวลาของหน้านี้ — ยังไม่ตั้ง/ยังไม่มีฉบับร่าง = null */
+export async function readPublishSchedule(page: string): Promise<PublishSchedule | null> {
+  const { rows } = await getPool().query<{ publish_at: Date | null; scheduled_by: string | null }>(
+    `select publish_at, scheduled_by from page_document where page = $1 and status = 'draft'`,
+    [page],
+  );
+
+  const row = rows[0];
+  if (row === undefined || row.publish_at === null) return null;
+  return { at: row.publish_at.toISOString(), by: row.scheduled_by };
+}
+
+/**
+ * ตั้ง/ยกเลิกกำหนดเวลาเผยแพร่ (`atIso = null` = ยกเลิก)
+ * - **ไม่แตะ `updated_at`/`updated_by`** เพราะการตั้งเวลาไม่ใช่ "การแก้เนื้อหา"
+ *   (หน้าจอตัวสร้างใช้ `updated_at` ของฉบับร่างบอกว่า "บันทึกล่าสุดเมื่อไร")
+ * - ยังไม่มีฉบับร่าง = โยน error ⇒ Server Action รายงานผู้ใช้ ไม่ใช่เงียบ
+ */
+export async function setPublishSchedule(page: string, atIso: string | null, actor: string): Promise<void> {
+  const result = await getPool().query(
+    `update page_document set publish_at = $2::timestamptz, scheduled_by = $3 where page = $1 and status = 'draft'`,
+    [page, atIso, atIso === null ? null : actor],
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new Error("ไม่มีฉบับร่างให้ตั้งกำหนดเวลาเผยแพร่");
+  }
+}
+
+export type DueSchedule = {
+  readonly page: string;
+  readonly at: string;
+  readonly by: string | null;
+};
+
+/** หน้าที่ "ครบกำหนด" แล้ว (ใหม่สุดก่อน) — เพดานกันรอบเดียวเผยแพร่ทีละมากจนล้นเซิร์ฟเวอร์ */
+const MAX_DUE_PER_RUN = 50;
+
+export async function listDueSchedules(nowIso: string): Promise<readonly DueSchedule[]> {
+  const { rows } = await getPool().query<{ page: string; publish_at: Date; scheduled_by: string | null }>(
+    `select page, publish_at, scheduled_by
+       from page_document
+      where status = 'draft' and publish_at is not null and publish_at <= $1::timestamptz
+      order by publish_at asc
+      limit $2`,
+    [nowIso, MAX_DUE_PER_RUN],
+  );
+
+  return rows.map((row) => ({ page: row.page, at: row.publish_at.toISOString(), by: row.scheduled_by }));
+}
+
+/** กำหนดเวลาทั้งหมดที่ยังรออยู่ (ใช้แสดงบนหน้าภาพรวมหลังบ้าน — ไม่จำกัดแค่ที่ครบกำหนด) */
+export async function listPublishSchedules(limit = 20): Promise<readonly DueSchedule[]> {
+  const { rows } = await getPool().query<{ page: string; publish_at: Date; scheduled_by: string | null }>(
+    `select page, publish_at, scheduled_by
+       from page_document
+      where status = 'draft' and publish_at is not null
+      order by publish_at asc
+      limit $1`,
+    [Math.max(1, Math.min(Math.trunc(limit), 100))],
+  );
+
+  return rows.map((row) => ({ page: row.page, at: row.publish_at.toISOString(), by: row.scheduled_by }));
+}
+
+/**
+ * เผยแพร่หน้าที่ "ครบกำหนด" แล้ว — **claim (ยึดกำหนดเวลา) + เขียนฉบับเผยแพร่ ในทรานแซกชันเดียว**
+ *
+ * คืน `null` = ไม่ได้ทำอะไร (มีตัวอื่นยึดกำหนดเวลาไปก่อน หรือกำหนดถูกยกเลิกไปแล้ว)
+ * ⇒ เรียกซ้ำ/รันพร้อมกันได้อย่างปลอดภัย (idempotent)
+ *
+ * ⚠️ ถ้าเขียนไม่สำเร็จ ทรานแซกชัน rollback ⇒ **กำหนดเวลายังอยู่** ให้รอบถัดไปลองใหม่ (ไม่หายเงียบ)
+ * ⚠️ actor = คนที่ตั้งกำหนดเวลา (ร่องรอยในประวัติ/audit) · ไม่รู้ = `fallbackActor`
+ */
+export async function publishDuePage(
+  page: string,
+  nowIso: string,
+  fallbackActor: string,
+  note: string | null,
+): Promise<{ readonly revision: number; readonly by: string | null } | null> {
+  return withTransaction(async (client) => {
+    /*
+      ⚠️ ต้องอ่านค่าดิบ "ก่อน" ล้าง — Postgres `returning` คืนค่า **หลัง** update
+      ⇒ ใช้ CTE `for update` ยึดแถว + คืนค่าเดิมของแถวนั้น แล้วล้างในคำสั่งเดียว (ยัง atomic)
+      (เคสจริงที่เจอตอนยิง CLI: ใช้ `... returning scheduled_by` ตรง ๆ แล้วได้ null
+       ทำให้ประวัติ/audit ไม่รู้ว่าใครเป็นคนตั้งกำหนด)
+    */
+    const { rows } = await client.query<{ scheduled_by: string | null; document: unknown }>(
+      `with due as (
+         select page, scheduled_by, document
+           from page_document
+          where page = $1 and status = 'draft' and publish_at is not null and publish_at <= $2::timestamptz
+          for update
+       )
+       update page_document as target
+          set publish_at = null, scheduled_by = null
+         from due
+        where target.page = due.page and target.status = 'draft'
+       returning due.scheduled_by, due.document`,
+      [page, nowIso],
+    );
+
+    const claim = rows[0];
+    if (claim === undefined) return null;
+
+    const revision = await writePublishedRevision(client, page, claim.document, claim.scheduled_by ?? fallbackActor, note);
+    return { revision, by: claim.scheduled_by };
+  });
 }
 
 /* ── ตัวย้ายเวอร์ชันของข้อมูลที่เก็บไว้ (X1.1) ────────────────────────────── */

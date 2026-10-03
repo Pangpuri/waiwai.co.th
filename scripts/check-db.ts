@@ -81,12 +81,17 @@ import {
 } from "@/lib/preview-link/repository";
 import {
   isPageLive,
+  listDueSchedules,
   loadDocumentRow,
   publishDraft,
+  publishDuePage,
+  readPublishSchedule,
   saveDraft,
   saveJsonDraft,
   setPageLive,
+  setPublishSchedule,
 } from "@/lib/blocks/repository";
+import { publishDueScheduled, scheduledPublishOverview } from "@/lib/blocks/publish-scheduler";
 import {
   deleteTrashItemPermanently,
   listTrash,
@@ -229,6 +234,9 @@ async function main(): Promise<void> {
 
   /* 16) บัญชีผู้ดูแลในฐานข้อมูล + บทบาท (X1.10 · RBAC · รอบที่ 84) */
   await checkAdminUsers();
+
+  /* 17) ตั้งเวลาเผยแพร่: ตั้งกำหนดในอดีต → ครบกำหนด → เผยแพร่ครั้งเดียว → ล้างกำหนด (X2.7 · รอบที่ 100) */
+  await checkScheduledPublish();
 
   await closePool();
 
@@ -1563,6 +1571,136 @@ async function checkAdminUsers(): Promise<void> {
   }
 }
 
+
+/**
+ * 17) ตั้งเวลาเผยแพร่ (X2.7 ส่วนที่ 1 · รอบที่ 100) — วงจรจริงกับฐานข้อมูล
+ *
+ * พิสูจน์
+ * 1. ตั้งกำหนดเวลาแล้วอ่านกลับได้ (เวลาที่ตั้ง + ใครตั้ง)
+ * 2. งานที่ครบกำหนดปรากฏในรายการที่การ์ดหน้าภาพรวมใช้
+ * 3. ตัวเผยแพร่ตามกำหนดเผยแพร่จริง → ล้างกำหนด → เขียนประวัติ → ลง audit
+ * 4. รันซ้ำไม่เผยแพร่ซ้ำ · claim แย่งกันได้หน้าละครั้งเดียว (idempotent)
+ * 5. กำหนดในอนาคตยังไม่ถูกแตะ
+ * 6. "กดเผยแพร่เอง" ก็ล้างกำหนดเวลาเดิม
+ *
+ * ⚠️ ใช้ page key สำหรับทดสอบโดยเฉพาะ และล้างทุกอย่างใน `finally` (ทั้งกรณีผ่านและล้มเหลว)
+ */
+const SCHEDULE_TEST_PAGE = "check-scheduled-publish";
+const SCHEDULE_TEST_ACTOR = "check-db-schedule@example.invalid";
+
+async function checkScheduledPublish(): Promise<void> {
+  const pool = getPool();
+
+  const cleanup = async (): Promise<void> => {
+    /* ⚠️ ต้องลบ "ประวัติ" ด้วย — ถ้าลบแค่ page_document รอบถัดไปจะนับประวัติของรอบก่อนปนเข้ามา */
+    await pool.query("delete from page_document where page = $1", [SCHEDULE_TEST_PAGE]);
+    await pool.query("delete from page_document_revision where page = $1", [SCHEDULE_TEST_PAGE]);
+    await pool.query("delete from audit_log where target = $1", [SCHEDULE_TEST_PAGE]);
+  };
+
+  await cleanup(); /* กันร่องรอยจากรอบก่อน */
+
+  const now = new Date();
+  const past = new Date(now.getTime() - 60 * 1000);
+  const future = new Date(now.getTime() + 60 * 60 * 1000);
+  const document = { page: SCHEDULE_TEST_PAGE, blocks: [] };
+
+  try {
+    await saveDraft(SCHEDULE_TEST_PAGE, document, SCHEDULE_TEST_ACTOR);
+    assert.equal(await readPublishSchedule(SCHEDULE_TEST_PAGE), null, "ยังไม่ตั้งกำหนด = ต้องเป็น null");
+
+    /* ── ตั้งกำหนดในอดีต (จำลองว่าเวลาผ่านมาแล้ว) ── */
+    await setPublishSchedule(SCHEDULE_TEST_PAGE, past.toISOString(), SCHEDULE_TEST_ACTOR);
+    const stored = await readPublishSchedule(SCHEDULE_TEST_PAGE);
+    assert.ok(stored !== null, "ตั้งกำหนดแล้วต้องอ่านกลับได้");
+    assert.equal(stored?.at, past.toISOString(), "เวลาที่อ่านกลับต้องตรง (UTC)");
+    assert.equal(stored?.by, SCHEDULE_TEST_ACTOR, "ต้องรู้ว่าใครตั้งกำหนด");
+
+    const due = await listDueSchedules(now.toISOString());
+    assert.equal(due.filter((row) => row.page === SCHEDULE_TEST_PAGE).length, 1, "ต้องเห็นงานที่ครบกำหนด");
+
+    const overview = await scheduledPublishOverview({ now });
+    assert.ok(overview !== null, "การ์ดหน้าภาพรวมต้องอ่านได้");
+    assert.ok((overview?.dueCount ?? 0) >= 1, "การ์ดต้องนับงานที่ครบกำหนด");
+    assert.ok((overview?.upcoming ?? []).some((row) => row.page === SCHEDULE_TEST_PAGE), "ต้องมีหน้านี้ในรายการที่ตั้งไว้");
+
+    /* ── เผยแพร่ตามกำหนด: ต้องเกิดจริงครั้งเดียว ── */
+    const report = await publishDueScheduled({ now, actorEmail: SCHEDULE_TEST_ACTOR });
+    assert.ok(report !== null, "ตัวเผยแพร่ต้องทำงานได้");
+    const publishedItem = report?.published.find((item) => item.page === SCHEDULE_TEST_PAGE);
+    assert.ok(publishedItem !== undefined, "ต้องเผยแพร่หน้านี้");
+    assert.ok((publishedItem?.revision ?? 0) >= 1, "ต้องได้เลขรุ่น");
+
+    assert.equal(await readPublishSchedule(SCHEDULE_TEST_PAGE), null, "เผยแพร่แล้วต้องล้างกำหนดเวลา");
+    const draftRow = await loadDocumentRow(SCHEDULE_TEST_PAGE, "draft");
+    const liveRow = await loadDocumentRow(SCHEDULE_TEST_PAGE, "published");
+    assert.ok(draftRow !== null && liveRow !== null, "ต้องมีทั้งฉบับร่างและฉบับเผยแพร่");
+    assert.equal(JSON.stringify(liveRow?.raw), JSON.stringify(draftRow?.raw), "ฉบับเผยแพร่ต้องเป็นสำเนาของฉบับร่าง");
+    assert.equal(
+      await countWhere("page_document_revision where page = $1", [SCHEDULE_TEST_PAGE]),
+      1,
+      "ต้องมีประวัติการเผยแพร่ 1 รุ่น",
+    );
+    assert.equal(
+      await countWhere("audit_log where target = $1 and action = 'publish-scheduled'", [SCHEDULE_TEST_PAGE]),
+      1,
+      "ต้องมีร่องรอย publish-scheduled ใน audit log",
+    );
+
+    /*
+      ⚠️ บทเรียนจากการยิงจริง: Postgres `returning` คืนค่า "หลัง" update
+      ⇒ ถ้าลืมอ่านค่าเดิมของ `scheduled_by` ก่อนล้าง ประวัติ/audit จะไม่รู้ว่าใครตั้งกำหนด (กลายเป็น fallback)
+    */
+    assert.equal(liveRow?.updatedBy, SCHEDULE_TEST_ACTOR, "ผู้ทำรายการในประวัติต้องเป็นคนที่ตั้งกำหนด (ไม่ใช่ fallback)");
+    const { rows: scheduleAudit } = await pool.query<{ readonly detail: string | null }>(
+      "select detail from audit_log where target = $1 and action = 'publish-scheduled'",
+      [SCHEDULE_TEST_PAGE],
+    );
+    assert.ok((scheduleAudit[0]?.detail ?? "").includes(SCHEDULE_TEST_ACTOR), "audit ต้องบอกว่าใครเป็นคนตั้งกำหนด");
+
+    /* ── รันซ้ำ = ไม่ทำอะไร (idempotent) ── */
+    const second = await publishDueScheduled({ now, actorEmail: SCHEDULE_TEST_ACTOR });
+    assert.equal(second?.published.length ?? -1, 0, "รันซ้ำต้องไม่เผยแพร่ซ้ำ");
+    assert.equal(
+      await countWhere("page_document_revision where page = $1", [SCHEDULE_TEST_PAGE]),
+      1,
+      "รันซ้ำต้องไม่เพิ่มประวัติ",
+    );
+
+    /* ── กำหนดในอนาคต = ยังไม่ถูกแตะ ── */
+    await setPublishSchedule(SCHEDULE_TEST_PAGE, future.toISOString(), SCHEDULE_TEST_ACTOR);
+    const early = await publishDueScheduled({ now, actorEmail: SCHEDULE_TEST_ACTOR });
+    assert.equal(early?.published.length ?? -1, 0, "ยังไม่ถึงกำหนด = ต้องไม่เผยแพร่");
+    assert.ok((await readPublishSchedule(SCHEDULE_TEST_PAGE)) !== null, "กำหนดในอนาคตต้องยังอยู่");
+
+    /* ── claim แย่งกัน: ครั้งแรกได้ ครั้งที่สองไม่ได้ ── */
+    assert.ok(
+      (await publishDuePage(SCHEDULE_TEST_PAGE, future.toISOString(), "system", "check:db")) !== null,
+      "ครบกำหนดแล้ว claim ต้องได้",
+    );
+    assert.equal(
+      await publishDuePage(SCHEDULE_TEST_PAGE, future.toISOString(), "system", "check:db"),
+      null,
+      "claim ซ้ำต้องไม่ได้ (กันเผยแพร่ซ้ำ)",
+    );
+
+    /* ── กดเผยแพร่เอง = ล้างกำหนดเวลาเดิมด้วย ── */
+    await setPublishSchedule(SCHEDULE_TEST_PAGE, future.toISOString(), SCHEDULE_TEST_ACTOR);
+    await publishDraft(SCHEDULE_TEST_PAGE, SCHEDULE_TEST_ACTOR, "check:db");
+    assert.equal(await readPublishSchedule(SCHEDULE_TEST_PAGE), null, "กดเผยแพร่เองต้องล้างกำหนดเวลาเดิม");
+
+    done("ตั้งเวลาเผยแพร่: ครบกำหนด → เผยแพร่ครั้งเดียว → ล้างกำหนด", "idempotent · claim แย่งกัน · audit");
+  } finally {
+    await cleanup();
+    assert.equal(await countWhere("page_document where page = $1", [SCHEDULE_TEST_PAGE]), 0, "ต้องไม่เหลือแถวทดสอบ");
+    assert.equal(
+      await countWhere("page_document_revision where page = $1", [SCHEDULE_TEST_PAGE]),
+      0,
+      "ต้องไม่เหลือประวัติทดสอบ (ไม่งั้นรอบถัดไปนับปน)",
+    );
+    assert.equal(await countWhere("audit_log where target = $1", [SCHEDULE_TEST_PAGE]), 0, "ต้องไม่เหลือร่องรอยทดสอบ");
+  }
+}
 
 /** อ่านสวิตช์ตรงจากตาราง (ใช้ยืนยันว่าปิดจริงหลังทดสอบ) */
 async function loadPageLiveFlag(page: string): Promise<boolean> {

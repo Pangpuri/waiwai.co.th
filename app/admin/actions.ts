@@ -16,6 +16,8 @@ import { verifyPassword } from "@/lib/auth/password";
 import { ADMIN_LOGIN_PATH } from "@/lib/auth/credentials";
 import { equalizeTiming } from "@/lib/auth/user-store";
 import { purgeNow, runScheduledPurge } from "@/lib/retention/purge";
+import { publishDueScheduled, runScheduledPublish } from "@/lib/blocks/publish-scheduler";
+import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isValidEmail } from "@/lib/validate";
 
 /**
@@ -105,6 +107,21 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
   */
   await runScheduledPurge({ actorEmail: email });
 
+  /*
+    เผยแพร่หน้าที่ "ตั้งกำหนดเวลาไว้และครบกำหนดแล้ว" (X2.7) — ใช้เหตุผลเดียวกับตัวลบตามระยะเก็บ:
+    โปรเจกต์นี้ไม่มีตัวจับเวลา/worker ⇒ ล็อกอินหลังบ้านคือจังหวะที่งานตามรอบได้ทำ
+    · ล้มเหลว/ไม่มี DB = คืน null เงียบ ๆ — **ห้ามทำให้ล็อกอินล้ม**
+    · เผยแพร่จริง = ทำให้หน้าเว็บสดใหม่ทันที (ISR) · ถ้าสั่งไม่สำเร็จก็ไม่ทำให้ล็อกอินล้ม
+  */
+  const scheduled = await runScheduledPublish({ actorEmail: email });
+  if (scheduled !== null && scheduled.published.length > 0) {
+    try {
+      await refreshPublicSite("page");
+    } catch {
+      /* ปล่อยผ่าน — ISR จะทำให้หน้าเว็บสดใหม่เองภายในรอบถัดไป */
+    }
+  }
+
   /* redirect ต้องอยู่นอก try/catch — ตัวมันเองโยน error ภายในเพื่อหยุด render */
   redirect("/admin");
 }
@@ -142,4 +159,27 @@ export async function purgeRetentionNowAction(): Promise<void> {
   const user = await requireAdminUser("retention");
   await purgeNow({ actorEmail: user.email });
   revalidatePath("/admin");
+}
+
+/**
+ * "เผยแพร่หน้าที่ครบกำหนดเดี๋ยวนี้" — ผู้ดูแลกดเองจากหน้าภาพรวม (X2.7)
+ *
+ * ทำไมต้องมีปุ่มนี้ทั้งที่ตัวเผยแพร่ตามกำหนดทำงานตอนล็อกอินอยู่แล้ว
+ * - กำหนดเวลาที่ครบระหว่างวันจะถูกเก็บไว้จนกว่าจะมีคนล็อกอินใหม่ ⇒ ปุ่มนี้ทำให้ "เห็นแล้วสั่งได้เลย"
+ * - ใช้สิทธิ์ `content` (ทุกบทบาทมี) เพราะเป็นการเผยแพร่เนื้อหา ไม่ใช่การแตะข้อมูลส่วนบุคคล
+ * - ล้มเหลวไม่ทำให้หน้าจอพัง (ปุ่มนี้ไม่คืนข้อความ — ร่องรอยใน audit log/การ์ดจะบอกผลเอง)
+ */
+export async function publishScheduledNowAction(): Promise<void> {
+  const user = await requireAdminUser("content");
+
+  let published = 0;
+  try {
+    const report = await publishDueScheduled({ actorEmail: user.email });
+    published = report === null ? 0 : report.published.length;
+  } catch {
+    published = 0;
+  }
+
+  revalidatePath("/admin");
+  if (published > 0) await refreshPublicSite("page");
 }

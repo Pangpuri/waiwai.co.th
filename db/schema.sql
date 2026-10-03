@@ -134,6 +134,10 @@ create table if not exists page_document (
 -- (เพิ่มทีหลังใน migration 0003 · เขียนเป็น alter เพื่อให้ไฟล์นี้ตรงกับประวัติ migration)
 alter table page_document add column if not exists is_live boolean not null default false;
 
+-- ตั้งเวลาเผยแพร่อัตโนมัติ (X2.7 · migration 0014): null = ไม่ได้ตั้ง · เก็บกับแถวฉบับร่าง
+alter table page_document add column if not exists publish_at   timestamptz;
+alter table page_document add column if not exists scheduled_by text;
+
 -- ประวัติทุกครั้งที่ "เผยแพร่" (และตอนกู้คืน) → ย้อนกลับได้ ของเดิมไม่หายแม้เผยแพร่ทับ
 create table if not exists page_document_revision (
   id         bigint generated always as identity primary key,

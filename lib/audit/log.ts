@@ -63,7 +63,12 @@ export type AuditAction =
   /** นำเข้าชุดของส่วนกลางจากไฟล์ JSON (W3b ต่อ · รอบที่ 91) */
   | "chrome-preset-import"
   /** เพิกถอนเซสชันหลังบ้าน (รายตัว/ทั้งบัญชี · รอบที่ 95) */
-  | "admin-session-revoke";
+  | "admin-session-revoke"
+  /**
+   * เผยแพร่ **ตามกำหนดเวลา** (X2.7 ส่วนที่ 1 · รอบที่ 100)
+   * ⚠️ แยกจาก `publish` เพราะ "ไม่มีใครกด" — detail บอกว่าเวลาที่ตั้งไว้และใครตั้ง
+   */
+  | "publish-scheduled";
 
 export type AuditEntry = {
   readonly action: AuditAction;

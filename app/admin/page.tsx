@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-import { logoutAction, purgeRetentionNowAction } from "@/app/admin/actions";
+import { logoutAction, publishScheduledNowAction, purgeRetentionNowAction } from "@/app/admin/actions";
 import { auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
+import { scheduledPublishOverview } from "@/lib/blocks/publish-scheduler";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { maintenanceFlagOf, MAINTENANCE_ENV_VAR } from "@/lib/maintenance/plan";
 import { describeRetention } from "@/lib/retention/format";
@@ -53,6 +54,12 @@ export default async function AdminHomePage() {
     อ่านเฉพาะเมื่อมีสิทธิ์ (เหตุผลเดียวกับระยะเก็บด้านบน)
   */
   const trash = canTrash ? await trashStats() : null;
+
+  /*
+    งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — ทุกบทบาทมีสิทธิ์ `content` จึงไม่ต้องซ่อนการ์ด
+    อ่านล้วน + คืน null เมื่อยังไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
+  */
+  const schedule = await scheduledPublishOverview();
   const labelByClass: Readonly<Record<RetentionClass, string>> = {
     contact: strings.retentionLabelContact,
     newsletter: strings.retentionLabelNewsletter,
@@ -232,6 +239,45 @@ export default async function AdminHomePage() {
               .replace("{preset}", String(trash.preset))}
           </span>
         </div>
+      </section>
+      ) : null}
+
+      {/* ── งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — ทุกบทบาทเข้าถึงได้ (สิทธิ์ content) ── */}
+      {schedule !== null ? (
+      <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.scheduleCardTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.scheduleCardHint}</p>
+        </div>
+
+        <p className="text-fg text-sm font-semibold">
+          {schedule.upcoming.length === 0 || schedule.nextAt === null
+            ? strings.scheduleCardNone
+            : schedule.dueCount > 0
+              ? strings.scheduleCardDue.replace("{count}", String(schedule.dueCount))
+              : strings.scheduleCardNext.replace("{time}", stamp(schedule.nextAt))}
+        </p>
+
+        {schedule.upcoming.length === 0 ? null : (
+          <ul className="text-fg-muted flex flex-col gap-1 text-xs">
+            {schedule.upcoming.map((row) => (
+              <li key={row.page} className="font-mono">
+                {strings.scheduleCardRow.replace("{page}", row.page).replace("{time}", stamp(row.at))}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form action={publishScheduledNowAction} className="flex flex-col gap-2">
+          <button
+            type="submit"
+            disabled={schedule.dueCount === 0}
+            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring w-fit rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {strings.schedulePublishNow}
+          </button>
+          <p className="text-fg-muted text-xs">{strings.schedulePublishNowHint}</p>
+        </form>
       </section>
       ) : null}
 
