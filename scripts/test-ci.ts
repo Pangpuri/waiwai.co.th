@@ -87,9 +87,16 @@ test("ci: งาน database พิสูจน์ฐานข้อมูลจ
   assert.ok(workflow.includes("postgresql-client-17"), "ต้องมี pg_dump/pg_restore ให้ check:restore ทำงานได้");
   assert.ok(workflow.includes("DATABASE_URL"), "งานนี้ต้องตั้ง DATABASE_URL ให้สคริปต์");
 
-  for (const script of ["db:migrate", "check:migrations", "check:db", "db:backup", "check:restore"]) {
+  for (const script of ["db:migrate", "db:seed", "check:migrations", "check:db", "db:backup", "check:restore"]) {
     assert.ok(workflow.includes(`npm run ${script}`), `ขาดขั้นตอน ${script}`);
   }
+
+  /* seed ต้องอยู่หลัง migrate และก่อนการตรวจ (check:db ต้องการเนื้อหาตั้งต้น) */
+  const migrateAt = workflow.indexOf("npm run db:migrate");
+  const seedAt = workflow.indexOf("npm run db:seed");
+  const checkDbAt = workflow.indexOf("npm run check:db");
+  assert.ok(seedAt > migrateAt, "seed ต้องอยู่หลัง migrate");
+  assert.ok(seedAt < checkDbAt, "seed ต้องอยู่ก่อน check:db (ไม่งั้นฐานข้อมูลเปล่าแล้วด่านตก)");
 
   /* ลำดับสำคัญ: migrate → migrations → db → backup → restore */
   const order = ["db:migrate", "check:migrations", "check:db", "db:backup", "check:restore"].map((script) =>

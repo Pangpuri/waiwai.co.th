@@ -129,8 +129,13 @@ jobs:
       - name: Install dependencies (ตาม lockfile เท่านั้น)
         run: npm ci
 
+      # ⚠️ ลำดับสำคัญ: migrate → seed → ตรวจ (พบจริงรอบที่ 2 ของ CI: check:db ตกเพราะฐานข้อมูลยังเปล่า)
       - name: รัน migration จากศูนย์ (ด่าน 12 ต่อ)
         run: npm run db:migrate
+
+      # check:db ต้องมีเนื้อหาตั้งต้น (เหมือนเครื่องใหม่ที่เพิ่งติดตั้ง) ⇒ รัน seed ต่อจาก migrate
+      - name: ใส่เนื้อหาตั้งต้น (เหมือนเครื่องใหม่)
+        run: npm run db:seed
 
       - name: check:migrations (ด่าน 12)
         run: npm run check:migrations
