@@ -39,6 +39,8 @@ function retentionLabels(m: Messages["privacyPage"]): Readonly<Record<RetentionC
     contact: m.retentionLabelContact,
     newsletter: m.retentionLabelNewsletter,
     careers: m.retentionLabelCareers,
+    blockRevision: m.retentionLabelBlockRevision,
+    contentRevision: m.retentionLabelContentRevision,
     loginAttempt: m.retentionLabelLoginAttempt,
     auditLog: m.retentionLabelAuditLog,
   };

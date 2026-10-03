@@ -23,6 +23,8 @@ export const adminRetention = {
   retentionLabelContact: "ข้อความจากฟอร์มติดต่อ",
   retentionLabelNewsletter: "อีเมลรับข่าวสาร",
   retentionLabelCareers: "ใบสมัครงาน + เรซูเม่",
+  retentionLabelBlockRevision: "ประวัติเนื้อหาหน้าเว็บ (เก็บบล็อกรุ่นล่าสุด)",
+  retentionLabelContentRevision: "ประวัติเนื้อหาแบบฟิลด์ (เก็บรุ่นล่าสุด)",
   retentionLabelLoginAttempt: "ร่องรอยการพยายามล็อกอิน",
   retentionLabelAuditLog: "บันทึกการแก้ไขเนื้อหา",
   auditRetentionPurge: "ลบข้อมูลตามระยะเก็บ",

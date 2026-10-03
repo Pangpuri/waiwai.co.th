@@ -51,10 +51,12 @@ export const privacyPage = {
   retentionLabelContact: "Contact form messages",
   retentionLabelNewsletter: "Newsletter subscribers",
   retentionLabelCareers: "Job applications and résumé files",
+  retentionLabelBlockRevision: "Page content edit history (latest revision always kept)",
+  retentionLabelContentRevision: "Field content edit history (latest revision always kept)",
   retentionLabelLoginAttempt: "Back-office sign-in attempts (staff only)",
   retentionLabelAuditLog: "Content change log (staff only)",
   retentionNote:
-    "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · if you want your data deleted earlier, contact us using the details below",
+    "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · the latest revision of each page is always kept so mistakes can be restored · if you want your data deleted earlier, contact us using the details below",
 
   rightsTitle: "Your rights",
   rightsIntro: "Under personal data protection law you have the following rights",

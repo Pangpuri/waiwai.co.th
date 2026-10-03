@@ -36,6 +36,7 @@ export default async function AdminHomePage() {
       "pages-update": strings.auditPagesUpdate,
       "migrate-blocks": strings.auditBlockMigrate,
       "retention-purge": strings.auditRetentionPurge,
+      "erase-subject": strings.auditEraseSubject,
     };
     return map[action] ?? action;
   };
@@ -50,6 +51,8 @@ export default async function AdminHomePage() {
     contact: strings.retentionLabelContact,
     newsletter: strings.retentionLabelNewsletter,
     careers: strings.retentionLabelCareers,
+    blockRevision: strings.retentionLabelBlockRevision,
+    contentRevision: strings.retentionLabelContentRevision,
     loginAttempt: strings.retentionLabelLoginAttempt,
     auditLog: strings.retentionLabelAuditLog,
   };

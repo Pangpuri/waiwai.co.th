@@ -24,6 +24,7 @@ import { errorsOf, validateContent } from "@/lib/content/validate";
 import type { PageContent } from "@/lib/content/types";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
+import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
 
 type MutableText = { th: string; en: string };
 type MutableItem = { order: number; fields: Record<string, MutableText>; media: Record<string, never> };
@@ -135,6 +136,12 @@ async function main(): Promise<void> {
 
   /* 9) ข้อมูลที่การ์ดบนหน้าภาพรวมใช้ (อ่านล้วน — ต้องไม่พังและต้องตรงกับนโยบาย) */
   await checkRetentionOverview();
+
+  /* 10) ระยะเก็บของ "ประวัติเนื้อหา" (มติรอบที่ 77) — ลบของเก่า แต่เก็บรุ่นล่าสุดของแต่ละหน้าไว้เสมอ */
+  await checkRevisionPurge();
+
+  /* 11) คำขอใช้สิทธิ์: ลบข้อมูลของอีเมลหนึ่ง ต้องไม่แตะของอีเมลอื่น (PDPA · รอบที่ 77) */
+  await checkErasure();
 
   await closePool();
 
@@ -305,6 +312,215 @@ async function checkRetentionOverview(): Promise<void> {
   }
 
   done("การ์ดระยะเก็บบนหน้าภาพรวมอ่านข้อมูลได้", `ชั้นข้อมูล ${overview.steps.length} · ค้างลบ ${overview.dueTotal} แถว`);
+}
+
+/**
+ * 10) ระยะเก็บของ "ประวัติเนื้อหา" (มติรอบที่ 77 — ผู้ใช้เลือกเอง)
+ *
+ * พิสูจน์ 2 อย่างที่สำคัญที่สุด
+ * 1. ประวัติที่เก่ากว่าระยะเก็บ **ถูกลบจริง** (ไม่งั้นนโยบายที่ประกาศบน `/privacy` เป็นเท็จ)
+ * 2. **รุ่นล่าสุดของแต่ละหน้ารอดเสมอ** — หน้าที่ทั้งหน้าถูกแก้ครั้งสุดท้ายนานกว่า 1 ปี
+ *    ต้องยังเหลือ 1 รุ่นให้ย้อนกลับ (กันเคส "ผู้ใช้กู้คืนประวัติแล้วเจอ pageless")
+ *
+ * ใช้ชื่อหน้า `check-db-*` ที่ไม่มีอยู่จริง (ทั้งสองตารางไม่มี FK) ⇒ ไม่แตะเนื้อหาจริงเลย
+ * และลบรอยทดสอบใน `finally` เหมือนข้ออื่น
+ */
+async function checkRevisionPurge(): Promise<void> {
+  const pool = getPool();
+
+  /* หน้า A: เก่าทั้ง 3 รุ่น → ต้องเหลือรุ่น 3 · หน้า B: เก่า 1 + ใหม่ 1 → ต้องเหลือทั้งคู่ */
+  const oldPage = "check-db-revision-old";
+  const freshPage = "check-db-revision-fresh";
+  const oldContentPage = "check-db-content-revision-old";
+
+  const leftovers = {
+    blockOld: await countWhere("page_document_revision where page like 'check-db-revision-%'", []),
+    contentOld: await countWhere("content_revision where page like 'check-db-content-revision-%'", []),
+  };
+  assert.deepEqual(leftovers, { blockOld: 0, contentOld: 0 }, "ต้องไม่มีรอยทดสอบประวัติค้างจากรอบก่อน");
+
+  try {
+    /* แถวเก่า: 800 วัน (เกิน 365 วันแน่นอน) — ของใหม่: เดี๋ยวนี้ */
+    await pool.query(
+      `insert into page_document_revision (page, revision, document, created_at, created_by) values
+        ($1, 1, '{"blocks":[]}'::jsonb, now() - interval '800 days', $3),
+        ($1, 2, '{"blocks":[]}'::jsonb, now() - interval '700 days', $3),
+        ($1, 3, '{"blocks":[]}'::jsonb, now() - interval '600 days', $3),
+        ($2, 1, '{"blocks":[]}'::jsonb, now() - interval '700 days', $3),
+        ($2, 2, '{"blocks":[]}'::jsonb, now(), $3)`,
+      [oldPage, freshPage, "check-db"],
+    );
+    await pool.query(
+      `insert into content_revision (page, revision, status, snapshot, created_at, created_by) values
+        ($1, 1, 'archived', '{}'::jsonb, now() - interval '800 days', $2),
+        ($1, 2, 'archived', '{}'::jsonb, now() - interval '700 days', $2)`,
+      [oldContentPage, "check-db"],
+    );
+    done("สร้างประวัติสังเคราะห์", "บล็อกเก่า 3 รุ่น + ใหม่ 1 · ฟิลด์เก่า 2 รุ่น");
+
+    /* นับก่อนลบ (dry run) — ต้องเห็น >= 4 (บล็อก 2 + ฟิลด์ 1 + ... ตามจริง 3) */
+    const dry = await purgeExpired({ dryRun: true });
+    assert.ok(dry !== null, "ต้องอ่านสถานะได้");
+    assert.ok(
+      dry.counts.blockRevision >= 2,
+      `ต้องเห็นประวัติบล็อกหมดอายุอย่างน้อย 2 รุ่น (เห็น ${dry.counts.blockRevision})`,
+    );
+    assert.ok(dry.counts.contentRevision >= 1, `ต้องเห็นประวัติฟิลด์หมดอายุ (เห็น ${dry.counts.contentRevision})`);
+    done(
+      "นับประวัติที่หมดอายุก่อนลบ (dry run)",
+      `บล็อก ${dry.counts.blockRevision} · ฟิลด์ ${dry.counts.contentRevision}`,
+    );
+
+    /* ลบจริงด้วยเส้นทางเดียวกับตัวลบอัตโนมัติ */
+    const purged = await purgeExpired();
+    assert.ok(purged !== null, "ลบจริงต้องได้รายงาน");
+
+    /* หน้า A: ต้องเหลือรุ่น 3 (รุ่นล่าสุด) เท่านั้น — 1 กับ 2 ถูกลบ */
+    const keepLatest = await countWhere("page_document_revision where page = $1 and revision = 3", [oldPage]);
+    const olderGone = await countWhere("page_document_revision where page = $1 and revision < 3", [oldPage]);
+    assert.equal(keepLatest, 1, "รุ่นล่าสุดของหน้าที่เก่าทั้งหน้า ต้องถูกเก็บไว้เสมอ");
+    assert.equal(olderGone, 0, "รุ่นที่เก่ากว่าต้องถูกลบ");
+    done("ประวัติเก่าถูกลบ แต่รุ่นล่าสุดของหน้ายังอยู่", `${oldPage} เหลือรุ่น 3`);
+
+    /* หน้า B: ทั้งสองรุ่นยังอยู่ (รุ่น 2 ใหม่ · รุ่น 1 เก่าแต่เป็นรุ่นเดียว... ต้องถูกลบเพราะไม่ใช่รุ่นล่าสุด) */
+    const fresh = {
+      newest: await countWhere("page_document_revision where page = $1 and revision = 2", [freshPage]),
+      older: await countWhere("page_document_revision where page = $1 and revision = 1", [freshPage]),
+    };
+    assert.equal(fresh.newest, 1, "รุ่นใหม่ต้องอยู่");
+    assert.equal(fresh.older, 0, "รุ่นเก่าของหน้าเดียวกันต้องถูกลบ (ไม่ใช่รุ่นล่าสุด)");
+    done("หน้าเดียวกัน: เก็บเฉพาะรุ่นล่าสุด", `${freshPage} เหลือรุ่น 2`);
+
+    /* ประวัติแบบฟิลด์: เหลือรุ่น 2 เท่านั้น */
+    const content = {
+      kept: await countWhere("content_revision where page = $1 and revision = 2", [oldContentPage]),
+      gone: await countWhere("content_revision where page = $1 and revision = 1", [oldContentPage]),
+    };
+    assert.deepEqual(content, { kept: 1, gone: 0 }, "ประวัติฟิลด์ต้องเหลือรุ่นล่าสุดและลบรุ่นเก่า");
+    done("ประวัติฟิลด์ (content_revision) ทำงานตามกฎเดียวกัน");
+  } finally {
+    /* คืนสภาพ: ลบรอยทดสอบทั้งหมด แล้วยืนยันว่าไม่เหลือ */
+    await pool.query("delete from page_document_revision where page like 'check-db-revision-%'");
+    await pool.query("delete from content_revision where page like 'check-db-content-revision-%'");
+
+    const after = {
+      blockOld: await countWhere("page_document_revision where page like 'check-db-revision-%'", []),
+      contentOld: await countWhere("content_revision where page like 'check-db-content-revision-%'", []),
+    };
+    assert.deepEqual(after, { blockOld: 0, contentOld: 0 }, "ลบรอยทดสอบประวัติต้องไม่เหลืออะไรค้าง");
+    done("คืนสภาพตารางประวัติแล้ว", "ไม่เหลือรอยทดสอบ");
+  }
+}
+
+/**
+ * 11) คำขอใช้สิทธิ์: "ลบข้อมูลทั้งหมดของอีเมลนี้" (PDPA · รอบที่ 77)
+ *
+ * พิสูจน์ 5 อย่าง
+ * 1. ลบ **ครบทุกฟอร์ม** ของอีเมลนั้น (ติดต่อ + ข่าวสาร + ใบสมัครงาน) ในคำสั่งเดียว
+ * 2. **ไฟล์เรซูเม่หายตามใบสมัคร** (`on delete cascade`)
+ * 3. **ไม่แตะข้อมูลของอีเมลอื่น** (ข้อนี้สำคัญที่สุด — ลบเกิน = ข้อมูลคนอื่นหายถาวร)
+ * 4. ตัวพิมพ์ใหญ่/ช่องว่างต้องไม่ทำให้ลบไม่ครบ
+ * 5. บันทึก audit ใช้ **อีเมลแบบปิดบางส่วน** เท่านั้น
+ */
+async function checkErasure(): Promise<void> {
+  const pool = getPool();
+  const target = "check-db-erase-target@example.invalid";
+  /* ตัวพิมพ์ต่าง = ต้องถูกลบด้วย (พิสูจน์ว่าเทียบแบบ normalize จริง) */
+  const targetMixedCase = "Check-DB-Erase-Target@Example.INVALID";
+  const bystander = "check-db-erase-bystander@example.invalid";
+  const actor = "check-db@example.invalid";
+
+  const before = {
+    target: await countWhere("form_submission where lower(btrim(email)) = $1", [target]),
+    bystander: await countWhere("form_submission where lower(btrim(email)) = $1", [bystander]),
+    audit: await countWhere("audit_log where actor_email = $1", [actor]),
+  };
+  assert.deepEqual(before, { target: 0, bystander: 0, audit: 0 }, "ต้องไม่มีรอยทดสอบค้างจากรอบก่อน");
+
+  let careersId = 0;
+
+  try {
+    await pool.query(
+      `insert into form_submission (form, email, name, message, consent) values
+        ('contact', $1, 'ผู้ขอ', 'ขอให้ลบข้อมูล', true),
+        ('newsletter', $2, 'ผู้ขอ', 'สมัครข่าว', true)`,
+      [target, targetMixedCase],
+    );
+    const { rows } = await pool.query<{ id: string }>(
+      `insert into form_submission (form, email, name, message, consent) values
+        ('careers', $1, 'ผู้ขอ', 'สมัครงาน', true) returning id`,
+      [target],
+    );
+    careersId = Number(rows[0]?.id ?? 0);
+    assert.ok(careersId > 0, "ต้องสร้างใบสมัครทดสอบได้");
+
+    await pool.query(
+      `insert into form_attachment (submission_id, filename, mime, size_bytes, data)
+       values ($1, 'cv.pdf', 'application/pdf', 4, $2)`,
+      [careersId, Buffer.from("test")],
+    );
+    await pool.query(
+      `insert into form_submission (form, email, name, message, consent) values
+        ('contact', $1, 'คนข้าง ๆ', 'ต้องไม่ถูกลบ', true)`,
+      [bystander],
+    );
+
+    const preview = await erasurePreview(target);
+    assert.ok(preview !== null, "ต้องอ่านตัวอย่างก่อนลบได้");
+    assert.deepEqual(
+      preview.counts,
+      { contact: 1, newsletter: 1, careers: 1, attachments: 1 },
+      "ต้องเห็นครบทุกฟอร์มของอีเมลนี้ (รวมแบบตัวพิมพ์ผสม)",
+    );
+    done(
+      "นับข้อมูลของอีเมลเป้าหมายก่อนลบ",
+      `ติดต่อ ${preview.counts.contact} · ข่าวสาร ${preview.counts.newsletter} · สมัครงาน ${preview.counts.careers} · ไฟล์แนบ ${preview.counts.attachments}`,
+    );
+
+    const report = await eraseSubject({ email: target, actorEmail: actor });
+    assert.ok(report !== null, "ลบต้องได้รายงาน");
+    assert.equal(report.total, 3, "ต้องลบครบ 3 รายการ");
+    assert.equal(report.nothingFound, false);
+    assert.ok(report.masked.includes("***") && !report.masked.includes(target), "รายงานต้องเป็นแบบปิดบางส่วน");
+
+    const after = {
+      targetRows: await countWhere("form_submission where lower(btrim(email)) = $1", [target]),
+      targetAttachments: await countWhere("form_attachment where submission_id = $1", [careersId]),
+      bystanderRows: await countWhere("form_submission where lower(btrim(email)) = $1", [bystander]),
+      auditRows: await countWhere("audit_log where actor_email = $1 and action = 'erase-subject'", [actor]),
+    };
+    assert.deepEqual(
+      after,
+      { targetRows: 0, targetAttachments: 0, bystanderRows: 1, auditRows: 1 },
+      "ลบครบ + ไฟล์แนบหายตาม + ห้ามแตะอีเมลอื่น + ต้องมีบันทึกการลบ 1 แถว",
+    );
+    done("ลบข้อมูลอีเมลเป้าหมายครบ + ไม่แตะอีเมลอื่น", "ไฟล์เรซูเม่หายตามใบสมัคร · audit 1 แถว");
+
+    const { rows: detailRows } = await pool.query<{ detail: string | null }>(
+      "select detail from audit_log where actor_email = $1 order by created_at desc limit 1",
+      [actor],
+    );
+    const detail = detailRows[0]?.detail ?? "";
+    assert.ok(!detail.includes(target), "บันทึกการลบห้ามมีอีเมลเต็ม");
+    assert.ok(detail.includes("***"), "บันทึกต้องเป็นแบบปิดบางส่วน");
+    done("บันทึกการลบไม่เก็บอีเมลเต็ม", `detail = ${detail}`);
+
+    const second = await eraseSubject({ email: target, actorEmail: actor });
+    assert.equal(second?.nothingFound, true, "ลบซ้ำต้องบอกว่าไม่พบข้อมูล ไม่ใช่พัง");
+    done("ลบซ้ำอย่างปลอดภัย", "ไม่พบข้อมูล · ไม่เกิด error");
+  } finally {
+    /* คืนสภาพ: ลบรอยทดสอบทั้งหมด (ไฟล์แนบหายตาม cascade) */
+    await pool.query("delete from form_submission where lower(btrim(email)) in ($1, $2)", [target, bystander]);
+    await pool.query("delete from audit_log where actor_email = $1", [actor]);
+
+    const after = {
+      target: await countWhere("form_submission where lower(btrim(email)) = $1", [target]),
+      bystander: await countWhere("form_submission where lower(btrim(email)) = $1", [bystander]),
+      audit: await countWhere("audit_log where actor_email = $1", [actor]),
+    };
+    assert.deepEqual(after, { target: 0, bystander: 0, audit: 0 }, "ลบรอยทดสอบต้องไม่เหลืออะไรค้าง");
+    done("คืนสภาพตารางคำขอใช้สิทธิ์แล้ว", "ไม่เหลือรอยทดสอบ");
+  }
 }
 
 await main();

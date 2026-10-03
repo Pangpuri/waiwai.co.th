@@ -1,11 +1,14 @@
 import Link from "next/link";
 
-import { deleteSubmissionAction, setSubmissionStatusAction } from "@/app/admin/inbox/actions";
+import { deleteSubmissionAction, eraseSubjectAction, setSubmissionStatusAction } from "@/app/admin/inbox/actions";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { isDatabaseConfigured } from "@/lib/content/repository";
 import { formatBytes } from "@/lib/forms/attachment";
 import { countSubmissionsByStatus, listAttachments, listSubmissions, type SubmissionRow, type SubmissionStatus } from "@/lib/forms/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
+import { erasureIsEmpty, erasureTotal, isPlausibleEmail } from "@/lib/privacy/erasure";
+import { erasurePreview } from "@/lib/privacy/repository";
 
 /**
  * กล่องข้อความหลังบ้าน (X1.9) — ผู้ติดต่อ/ผู้สมัครจากฟอร์มหน้าเว็บ
@@ -34,7 +37,7 @@ function formLabel(strings: Awaited<ReturnType<typeof getMessagesFor>>["admin"],
 export default async function AdminInboxPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly status?: string; readonly form?: string }>;
+  readonly searchParams: Promise<{ readonly status?: string; readonly form?: string; readonly erase?: string }>;
 }) {
   await requireAdminUser();
   const messages = await getMessagesFor("th");
@@ -43,6 +46,15 @@ export default async function AdminInboxPage({
   const query = await searchParams;
   const status: SubmissionStatus | "all" = query.status === "handled" || query.status === "spam" || query.status === "new" ? query.status : "all";
   const formFilter = query.form === "newsletter" || query.form === "careers" || query.form === "contact" ? query.form : "all";
+
+  /*
+    คำขอใช้สิทธิ์ (ลบข้อมูลของอีเมลนี้) — อ่านจาก query string
+    ⚠️ ขั้นนี้ **อ่านล้วน** (นับว่าจะลบอะไร) · การลบจริงเกิดใน server action หลังผ่านการตรวจ 3 ด่าน
+  */
+  const eraseEmail = (query.erase ?? "").trim();
+  const eraseCheckOk = eraseEmail !== "" && isPlausibleEmail(eraseEmail);
+  const eraseDbMissing = !isDatabaseConfigured();
+  const preview = eraseCheckOk && !eraseDbMissing ? await erasurePreview(eraseEmail) : null;
 
   const rows = await listSubmissions({ status, form: formFilter, limit: 100 });
   const counts = await countSubmissionsByStatus();
@@ -186,6 +198,104 @@ export default async function AdminInboxPage({
           ))}
         </ul>
       )}
+
+      {/*
+        คำขอใช้สิทธิ์: ลบข้อมูลของอีเมลนี้ (PDPA · รอบที่ 77)
+        สองจังหวะโดยตั้งใจ: (1) กรอกอีเมล → เห็นว่าจะลบอะไร (อ่านล้วน ไม่แก้อะไร)
+                          (2) พิมพ์อีเมลซ้ำ + ติ๊กยืนยันตัวตน → จึงลบจริง
+        ใช้ <form method="get"> ของเบราว์เซอร์ล้วน ๆ (ไม่มี JS) ⇒ ทำงานได้ทุกเครื่อง
+      */}
+      <section className="border-line bg-surface mt-4 flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-brand-red text-sm font-semibold">{strings.eraseTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.eraseHint}</p>
+        </div>
+
+        <div className="border-line bg-bg-subtle flex flex-col gap-1 rounded-xl border p-3">
+          <p className="text-fg text-xs font-semibold">{strings.eraseProcedureTitle}</p>
+          <p className="text-fg-muted text-xs">{strings.eraseProcedure1}</p>
+          <p className="text-fg-muted text-xs">{strings.eraseProcedure2}</p>
+          <p className="text-fg-muted text-xs">{strings.eraseProcedure3}</p>
+        </div>
+
+        {eraseDbMissing ? (
+          <p className="text-fg-muted text-xs italic">{strings.eraseDbMissing}</p>
+        ) : (
+          <>
+            <form method="get" action="/admin/inbox" className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-fg-muted text-xs font-medium">{strings.eraseEmailLabel}</span>
+                <input
+                  type="email"
+                  name="erase"
+                  required
+                  defaultValue={eraseEmail}
+                  placeholder={strings.eraseEmailPlaceholder}
+                  className="border-line bg-bg text-fg focus-visible:ring-ring w-72 rounded-lg border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                />
+              </label>
+              <button type="submit" className={BUTTON_CLASS}>
+                {strings.eraseCheck}
+              </button>
+            </form>
+
+            {eraseEmail !== "" ? (
+              eraseCheckOk && preview !== null ? (
+                <div className="border-line flex flex-col gap-3 rounded-xl border p-4">
+                  <p className="text-fg text-sm font-semibold">{strings.erasePreviewTitle}</p>
+
+                  {erasureIsEmpty(preview.counts) ? (
+                    <p className="text-fg-muted text-sm">{strings.eraseNothingFound}</p>
+                  ) : (
+                    <>
+                      <p className="text-fg text-sm">
+                        {fillTemplate(strings.eraseWillDelete, {
+                          total: erasureTotal(preview.counts),
+                          contact: preview.counts.contact,
+                          newsletter: preview.counts.newsletter,
+                          careers: preview.counts.careers,
+                          attachments: preview.counts.attachments,
+                        })}
+                      </p>
+                      <p className="text-fg-muted text-xs">
+                        {fillTemplate(strings.eraseWillKeep, { attempts: preview.keptLoginAttempts })}
+                      </p>
+
+                      <form action={eraseSubjectAction} className="flex flex-col gap-3">
+                        <input type="hidden" name="email" value={eraseEmail} />
+
+                        <label className="flex flex-col gap-1">
+                          <span className="text-fg-muted text-xs font-medium">{strings.eraseConfirmLabel}</span>
+                          <input
+                            type="email"
+                            name="confirmEmail"
+                            required
+                            placeholder={strings.eraseConfirmPlaceholder}
+                            className="border-line bg-bg text-fg focus-visible:ring-ring w-72 rounded-lg border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                          />
+                        </label>
+
+                        <label className="flex items-center gap-2">
+                          <input type="checkbox" name="verified" required className="h-4 w-4" />
+                          <span className="text-fg text-xs">{strings.eraseVerifiedLabel}</span>
+                        </label>
+
+                        <button type="submit" className={`${BUTTON_CLASS} text-brand-red self-start`}>
+                          {strings.eraseSubmit}
+                        </button>
+                      </form>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="text-brand-red text-xs font-semibold">
+                  {eraseCheckOk ? strings.eraseNothingFound : strings.eraseInvalidEmail}
+                </p>
+              )
+            ) : null}
+          </>
+        )}
+      </section>
     </main>
   );
 }

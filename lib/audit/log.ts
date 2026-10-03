@@ -22,7 +22,12 @@ export type AuditAction =
   /** ย้ายรุ่นรูปทรงบล็อกของข้อมูลที่เก็บไว้ (X1.1) */
   | "migrate-blocks"
   /** ลบข้อมูลที่หมดอายุตามนโยบายระยะเก็บ (X2b) — ร่องรอยว่าลบอะไรไปเท่าไร */
-  | "retention-purge";
+  | "retention-purge"
+  /**
+   * ลบข้อมูลทั้งหมดของเจ้าของข้อมูลตามคำขอใช้สิทธิ์ (PDPA · รอบที่ 77)
+   * ⚠️ เก็บอีเมลแบบปิดบางส่วนเท่านั้น (`a***@domain`) — ดู `lib/privacy/erasure.ts`
+   */
+  | "erase-subject";
 
 export type AuditEntry = {
   readonly action: AuditAction;

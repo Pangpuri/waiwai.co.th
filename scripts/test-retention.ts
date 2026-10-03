@@ -7,10 +7,14 @@ import { EMPTY_PAGE_SEO, type PageRecord } from "@/lib/pages/model";
 import { CODE_ONLY_PAGE_PATHS } from "@/lib/pages/paths";
 import { describeRetention, retentionPhrase } from "@/lib/retention/format";
 import {
+  FORM_RETENTION_CLASSES,
   LAZY_PURGE_INTERVAL_HOURS,
+  LOG_RETENTION_CLASSES,
   PURGE_AUDIT_ACTION,
   RETENTION_CLASSES,
   RETENTION_DAYS,
+  REVISIONS_KEPT_PER_PAGE,
+  REVISION_RETENTION_CLASSES,
   cutoffFor,
   cutoffIsoFor,
   isExpired,
@@ -134,9 +138,32 @@ test("retention: บอกรอบลบถัดไปได้ (null = ลบ
 });
 
 test("retention: สรุปผลลบสำหรับ audit log มีทุกชั้นข้อมูล", () => {
-  const summary = summarizePurge({ contact: 1, newsletter: 2, careers: 3, loginAttempt: 4, auditLog: 5 });
-  assert.equal(summary, "contact=1 newsletter=2 careers=3 loginAttempt=4 auditLog=5");
+  const summary = summarizePurge({
+    contact: 1,
+    newsletter: 2,
+    careers: 3,
+    blockRevision: 6,
+    contentRevision: 7,
+    loginAttempt: 4,
+    auditLog: 5,
+  });
+  assert.equal(summary, "contact=1 newsletter=2 careers=3 blockRevision=6 contentRevision=7 loginAttempt=4 auditLog=5");
   assert.ok(PURGE_AUDIT_ACTION.length > 0, "ต้องมีชื่อ action สำหรับบันทึก");
+});
+
+test("retention: ประวัติเนื้อหาเก็บ 1 ปี และต้องเก็บรุ่นล่าสุดของแต่ละหน้าไว้เสมอ", () => {
+  /* มติรอบที่ 77 (ผู้ใช้เลือกเอง) */
+  assert.equal(RETENTION_DAYS.blockRevision, 365);
+  assert.equal(RETENTION_DAYS.contentRevision, 365);
+  assert.ok(REVISIONS_KEPT_PER_PAGE >= 1, "ต้องเก็บรุ่นล่าสุดไว้เสมอ (ห้ามลบจนเกลี้ยง)");
+
+  assert.deepEqual([...REVISION_RETENTION_CLASSES], ["blockRevision", "contentRevision"]);
+  for (const cls of REVISION_RETENTION_CLASSES) {
+    assert.ok(RETENTION_CLASSES.includes(cls), `${cls} ต้องอยู่ในรายการที่แสดงบนหน้าจอ`);
+    /* ประวัติไม่ใช่ "ข้อมูลฟอร์ม" และไม่ใช่ "ร่องรอยเจ้าหน้าที่" — ห้ามถูกจัดกลุ่มผิด */
+    assert.ok(!FORM_RETENTION_CLASSES.includes(cls), `${cls} ห้ามอยู่ในกลุ่มฟอร์ม`);
+    assert.ok(!LOG_RETENTION_CLASSES.includes(cls), `${cls} ห้ามอยู่ในกลุ่มร่องรอยเจ้าหน้าที่`);
+  }
 });
 
 /* ── 4) คำอธิบายระยะเวลาให้คนอ่าน ───────────────────────────────────────────── */

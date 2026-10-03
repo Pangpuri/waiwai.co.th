@@ -23,6 +23,8 @@ export const adminRetention = {
   retentionLabelContact: "Contact form messages",
   retentionLabelNewsletter: "Newsletter subscribers",
   retentionLabelCareers: "Job applications + résumés",
+  retentionLabelBlockRevision: "Page revision history (latest block kept)",
+  retentionLabelContentRevision: "Field revision history (latest kept)",
   retentionLabelLoginAttempt: "Sign-in attempts",
   retentionLabelAuditLog: "Content change log",
   auditRetentionPurge: "Retention deletion",

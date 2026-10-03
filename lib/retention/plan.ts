@@ -11,6 +11,12 @@
  *   ติดต่อ/ข่าวสาร 1 ปี (365 วัน) · ใบสมัครงาน 6 เดือน (180 วัน)
  *   · พยายามล็อกอินหลังบ้าน 30 วัน · บันทึกการแก้ไขเนื้อหา 90 วัน (มติ Q16 เดิม)
  *
+ * มติผู้ใช้ 2026-10-03 (รอบที่ 77 — ผู้ใช้เลือกเอง)
+ *   **ประวัติเนื้อหา (บล็อก/ฟิลด์) เก็บ 1 ปี** — `content_revision` + `page_document_revision`
+ *   ⚠️ ตอนลบ **เก็บรุ่นล่าสุดของแต่ละหน้าไว้เสมอ** (`REVISIONS_KEPT_PER_PAGE`)
+ *      ⇒ ต่อให้ทั้งหน้าถูกแก้ครั้งสุดท้ายนานกว่า 1 ปี ก็ยังย้อนกลับได้อย่างน้อย 1 รุ่น
+ *      และเลขรุ่น (`revision`) ยังเดินหน้าต่อ ไม่ถูกนำกลับมาใช้ซ้ำ
+ *
  * ⚠️ ไฟล์นี้เป็น "นโยบาย" เท่านั้น — การอ่าน/ลบจริงอยู่ที่ `lib/retention/purge.ts`
  */
 
@@ -26,6 +32,10 @@ export const RETENTION_DAYS = {
   loginAttempt: 30,
   /** บันทึกว่าผู้ดูแลทำอะไร (audit log) */
   auditLog: 90,
+  /** ประวัติเอกสารบล็อก (`page_document_revision`) — เก็บ 1 ปี ตามมติรอบที่ 77 */
+  blockRevision: 365,
+  /** ประวัติเนื้อหาแบบฟิลด์ (`content_revision`) — เก็บ 1 ปี ตามมติรอบที่ 77 */
+  contentRevision: 365,
 } as const;
 
 export type RetentionClass = keyof typeof RETENTION_DAYS;
@@ -35,6 +45,8 @@ export const RETENTION_CLASSES: readonly RetentionClass[] = [
   "contact",
   "newsletter",
   "careers",
+  "blockRevision",
+  "contentRevision",
   "loginAttempt",
   "auditLog",
 ];
@@ -42,8 +54,18 @@ export const RETENTION_CLASSES: readonly RetentionClass[] = [
 /** ชั้นข้อมูลที่มาจากฟอร์มหน้าเว็บ (ตาราง `form_submission`) */
 export const FORM_RETENTION_CLASSES: readonly RetentionClass[] = ["contact", "newsletter", "careers"];
 
+/** ชั้นข้อมูลประวัติเนื้อหา — ⚠️ ลบแบบ "เก็บรุ่นล่าสุดต่อหน้าไว้เสมอ" (ดู `REVISIONS_KEPT_PER_PAGE`) */
+export const REVISION_RETENTION_CLASSES: readonly RetentionClass[] = ["blockRevision", "contentRevision"];
+
 /** ชั้นข้อมูลที่เป็นร่องรอยการใช้งาน (เฉพาะเจ้าหน้าที่) */
 export const LOG_RETENTION_CLASSES: readonly RetentionClass[] = ["loginAttempt", "auditLog"];
+
+/**
+ * จำนวนรุ่นล่าสุดของ **แต่ละหน้า** ที่เก็บไว้เสมอ แม้เก่ากว่าระยะเก็บ
+ * ทำไมไม่ลบทิ้งหมด: ประวัติคือ "ตาข่ายกันพลาด" เวลามีคนแก้เนื้อหาผิด — เก็บรุ่นสุดท้ายไว้ 1 รุ่น
+ * = ยังกู้คืนได้ และราคาที่จ่ายคือ 1 แถวต่อหน้า (ไม่ใช่ข้อมูลที่โตต่อเนื่อง)
+ */
+export const REVISIONS_KEPT_PER_PAGE = 1;
 
 /** ชื่อ action ใน audit log ที่ใช้บันทึกว่า "รอบนี้ลบไปเท่าไร" (และใช้เช็คว่าถึงรอบลบถัดไปหรือยัง) */
 export const PURGE_AUDIT_ACTION = "retention-purge";
