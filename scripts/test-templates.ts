@@ -125,7 +125,21 @@ test("templates: 3 หน้าที่แปลงต้องเรนเด�
 test("templates: พรีวิวโหมด 'หน้าเว็บจริง' ต้องชี้หน้าที่กำลังแก้ (ไม่ใช่หน้าแรกเสมอ)", () => {
   const builder = sourceOf("features/admin/ui/block-builder.tsx");
   assert.ok(builder.includes("previewLiveSrc"), "ต้องรับที่อยู่พรีวิวสดจากหน้าจอ");
-  assert.ok(!builder.includes('previewMode === "live" ? "/th"'), "ห้ามตรึงที่อยู่พรีวิวสดเป็น /th อีก");
+  assert.ok(!builder.includes('previewMode === "live" ? previewLiveSrc :'), "ห้ามใช้ค่าที่ไม่มีการกัน undefined");
+
+  /*
+    prop นี้ต้อง **ไม่บังคับ** — บทเรียนเดิมของโปรเจกต์: prop บังคับเคยทำให้ `next build` พัง
+    เพราะมีหน้าจอลืมส่งค่า (ดูคอมเมนต์ของ `isLive` ในไฟล์เดียวกัน) ⇒ ต้องมีค่าถอยเสมอ
+  */
+  assert.ok(builder.includes("readonly previewLiveSrc?: string"), "previewLiveSrc ต้องเป็น prop ไม่บังคับ");
+  assert.ok(builder.includes('previewLiveSrc ?? "/th"'), "ต้องมีค่าถอยเป็นหน้าแรกเมื่อไม่ส่งมา");
+
+  /*
+    client component ห้ามดึงพจนานุกรม/ทะเบียนเทมเพลตเข้ามาคำนวณค่าถอย
+    (จะทำให้ทั้งพจนานุกรมสองภาษาถูกส่งไปเบราว์เซอร์)
+  */
+  assert.ok(!builder.includes("@/lib/blocks/templates"), "client ห้าม import ทะเบียนเทมเพลต");
+  assert.ok(!builder.includes("@/lib/pages/paths"), "client ห้าม import paths (ลากพจนานุกรมไปด้วย)");
 
   const page = sourceOf("app/admin/builder/[page]/page.tsx");
   assert.ok(page.includes("previewLiveSrc={localePath("), "หน้าจอต้องส่งที่อยู่จริงของหน้านั้น");

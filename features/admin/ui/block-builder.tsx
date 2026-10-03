@@ -87,8 +87,12 @@ type Props = {
   /**
    * ที่อยู่ของหน้าเว็บจริงของหน้านี้ (ใช้ในโหมดพรีวิว "หน้าเว็บจริง")
    * S2 (รอบที่ 82): เดิมตรึงเป็น `/th` ⇒ พรีวิวโหมดนี้แสดง "หน้าแรก" เสมอ แม้แก้หน้าอื่นอยู่
+   *
+   * ⚠️ **ไม่บังคับ** (บทเรียนเดิม: prop บังคับเคยทำให้ build พังเมื่อมีหน้าจอลืมส่ง)
+   *    ถ้าไม่ส่ง = ใช้ `/th` (หน้าแรก) เป็นค่าถอย ⇒ หน้าจอใหม่ยังเปิดได้ ไม่ล้มทั้ง build
+   *    · หน้าจอที่อยากได้พรีวิวถูกหน้า **ควรส่งค่ามา** (`previewLiveSrc={localePath("th", pathForPage(page))}`)
    */
-  readonly previewLiveSrc: string;
+  readonly previewLiveSrc?: string;
   /**
    * หน้าเว็บสาธารณะกำลังใช้เนื้อหาชุดนี้อยู่หรือไม่ (เซสชัน S1)
    * - **ไม่บังคับ** เพื่อกันกรณีหน้าจอใดลืมส่งค่า (เคยเกิด error ตอน build: "Property 'isLive' is missing")
@@ -433,7 +437,8 @@ export function BlockBuilder({
   const [uploadState, uploadAction] = useActionState(uploadImageAction, INITIAL_UPLOAD_STATE);
 
   /* พรีวิวโหลดจาก "เส้นทางฝั่งเว็บจริง" จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม เหมือนหน้าจริง */
-  const previewSrc = previewMode === "live" ? previewLiveSrc : `/th/preview/${page}?mode=${previewMode}`;
+  const previewSrc =
+    previewMode === "live" ? (previewLiveSrc ?? "/th") : `/th/preview/${page}?mode=${previewMode}`;
 
   /** ส่งฉบับร่างที่กำลังแก้เข้าพรีวิวทันที (ยังไม่ต้องบันทึก) */
   const postToFrame = useCallback(() => {
