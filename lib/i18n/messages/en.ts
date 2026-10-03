@@ -9,6 +9,8 @@ import { admin } from "./areas/en/admin.ts";
 import { adminMedia } from "./areas/en/adminMedia.ts";
 import { adminSettings } from "./areas/en/adminSettings.ts";
 import { adminDraft } from "./areas/en/adminDraft.ts";
+import { adminRetention } from "./areas/en/adminRetention.ts";
+import { privacyPage } from "./areas/en/privacy.ts";
 
 import type { Messages } from "./th";
 
@@ -48,5 +50,6 @@ export const en: Messages = {
   cookie,
   notFound,
   mourning,
-  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft },
+  privacyPage,
+  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft, ...adminRetention },
 };

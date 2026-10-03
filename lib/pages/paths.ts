@@ -33,3 +33,18 @@ export function pathForPage(id: string): string {
 export function isKnownPagePath(id: string): boolean {
   return id in PAGE_PATHS;
 }
+
+/**
+ * หน้าที่ "อยู่ในโค้ดล้วน" — **ไม่ใช่แถวในตาราง `page`** เพราะตารางนั้นผูกกับเมนูหลัก 9 รายการ
+ * (เพิ่มแถวในตาราง = หน้านั้นโผล่ในเมนู/แท็บหลังบ้านทันที ซึ่งไม่ใช่สิ่งที่ต้องการ)
+ *
+ * แต่ยังควรให้เครื่องค้นหาจัดทำดัชนี ⇒ `sitemap.xml` ใส่ให้ผ่านรายการนี้
+ * ⚠️ หน้าที่นี่ต้องมีอยู่จริงใน `app/[lang]/` ไม่งั้น sitemap จะชี้ไป 404
+ *
+ * ปัจจุบัน: `/privacy` (นโยบายความเป็นส่วนตัว — X2b · จำเป็นเพราะข้อความยินยอมของทุกฟอร์มอ้างถึงหน้านี้)
+ */
+export const CODE_ONLY_PAGE_PATHS: readonly {
+  readonly id: string;
+  readonly path: string;
+  readonly priority: number;
+}[] = [{ id: "privacy", path: "/privacy", priority: 0.5 }];

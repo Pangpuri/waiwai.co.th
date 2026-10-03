@@ -1,9 +1,12 @@
 import Link from "next/link";
 
-import { logoutAction } from "@/app/admin/actions";
+import { logoutAction, purgeRetentionNowAction } from "@/app/admin/actions";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { describeRetention } from "@/lib/retention/format";
+import { type RetentionClass } from "@/lib/retention/plan";
+import { retentionOverview } from "@/lib/retention/purge";
 
 /**
  * ภาพรวมหลังบ้าน — หน้าที่ "ต้องล็อกอินก่อน" หน้าที่แรก
@@ -11,7 +14,8 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
  * ทุกหน้าของหลังบ้านต้องเริ่มด้วย `requireAdminUser()` (DAL) — ไม่ล็อกอิน = เด้งไปหน้าล็อกอิน
  * นี่คือจุดเดียวที่ตรวจสิทธิ์ จึงไม่มีทางลืม (กติกา: ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ทุกคำขอ)
  *
- * ⚠️ หน้าจอแก้เนื้อหาหน้าแรก (B2) จะมาแทนที่ส่วน "ขั้นถัดไป" — ต้องมีฐานข้อมูลก่อน
+ * หน้านี้รวม "ร่องรอยการใช้งาน" (X2.2) และ "ระยะเก็บข้อมูลส่วนบุคคล" (X2b) ไว้ที่เดียว
+ * ⇒ เจ้าของเห็นทันทีว่ามีข้อมูลหมดอายุค้างอยู่ไหม และกดลบเองได้โดยไม่ต้องรอรอบอัตโนมัติ
  */
 export default async function AdminHomePage() {
   const user = await requireAdminUser();
@@ -30,9 +34,27 @@ export default async function AdminHomePage() {
       "preset-save": strings.auditPresetSave,
       "pages-update": strings.auditPagesUpdate,
       "migrate-blocks": strings.auditBlockMigrate,
+      "retention-purge": strings.auditRetentionPurge,
     };
     return map[action] ?? action;
   };
+
+  /*
+    ระยะเก็บข้อมูลส่วนบุคคล (X2b)
+    `retentionOverview()` นับแบบ "อ่านล้วน" (dry run) ⇒ ตัวเลขบนจอ = จำนวนแถวที่จะถูกลบจริงในรอบถัดไป
+    คืน null = ยังไม่ได้ตั้ง DATABASE_URL (หน้าจอต้องไม่พังเพราะเรื่องนี้)
+  */
+  const retention = await retentionOverview();
+  const labelByClass: Readonly<Record<RetentionClass, string>> = {
+    contact: strings.retentionLabelContact,
+    newsletter: strings.retentionLabelNewsletter,
+    careers: strings.retentionLabelCareers,
+    loginAttempt: strings.retentionLabelLoginAttempt,
+    auditLog: strings.retentionLabelAuditLog,
+  };
+
+  /* เวลาบนหน้าจอ — ตัดถึงนาที (รูปแบบเดียวกับรายการ audit ด้านล่าง) */
+  const stamp = (iso: string): string => iso.slice(0, 16).replace("T", " ");
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
@@ -96,6 +118,81 @@ export default async function AdminHomePage() {
         </div>
       </section>
 
+      {/* ── ระยะเก็บข้อมูลส่วนบุคคล (X2b) ─────────────────────────────────────── */}
+      <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.retentionTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.retentionHint}</p>
+        </div>
+
+        {retention === null ? (
+          <p className="text-fg-muted text-sm">{strings.retentionDbMissing}</p>
+        ) : (
+          <>
+            <p className="text-fg-muted text-xs">
+              {retention.lastPurgeAt === null
+                ? strings.retentionNeverRun
+                : strings.retentionLastRun.replace("{time}", stamp(retention.lastPurgeAt))}
+              {" · "}
+              {retention.nextDueAt === null
+                ? strings.retentionDueNow
+                : strings.retentionNextRun.replace("{time}", stamp(retention.nextDueAt))}
+            </p>
+
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="text-fg-muted">
+                    <th scope="col" className="py-1.5 pr-3 font-semibold">
+                      {strings.retentionColData}
+                    </th>
+                    <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">
+                      {strings.retentionColKeep}
+                    </th>
+                    <th scope="col" className="py-1.5 pr-3 font-semibold whitespace-nowrap">
+                      {strings.retentionColCutoff}
+                    </th>
+                    <th scope="col" className="py-1.5 font-semibold whitespace-nowrap">
+                      {strings.retentionColDue}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {retention.steps.map((step) => (
+                    <tr key={step.cls} className="border-line border-t">
+                      <td className="text-fg py-1.5 pr-3">{labelByClass[step.cls]}</td>
+                      <td className="text-fg-muted py-1.5 pr-3 whitespace-nowrap">
+                        {describeRetention(step.days, "th")}
+                      </td>
+                      <td className="text-fg-muted py-1.5 pr-3 font-mono whitespace-nowrap">
+                        {step.cutoffIso.slice(0, 10)}
+                      </td>
+                      <td className="text-fg py-1.5 font-semibold">{retention.due[step.cls]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-fg-muted text-xs">
+              {retention.dueTotal === 0
+                ? strings.retentionNothingDue
+                : strings.retentionDueTotal.replace("{count}", String(retention.dueTotal))}
+            </p>
+
+            <form action={purgeRetentionNowAction} className="flex flex-col gap-2">
+              <button
+                type="submit"
+                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring w-fit rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {strings.retentionPurgeNow}
+              </button>
+              <p className="text-fg-muted text-xs">{strings.retentionPurgeWarning}</p>
+            </form>
+          </>
+        )}
+      </section>
+
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.auditTitle}</h2>
@@ -114,7 +211,7 @@ export default async function AdminHomePage() {
                 <span className="text-fg font-semibold">{actionLabel(entry.action)}</span>
                 <span className="text-fg-muted font-mono">{entry.target ?? "-"}</span>
                 <span className="text-fg-muted">{entry.actorEmail ?? "-"}</span>
-                <span className="text-fg-muted ml-auto">{entry.createdAt.slice(0, 16).replace("T", " ")}</span>
+                <span className="text-fg-muted ml-auto">{stamp(entry.createdAt)}</span>
               </li>
             ))}
           </ul>

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { th } from "@/lib/i18n/messages/th";
 import { LOCALES } from "@/lib/i18n/config";
 import { defaultPages } from "@/lib/pages/model";
-import { PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
+import { CODE_ONLY_PAGE_PATHS, PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
 import { SITE } from "@/lib/site";
 import {
   EMPTY_SITE_SETTINGS,
@@ -82,7 +82,9 @@ test("buildSitemapEntries: มีทั้ง 2 ภาษา · ตัดหน�
   const pages = defaultPages(th);
   const entries = buildSitemapEntries({ siteUrl: SITE.url, pages, locales: LOCALES });
 
-  assert.equal(entries.length, (pages.length - PAGES_ALWAYS_NOINDEX.length) * LOCALES.length, "ตัดหน้าที่ noindex ในโค้ดออกก่อนนับ");
+  /* นับจากข้อมูลจริง: หน้าที่อยู่ในเมนู − หน้าที่ noindex ในโค้ด + หน้าในโค้ด (เช่น /privacy) — ต่อภาษา */
+  const expectedPerLocale = pages.length - PAGES_ALWAYS_NOINDEX.length + CODE_ONLY_PAGE_PATHS.length;
+  assert.equal(entries.length, expectedPerLocale * LOCALES.length, "ตัดหน้าที่ noindex ในโค้ดออกก่อนนับ (และบวกหน้าในโค้ด)");
   assert.ok(entries.some((entry) => entry.url === `${SITE.url}/th`), "หน้าแรกไทยคือ /th");
   assert.ok(entries.some((entry) => entry.url === `${SITE.url}/en/about/certifications`));
   assert.equal(entries.find((entry) => entry.url === `${SITE.url}/th`)?.priority, 1);

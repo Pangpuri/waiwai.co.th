@@ -20,7 +20,9 @@ export type AuditAction =
   | "preset-save"
   | "pages-update"
   /** ย้ายรุ่นรูปทรงบล็อกของข้อมูลที่เก็บไว้ (X1.1) */
-  | "migrate-blocks";
+  | "migrate-blocks"
+  /** ลบข้อมูลที่หมดอายุตามนโยบายระยะเก็บ (X2b) — ร่องรอยว่าลบอะไรไปเท่าไร */
+  | "retention-purge";
 
 export type AuditEntry = {
   readonly action: AuditAction;

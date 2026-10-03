@@ -1,5 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
-import { PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
+import { CODE_ONLY_PAGE_PATHS, PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
 import type { PageRecord } from "@/lib/pages/model";
 
 /**
@@ -9,6 +9,8 @@ import type { PageRecord } from "@/lib/pages/model";
  * - ใส่เฉพาะหน้าที่ **ควรให้เครื่องค้นหาจัดทำดัชนี**: ไม่ถูกตั้ง `noindex` และยังอยู่ในเมนู
  * - มีทั้งภาษาไทยและอังกฤษ (แต่ละภาษาเป็น URL ของตัวเอง)
  * - ลำดับความสำคัญ: หน้าแรกสูงสุด → หน้าหลัก → หน้าอื่น
+ * - **หน้าในโค้ด** (เช่น `/privacy`) ไม่ได้อยู่ในตาราง `page` ⇒ ใส่ผ่าน `CODE_ONLY_PAGE_PATHS`
+ *   (ไม่งั้นหน้าด้านกฎหมายจะไม่ปรากฏใน sitemap เลย และผู้ใช้ที่กดยินยอมก็หานโยบายไม่เจอจากเครื่องค้นหา)
  */
 
 export type SitemapEntry = {
@@ -37,6 +39,17 @@ export function buildSitemapEntries(options: {
         url,
         changeFrequency: page.id === "home" ? "weekly" : "monthly",
         priority: page.id === "home" ? 1 : path.split("/").length <= 2 ? 0.8 : 0.6,
+      });
+    }
+  }
+
+  /* หน้าในโค้ด (ไม่มีแถวในตาราง `page`) — ใส่ตรงนี้เพื่อให้เครื่องค้นหาจัดทำดัชนีได้ */
+  for (const page of CODE_ONLY_PAGE_PATHS) {
+    for (const locale of options.locales) {
+      entries.push({
+        url: `${base}/${locale}${page.path}`,
+        changeFrequency: "yearly",
+        priority: page.priority,
       });
     }
   }

@@ -9,6 +9,8 @@ import { admin } from "./areas/th/admin.ts";
 import { adminMedia } from "./areas/th/adminMedia.ts";
 import { adminSettings } from "./areas/th/adminSettings.ts";
 import { adminDraft } from "./areas/th/adminDraft.ts";
+import { adminRetention } from "./areas/th/adminRetention.ts";
+import { privacyPage } from "./areas/th/privacy.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -47,7 +49,8 @@ export const th = {
   cookie,
   notFound,
   mourning,
-  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft },
+  privacyPage,
+  admin: { ...admin, ...adminMedia, ...adminSettings, ...adminDraft, ...adminRetention },
 };
 
 /**

@@ -1,9 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { type LoginState } from "@/features/admin/login-state";
-import { getAdminUserStore, endSession, isAdminConfigured, startSession } from "@/lib/auth/dal";
+import { getAdminUserStore, endSession, isAdminConfigured, requireAdminUser, startSession } from "@/lib/auth/dal";
 import { recordAudit } from "@/lib/audit/log";
 import { getSessionUser } from "@/lib/auth/dal";
 import { loginRateLimit, recordLoginAttempt } from "@/lib/auth/attempts";
@@ -12,15 +13,16 @@ import { retryAfterMinutes } from "@/lib/auth/rate-limit";
 import { verifyPassword } from "@/lib/auth/password";
 import { ADMIN_LOGIN_PATH } from "@/lib/auth/credentials";
 import { equalizeTiming } from "@/lib/auth/user-store";
+import { purgeNow, runScheduledPurge } from "@/lib/retention/purge";
 import { isValidEmail } from "@/lib/validate";
 
 /**
  * Server Actions ของหลังบ้าน (ไฟล์นี้ส่งออกได้เฉพาะ async function)
  *
- * ⚠️ ข้อจำกัดที่ตั้งใจและต้องรู้ (จะปิดในเฟส B3 เมื่อมี DB)
- * - **ยังไม่มี rate limit ที่แท้จริง** (ต้องมีที่เก็บถาวร — in-memory ใช้บน serverless ไม่ได้ผล)
- *   ⇒ ตอนนี้ทำได้แค่ "หน่วงเมื่อล้มเหลว" เพื่อให้เดารหัสช้าลง · **ห้ามเปิดหลังบ้านสู่อินเทอร์เน็ตก่อนมี B3**
- * - ไม่บันทึก audit log (ต้องมีตารางใน DB เหมือนกัน)
+ * สถานะปัจจุบัน (อัปเดต 2026-10-03)
+ * - **มี rate limit จริงแล้ว** (X2a รอบที่ 65 — ตาราง `login_attempt` + `lib/auth/rate-limit.ts`)
+ * - **เขียน audit log จริงแล้ว** (X2.2) ทั้งตอนล็อกอินสำเร็จ/ล้มเหลว และตอนเผยแพร่เนื้อหา
+ * - ⚠️ แต่ยัง **ไม่ควรเปิด `/admin` สู่อินเทอร์เน็ต** ก่อนทบทวนความปลอดภัย/PDPA รอบสุดท้าย (มติ D4)
  */
 
 /** หน่วงเมื่อล็อกอินไม่ผ่าน — ให้การเดารหัสช้าลง (scrypt กินเวลาอยู่แล้ว ~100ms) */
@@ -90,6 +92,13 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
   await recordLoginAttempt(email, true);
   await recordAudit({ action: "login-success", actorEmail: email, target: "login", detail: null });
 
+  /*
+    ลบข้อมูลส่วนบุคคลที่หมดอายุ (X2b · PDPA) — ทำตอนล็อกอินเพราะโปรเจกต์ไม่มี cron/worker
+    · ตัวมันเองกันซ้ำ 24 ชม. (`shouldRunPurge`) ⇒ ไม่ได้ลบทุกครั้งที่เข้า
+    · ล้มเหลว/ไม่มี DB = คืน null เงียบ ๆ — **ห้ามทำให้ล็อกอินล้มเพราะงานลบรอบนี้**
+  */
+  await runScheduledPurge({ actorEmail: email });
+
   /* redirect ต้องอยู่นอก try/catch — ตัวมันเองโยน error ภายในเพื่อหยุด render */
   redirect("/admin");
 }
@@ -99,4 +108,16 @@ export async function logoutAction(): Promise<void> {
   if (user !== null) await recordAudit({ action: "logout", actorEmail: user.email, target: "login", detail: null });
   await endSession();
   redirect(ADMIN_LOGIN_PATH);
+}
+
+/**
+ * "ลบข้อมูลที่หมดอายุตอนนี้" — ผู้ดูแลกดเองจากหน้าภาพรวม (X2b)
+ *
+ * - ข้ามการกัน 24 ชม. (ผู้ใช้สั่งชัดเจน) แต่ยังบันทึก audit log เสมอ
+ * - ลบถาวร: ใบสมัครที่หมดอายุ + ไฟล์เรซูเม่ของใบนั้น (cascade) — ปุ่มมีคำเตือนบนหน้าจอแล้ว
+ */
+export async function purgeRetentionNowAction(): Promise<void> {
+  const user = await requireAdminUser();
+  await purgeNow({ actorEmail: user.email });
+  revalidatePath("/admin");
 }
