@@ -41,7 +41,8 @@ export async function updatePageAction(formData: FormData): Promise<void> {
 
 /** บันทึกค่า SEO ของหน้า (W2) — ว่างได้ทุกช่อง = ใช้ค่าเดิมจากพจนานุกรม */
 export async function updatePageSeoAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser("content");
+  /* SEO รายหน้า = สิทธิ์ของผู้เผยแพร่ขึ้นไป (X1.10) — ตรงกับบทบาทที่นิยามใน lib/auth/roles.ts */
+  const user = await requireAdminUser("seo");
   if (!isDatabaseConfigured()) return;
 
   const id = String(formData.get("id") ?? "").trim();

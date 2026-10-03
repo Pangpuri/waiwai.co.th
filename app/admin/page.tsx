@@ -3,6 +3,7 @@ import Link from "next/link";
 import { logoutAction, purgeRetentionNowAction } from "@/app/admin/actions";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { maintenanceFlagOf, MAINTENANCE_ENV_VAR } from "@/lib/maintenance/plan";
 import { describeRetention } from "@/lib/retention/format";
@@ -58,17 +59,27 @@ export default async function AdminHomePage() {
   };
 
   /*
+    สิทธิ์ของการ์ด "เฉพาะทาง" (X1.10 · รอบที่ 85)
+    หลักการ: การ์ดที่กระทำได้เฉพาะบทบาทสูงกว่า (หรือพาไปหน้าที่บทบาทนี้เข้าไม่ได้) ต้องไม่โชว์
+    ⚠️ นี่เป็นแค่การซ่อนใน UI — การบังคับจริงอยู่ที่ Server Action และหน้าเป้าหมาย (`requireAdminUser("<permission>")`)
+  */
+  const canRetention = can(user.role, "retention");
+  const canTrash = can(user.role, "trash");
+
+  /*
     ระยะเก็บข้อมูลส่วนบุคคล (X2b)
     `retentionOverview()` นับแบบ "อ่านล้วน" (dry run) ⇒ ตัวเลขบนจอ = จำนวนแถวที่จะถูกลบจริงในรอบถัดไป
     คืน null = ยังไม่ได้ตั้ง DATABASE_URL (หน้าจอต้องไม่พังเพราะเรื่องนี้)
+    อ่านเฉพาะเมื่อมีสิทธิ์ ⇒ ไม่ยิงคำสั่งนับทิ้งให้บทบาทที่มองไม่เห็นการ์ด
   */
-  const retention = await retentionOverview();
+  const retention = canRetention ? await retentionOverview() : null;
 
   /*
     ถังขยะ (X2.4) — นับของที่รอกู้คืน/ลบถาวร
     อ่านล้วน + คืน 0 เมื่อไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
+    อ่านเฉพาะเมื่อมีสิทธิ์ (เหตุผลเดียวกับระยะเก็บด้านบน)
   */
-  const trash = await trashStats();
+  const trash = canTrash ? await trashStats() : null;
   const labelByClass: Readonly<Record<RetentionClass, string>> = {
     contact: strings.retentionLabelContact,
     newsletter: strings.retentionLabelNewsletter,
@@ -147,7 +158,8 @@ export default async function AdminHomePage() {
         </div>
       </section>
 
-      {/* ── ระยะเก็บข้อมูลส่วนบุคคล (X2b) ─────────────────────────────────────── */}
+      {/* ── ระยะเก็บข้อมูลส่วนบุคคล (X2b) — เฉพาะผู้มีสิทธิ์ retention ──────────── */}
+      {canRetention ? (
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.retentionTitle}</h2>
@@ -221,8 +233,10 @@ export default async function AdminHomePage() {
           </>
         )}
       </section>
+      ) : null}
 
-      {/* ── ถังขยะ (X2.4) ─────────────────────────────────────────────────────── */}
+      {/* ── ถังขยะ (X2.4) — เฉพาะผู้มีสิทธิ์ trash ────────────────────────────── */}
+      {canTrash && trash !== null ? (
       <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.trashCardTitle}</h2>
@@ -245,7 +259,10 @@ export default async function AdminHomePage() {
           </span>
         </div>
       </section>
+      ) : null}
 
+      {/* โหมดปิดปรับปรุง = เรื่องของผู้ดูแลระบบ (สวิตช์อยู่ที่ env/CLI) ⇒ แสดงการ์ดนี้เฉพาะบทบาทที่มีสิทธิ์ maintenance */}
+      {can(user.role, "maintenance") ? (
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.maintenanceTitle}</h2>
@@ -278,6 +295,7 @@ export default async function AdminHomePage() {
           <p>{strings.maintenanceEnvNote}</p>
         </div>
       </section>
+      ) : null}
 
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">

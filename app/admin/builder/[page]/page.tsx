@@ -7,6 +7,7 @@ import { PageSettings } from "@/features/admin/ui/page-settings";
 import { PageTabs } from "@/features/admin/ui/page-tabs";
 import { TemplateCoverageNote } from "@/features/admin/ui/template-coverage-note";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { blockCoverageGaps, hasBlockTemplate, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
@@ -15,7 +16,7 @@ import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readStoredVersions } from "@/lib/blocks/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
-import { isDatabaseConfigured } from "@/lib/content/repository";
+import { isDatabaseConfigured } from "@/db/pool";
 import { localePath } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -24,19 +25,17 @@ import type { Messages } from "@/lib/i18n/messages/th";
  * หน้าจอสร้างหน้าเว็บ (บล็อกอิสระ) — Server Component
  *
  * ขั้นตอน
- *   1. `requireAdminUser("<permission>")` — ต้องล็อกอิน
- *   2. รองรับเฉพาะหน้าที่ประกาศไว้ (`home`) — หน้าที่อื่น 404 (กันเปิดหน้าจอที่ยังไม่มีเทมเพลต)
- *   3. อ่าน **ฉบับร่าง** จาก DB → ถ้าไม่มี แสดงปุ่ม "เริ่มจากเนื้อหาปัจจุบัน"
+ *   1. `requireAdminUser("content")` — ต้องมีสิทธิ์จัดเนื้อหา (ไม่ล็อกอิน = ไปหน้าล็อกอิน · สิทธิ์ไม่พอ = ไป `/admin/denied`)
+ *   2. **ตรวจว่าเป็นหน้าที่รู้จัก** (`listPages` = ตาราง `page` หรือรายการหน้าในโค้ด) — ที่เหลือ 404
+ *      ⚠️ บทเรียน รอบที่ 62: เดิมล็อกไว้ `["home"]` แต่แท็บรายหน้ามี 9 หน้า ⇒ กดแท็บอื่นแล้ว **404**
+ *   3. อ่าน **ฉบับร่าง** จาก DB → ถ้าไม่มี: หน้าที่มีเทมเพลตแสดงปุ่ม "เริ่มจากเนื้อหาปัจจุบัน" + คำเตือนส่วนที่ไม่ครอบคลุม
+ *      (หน้าที่ไม่มีเทมเพลต: บอกตรง ๆ ให้ใช้หน้าจอเนื้อหาแบบฟิลด์ไปก่อน — ไม่ปล่อยให้กดแล้วเงียบ)
  *   4. ส่งฉบับร่าง + เวลาที่เผยแพร่ + ประวัติ ให้หน้าจอแก้ไข (client)
  *
  * ทำไมอ่าน "ฉบับร่าง" เป็นค่าตั้งต้น: ผู้แก้ต้องเห็นงานที่ค้างไว้ของตัวเอง ไม่ใช่ของที่เผยแพร่อยู่
+ * ⚠️ เอกสารที่อ่านจาก DB ต้องผ่าน `parseBlockDocument` ก่อนใช้เสมอ (ข้อมูลเสียหาย = เริ่มจากหน้าว่าง ไม่ทำให้หน้าจอพัง)
+ * ⚠️ การ์ด SEO รายหน้าแสดงเฉพาะบทบาทที่มีสิทธิ์ `seo` (ผู้เผยแพร่ขึ้นไป) — การบันทึกก็ถูกกันที่ action ด้วยสิทธิ์เดียวกัน
  */
-
-/*
-  หน้าที่เปิดในหน้าจอสร้างหน้าเว็บได้ (W1/W2)
-  ⚠️ บทเรียน รอบที่ 62: เดิมล็อกไว้ `["home"]` แต่แท็บรายหน้ามี 9 หน้า ⇒ กดแท็บอื่นแล้ว **404**
-  แก้: ยอมรับ id ที่มีอยู่จริงในตาราง `page` (หรือรายการหน้าในโค้ด) · ที่เหลือ 404 ตามเดิม
-*/
 
 /**
  * รหัสส่วนที่เทมเพลตไม่ครอบคลุม → ข้อความจากพจนานุกรม (S2 รอบที่ 83)
@@ -65,14 +64,19 @@ function coveragePartLabel(
 }
 
 export default async function AdminBuilderPage({ params }: { readonly params: Promise<{ readonly page: string }> }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const { page } = await params;
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 
-  const knownPages = await listPages(defaultPages(messages));
-  if (!knownPages.some((entry) => entry.id === page)) notFound();
+  /*
+    หน้าที่รู้จัก = ตาราง `page` (ถ้าอ่านไม่ได้/ว่าง ใช้รายการในโค้ด) — ตรวจครั้งเดียวแล้วใช้ค่าที่ได้เลย
+    ⇒ ไม่มีสาขา "หาไม่เจอ" ที่ไม่มีทางเป็นจริงอยู่ข้างล่างให้สับสน
+  */
+  const pages = await listPages(defaultPages(messages));
+  const currentPage = pages.find((entry) => entry.id === page);
+  if (currentPage === undefined) notFound();
 
 
   if (!isDatabaseConfigured()) {
@@ -85,23 +89,25 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
     );
   }
 
-  const draftRow = await loadDocumentRow(page, "draft");
-  const publishedRow = await loadDocumentRow(page, "published");
-  const revisions = await listRevisions(page);
-  /* รุ่นรูปทรงของข้อมูลที่เก็บไว้ (X1.1) — หน้าจอเตือน + มีปุ่มย้ายเป็นรุ่นปัจจุบัน */
-  const storedVersions = await readStoredVersions(page);
+  /*
+    อ่านข้อมูลของหน้าแบบขนาน (4 คำสั่งไม่ขึ้นแก่กัน) + แถวที่เหลืออีกชุด
+    ⚠️ ยังต้องมี DB จริง (ตรวจ `isDatabaseConfigured` ด้านบนแล้ว) — ถ้าไม่มี จะออกก่อนถึงบรรทัดนี้
+  */
+  const [draftRow, publishedRow, revisions, storedVersions, isLive, presets] = await Promise.all([
+    loadDocumentRow(page, "draft"),
+    loadDocumentRow(page, "published"),
+    listRevisions(page),
+    /* รุ่นรูปทรงของข้อมูลที่เก็บไว้ (X1.1) — หน้าจอเตือน + มีปุ่มย้ายเป็นรุ่นปัจจุบัน */
+    readStoredVersions(page),
+    isPageLive(page),
+    listBlockPresets(),
+  ]);
 
   const parsedDraft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
   const emptyDocument: BlockDocument = { page, blocks: [] };
 
   /* เอกสารที่อ่านจาก DB ต้องผ่าน parse ก่อนใช้ — ถ้าเสียหายให้เริ่มจากหน้าว่าง (ไม่ทำให้หน้าจอพัง) */
   const initialDraft = parsedDraft !== null && parsedDraft.ok ? parsedDraft.document : emptyDocument;
-
-  /*
-    การ์ด "ป้ายประกาศเข้าเว็บ" (ผู้ใช้สั่ง รอบที่ 38: ควบคุม/โยนภาพจากหน้านี้ได้เลย)
-    อ่านค่าล่าสุดของป้าย (ฉบับร่างก่อน ถ้าไม่มี = ค่าเริ่มต้น) — เสียหายก็ใช้ค่าเริ่มต้น ไม่ทำให้หน้าจอพัง
-  */
-
 
   /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
   const coverage = {
@@ -111,20 +117,15 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
     parts: blockCoverageGaps(page).map((part) => coveragePartLabel(part, strings)),
   };
 
-  /* ── หน้าเป็นวัตถุ (W1): แท็บรายหน้า + ชื่อหน้า = ชื่อเมนู ── */
-  const pages = knownPages;
-  const currentPage = pages.find((entry) => entry.id === page) ?? null;
-
   return (
     <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-6">
       <PageTabs pages={pages} activeId={page} label={strings.pagesTabsLabel} strings={{ pageHiddenFromMenu: strings.pageHiddenFromMenu }} />
 
-      {currentPage === null ? null : (
-        <div className="grid gap-4 md:grid-cols-2">
-          <PageSettings page={currentPage} strings={strings} />
-          <PageSeoSettings page={currentPage} strings={strings} />
-        </div>
-      )}
+      {/* หน้าเป็นวัตถุ (W1): ตั้งค่าหน้า/เมนู + SEO รายหน้า (SEO แสดงเฉพาะบทบาทที่มีสิทธิ์ seo) */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <PageSettings page={currentPage} strings={strings} />
+        {can(user.role, "seo") ? <PageSeoSettings page={currentPage} strings={strings} /> : null}
+      </div>
 
 
       {draftRow === null ? (
@@ -157,15 +158,15 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
         </section>
       ) : (
         <BlockBuilder
-          presets={await listBlockPresets()}
+          presets={presets}
           page={page}
-          isLive={await isPageLive(page)}
+          isLive={isLive}
           initialDraft={initialDraft}
           draftUpdatedAt={draftRow?.updatedAt ?? null}
           publishedAt={publishedRow?.publishedAt ?? null}
           revisions={revisions}
           storedVersions={storedVersions}
-          previewLiveSrc={localePath("th", pathForPage(currentPage?.id ?? page))}
+          previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
           coverage={coverage}
           strings={strings}
         />

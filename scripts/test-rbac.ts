@@ -117,6 +117,80 @@ test("rbac: หน้าจอ/prévue/action สำคัญผูกกับ�
   }
 });
 
+test("rbac: ลิงก์ข้ามสิทธิ์ต้องถูกซ่อนด้วย can(user.role, ...) (ไม่ให้กดแล้วเด้ง /admin/denied)", () => {
+  /*
+    บทเรียน รอบที่ 85: หลังทำ RBAC ยังเหลือจุดที่ UI โชว์ของซึ่งกดแล้วเด้งไป /admin/denied
+    (การ์ดถังขยะบน /admin · ลิงก์ถังขยะบนคลังภาพ) เพราะหน้าแม่ใช้สิทธิ์ต่ำกว่าเป้าหมาย
+    เทสต์นี้สแกนอัตโนมัติ: ถ้า "บทบาทต่ำสุดที่เข้าหน้านี้ได้" ยังเข้าเป้าหมายไม่ได้
+    ไฟล์นั้นต้องมี `can(user.role, "<permission ของเป้าหมาย>")` กำกับ
+  */
+  const privilegedRoutes: readonly { readonly prefix: string; readonly permission: AdminPermission }[] = [
+    { prefix: "/admin/trash", permission: "trash" },
+    { prefix: "/admin/users", permission: "users" },
+    { prefix: "/admin/settings", permission: "settings" },
+    { prefix: "/admin/preview-links", permission: "preview" },
+    { prefix: "/admin/inbox", permission: "inbox" },
+    { prefix: "/admin/media", permission: "media" },
+    { prefix: "/admin/builder/chrome", permission: "presets" },
+    { prefix: "/admin/builder/mourning", permission: "presets" },
+    { prefix: "/admin/builder/footer", permission: "presets" },
+    { prefix: "/admin/builder/navbar", permission: "presets" },
+  ];
+
+  const offenders: string[] = [];
+  for (const file of adminFiles()) {
+    const source = sourceOf(file);
+    const own = /requireAdminUser\("([a-z]+)"\)/.exec(source)?.[1];
+    if (own === undefined) continue;
+
+    /* บทบาท "ต่ำสุด" ที่เข้าได้ = บทบาทแรกในลำดับที่มีสิทธิ์นี้ (ตารางสิทธิ์เป็นแบบเพิ่มขึ้นเสมอ) */
+    const weakest = ADMIN_ROLES.find((role) => can(role, own as AdminPermission));
+    if (weakest === undefined) continue;
+
+    for (const { prefix, permission } of privilegedRoutes) {
+      if (!source.includes(`href="${prefix}`)) continue;
+      if (can(weakest, permission)) continue; /* เข้าหน้านั้นได้อยู่แล้ว ⇒ ไม่ต้องซ่อน */
+      if (source.includes(`can(user.role, "${permission}")`)) continue;
+      offenders.push(`${file} → ${prefix} ต้องมี can(user.role, "${permission}")`);
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    "ลิงก์ไปหน้าที่ต้องสิทธิ์สูงกว่าต้องซ่อนตามสิทธิ์ (ไม่ให้กดแล้วเด้ง /admin/denied)",
+  );
+});
+
+test("rbac: การ์ดเฉพาะทางบน /admin และการ์ด SEO รายหน้า ต้องผูกสิทธิ์ตรงกับ action", () => {
+  /* การ์ด "เฉพาะทาง" ไม่ใช่แค่ลิงก์ ⇒ เทสต์สแกนลิงก์ด้านบนจับไม่ได้ ต้องตรวจชื่อสิทธิ์ตรง ๆ */
+  const overview = sourceOf("app/admin/page.tsx");
+  assert.ok(overview.includes('can(user.role, "retention")'), "การ์ดระยะเก็บข้อมูล/ปุ่มลบ ต้องผูกกับสิทธิ์ retention");
+  assert.ok(overview.includes('can(user.role, "maintenance")'), "การ์ดโหมดปิดปรับปรุง ต้องผูกกับสิทธิ์ maintenance");
+  assert.ok(overview.includes('can(user.role, "trash")'), "การ์ดถังขยะ ต้องผูกกับสิทธิ์ trash");
+
+  /*
+    การ์ด SEO รายหน้า (ตัวสร้างหน้า) = ผู้เผยแพร่ขึ้นไป และการบันทึกก็ใช้สิทธิ์เดียวกัน
+    ⚠️ ต้องเก็บผลของประตูสิทธิ์ไว้ใช้ตัดสิน UI ด้วย (ไม่ทิ้งค่า) — เคสจริงรอบที่ 85: ทิ้งแล้วอ้าง `user.role` → compile พัง
+  */
+  const builder = sourceOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(builder.includes('can(user.role, "seo")'), "การ์ด SEO รายหน้า ต้องผูกกับสิทธิ์ seo");
+  assert.ok(
+    builder.includes('const user = await requireAdminUser("content")'),
+    "ตัวสร้างหน้าต้องเก็บผู้ใช้จากประตูสิทธิ์ไว้ใช้ตัดสินการแสดงผล",
+  );
+  assert.ok(
+    sourceOf("app/admin/builder/page-actions.ts").includes('requireAdminUser("seo")'),
+    "บันทึก SEO รายหน้า ต้องใช้สิทธิ์ seo ให้ตรงกับการ์ด",
+  );
+
+  /* คลังภาพเข้าถึงด้วยสิทธิ์ media แต่ถังขยะต้องใช้ trash ⇒ ต้องซ่อนลิงก์สำหรับบทบาทที่ไม่มี */
+  assert.ok(
+    sourceOf("app/admin/media/page.tsx").includes('const user = await requireAdminUser("media")'),
+    "คลังภาพต้องเก็บผู้ใช้จากประตูสิทธิ์ไว้ใช้ตัดสินการแสดงผล",
+  );
+});
+
 /* ── 2) ตารางสิทธิ์ ───────────────────────────────────────────────────────── */
 
 test("rbac: บทบาทต้องเป็นชุดที่ฐานข้อมูลรู้จัก และตรวจค่าที่ส่งมาจากฟอร์มได้", () => {
