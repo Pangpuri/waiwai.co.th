@@ -34,4 +34,7 @@ export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaUploadAction: "Upload",
   mediaNoResults: "No images found",
   mediaDimensions: "Size",
+  /* Pick from the library inside the content editor (round 93) */
+  mediaPickFromLibrary: "Pick from library",
+  mediaPickHint: "Click an image to use it here (alt text comes from the library and can be edited)",
 };

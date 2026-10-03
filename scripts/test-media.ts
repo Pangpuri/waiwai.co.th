@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import { MAX_UPLOAD_BYTES, extensionFor, readImageInfo, safeFilename } from "@/lib/media/image-info";
@@ -134,4 +136,26 @@ test("image: ล้างชื่อไฟล์ที่ผู้ใช้ส�
   assert.equal(safeFilename("   ", "image.png"), "image.png");
   assert.equal(safeFilename("", "image.png"), "image.png");
   assert.ok(safeFilename("ก".repeat(300), "x").length <= 120);
+});
+
+/* ── เลือกภาพจากคลังในหน้าแก้เนื้อหา (รอบที่ 93) ─────────────────────────────── */
+
+test("media: ช่องภาพใช้คลังจาก context และหน้าตัวสร้างส่งเฉพาะผู้มีสิทธิ์ media", () => {
+  const root = join(import.meta.dirname, "..");
+  const drop = readFileSync(join(root, "features", "admin", "ui", "image-drop.tsx"), "utf8");
+  const library = readFileSync(join(root, "features", "admin", "ui", "image-library.tsx"), "utf8");
+  const page = readFileSync(join(root, "app", "admin", "builder", "[page]", "page.tsx"), "utf8");
+
+  /* 1) ช่องภาพทุกช่องใช้คลังผ่าน context (ไม่ต้องแก้ทุกจุดเรียก — จุดเดียวคือในตัว ImageDrop) */
+  assert.ok(drop.includes("useImageLibrary()"), "ImageDrop ต้องอ่านคลังจาก context");
+  assert.ok(drop.includes("`/media/${item.id}`"), "การเลือกต้องตั้งพาธภายในโปรเจกต์ (มติ D9) ไม่ใช่ URL เต็ม");
+  assert.ok(drop.includes("mediaPickFromLibrary"), "ต้องมีป้ายจากพจนานุกรม (ห้ามข้อความฝัง)");
+
+  /* 2) ค่าเริ่มต้นของ context = ว่าง ⇒ ที่ไม่มีผู้ให้บริการ ช่องภาพยังทำงานได้เหมือนเดิม */
+  assert.ok(library.includes("createContext<readonly ImageLibraryItem[]>([])"), "ค่าเริ่มต้นต้องว่าง");
+
+  /* 3) หน้าตัวสร้างส่งรายการเฉพาะเมื่อมีสิทธิ์ `media` (ผู้ไม่มีสิทธิ์ไม่เห็นภาพในคลัง) */
+  assert.ok(page.includes('can(user.role, "media")'), "ต้องเช็คสิทธิ์ media ก่อนส่งคลัง");
+  assert.ok(page.includes("ImageLibraryProvider"), "ต้องมีผู้ให้บริการคลังครอบตัวสร้าง");
+  assert.ok(page.includes("listMedia("), "ต้องอ่านรายการจากคลังจริง");
 });

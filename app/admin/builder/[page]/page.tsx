@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { startFromTemplateAction } from "@/app/admin/builder/actions";
 import { BlockBuilder } from "@/features/admin/ui/block-builder";
+import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { PageSeoSettings } from "@/features/admin/ui/page-seo-settings";
 import { PageSettings } from "@/features/admin/ui/page-settings";
 import { PageTabs } from "@/features/admin/ui/page-tabs";
@@ -15,6 +16,7 @@ import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readStoredVersions } from "@/lib/blocks/repository";
+import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/db/pool";
 import { localePath } from "@/lib/i18n/config";
@@ -77,6 +79,20 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
   const pages = await listPages(defaultPages(messages));
   const currentPage = pages.find((entry) => entry.id === page);
   if (currentPage === undefined) notFound();
+
+  /*
+    คลังภาพสำหรับ "เลือกจากคลัง" ในช่องภาพ (รอบที่ 93)
+    ⚠️ ส่งรายการให้เฉพาะผู้ที่มีสิทธิ์ `media` — ผู้ที่ไม่มีสิทธิ์จะไม่เห็นภาพในคลังเลย
+    (การอัปโหลด/แก้คลังยังถูกบังคับที่ Server Action ของคลังอีกชั้นเสมอ)
+  */
+  const imageLibrary: readonly ImageLibraryItem[] = can(user.role, "media")
+    ? (await listMedia(48)).map((item) => ({
+        id: item.id,
+        filename: item.filename,
+        altTh: item.altTh,
+        altEn: item.altEn,
+      }))
+    : [];
 
 
   if (!isDatabaseConfigured()) {
@@ -157,19 +173,22 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
           )}
         </section>
       ) : (
-        <BlockBuilder
-          presets={presets}
-          page={page}
-          isLive={isLive}
-          initialDraft={initialDraft}
-          draftUpdatedAt={draftRow?.updatedAt ?? null}
-          publishedAt={publishedRow?.publishedAt ?? null}
-          revisions={revisions}
-          storedVersions={storedVersions}
-          previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
-          coverage={coverage}
-          strings={strings}
-        />
+        /* คลังภาพส่งผ่าน context ครั้งเดียว (รอบที่ 93) — ช่องภาพทุกช่องในตัวสร้างใช้ได้ทันที */
+        <ImageLibraryProvider items={imageLibrary}>
+          <BlockBuilder
+            presets={presets}
+            page={page}
+            isLive={isLive}
+            initialDraft={initialDraft}
+            draftUpdatedAt={draftRow?.updatedAt ?? null}
+            publishedAt={publishedRow?.publishedAt ?? null}
+            revisions={revisions}
+            storedVersions={storedVersions}
+            previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
+            coverage={coverage}
+            strings={strings}
+          />
+        </ImageLibraryProvider>
       )}
     </main>
   );

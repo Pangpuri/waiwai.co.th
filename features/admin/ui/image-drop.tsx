@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { uploadImageAction } from "@/app/admin/media/actions";
+import { useImageLibrary } from "@/features/admin/ui/image-library";
 import { INITIAL_UPLOAD_STATE, type UploadFailure, type UploadState } from "@/features/admin/upload-state";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -86,6 +87,8 @@ export function ImageDrop({
   dropPrompt,
 }: Props) {
   const [state, action] = useActionState<UploadState, FormData>(uploadImageAction, INITIAL_UPLOAD_STATE);
+  /* คลังภาพในบริบทนี้ (ว่าง = ไม่มีคลัง ⇒ ซ่อนปุ่ม "เลือกจากคลัง" ไม่ทำให้ช่องภาพพัง) */
+  const library = useImageLibrary();
   const [dragging, setDragging] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [localError, setLocalError] = useState<UploadFailure | null>(null);
@@ -215,6 +218,46 @@ export function ImageDrop({
         {/* ปุ่มนี้มีไว้ให้ใช้งานได้แม้ปิด JavaScript (ปกติลากวาง/เลือกไฟล์แล้วส่งทันที) */}
         <UploadButton label={strings.imageChoose} pendingLabel={strings.imageUploading} />
       </form>
+
+      {/*
+        เลือกภาพจากคลัง (หนี้จากรอบที่ 81 · ปิดรอบที่ 93)
+        เดิมต้องไปเปิด /admin/media แล้วคัดลอกพาธมาวาง ⇒ ตอนนี้กดเลือกได้เลย
+        ⚠️ แสดงเฉพาะเมื่อมีคลังในบริบท (ผู้ใช้ที่ไม่มีสิทธิ์ `media` จะไม่เห็น — หน้าเว็บส่งรายการมาให้เฉพาะผู้มีสิทธิ์)
+      */}
+      {library.length === 0 ? null : (
+        <details className="border-line rounded-lg border p-2">
+          <summary className="text-fg-muted cursor-pointer text-xs font-semibold">{strings.mediaPickFromLibrary}</summary>
+          <p className="text-fg-muted mt-1 text-[11px]">{strings.mediaPickHint}</p>
+          <ul className="mt-2 grid max-h-56 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+            {library.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      path: `/media/${item.id}`,
+                      altTh: item.altTh,
+                      altEn: item.altEn,
+                      hasWatermark: false,
+                    })
+                  }
+                  className="border-line hover:bg-surface-raised focus-visible:ring-ring flex w-full flex-col gap-1 rounded-lg border p-1 text-left focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {/* เส้นทางเดียวกันกับหน้าเว็บ (immutable + nosniff) — ย่อด้วย CSS ไม่ต้องมีรูปย่อแยก */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/media/${item.id}`}
+                    alt={item.altTh === "" ? item.filename : item.altTh}
+                    loading="lazy"
+                    className="bg-bg-subtle h-16 w-full rounded object-cover"
+                  />
+                  <span className="text-fg-muted truncate text-[10px]">{item.filename}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {reason !== null ? <p className="text-fg text-xs font-semibold">{failureMessage(strings, reason)}</p> : null}
 

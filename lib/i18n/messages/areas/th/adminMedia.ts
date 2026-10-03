@@ -30,4 +30,7 @@ export const adminMedia = {
   mediaUploadAction: "อัปโหลด",
   mediaNoResults: "ไม่พบภาพ",
   mediaDimensions: "ขนาด",
+  /* เลือกภาพจากคลังในหน้าแก้เนื้อหา (รอบที่ 93) */
+  mediaPickFromLibrary: "เลือกจากคลังภาพ",
+  mediaPickHint: "กดภาพเพื่อใช้ในช่องนี้ (คำอธิบายภาพดึงจากคลังให้ — แก้ต่อได้)",
 };
