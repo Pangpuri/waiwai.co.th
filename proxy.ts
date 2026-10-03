@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SESSION_COOKIE_NAME, isSecretUsable, parseSessionToken } from "@/lib/auth/session";
+import { isSecretUsable } from "@/lib/auth/session";
 import {
   isLocale,
   resolveLocale,
   shouldBypassLocaleRouting,
 } from "@/lib/i18n/config";
+import { MAINTENANCE_BYPASS_COOKIE, parseMaintenanceBypassToken } from "@/lib/maintenance/bypass";
 import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
   MAINTENANCE_STATUS,
@@ -33,15 +34,22 @@ import {
  *    ⇒ ที่นี่อ่านแค่ env + ตรวจลายเซ็นคุกกี้ (คำนวณในเครื่อง ไม่มี I/O) · มีเทสต์สแกนซอร์สกันการเผลอ import DB
  */
 
-/** ผู้ดูแลที่ถือคุกกี้เซสชันลายเซ็นถูกต้องและยังไม่หมดอายุ (ตรวจในเครื่องทั้งหมด — ไม่แตะ DB) */
-function hasValidAdminSession(request: NextRequest): boolean {
+/**
+ * ผู้ดูแลที่ถือ **"บัตรผ่าน" ใบล่าสุด** (อายุ ≤ 15 นาที · ตรวจในเครื่องทั้งหมด — ไม่แตะ DB)
+ *
+ * ⚠️ ตรวจบัตรผ่าน **ไม่ใช่คุกกี้เซสชัน** โดยตั้งใจ (รอบที่ 96):
+ *    บัตรผ่านถูกออก/ต่ออายุจาก route handler `/admin/bypass` ซึ่งตรวจเซสชันกับ **ฐานข้อมูล** ทุกครั้ง
+ *    ⇒ เซสชันที่ถูกเพิกถอน/บัญชีที่ถูกปิด = ต่ออายุไม่ได้ ⇒ บัตรผ่านเก่าตายภายใน ≤ 15 นาที
+ *    (เดิม proxy ใช้คุกกี้เซสชันอายุ 8 ชั่วโมง ⇒ เพิกถอนแล้วยังบายพาสโหมดปิดปรับปรุงได้อีกนาน)
+ */
+function hasValidMaintenanceBypass(request: NextRequest): boolean {
   const secret = process.env["SESSION_SECRET"];
   if (secret === undefined || !isSecretUsable(secret)) return false;
 
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const token = request.cookies.get(MAINTENANCE_BYPASS_COOKIE)?.value;
   if (token === undefined || token === "") return false;
 
-  return parseSessionToken(token, secret, Date.now()) !== null;
+  return parseMaintenanceBypassToken(token, secret, Date.now()) !== null;
 }
 
 export function proxy(request: NextRequest) {
@@ -55,7 +63,7 @@ export function proxy(request: NextRequest) {
   if (isLocale(first)) {
     /* ── โหมดปิดปรับปรุง: ตรวจ *หลัง* รู้ภาษาแล้ว เพื่อให้หน้าแจ้งเตือนเป็นภาษาที่ผู้เข้าชมขอ ── */
     if (isMaintenanceEnabled(process.env)) {
-      const bypass = shouldBypassMaintenance({ pathname, hasAdminSession: hasValidAdminSession(request) });
+      const bypass = shouldBypassMaintenance({ pathname, hasAdminSession: hasValidMaintenanceBypass(request) });
       if (!bypass) {
         const url = request.nextUrl.clone();
         url.pathname = maintenancePathFor(maintenanceLocaleOf(pathname));

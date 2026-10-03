@@ -5,6 +5,14 @@ import { test } from "node:test";
 
 import { PROXY_BYPASS_PREFIXES } from "@/lib/i18n/config";
 import {
+  MAINTENANCE_BYPASS_REFRESH_MS,
+  MAINTENANCE_BYPASS_TTL_MS,
+  createMaintenanceBypassToken,
+  nextMaintenanceBypassExpiry,
+  parseMaintenanceBypassToken,
+  shouldRefreshMaintenanceBypass,
+} from "@/lib/maintenance/bypass";
+import {
   MAINTENANCE_ENV_VAR,
   MAINTENANCE_RETRY_AFTER_SECONDS,
   MAINTENANCE_SEGMENT,
@@ -230,4 +238,60 @@ test("maintenance: พจนานุกรมต้องมีข้อคว�
     }
     assert.ok(!/ภายใน\s*\d+\s*(นาที|ชั่วโมง)/.test(dict), `${locale}: ห้ามสัญญาเวลาที่เราไม่รู้`);
   }
+});
+
+/* ── บัตรผ่านดูเว็บมีอายุจำกัด (X2.5 ต่อ · รอบที่ 96) ───────────────────────── */
+
+test("maintenance: บัตรผ่านมีอายุสั้น และใช้ไม่ได้เมื่อหมดอายุ/ลายเซ็นผิด", () => {
+  const secret = "m".repeat(40);
+  const now = Date.now();
+
+  const token = createMaintenanceBypassToken(nextMaintenanceBypassExpiry(now), secret);
+  assert.equal(parseMaintenanceBypassToken(token, secret, now)?.expiresAt, now + MAINTENANCE_BYPASS_TTL_MS);
+  assert.ok(
+    MAINTENANCE_BYPASS_TTL_MS <= 30 * 60 * 1000,
+    "บัตรผ่านต้องสั้น (≤30 นาที) — ไม่งั้นเพิกถอนเซสชันแล้วยังบายพาสได้นาน",
+  );
+  assert.ok(
+    MAINTENANCE_BYPASS_REFRESH_MS < MAINTENANCE_BYPASS_TTL_MS,
+    "ต้องต่ออายุก่อนหมดอายุเสมอ",
+  );
+
+  /* หมดอายุ = ใช้ไม่ได้ */
+  assert.equal(parseMaintenanceBypassToken(token, secret, now + MAINTENANCE_BYPASS_TTL_MS + 1), null);
+  /* ลายเซ็นผิด/แก้ payload = ใช้ไม่ได้ */
+  assert.equal(parseMaintenanceBypassToken(token, "x".repeat(40), now), null);
+  assert.equal(parseMaintenanceBypassToken(`${token}x`, secret, now), null);
+  assert.equal(parseMaintenanceBypassToken("ไม่มีจุดคั่น", secret, now), null);
+  assert.equal(parseMaintenanceBypassToken("eyJhIjoxfQ.c2ln", secret, now), null, "payload เพี้ยน = ปฏิเสธ");
+
+  /* ต่ออายุเมื่อไม่มี/ใกล้หมดอายุเท่านั้น */
+  assert.equal(shouldRefreshMaintenanceBypass(null, now), true);
+  assert.equal(shouldRefreshMaintenanceBypass(now + MAINTENANCE_BYPASS_TTL_MS, now), false);
+  assert.equal(shouldRefreshMaintenanceBypass(now + 1000, now), true);
+});
+
+test("maintenance: proxy ใช้บัตรผ่าน (ไม่ใช่คุกกี้เซสชัน) และยังไม่ Import DB", () => {
+  const root = path.join(import.meta.dirname, "..");
+  const proxy = readFileSync(path.join(root, "proxy.ts"), "utf8");
+  const dal = readFileSync(path.join(root, "lib", "auth", "dal.ts"), "utf8");
+  const route = readFileSync(path.join(root, "app", "admin", "bypass", "route.ts"), "utf8");
+
+  /* proxy ต้องไม่แตะ DB/คุกกี้เซสชันตรง ๆ อีก */
+  assert.ok(!proxy.includes("parseSessionToken"), "proxy ต้องไม่ตรวจคุกกี้เซสชันเองแล้ว (เพิกถอนไม่เห็น)");
+  assert.ok(proxy.includes("parseMaintenanceBypassToken"), "proxy ต้องตรวจบัตรผ่าน");
+  assert.ok(!/from "@\/db\/pool"/.test(proxy), "proxy ห้าม Import DB");
+  assert.ok(!/from "@\/lib\/content\/repository"/.test(proxy), "proxy ห้าม Import repository ที่อ่าน DB");
+
+  /* บัตรผ่านออกโดยจุดที่ตรวจ DB เท่านั้น */
+  assert.ok(route.includes("getSessionUser()"), "route ต้องตรวจเซสชันกับ DB");
+  assert.ok(route.includes('can(user.role, "content")'), "route ต้องตรวจสิทธิ์เอง (กติกา route handler)");
+  assert.ok(route.includes("refreshMaintenanceBypass"), "route ต้องต่ออายุบัตรผ่าน");
+  assert.ok(dal.includes("export async function refreshMaintenanceBypass"), "ต้องมีตัวต่ออายุใน DAL");
+  assert.ok(dal.includes("delete(MAINTENANCE_BYPASS_COOKIE)"), "ออกจากระบบต้องลบบัตรผ่าน");
+
+  /* หน้าหลังบ้านต้องต่ออายุเป็นระยะ (ไม่งั้นบัตรผ่านตายระหว่างใช้งาน) */
+  const layout = readFileSync(path.join(root, "app", "admin", "layout.tsx"), "utf8");
+  assert.ok(layout.includes("MaintenanceBypassPing"), "ต้องมีการต่ออายุเป็นระยะบนหน้าหลังบ้าน");
+  assert.ok(layout.includes("isMaintenanceEnabled(process.env)"), "ต่ออายุเฉพาะเมื่อเปิดโหมดปิดปรับปรุง");
 });

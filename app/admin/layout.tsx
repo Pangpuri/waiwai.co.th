@@ -5,9 +5,11 @@ import type { ReactNode } from "react";
 import "../globals.css";
 
 import { roleLabelOf } from "@/features/admin/rbac-labels";
+import { MaintenanceBypassPing } from "@/features/admin/ui/maintenance-bypass-ping";
 import { getSessionUser } from "@/lib/auth/dal";
 import { can, type AdminPermission } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { isMaintenanceEnabled } from "@/lib/maintenance/plan";
 
 /**
  * Layout ของหลังบ้าน — เป็น layout ชั้นนอกสุดของเส้นทาง `/admin`
@@ -80,6 +82,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             </div>
           </nav>
         )}
+        {/* ต่ออายุ "บัตรผ่านดูเว็บระหว่างปิดปรับปรุง" — ทำงานเฉพาะเมื่อเปิดโหมด (รอบที่ 96) */}
+        <MaintenanceBypassPing enabled={user !== null && isMaintenanceEnabled(process.env)} />
         {children}
       </body>
     </html>

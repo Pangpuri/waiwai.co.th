@@ -16,6 +16,13 @@ import {
 import { createDbUserStore } from "@/lib/auth/users-repository";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import {
+  MAINTENANCE_BYPASS_COOKIE,
+  createMaintenanceBypassToken,
+  nextMaintenanceBypassExpiry,
+  parseMaintenanceBypassToken,
+  shouldRefreshMaintenanceBypass,
+} from "@/lib/maintenance/bypass";
+import {
   SESSION_COOKIE_NAME,
   createSessionToken,
   isSecretUsable,
@@ -163,6 +170,33 @@ export const getSessionUser = cache(async (): Promise<AdminUser | null> => {
   };
 });
 
+/**
+ * ต่ออายุ "บัตรผ่านดูเว็บระหว่างปิดปรับปรุง" (รอบที่ 96)
+ *
+ * ⚠️ เรียกได้เฉพาะใน Server Action / Route Handler (ตั้งคุกกี้จาก Server Component ไม่ได้)
+ * ⚠️ **ต้องเรียกหลังตรวจเซสชันกับฐานข้อมูลแล้วเท่านั้น** — นี่คือหัวใจของกลไก:
+ *    เซสชันที่ถูกเพิกถอน/บัญชีที่ถูกปิด จะไม่มีใครต่ออายุบัตรผ่านให้ ⇒ บัตรผ่านเก่าตายภายใน ≤ 15 นาที
+ */
+export async function refreshMaintenanceBypass(): Promise<void> {
+  const secret = readSecret();
+  if (secret === null) return;
+
+  const jar = await cookies();
+  const now = Date.now();
+  const current = jar.get(MAINTENANCE_BYPASS_COOKIE)?.value;
+  const expiresAt = current === undefined ? null : (parseMaintenanceBypassToken(current, secret, now)?.expiresAt ?? null);
+  if (!shouldRefreshMaintenanceBypass(expiresAt, now)) return;
+
+  const next = nextMaintenanceBypassExpiry(now);
+  jar.set(MAINTENANCE_BYPASS_COOKIE, createMaintenanceBypassToken(next, secret), {
+    httpOnly: true,
+    secure: shouldUseSecureCookies(),
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(next),
+  });
+}
+
 /** รหัสเซสชันของคำขอนี้ (`null` = ไม่มี/อ่านไม่ได้) — ใช้ตอน "ตัดเซสชันอื่นทั้งหมด" ของตัวเอง */
 export async function currentSessionId(): Promise<string | null> {
   const secret = readSecret();
@@ -235,4 +269,6 @@ export async function endSession(): Promise<void> {
     await revokeAdminSessions({ hash: hashSessionId(sid), actor: "self-logout" });
   }
   (await cookies()).delete(SESSION_COOKIE_NAME);
+  /* ลบบัตรผ่านดูเว็บด้วย — ออกจากระบบแล้วต้องดูเว็บที่ปิดอยู่ไม่ได้ */
+  (await cookies()).delete(MAINTENANCE_BYPASS_COOKIE);
 }
