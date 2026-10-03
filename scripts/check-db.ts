@@ -47,7 +47,7 @@ import {
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { buildBlockTemplate } from "@/lib/blocks/templates";
+import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { th } from "@/lib/i18n/messages/th";
@@ -1121,17 +1121,37 @@ async function checkChromePresets(): Promise<void> {
  * ⚠️ ล้างทุกอย่างที่สร้างในตอนจบ (แถว draft/published + ประวัติ + audit ของหน้านี้)
  *    และ **ไม่แตะหน้าแรก** (มีข้อมูลจริงของผู้ใช้อยู่)
  */
-const TEMPLATE_TEST_PAGES = ["about", "careers", "contact"] as const;
+const TEMPLATE_TEST_PAGES = BLOCK_TEMPLATE_PAGE_IDS.filter((page) => page !== "home");
 const TEMPLATE_TEST_ACTOR = "check-db-template@example.invalid";
 
+/** แถวของเอกสารหน้าที่จะคืนกลับหลังทดสอบ (จำของเดิมไว้แบบครบทุกคอลัมน์) */
+type DocumentSnapshot = {
+  readonly page: string;
+  readonly status: string;
+  readonly document: unknown;
+  readonly updated_by: string | null;
+  readonly updated_at: string | null;
+  readonly published_at: string | null;
+  readonly is_live: boolean | null;
+};
+
+/**
+ * 15) ตัวสร้างหลายหน้า (S2 · รอบที่ 82–83) — **วงจรจริงของทุกหน้าที่มีเทมเพลต**
+ *
+ * พิสูจน์ว่า "หน้าที่แปลงแล้วขึ้นจากฉบับเผยแพร่จริง" ไม่ใช่แค่มีเทมเพลตในโค้ด
+ * 1. เทมเพลตของหน้านั้นผ่าน parser + validator (ก่อนเขียนลงฐานข้อมูล)
+ * 2. บันทึกฉบับร่าง → เผยแพร่ → **สวิตช์ปิด = หน้าเว็บยังใช้ของเดิม** (`loadLiveBlockDocument` คืน null)
+ * 3. เปิดสวิตช์ → อ่านได้เอกสารที่เผยแพร่ (จำนวนบล็อกตรงกับเทมเพลต)
+ * 4. ปิดสวิตช์ → กลับเป็น null (ปิดแล้วกลับไปใช้เลย์เอาต์เดิมได้ทันที)
+ *
+ * ⚠️ **ไม่แตะข้อมูลจริง**: ก่อนทดสอบจะ **จำแถวเดิมของหน้านั้นไว้** (ถ้ามี) แล้วคืนกลับให้เหมือนเดิมทุกคอลัมน์
+ *    ⇒ ด่านนี้รันซ้ำได้แม้วันหนึ่งเจ้าของจะเริ่มแก้หน้านั้นในหลังบ้าน (เดิมด่านบังคับว่า "ต้องว่าง" ซึ่งจะพังเมื่อมีข้อมูลจริง)
+ * ⚠️ ไม่แตะหน้าแรก (ใช้จริงอยู่) — ตรวจหน้าแรกซ้ำผ่านเทสต์ `scripts/test-templates.ts`
+ */
 async function checkPageTemplates(): Promise<void> {
   const pool = getPool();
 
   for (const page of TEMPLATE_TEST_PAGES) {
-    /* ต้องเริ่มจาก "ว่าง" จริง ๆ ไม่งั้นเราไปทับข้อมูลของผู้ใช้ */
-    const existing = await countWhere("page_document where page = $1", [page]);
-    assert.equal(existing, 0, `${page}: ต้องไม่มีเอกสารค้างอยู่ก่อนทดสอบ (กันการทับข้อมูลจริง)`);
-
     const template = buildBlockTemplate(page);
     assert.ok(template !== null, `${page}: ต้องมีเทมเพลต`);
 
@@ -1143,13 +1163,20 @@ async function checkPageTemplates(): Promise<void> {
     assert.equal(errors.length, 0, `${page}: เทมเพลตต้องไม่มี error`);
     const expectedBlocks = countRawBlocks(parsed.document);
 
+    /* ── จำสภาพเดิมของหน้านี้ (รวมของจริงถ้ามี) ── */
+    const snapshot = await pool.query<DocumentSnapshot>(
+      `select page, status, document, updated_by, updated_at, published_at, is_live
+         from page_document where page = $1`,
+      [page],
+    );
+
     try {
       /* ── 1) บันทึกฉบับร่างจากเทมเพลต → เผยแพร่ ── */
       await saveDraft(page, parsed.document, TEMPLATE_TEST_ACTOR);
       const { revision } = await publishDraft(page, TEMPLATE_TEST_ACTOR, "check:db");
       assert.ok(revision >= 1, `${page}: เผยแพร่ต้องได้เลขรุ่น`);
 
-      /* ── 2) สวิตช์ปิด ⇒ หน้าเว็บยังใช้เลย์เอาต์เดิม ── */
+      /* ── 2) สวิตช์: ค่าเริ่มต้นต้องเป็น "ปิด" และหน้าเว็บยังใช้เลย์เอาต์เดิม ── */
       assert.equal(await isPageLive(page), false, `${page}: ค่าเริ่มต้นคือสวิตช์ปิด`);
       assert.equal(await loadLiveBlockDocument(page), null, `${page}: ปิดสวิตช์แล้วต้องไม่ใช้เอกสารบล็อก`);
 
@@ -1166,10 +1193,21 @@ async function checkPageTemplates(): Promise<void> {
       assert.equal(await loadLiveBlockDocument(page), null, `${page}: ปิดสวิตช์แล้วต้องกลับไปใช้ของเดิม`);
       done(`หน้า ${page}: เทมเพลต → เผยแพร่ → สวิตช์รายหน้า`, `${expectedBlocks} บล็อก`);
     } finally {
-      await pool.query("delete from page_document_revision where page = $1", [page]);
+      /* ── คืนสภาพเดิมเป๊ะ: ลบของที่ด่านสร้าง + ใส่แถวเดิมกลับ (ถ้ามี) ── */
+      await pool.query("delete from page_document_revision where page = $1 and created_by = $2", [page, TEMPLATE_TEST_ACTOR]);
       await pool.query("delete from page_document where page = $1", [page]);
+      for (const row of snapshot.rows) {
+        await pool.query(
+          `insert into page_document (page, status, document, updated_by, updated_at, published_at, is_live)
+             values ($1, $2, $3::jsonb, $4, coalesce($5::timestamptz, now()), $6, $7)`,
+          [row.page, row.status, JSON.stringify(row.document), row.updated_by, row.updated_at, row.published_at, row.is_live],
+        );
+      }
       await pool.query("delete from audit_log where actor_email = $1", [TEMPLATE_TEST_ACTOR]);
-      assert.equal(await countWhere("page_document where page = $1", [page]), 0, `${page}: ต้องไม่เหลือร่องรอย`);
+
+      /* ยืนยันว่าคืนครบจริง (ถ้ามีของเดิม ต้องได้เท่าเดิม) */
+      const restored = await countWhere("page_document where page = $1", [page]);
+      assert.equal(restored, snapshot.rows.length, `${page}: ต้องได้แถวเดิมกลับมาครบ (${snapshot.rows.length})`);
     }
   }
 }

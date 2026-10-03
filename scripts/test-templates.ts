@@ -4,7 +4,13 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
+import {
+  BLOCK_COVERAGE_PART_IDS,
+  BLOCK_TEMPLATE_PAGE_IDS,
+  blockCoverageGaps,
+  buildBlockTemplate,
+  hasBlockTemplate,
+} from "@/lib/blocks/templates";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { MAX_BLOCKS_TOTAL } from "@/lib/blocks/types";
@@ -29,8 +35,11 @@ function sourceOf(relativePath: string): string {
 
 /* ── 1) ทะเบียนเทมเพลต ─────────────────────────────────────────────────────── */
 
-test("templates: ทะเบียนมีหน้าแรก + 3 หน้าที่แปลงรอบนี้ และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
-  assert.deepEqual([...BLOCK_TEMPLATE_PAGE_IDS], ["home", "about", "careers", "contact"]);
+test("templates: ทะเบียนครบทั้ง 9 หน้า และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
+  assert.deepEqual(
+    [...BLOCK_TEMPLATE_PAGE_IDS],
+    ["home", "about", "careers", "contact", "products", "recipes", "news", "certifications", "executives"],
+  );
 
   for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
     const template = buildBlockTemplate(page);
@@ -49,14 +58,78 @@ test("templates: ทะเบียนมีหน้าแรก + 3 หน้�
   }
 });
 
-test("templates: หน้าที่ไม่มีเทมเพลตต้องไม่ถูกเขียนทับด้วยเทมเพลตของคนอื่น", () => {
-  for (const page of ["products", "recipes", "news", "executives", "certifications"]) {
-    assert.equal(hasBlockTemplate(page), false, `${page}: ยังไม่มีเทมเพลตในรอบนี้`);
-    assert.equal(buildBlockTemplate(page), null, `${page}: ต้องไม่คืนเทมเพลต`);
+test("templates: หน้าที่อยู่นอกทะเบียนต้องไม่ถูกเขียนทับด้วยเทมเพลตของคนอื่น", () => {
+  for (const page of ["sustainability", "where-to-buy", "cookie-policy", "terms", "privacy", ""]) {
+    assert.equal(hasBlockTemplate(page), false, `"${page}": ไม่มีเทมเพลต`);
+    assert.equal(buildBlockTemplate(page), null, `"${page}": ต้องไม่คืนเทมเพลต`);
+    assert.deepEqual([...blockCoverageGaps(page)], [], `"${page}": ไม่มีข้อมูลครอบคลุม`);
   }
 
-  assert.equal(hasBlockTemplate("home"), true);
-  assert.equal(hasBlockTemplate("about"), true);
+  /* ทุก id ในทะเบียนต้องเป็นเส้นทางที่มีจริงในเว็บ (ไม่งั้นปุ่มจะพาไป 404) */
+  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+    assert.ok(PAGE_PATHS[page] !== undefined, `${page}: ต้องมี path ในเว็บ`);
+  }
+});
+
+test("templates: ทุกหน้าต้องประกาศ 'ส่วนที่ไม่ครอบคลุม' ด้วยรหัสที่รู้จัก", () => {
+  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+    const gaps = blockCoverageGaps(page);
+    assert.ok(Array.isArray(gaps), `${page}: ต้องคืนรายการ`);
+    for (const part of gaps) {
+      assert.ok(BLOCK_COVERAGE_PART_IDS.includes(part), `${page}: รหัส "${part}" ต้องอยู่ในรายการกลาง`);
+    }
+    assert.equal(new Set(gaps).size, gaps.length, `${page}: ห้ามระบุซ้ำ`);
+  }
+
+  /*
+    หน้าที่เนื้อหาส่วนหนึ่ง "ไม่ใช่บล็อก" ต้องถูกประกาศว่าขาด เพื่อให้หน้าจอเตือนก่อนเปิดสวิตช์
+    (เปิดแล้วส่วนนั้นหายจากหน้าเว็บจริง) — ถ้าวันหนึ่งทำเป็นบล็อกได้ ค่อยถอดออกจากรายการนี้
+  */
+  assert.ok(blockCoverageGaps("contact").includes("form"), "หน้าติดต่อมีฟอร์มที่ยังไม่ใช่บล็อก");
+  assert.ok(blockCoverageGaps("contact").includes("map"), "หน้าติดต่อมีแผนที่ที่ยังไม่ใช่บล็อก");
+  assert.ok(blockCoverageGaps("careers").includes("jobBoard"), "หน้าร่วมงานมีตารางตำแหน่งงาน");
+  assert.ok(blockCoverageGaps("certifications").includes("lightbox"), "หน้าใบรับรองมีตัวขยายภาพ");
+  assert.ok(blockCoverageGaps("executives").includes("rosterText"), "ชื่อผู้บริหารยังอยู่ในภาพ");
+  assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
+  assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
+  assert.deepEqual([...blockCoverageGaps("home")], [], "หน้าแรกครอบคลุมครบ");
+
+  /* ทุกรหัสต้องมีคำแปลสองภาษา (belongs to admin area) และหน้าจอต้องมี case ครบ */
+  for (const part of BLOCK_COVERAGE_PART_IDS) {
+    for (const locale of ["th", "en"]) {
+      /* คีย์เหล่านี้อยู่ในพื้นที่ย่อย adminTemplate (พื้นที่ admin ชนเพดาน 32KB ⇒ ห้ามขยาย) */
+      const area = sourceOf(`lib/i18n/messages/areas/${locale}/adminTemplate.ts`);
+      const key = `coverage${part.charAt(0).toUpperCase()}${part.slice(1)}:`;
+      assert.ok(area.includes(key), `${locale}: ขาดคำแปลของ "${part}"`);
+    }
+  }
+
+  const page = sourceOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(page.includes("coveragePartLabel"), "หน้าจอต้องแปลงรหัสส่วนเป็นข้อความ");
+
+  /* พื้นที่ admin ต้องไม่กลับไปบวมเกินเพดานของด่าน check:i18n */
+  const adminTh = sourceOf("lib/i18n/messages/areas/th/admin.ts");
+  assert.ok(!adminTh.includes("coverageGallery:"), "คีย์ของเทมเพลตต้องอยู่พื้นที่ย่อย ไม่ใช่ admin หลัก");
+  assert.ok(page.includes("blockCoverageGaps(page)"), "หน้าจอต้องอ่านส่วนที่ขาดจากทะเบียนกลาง");
+  assert.ok(!page.includes("switch (part) {\n    default"), "ห้ามใช้ default (ต้อง exhaustive)");
+});
+
+test("templates: คำเตือนเรื่องส่วนที่ขาดต้องแสดงทั้งตอนว่างและข้างสวิตช์ (คอมโพเนนต์กลางตัวเดียว)", () => {
+  const builder = sourceOf("features/admin/ui/block-builder.tsx");
+  assert.ok(builder.includes("readonly coverage?: TemplateCoverage"), "prop คำเตือนต้องไม่บังคับ (กัน build พัง)");
+  assert.ok(builder.includes("<TemplateCoverageNote {...coverage} />"), "ต้องใช้คอมโพเนนต์กลาง ไม่เขียนกล่องซ้ำ");
+
+  /* เคสจริงรอบที่ 83: เดิมแสดงเฉพาะใน BlockBuilder (หน้าที่มีฉบับร่างแล้ว) ⇒ หน้าที่ว่างไม่เห็นคำเตือน */
+  const page = sourceOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(page.includes("const coverage = {"), "หน้าจอต้องคำนวณคำเตือนครั้งเดียว");
+  assert.ok(page.includes("<TemplateCoverageNote {...coverage} />"), "สถานะว่างต้องแสดงคำเตือนด้วย");
+  assert.ok(page.includes("coverage={coverage}"), "ส่งค่าที่คำนวณแล้วเข้า BlockBuilder (ไม่คำนวณซ้ำ)");
+  assert.equal(page.split("<TemplateCoverageNote").length - 1, 1, "หน้าจอต้องมีกล่องคำเตือนเดียวในโค้ด");
+
+  /* คำเตือนต้องอยู่ "ก่อน" ฟอร์มสวิตช์ในโค้ด (ผู้ใช้เห็นก่อนกด) */
+  const coverageAt = builder.indexOf("coverage === undefined ? null :");
+  const switchAt = builder.indexOf("action={setPageLiveAction}");
+  assert.ok(coverageAt > 0 && switchAt > coverageAt, "คำเตือนต้องวางก่อนฟอร์มสวิตช์");
 });
 
 test("templates: บล็อกในเทมเพลตมี id ไม่ซ้ำ และทุก id ตรงรูปแบบของโปรเจกต์", () => {
@@ -76,7 +149,8 @@ test("templates: บล็อกในเทมเพลตมี id ไม่�
 test("templates: รายการหน้าที่พรีวิวได้มาจากทะเบียนเทมเพลต (ไม่ใช่การพิมพ์ซ้ำ)", () => {
   assert.deepEqual([...PREVIEWABLE_PAGE_IDS], [...BLOCK_TEMPLATE_PAGE_IDS]);
   assert.equal(isPreviewablePage("about"), true);
-  assert.equal(isPreviewablePage("products"), false, "หน้าที่ยังไม่มีเทมเพลตต้องไม่เปิดพรีวิว");
+  assert.equal(isPreviewablePage("products"), true, "มีเทมเพลตแล้ว = พรีวิวได้");
+  assert.equal(isPreviewablePage("privacy"), false, "หน้าที่ไม่มีเทมเพลต (อยู่ในโค้ดล้วน) ต้องไม่เปิดพรีวิว");
 
   const paths = sourceOf("lib/pages/paths.ts");
   assert.ok(paths.includes("BLOCK_TEMPLATE_PAGE_IDS"), "paths ต้องอ่านจากทะเบียน ไม่ใช่พิมพ์รายการเอง");
@@ -107,11 +181,24 @@ test("templates: ตัวเลือกลิงก์พรีวิวคร
 
 /* ── 3) หน้าสาธารณะที่แปลงแล้ว ─────────────────────────────────────────────── */
 
-test("templates: 3 หน้าที่แปลงต้องเรนเดอร์เอกสารที่เผยแพร่ได้ และมีทางถอยเป็นเลย์เอาต์เดิม", () => {
-  for (const page of ["about", "careers", "contact"]) {
+test("templates: ทุกหน้าที่มีเทมเพลตต้องเรนเดอร์เอกสารที่เผยแพร่ได้ และมีทางถอยเป็นเลย์เอาต์เดิม", () => {
+  /* หน้าแรกอยู่ที่ app/[lang]/page.tsx · หน้าอื่นมีโฟลเดอร์ของตัวเอง (certifications/executives อยู่ใต้ about) */
+  const routeFiles: Readonly<Record<string, string>> = {
+    home: "app/[lang]/page.tsx",
+    about: "app/[lang]/about/page.tsx",
+    careers: "app/[lang]/careers/page.tsx",
+    contact: "app/[lang]/contact/page.tsx",
+    products: "app/[lang]/products/page.tsx",
+    recipes: "app/[lang]/recipes/page.tsx",
+    news: "app/[lang]/news/page.tsx",
+    certifications: "app/[lang]/about/certifications/page.tsx",
+    executives: "app/[lang]/about/executives/page.tsx",
+  };
+
+  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
     assert.ok(PAGE_PATHS[page] !== undefined, `${page}: ต้องมี path ในเว็บ`);
 
-    const source = sourceOf(`app/[lang]/${page}/page.tsx`);
+    const source = sourceOf(routeFiles[page] ?? "");
     assert.ok(source.includes(`loadLiveBlockDocument("${page}")`), `${page}: ต้องโหลดเอกสารที่เผยแพร่`);
     assert.ok(source.includes("<BlockDocumentView"), `${page}: ต้องใช้ตัวเรนเดอร์ตัวเดียวกับหน้าแรก`);
     assert.ok(source.includes("return ("), `${page}: ต้องมีเลย์เอาต์เดิมเป็นทางถอย`);
@@ -119,6 +206,12 @@ test("templates: 3 หน้าที่แปลงต้องเรนเด�
     /* สวิตช์ "ใช้กับหน้าเว็บจริง" เปิดได้เฉพาะหน้าที่มีเอกสาร — ต้องมีสวิตช์ในหน้าจอสร้าง */
     const builder = sourceOf("app/admin/builder/[page]/page.tsx");
     assert.ok(builder.includes("isPageLive(page)"), "หน้าจอสร้างต้องอ่านสถานะสวิตช์ของหน้านั้น");
+  }
+
+  /* ทะเบียนกับไฟล์ route ต้องตรงกันเป๊ะ — ลืมเพิ่มหน้า = เทสต์แดงทันที */
+  assert.equal(Object.keys(routeFiles).length, BLOCK_TEMPLATE_PAGE_IDS.length);
+  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+    assert.ok(routeFiles[page] !== undefined, `${page}: ต้องประกาศไฟล์ route ในเทสต์นี้ด้วย`);
   }
 });
 

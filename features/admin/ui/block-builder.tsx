@@ -61,6 +61,7 @@ import {
 } from "@/lib/blocks/types";
 import { documentErrorsOf, documentWarningsOf, missingEnglishCount, validateDocument } from "@/lib/blocks/validate";
 import { fillTemplate } from "@/lib/i18n/template";
+import { TemplateCoverageNote, type TemplateCoverage } from "@/features/admin/ui/template-coverage-note";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -99,6 +100,11 @@ type Props = {
    * - ถ้าไม่ส่งมา = **ไม่แสดงสวิตช์นี้เลย** (ดีกว่าแสดงผิดว่า "ยังไม่ใช้กับหน้าเว็บจริง" ทั้งที่ใช้อยู่)
    */
   readonly isLive?: boolean;
+  /**
+   * คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" (S2 รอบที่ 83) — ข้อความแปลแล้วจากฝั่งเซิร์ฟเวอร์
+   * ⚠️ **ไม่บังคับ** (prop บังคับเคยทำให้ build พัง) — ไม่ส่ง = ไม่แสดงคำเตือน
+   */
+  readonly coverage?: TemplateCoverage;
   /** เนื้อหาเพิ่มเติมในแผงขวา (ใช้เสียบ "ป้ายประกาศเข้าเว็บ" ให้แก้ได้จากหน้านี้เลย) */
   /** ตัวแก้ "แถบเมนู (navbar)" — ส่วนกลางของเว็บ (ผู้ใช้สั่ง รอบที่ 53) */
   /** พรีเซ็ตที่บันทึกไว้ (โหลดจากฐานข้อมูลที่หน้าจอ server) */
@@ -372,6 +378,7 @@ export function BlockBuilder({
   page,
   previewLiveSrc,
   isLive,
+  coverage,
   presets = [],
   initialDraft,
   draftUpdatedAt,
@@ -1121,6 +1128,9 @@ export function BlockBuilder({
             </p>
             <p className="text-fg-muted text-xs">{isLive ? strings.liveHintOn : strings.liveHintOff}</p>
           </div>
+          {/* คำเตือนก่อนเปิดสวิตช์: เปิดแล้วหน้าเว็บจะแสดงเฉพาะบล็อก (S2 รอบที่ 83) */}
+          {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
+
           <form action={setPageLiveAction} className="flex items-center gap-2">
             <input type="hidden" name="page" value={page} />
             <input type="hidden" name="live" value={isLive ? "0" : "1"} />

@@ -1,4 +1,4 @@
-import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type BlockCard } from "@/lib/blocks/types";
+import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type BlockCard, type BlockMedia } from "@/lib/blocks/types";
 
 /**
  * เครื่องมือกลางสำหรับสร้าง **เทมเพลตบล็อกตั้งต้น** ของแต่ละหน้า (S2)
@@ -83,5 +83,32 @@ export function templateTextCards(
     body: { th: "", en: "" },
     href: "",
     image: null,
+  }));
+}
+
+/**
+ * รูปในเทมเพลต — เก็บเป็น **พาธในโปรเจกต์** (มติ D9) เช่นภาพจริงใน `public/products/*`
+ * `hasWatermark: false` = ภาพจริง (ไม่ใช่ภาพตัวอย่างที่วาดด้วย CSS) ⇒ validator ไม่เตือน
+ */
+export function templateMedia(path: string, altTh: string, altEn: string): BlockMedia {
+  return { path, altTh, altEn, hasWatermark: false };
+}
+
+/** การ์ดที่มีภาพ (ใช้กับหมวดผลิตภัณฑ์/ใบรับรอง) — จับคู่ TH/EN ด้วยคีย์เดียวกัน */
+export function templateCardsWithImage(
+  items: readonly {
+    readonly titleTh: string;
+    readonly titleEn: string;
+    readonly bodyTh: string;
+    readonly bodyEn: string;
+    readonly href: string;
+    readonly image: BlockMedia;
+  }[],
+): readonly BlockCard[] {
+  return items.map((item) => ({
+    title: { th: item.titleTh, en: item.titleEn },
+    body: { th: item.bodyTh, en: item.bodyEn },
+    href: item.href,
+    image: item.image,
   }));
 }

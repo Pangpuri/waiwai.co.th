@@ -5,9 +5,10 @@ import { BlockBuilder } from "@/features/admin/ui/block-builder";
 import { PageSeoSettings } from "@/features/admin/ui/page-seo-settings";
 import { PageSettings } from "@/features/admin/ui/page-settings";
 import { PageTabs } from "@/features/admin/ui/page-tabs";
+import { TemplateCoverageNote } from "@/features/admin/ui/template-coverage-note";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { hasBlockTemplate } from "@/lib/blocks/templates";
+import { blockCoverageGaps, hasBlockTemplate, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
@@ -17,6 +18,7 @@ import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { localePath } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
  * หน้าจอสร้างหน้าเว็บ (บล็อกอิสระ) — Server Component
@@ -35,6 +37,32 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
   ⚠️ บทเรียน รอบที่ 62: เดิมล็อกไว้ `["home"]` แต่แท็บรายหน้ามี 9 หน้า ⇒ กดแท็บอื่นแล้ว **404**
   แก้: ยอมรับ id ที่มีอยู่จริงในตาราง `page` (หรือรายการหน้าในโค้ด) · ที่เหลือ 404 ตามเดิม
 */
+
+/**
+ * รหัสส่วนที่เทมเพลตไม่ครอบคลุม → ข้อความจากพจนานุกรม (S2 รอบที่ 83)
+ * ⚠️ `switch` แบบ exhaustive ⇒ เพิ่มรหัสใหม่ในทะเบียนแล้วลืมแปล จะ compile ไม่ผ่าน
+ */
+function coveragePartLabel(
+  part: BlockCoveragePartId,
+  strings: Messages["admin"],
+): string {
+  switch (part) {
+    case "gallery":
+      return strings.coverageGallery;
+    case "lightbox":
+      return strings.coverageLightbox;
+    case "form":
+      return strings.coverageForm;
+    case "map":
+      return strings.coverageMap;
+    case "jobBoard":
+      return strings.coverageJobBoard;
+    case "sampleData":
+      return strings.coverageSampleData;
+    case "rosterText":
+      return strings.coverageRosterText;
+  }
+}
 
 export default async function AdminBuilderPage({ params }: { readonly params: Promise<{ readonly page: string }> }) {
   await requireAdminUser();
@@ -75,6 +103,14 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
   */
 
 
+  /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
+  const coverage = {
+    title: strings.templateCoverageTitle,
+    note: strings.templateCoverageNote,
+    noneLabel: strings.templateCoverageNone,
+    parts: blockCoverageGaps(page).map((part) => coveragePartLabel(part, strings)),
+  };
+
   /* ── หน้าเป็นวัตถุ (W1): แท็บรายหน้า + ชื่อหน้า = ชื่อเมนู ── */
   const pages = knownPages;
   const currentPage = pages.find((entry) => entry.id === page) ?? null;
@@ -101,6 +137,7 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
           {hasBlockTemplate(page) ? (
             <>
               <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
+              <TemplateCoverageNote {...coverage} />
               <form action={startFromTemplateAction}>
                 <input type="hidden" name="page" value={page} />
                 <button
@@ -129,6 +166,7 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
           revisions={revisions}
           storedVersions={storedVersions}
           previewLiveSrc={localePath("th", pathForPage(currentPage?.id ?? page))}
+          coverage={coverage}
           strings={strings}
         />
       )}
