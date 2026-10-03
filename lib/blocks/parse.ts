@@ -16,6 +16,8 @@ import {
   MAX_CARDS,
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
+  MAX_JOB_ITEMS,
+  MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
   countBlocks,
@@ -33,6 +35,8 @@ import {
   type BlockMedia,
   type BlockStyle,
   type BlockTableRow,
+  type JobBoardItem,
+  type RosterMember,
 } from "@/lib/blocks/types";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
 import type { LocalizedValue } from "@/lib/content/types";
@@ -95,6 +99,19 @@ function readBoolean(container: Record<string, unknown>, key: string, path: stri
     return false;
   }
   return value;
+}
+
+/** อ่าน true/false ที่ **ไม่ระบุ = ค่าเริ่มต้นที่ผู้เรียกกำหนด** (ต่างจาก `readBoolean` ที่ไม่ระบุ = false) */
+function readBooleanDefault(
+  container: Record<string, unknown>,
+  key: string,
+  fallback: boolean,
+  path: string,
+  problems: string[],
+): boolean {
+  const value = container[key];
+  if (value === undefined || value === null) return fallback;
+  return readBoolean(container, key, path, problems);
 }
 
 /** ภาพที่ไม่มีพาธ = ไม่มีภาพ (เหมือนกันทั้งระบบ) */
@@ -318,6 +335,97 @@ function readGalleryItems(entry: Record<string, unknown>, path: string, problems
     });
   });
   return items;
+}
+
+/** จำนวนอัตราที่เปิดรับ — 0 = ไม่ระบุ · จำกัดช่วงกันตัวเลขหลุดโลก (validator เตือนต่อ) */
+function readOpenings(container: Record<string, unknown>, key: string, path: string, problems: string[]): number {
+  const value = container[key];
+  if (value === undefined || value === null) return 0;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 999) {
+    problems.push(`${path}: ต้องเป็นจำนวนเต็ม 0-999`);
+    return 0;
+  }
+  return value;
+}
+
+/** อ่านรายการตำแหน่งงาน (บล็อก "กระดานรับสมัครงาน") */
+function readJobItems(entry: Record<string, unknown>, path: string, problems: string[]): readonly JobBoardItem[] {
+  const value = entry["items"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.items: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_JOB_ITEMS) {
+    problems.push(`${path}.items: เกินที่อนุญาต (${value.length} > ${MAX_JOB_ITEMS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  const items: JobBoardItem[] = [];
+  value.slice(0, MAX_JOB_ITEMS).forEach((raw, index) => {
+    const itemPath = `${path}.items[${index}]`;
+    if (!isRecord(raw)) {
+      problems.push(`${itemPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+
+    let id = readString(raw, "id", `${itemPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${itemPath}.id: ซ้ำกับตำแหน่งก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("job", seen);
+    }
+    seen.add(id);
+
+    items.push({
+      id,
+      title: toText(raw["title"], `${itemPath}.title`, problems),
+      department: toText(raw["department"], `${itemPath}.department`, problems),
+      openings: readOpenings(raw, "openings", `${itemPath}.openings`, problems),
+      qualifications: toText(raw["qualifications"], `${itemPath}.qualifications`, problems),
+      experience: toText(raw["experience"], `${itemPath}.experience`, problems),
+    });
+  });
+
+  return items;
+}
+
+/** อ่านรายชื่อคณะผู้บริหาร — คนที่ยังไม่มีภาพ (`image = null`) ยังเก็บไว้ได้ (ภาพไม่บังคับ) */
+function readRosterMembers(entry: Record<string, unknown>, path: string, problems: string[]): readonly RosterMember[] {
+  const value = entry["members"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.members: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_ROSTER_MEMBERS) {
+    problems.push(`${path}.members: เกินที่อนุญาต (${value.length} > ${MAX_ROSTER_MEMBERS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  const members: RosterMember[] = [];
+  value.slice(0, MAX_ROSTER_MEMBERS).forEach((raw, index) => {
+    const memberPath = `${path}.members[${index}]`;
+    if (!isRecord(raw)) {
+      problems.push(`${memberPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+
+    let id = readString(raw, "id", `${memberPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${memberPath}.id: ซ้ำกับคนก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("person", seen);
+    }
+    seen.add(id);
+
+    members.push({
+      id,
+      name: toText(raw["name"], `${memberPath}.name`, problems),
+      role: toText(raw["role"], `${memberPath}.role`, problems),
+      image: toMedia(raw["image"], `${memberPath}.image`, problems),
+    });
+  });
+
+  return members;
 }
 
 /** จำนวนคอลัมน์ของแกลเลอรี (2 | 3 | 4) */
@@ -560,6 +668,26 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         heading: readText(entry, "heading", `${path}.heading`, problems),
         items: readGalleryItems(entry, path, problems),
         columns: readGalleryColumns(entry, `${path}.columns`, problems),
+      };
+    case "jobBoard":
+      return {
+        ...base,
+        type: "jobBoard",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+        /* ไม่ระบุ = จัดกลุ่มตามฝ่าย (ตรงกับ `createBlock`) */
+        groupByDepartment: readBooleanDefault(entry, "groupByDepartment", true, `${path}.groupByDepartment`, problems),
+        items: readJobItems(entry, path, problems),
+      };
+    case "rosterText":
+      return {
+        ...base,
+        type: "rosterText",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+        /* ใช้ตัวอ่าน 2|3|4 ตัวเดียวกับแกลเลอรี (ความหมายเดียวกัน: จำนวนคอลัมน์ของกริด) */
+        columns: readGalleryColumns(entry, `${path}.columns`, problems),
+        members: readRosterMembers(entry, path, problems),
       };
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };

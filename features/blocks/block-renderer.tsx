@@ -3,7 +3,7 @@ import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
 import { CareerFormFields, ContactFormFields } from "@/features/forms/ui/form-fields";
 import { SubmitForm } from "@/features/forms/ui/submit-form";
 import { NewsletterForm } from "@/features/home/ui/newsletter-form";
-import { hiddenSizesOf, type Block, type BlockCard, type BlockDocument, type BlockMedia } from "@/lib/blocks/types";
+import { hiddenSizesOf, type Block, type BlockCard, type BlockDocument, type BlockMedia, type JobBoardItem } from "@/lib/blocks/types";
 import { alignClass, columnClass, containerClass, headingClass, heroHeightClass, rowGridClass, shellClass } from "@/lib/blocks/style";
 
 /**
@@ -471,6 +471,118 @@ function BlockView({
             ) : null}
             {visible.length === 0 ? null : (
               <GalleryLightbox items={visible} columns={block.columns} strings={strings.gallery} />
+            )}
+          </div>
+        );
+      }
+
+      /* ── กระดานรับสมัครงาน (รอบที่ 88) — จัดกลุ่มตามฝ่าย · เห็นครบทุกตำแหน่งโดยไม่ต้องใช้ JS ── */
+      case "jobBoard": {
+        const groups: { readonly label: string; readonly items: JobBoardItem[] }[] = [];
+        if (block.groupByDepartment) {
+          for (const item of block.items) {
+            const label = hasText(item.department) ? text(item.department, language) : "";
+            const existing = groups.find((group) => group.label === label);
+            if (existing === undefined) groups.push({ label, items: [item] });
+            else existing.items.push(item);
+          }
+        } else {
+          groups.push({ label: "", items: [...block.items] });
+        }
+
+        /* มีหัวกลุ่ม = ชื่อตำแหน่งเป็น h4 · ไม่มีหัวกลุ่ม = เป็น h3 (ลำดับหัวเรื่องยังถูกต้อง) */
+        const ItemTitle = block.groupByDepartment ? "h4" : "h3";
+
+        return (
+          <div className={`${container} flex flex-col gap-4`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+            {hasText(block.body) ? (
+              <p className="text-fg-muted text-sm" {...editAttrs(editable, "body")}>
+                {text(block.body, language)}
+              </p>
+            ) : null}
+
+            {block.items.length === 0 ? null : (
+              <div className="flex flex-col gap-6">
+                {groups.map((group, groupIndex) => (
+                  <section key={`job-group-${groupIndex}`} className="flex flex-col gap-3">
+                    {group.label.trim() === "" ? null : (
+                      <h3 className="text-fg-muted text-xs font-semibold tracking-wide uppercase">{group.label}</h3>
+                    )}
+                    <ul className="grid gap-4 sm:grid-cols-2">
+                      {group.items.map((item) => (
+                        <li key={item.id} className="border-line bg-surface rounded-2xl border p-5">
+                          <ItemTitle className="text-fg text-base font-semibold">{text(item.title, language)}</ItemTitle>
+                          {item.openings > 0 ? (
+                            <p className="text-fg-muted mt-1 text-sm">
+                              {item.openings} {strings.jobBoard.openingsUnit}
+                            </p>
+                          ) : null}
+                          {hasText(item.qualifications) ? (
+                            <p className="text-fg mt-3 text-sm">
+                              <span className="font-semibold">{strings.jobBoard.qualificationsLabel}: </span>
+                              {text(item.qualifications, language)}
+                            </p>
+                          ) : null}
+                          {hasText(item.experience) ? (
+                            <p className="text-fg-muted mt-2 text-sm">
+                              <span className="font-semibold">{strings.jobBoard.experienceLabel}: </span>
+                              {text(item.experience, language)}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      /* ── รายชื่อคณะผู้บริหาร (รอบที่ 88) — ชื่อ/ตำแหน่งเป็นข้อความ (ค้นหา/คัดลอก/อ่านออกเสียงได้) ── */
+      case "rosterText": {
+        const cols =
+          block.columns === 2
+            ? "sm:grid-cols-2"
+            : block.columns === 4
+              ? "sm:grid-cols-2 lg:grid-cols-4"
+              : "sm:grid-cols-2 lg:grid-cols-3";
+
+        return (
+          <div className={`${container} flex flex-col gap-4`}>
+            {hasText(block.heading) ? (
+              <h2 className={heading} {...editAttrs(editable, "heading")}>
+                {text(block.heading, language)}
+              </h2>
+            ) : null}
+            {hasText(block.body) ? (
+              <p className="text-fg-muted text-sm" {...editAttrs(editable, "body")}>
+                {text(block.body, language)}
+              </p>
+            ) : null}
+
+            {block.members.length === 0 ? null : (
+              <ul className={`grid gap-4 ${cols}`}>
+                {block.members.map((member) => (
+                  <li key={member.id} className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-4">
+                    {member.image === null
+                      ? null
+                      : image(member.image, language, "bg-bg-subtle aspect-[3/4] w-full rounded-xl object-cover")}
+                    <div>
+                      <p className="text-fg text-base font-semibold">{text(member.name, language)}</p>
+                      {hasText(member.role) ? (
+                        <p className="text-fg-muted mt-1 text-sm">{text(member.role, language)}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         );

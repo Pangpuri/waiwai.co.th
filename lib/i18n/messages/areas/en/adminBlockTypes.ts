@@ -28,4 +28,24 @@ export const adminBlockTypes = {
   /* Map */
   blockMapLink: "Map link (https://…)",
   blockMapLinkText: "Button label (optional)",
+  /* Job board (round 88) */
+  blockJobItems: "Positions ({n}/{max})",
+  blockAddJob: "Add position",
+  blockRemoveJob: "Remove position",
+  blockJobNumber: "Position {n}",
+  blockJobTitle: "Job title",
+  blockJobDepartment: "Department (used for grouping)",
+  blockJobOpenings: "Openings (0 = not specified)",
+  blockJobQualifications: "Qualifications",
+  blockJobExperience: "Experience (optional)",
+  blockJobGrouping: "Group by department",
+  /* Management roster (round 88) */
+  blockRosterMembers: "People ({n}/{max})",
+  blockAddMember: "Add person",
+  blockRemoveMember: "Remove person",
+  blockMemberNumber: "Person {n}",
+  blockMemberName: "Full name",
+  blockMemberRole: "Role",
+  blockRosterColumns: "Columns",
+  blockMemberPhotoHint: "Personal photo (optional)",
 };

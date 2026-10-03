@@ -29,4 +29,24 @@ export const adminBlockTypes = {
   /* แผนที่ */
   blockMapLink: "ลิงก์เปิดแผนที่ (https://…)",
   blockMapLinkText: "ข้อความบนปุ่ม (ไม่บังคับ)",
+  /* กระดานรับสมัครงาน (รอบที่ 88) */
+  blockJobItems: "ตำแหน่ง ({n}/{max})",
+  blockAddJob: "เพิ่มตำแหน่ง",
+  blockRemoveJob: "ลบตำแหน่ง",
+  blockJobNumber: "ตำแหน่งที่ {n}",
+  blockJobTitle: "ชื่อตำแหน่ง",
+  blockJobDepartment: "ฝ่าย (ใช้จัดกลุ่ม)",
+  blockJobOpenings: "จำนวนอัตรา (0 = ไม่ระบุ)",
+  blockJobQualifications: "คุณสมบัติ",
+  blockJobExperience: "ประสบการณ์ (ไม่บังคับ)",
+  blockJobGrouping: "จัดกลุ่มตามฝ่าย",
+  /* รายชื่อคณะผู้บริหาร (รอบที่ 88) */
+  blockRosterMembers: "รายชื่อ ({n}/{max})",
+  blockAddMember: "เพิ่มรายชื่อ",
+  blockRemoveMember: "ลบรายชื่อ",
+  blockMemberNumber: "คนที่ {n}",
+  blockMemberName: "ชื่อ–นามสกุล",
+  blockMemberRole: "ตำแหน่ง",
+  blockRosterColumns: "จำนวนคอลัมน์",
+  blockMemberPhotoHint: "ภาพรายบุคคล (ไม่บังคับ)",
 };

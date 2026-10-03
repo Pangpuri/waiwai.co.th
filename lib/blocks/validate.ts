@@ -220,6 +220,41 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
       });
       return;
 
+    case "jobBoard":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);
+
+      if (block.items.length === 0) {
+        issues.push(issue("warning", "jobBoard-empty", `${path}.items`, "กระดานรับสมัครงานยังไม่มีตำแหน่ง"));
+      }
+      block.items.forEach((item, index) => {
+        const itemPath = `${path}.items[${index}]`;
+        checkText(item.title, `${itemPath}.title`, { required: true, englishRequired: true }, issues);
+        checkText(item.department, `${itemPath}.department`, { required: false, englishRequired: false }, issues);
+        checkText(item.qualifications, `${itemPath}.qualifications`, { required: false, englishRequired: false }, issues);
+        checkText(item.experience, `${itemPath}.experience`, { required: false, englishRequired: false }, issues);
+        if (item.openings === 0) {
+          issues.push(issue("warning", "job-item-without-openings", `${itemPath}.openings`, "ตำแหน่งนี้ยังไม่ระบุจำนวนอัตรา"));
+        }
+      });
+      return;
+
+    case "rosterText":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);
+
+      if (block.members.length === 0) {
+        issues.push(issue("warning", "roster-empty", `${path}.members`, "รายชื่อนี้ยังไม่มีบุคคล"));
+      }
+      block.members.forEach((member, index) => {
+        const memberPath = `${path}.members[${index}]`;
+        /* ชื่อคนอาจไม่มีคำแปลอังกฤษ (ชื่อตามเอกสารราชการ) ⇒ บังคับเฉพาะภาษาไทย · "ตำแหน่ง" ต้องมีทั้งสองภาษา */
+        checkText(member.name, `${memberPath}.name`, { required: true, englishRequired: false }, issues);
+        checkText(member.role, `${memberPath}.role`, { required: true, englishRequired: true }, issues);
+        checkMedia(member.image, `${memberPath}.image`, issues);
+      });
+      return;
+
     case "row": {
       /* แถว: ตรวจโครงคอลัมน์ (ตัวบล็อกลูกถูกเดินตรวจด้านล่างผ่าน walkBlocks) */
       if (block.columns.length === 0) {

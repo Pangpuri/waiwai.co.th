@@ -31,6 +31,8 @@ export const BLOCK_TYPES = [
   "map",
   "form",
   "gallery",
+  "jobBoard",
+  "rosterText",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -307,6 +309,61 @@ export type GalleryBlock = BlockBase & {
   readonly columns: 2 | 3 | 4;
 };
 
+/* ── ชนิดบล็อกใหม่ รอบที่ 88 (กระดานรับสมัครงาน · รายชื่อคณะผู้บริหาร) ────────── */
+
+/**
+ * ตำแหน่งงานหนึ่งตำแหน่งในบล็อก "กระดานรับสมัครงาน"
+ * ⚠️ ข้อมูลตำแหน่งของบริษัทมาจาก `features/careers/jobs.ts` (ของจริง ไม่ใช่ตัวอย่าง)
+ *    ⇒ เทมเพลตสร้างบล็อกนี้จากข้อมูลนั้น · แต่ในหน้าเว็บจริง บล็อกเก็บข้อความที่กรอกไว้เอง (ไม่ผูกกับไฟล์โค้ด)
+ */
+export type JobBoardItem = {
+  readonly id: string;
+  readonly title: LocalizedValue;
+  /** ฝ่ายที่สังกัด (ใช้จัดกลุ่มเมื่อ `groupByDepartment` = true) */
+  readonly department: LocalizedValue;
+  /** จำนวนอัตราที่เปิดรับ — 0 = ไม่ระบุจำนวน */
+  readonly openings: number;
+  readonly qualifications: LocalizedValue;
+  /** ประสบการณ์ที่ต้องการ — ว่าง = ไม่ระบุ */
+  readonly experience: LocalizedValue;
+};
+
+/**
+ * บล็อก "กระดานรับสมัครงาน" — ตำแหน่งที่เปิดรับ + ฝ่าย + อัตรา + คุณสมบัติ
+ * ⚠️ ตั้งใจ **ไม่มีตัวกรองฝั่งเบราว์เซอร์** (ต่างจาก `JobBoard` ของเลย์เอาต์เดิม):
+ *    ตัวกรองต้องใช้ JS ⇒ เนื้อหาบางส่วนจะไม่ปรากฏเมื่อปิด JS/ผู้ช่วยอ่านหน้าจอ
+ *    บล็อกนี้จึงจัดกลุ่มตามฝ่ายให้เห็นครบทุกตำแหน่งตั้งแต่แรก (static ล้วน)
+ */
+export type JobBoardBlock = BlockBase & {
+  readonly type: "jobBoard";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  /** จัดกลุ่มตามฝ่าย (true) หรือเรียงเป็นรายการเดียว (false) */
+  readonly groupByDepartment: boolean;
+  readonly items: readonly JobBoardItem[];
+};
+
+/**
+ * คนหนึ่งคนในบล็อก "รายชื่อคณะผู้บริหาร" — **ชื่อ/ตำแหน่งเป็นข้อความ**
+ * (ค้นหาได้ · คัดลอกได้ · โปรแกรมอ่านหน้าจออ่านได้ ⇒ ต่างจากชื่อที่พิมพ์อยู่ในภาพ)
+ * `image = null` = ไม่มีภาพรายบุคคล (ไม่ใช่ error — บางองค์กรไม่ให้ภาพรายบุคคล)
+ */
+export type RosterMember = {
+  readonly id: string;
+  readonly name: LocalizedValue;
+  readonly role: LocalizedValue;
+  readonly image: BlockMedia | null;
+};
+
+/** บล็อก "รายชื่อคณะผู้บริหาร" — ชื่อ–ตำแหน่งเป็นข้อความ (ภาพรายบุคคลไม่บังคับ) */
+export type RosterTextBlock = BlockBase & {
+  readonly type: "rosterText";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly columns: 2 | 3 | 4;
+  readonly members: readonly RosterMember[];
+};
+
 export type Block =
   | HeroBlock
   | HeadingBlock
@@ -320,7 +377,9 @@ export type Block =
   | TableBlock
   | MapBlock
   | FormBlock
-  | GalleryBlock;
+  | GalleryBlock
+  | JobBoardBlock
+  | RosterTextBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -354,6 +413,8 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "map", label: "แผนที่", hint: "ภาพแผนที่ + คำบรรยาย + ลิงก์เปิดแผนที่" },
   { type: "form", label: "ฟอร์ม", hint: "ฝังฟอร์มจริง (ติดต่อ · ข่าวสาร · สมัครงาน)" },
   { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox)" },
+  { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
+  { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
 ];
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
@@ -385,6 +446,10 @@ export const MAX_TABLE_COLUMNS = 8;
 export const MAX_TABLE_ROWS = 30;
 /** จำนวนภาพสูงสุดในบล็อก "แกลเลอรี" (กันหน้าโหลดหนักจากภาพไม่จำกัด) */
 export const MAX_GALLERY_ITEMS = 24;
+/** จำนวนตำแหน่งงานสูงสุดในบล็อก "กระดานรับสมัครงาน" (ของจริงตอนนี้ 20 ตำแหน่ง — เผื่อ) */
+export const MAX_JOB_ITEMS = 60;
+/** จำนวนคนสูงสุดในบล็อก "รายชื่อคณะผู้บริหาร" */
+export const MAX_ROSTER_MEMBERS = 24;
 
 export function emptyText(): LocalizedValue {
   return { th: "", en: "" };
@@ -395,8 +460,8 @@ export function createBlock(type: BlockType, id: string): Block {
   const style: BlockStyle =
     type === "hero"
       ? { ...DEFAULT_BLOCK_STYLE, size: "lg", width: "full" }
-      : /* ตาราง/แกลเลอรีเริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุดอ่านยากถ้าแคบ */
-        type === "table" || type === "gallery"
+      : /* ตาราง/แกลเลอรี/กระดานงาน/รายชื่อ เริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุด/รายการอ่านยากถ้าแคบ */
+        type === "table" || type === "gallery" || type === "jobBoard" || type === "rosterText"
         ? { ...DEFAULT_BLOCK_STYLE, width: "wide" }
         : { ...DEFAULT_BLOCK_STYLE };
   const base = { id, version: BLOCK_SCHEMA_VERSION, style };
@@ -447,6 +512,11 @@ export function createBlock(type: BlockType, id: string): Block {
       return { ...base, type: "form", kind: "contact", heading: emptyText(), body: emptyText() };
     case "gallery":
       return { ...base, type: "gallery", heading: emptyText(), items: [], columns: 3 };
+    case "jobBoard":
+      /* เริ่มด้วยรายการว่าง + จัดกลุ่มตามฝ่าย (ผู้ใช้กด "เพิ่มตำแหน่ง" หรือเริ่มจากเทมเพลต) */
+      return { ...base, type: "jobBoard", heading: emptyText(), body: emptyText(), groupByDepartment: true, items: [] };
+    case "rosterText":
+      return { ...base, type: "rosterText", heading: emptyText(), body: emptyText(), columns: 3, members: [] };
   }
 }
 

@@ -13,6 +13,7 @@ import {
 } from "@/lib/blocks/templates";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
+import { JOBS } from "@/features/careers/jobs";
 import { MAX_BLOCKS_TOTAL } from "@/lib/blocks/types";
 import { PAGE_PATHS, PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
 
@@ -86,8 +87,7 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
     (เปิดแล้วส่วนนั้นหายจากหน้าเว็บจริง) — ถ้าวันหนึ่งทำเป็นบล็อกได้ ค่อยถอดออกจากรายการนี้
   */
   assert.deepEqual([...blockCoverageGaps("contact")], [], "รอบที่ 87: ฟอร์ม + แผนที่เป็นบล็อกแล้ว ⇒ หน้าติดต่อครอบคลุมครบ");
-  assert.ok(blockCoverageGaps("careers").includes("jobBoard"), "หน้าร่วมงานมีตารางตำแหน่งงาน (ยังไม่เป็นบล็อก)");
-  assert.ok(!blockCoverageGaps("careers").includes("form"), "รอบที่ 87: ใบสมัครงานเป็นบล็อกแล้ว");
+  assert.deepEqual([...blockCoverageGaps("careers")], [], "รอบที่ 88: กระดานงาน + ฟอร์มเป็นบล็อกแล้ว ⇒ หน้าสมัครงานครอบคลุมครบ");
   assert.deepEqual([...blockCoverageGaps("certifications")], [], "รอบที่ 87: gallery มี lightbox ในตัว ⇒ ครอบคลุมครบ");
   assert.ok(blockCoverageGaps("executives").includes("rosterText"), "ชื่อผู้บริหารยังอยู่ในภาพ");
   assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
@@ -125,6 +125,7 @@ test("templates: หน้าที่ปิดช่อง coverage ต้อ�
   assert.ok(typesOf("contact").includes("form"), "contact: ต้องมีบล็อกฟอร์มติดต่อจริง");
   assert.ok(typesOf("contact").includes("map"), "contact: ต้องมีบล็อกแผนที่ (ภาพ)");
   assert.ok(typesOf("careers").includes("form"), "careers: ต้องมีบล็อกฟอร์มสมัครงาน");
+  assert.ok(typesOf("careers").includes("jobBoard"), "careers: ต้องมีบล็อกกระดานรับสมัครงาน");
   assert.ok(typesOf("certifications").includes("gallery"), "certifications: ต้องมีบล็อกแกลเลอรี (มี lightbox)");
 
   /* ชนิดฟอร์มต้องตรงกับหน้าของเทมเพลต (กันต่อฟอร์มผิดหน้า) */
@@ -139,8 +140,19 @@ test("templates: หน้าที่ปิดช่อง coverage ต้อ�
   assert.equal(formKindOf("careers"), "careers");
 
   /* หน้าที่ปิดช่องแล้ว = ต้องไม่มีรายการขาดเหลือ */
-  for (const page of ["contact", "certifications"]) {
+  for (const page of ["contact", "certifications", "careers"]) {
     assert.deepEqual([...blockCoverageGaps(page)], [], `${page}: ปิดช่องครบแล้ว`);
+  }
+
+  /* กระดานงานต้องมี "ตำแหน่งจริง" ครบตามข้อมูลบริษัท (ไม่ใช่บล็อกเปล่า/ข้อมูลสมมติ) */
+  const board = buildBlockTemplate("careers")?.blocks.find((entry) => entry.type === "jobBoard");
+  assert.ok(board !== undefined && board.type === "jobBoard", "careers: ต้องมีบล็อกกระดานงาน");
+  assert.equal(board.items.length, JOBS.length, "จำนวนตำแหน่งต้องเท่ากับข้อมูลจริง");
+  assert.equal(new Set(board.items.map((item) => item.id)).size, board.items.length, "id ของตำแหน่งต้องไม่ซ้ำ");
+  for (const item of board.items) {
+    assert.ok(item.title.th.trim() !== "", "ทุกตำแหน่งต้องมีชื่อไทย");
+    assert.ok(item.department.th.trim() !== "", "ทุกตำแหน่งต้องมีฝ่าย");
+    assert.ok(item.openings >= 1, "ตำแหน่งจากข้อมูลจริงต้องมีอัตราอย่างน้อย 1");
   }
 });
 

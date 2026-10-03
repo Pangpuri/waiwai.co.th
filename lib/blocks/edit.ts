@@ -5,6 +5,8 @@ import {
   MAX_CARDS,
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
+  MAX_JOB_ITEMS,
+  MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
   VISIBLE_EVERYWHERE,
@@ -730,5 +732,183 @@ export function setGalleryItemImage(
     const base = item.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
     const merged = { ...base, ...patch };
     item.image = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/* ── กระดานรับสมัครงาน (รอบที่ 88) ─────────────────────────────────────────── */
+
+export function canAddJobItem(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "jobBoard" && block.items.length < MAX_JOB_ITEMS;
+}
+
+/** เพิ่มตำแหน่งว่าง (ผู้ใช้กรอกชื่อตำแหน่ง/ฝ่าย/คุณสมบัติเอง หรือเริ่มจากเทมเพลต) */
+export function addJobItem(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddJobItem(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "jobBoard") return;
+    const used = new Set(block.items.map((item) => item.id));
+    block.items.push({
+      id: nextPrefixedId("job", used),
+      title: emptyText(),
+      department: emptyText(),
+      openings: 0,
+      qualifications: emptyText(),
+      experience: emptyText(),
+    });
+  });
+}
+
+export function removeJobItem(document: BlockDocument, id: string, index: number): BlockDocument {
+  const location = findBlockLocation(document, id);
+  const block = location === null ? null : blockAt(document, location);
+  /* ไม่มีอะไรต้องทำ = คืนของเดิม (ไม่สร้างเอกสารใหม่ ⇒ ไม่ทำให้หน้าจอ re-render เปล่า) */
+  if (block === null || block.type !== "jobBoard" || index < 0 || index >= block.items.length) return document;
+
+  return withBlock(document, id, (target) => {
+    if (target.type !== "jobBoard") return;
+    target.items.splice(index, 1);
+  });
+}
+
+/** สลับลำดับตำแหน่ง (ใช้กับการลากวางในแผงแก้) */
+export function moveJobItem(document: BlockDocument, id: string, fromIndex: number, toIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "jobBoard") return;
+    const total = block.items.length;
+    if (fromIndex < 0 || fromIndex >= total) return;
+    const clamped = Math.max(0, Math.min(toIndex, total - 1));
+    if (clamped === fromIndex) return;
+    const [moved] = block.items.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    block.items.splice(clamped, 0, moved);
+  });
+}
+
+export type JobItemTextField = "title" | "department" | "qualifications" | "experience";
+
+export function setJobItemText(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  field: JobItemTextField,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "jobBoard") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item[field][language] = value;
+  });
+}
+
+/** จำนวนอัตราที่เปิดรับ — 0 = ไม่ระบุ (ค่าที่ส่งมาถูกปัดให้อยู่ในช่วง 0-999) */
+export function setJobItemOpenings(document: BlockDocument, id: string, index: number, openings: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "jobBoard") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    const safe = Number.isFinite(openings) ? Math.max(0, Math.min(Math.trunc(openings), 999)) : 0;
+    item.openings = safe;
+  });
+}
+
+/** จัดกลุ่มตามฝ่าย หรือเรียงเป็นรายการเดียว */
+export function setJobBoardGrouping(document: BlockDocument, id: string, value: boolean): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type === "jobBoard") block.groupByDepartment = value;
+  });
+}
+
+/* ── รายชื่อคณะผู้บริหาร (รอบที่ 88) ───────────────────────────────────────── */
+
+export function canAddRosterMember(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "rosterText" && block.members.length < MAX_ROSTER_MEMBERS;
+}
+
+/** เพิ่มคนว่าง (ยังไม่มีชื่อ — validator จะบังคับชื่อไทยก่อนเผยแพร่) */
+export function addRosterMember(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddRosterMember(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "rosterText") return;
+    const used = new Set(block.members.map((member) => member.id));
+    block.members.push({ id: nextPrefixedId("person", used), name: emptyText(), role: emptyText(), image: null });
+  });
+}
+
+export function removeRosterMember(document: BlockDocument, id: string, index: number): BlockDocument {
+  const location = findBlockLocation(document, id);
+  const block = location === null ? null : blockAt(document, location);
+  /* ไม่มีอะไรต้องทำ = คืนของเดิม (ไม่สร้างเอกสารใหม่) */
+  if (block === null || block.type !== "rosterText" || index < 0 || index >= block.members.length) return document;
+
+  return withBlock(document, id, (target) => {
+    if (target.type !== "rosterText") return;
+    target.members.splice(index, 1);
+  });
+}
+
+/** สลับลำดับคน (ใช้กับการลากวางในแผงแก้) — ลำดับมักตรงกับอาวุโส */
+export function moveRosterMember(document: BlockDocument, id: string, fromIndex: number, toIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "rosterText") return;
+    const total = block.members.length;
+    if (fromIndex < 0 || fromIndex >= total) return;
+    const clamped = Math.max(0, Math.min(toIndex, total - 1));
+    if (clamped === fromIndex) return;
+    const [moved] = block.members.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    block.members.splice(clamped, 0, moved);
+  });
+}
+
+export type RosterTextField = "name" | "role";
+
+export function setRosterMemberText(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  field: RosterTextField,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "rosterText") return;
+    const member = block.members[index];
+    if (member === undefined) return;
+    member[field][language] = value;
+  });
+}
+
+/** ตั้งค่าภาพรายบุคคล — พาธว่าง = เอารูปออก (ภาพไม่บังคับสำหรับรายชื่อ) */
+export function setRosterMemberImage(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  patch: { path?: string; altTh?: string; altEn?: string; hasWatermark?: boolean },
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "rosterText") return;
+    const member = block.members[index];
+    if (member === undefined) return;
+
+    const base = member.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
+    const merged = { ...base, ...patch };
+    member.image = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/* ── จำนวนคอลัมน์ของรายชื่อ (2 | 3 | 4) ───────────────────────────────────── */
+
+export function setRosterColumns(document: BlockDocument, id: string, columns: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "rosterText") return;
+    block.columns = columns === 2 ? 2 : columns === 4 ? 4 : 3;
   });
 }

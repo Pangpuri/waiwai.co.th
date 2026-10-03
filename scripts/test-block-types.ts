@@ -4,21 +4,36 @@ import { test } from "node:test";
 import { blockRenderStringsFor } from "@/features/blocks/render-strings";
 import {
   addGalleryItem,
+  addJobItem,
+  addRosterMember,
   addTableColumn,
   addTableRow,
   canAddTableColumn,
   canRemoveTableColumn,
+  moveJobItem,
+  moveRosterMember,
   removeGalleryItem,
+  removeJobItem,
+  removeRosterMember,
   removeTableColumn,
   setGalleryItemCaption,
   setGalleryItemImage,
+  setJobBoardGrouping,
+  setJobItemOpenings,
+  setJobItemText,
+  setRosterColumns,
+  setRosterMemberImage,
+  setRosterMemberText,
   setTableCellText,
 } from "@/lib/blocks/edit";
 import { FORM_KINDS } from "@/lib/forms/model";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import {
+  BLOCK_CATALOG,
   BLOCK_TYPES,
   FORM_BLOCK_KINDS,
+  MAX_JOB_ITEMS,
+  MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
   createBlock,
@@ -49,9 +64,9 @@ function docOf(blocks: readonly Block[]): BlockDocument {
   return { page: "home", blocks };
 }
 
-const NEW_TYPES = ["table", "map", "form", "gallery"] as const;
+const NEW_TYPES = ["table", "map", "form", "gallery", "jobBoard", "rosterText"] as const;
 
-test("block-types: แคตตาล็อกและ BLOCK_TYPES มีครบทั้ง 4 ชนิดใหม่", () => {
+test("block-types: แคตตาล็อกและ BLOCK_TYPES มีครบทุกชนิดใหม่", () => {
   for (const type of NEW_TYPES) {
     assert.ok((BLOCK_TYPES as readonly string[]).includes(type), `ขาดชนิด ${type}`);
   }
@@ -315,4 +330,216 @@ test("block-types: blockRenderStringsFor ให้ข้อความครบ
 
   assert.notEqual(th.gallery.open, en.gallery.open, "สองภาษาต้องไม่ใช่ข้อความเดียวกัน");
   assert.notEqual(th.form.contact.fields.topicLabel, en.form.contact.fields.topicLabel);
+  assert.ok(th.jobBoard.openingsUnit.length > 0);
+  assert.ok(en.jobBoard.openingsUnit.length > 0);
+  assert.notEqual(th.jobBoard.openingsUnit, en.jobBoard.openingsUnit, "ป้ายกระดานงานต้องมีสองภาษา");
+  assert.ok(th.jobBoard.qualificationsLabel.length > 0 && en.jobBoard.experienceLabel.length > 0);
+});
+
+/* ── รอบที่ 88: กระดานรับสมัครงาน · รายชื่อคณะผู้บริหาร ───────────────────── */
+
+test("block-types: createBlock ของ jobBoard/rosterText พร้อมแก้", () => {
+  const board = createBlock("jobBoard", "b1");
+  assert.ok(board.type === "jobBoard");
+  assert.equal(board.items.length, 0);
+  assert.equal(board.groupByDepartment, true, "ค่าเริ่มต้น = จัดกลุ่มตามฝ่าย");
+  assert.equal(board.style.width, "wide");
+
+  const roster = createBlock("rosterText", "b2");
+  assert.ok(roster.type === "rosterText");
+  assert.equal(roster.members.length, 0);
+  assert.equal(roster.columns, 3);
+  assert.equal(roster.style.width, "wide");
+});
+
+test("block-types: parse เอกสารที่มี jobBoard/rosterText ไปกลับได้เท่าเดิม", () => {
+  const doc = docOf([createBlock("jobBoard", "b1"), createBlock("rosterText", "b2")]);
+  const outcome = parseBlockDocument("home", JSON.parse(JSON.stringify(doc)));
+  assert.equal(outcome.ok, true);
+  assert.ok(outcome.ok);
+  assert.deepEqual(outcome.document, doc);
+});
+
+test("block-types: parse กระดานงาน — อัตราที่ผิดรูปเป็น 0 + id ซ้ำถูกเปลี่ยน", () => {
+  const raw = {
+    blocks: [
+      {
+        id: "b1",
+        type: "jobBoard",
+        style: {},
+        groupByDepartment: false,
+        items: [
+          { id: "job-x", title: { th: "ก", en: "A" }, department: { th: "ฝ่าย", en: "Dept" }, openings: 2, qualifications: { th: "", en: "" }, experience: { th: "", en: "" } },
+          { id: "job-x", title: { th: "ข", en: "B" }, department: { th: "ฝ่าย", en: "Dept" }, openings: "3", qualifications: { th: "", en: "" }, experience: { th: "", en: "" } },
+        ],
+      },
+    ],
+  };
+
+  const outcome = parseBlockDocument("home", raw);
+  assert.equal(outcome.ok, false, "ค่าที่ผิดรูปต้องถูกรายงาน");
+  assert.ok(!outcome.ok);
+  assert.ok(outcome.problems.some((problem) => problem.includes("openings")));
+  assert.ok(outcome.problems.some((problem) => problem.includes("ซ้ำ")));
+});
+
+test("block-types: parse รายชื่อ — คนที่ยังไม่มีภาพยังอยู่ได้ (ภาพไม่บังคับ)", () => {
+  const raw = {
+    blocks: [
+      {
+        id: "b1",
+        type: "rosterText",
+        style: {},
+        columns: 4,
+        members: [{ id: "person-1", name: { th: "สมชาย", en: "Somchai" }, role: { th: "กรรมการ", en: "Director" }, image: null }],
+      },
+    ],
+  };
+
+  const outcome = parseBlockDocument("home", raw);
+  assert.equal(outcome.ok, true);
+  assert.ok(outcome.ok);
+  const block = outcome.document.blocks[0];
+  assert.ok(block !== undefined && block.type === "rosterText");
+  assert.equal(block.columns, 4);
+  assert.equal(block.members[0]?.image, null);
+  assert.equal(block.members[0]?.name.th, "สมชาย");
+});
+
+test("block-types: parse ปฏิเสธจำนวนคอลัมน์รายชื่อที่ไม่รองรับ", () => {
+  const raw = {
+    blocks: [{ id: "b1", type: "rosterText", style: {}, columns: 5, members: [] }],
+  };
+  const outcome = parseBlockDocument("home", raw);
+  assert.equal(outcome.ok, false);
+  assert.ok(!outcome.ok);
+  assert.ok(outcome.problems.some((problem) => problem.includes("columns")));
+});
+
+test("block-types: validate กระดานงาน — ว่าง = เตือน · ชื่อตำแหน่งว่าง = error · ไม่ระบุอัตรา = เตือน", () => {
+  const empty = createBlock("jobBoard", "b1");
+  const emptyWarnings = documentWarningsOf(validateDocument(docOf([empty]))).map((entry) => entry.code);
+  assert.ok(emptyWarnings.includes("jobBoard-empty"));
+
+  const board = mutable(createBlock("jobBoard", "b2"));
+  assert.ok(board.type === "jobBoard");
+  board.items = [
+    { id: "job-1", title: { th: "", en: "Driver" }, department: { th: "ฝ่ายขาย", en: "Sales" }, openings: 0, qualifications: { th: "ป.6", en: "Grade 6" }, experience: { th: "", en: "" } },
+  ];
+  const issues = validateDocument(docOf([board]));
+  const errors = documentErrorsOf(issues).map((entry) => entry.code);
+  const warnings = documentWarningsOf(issues).map((entry) => entry.code);
+  assert.ok(errors.includes("empty-th"));
+  assert.ok(warnings.includes("job-item-without-openings"));
+});
+
+test("block-types: validate รายชื่อ — ว่าง = เตือน · ชื่อว่าง = error · ตำแหน่งไม่มี EN = เตือน", () => {
+  const empty = createBlock("rosterText", "b1");
+  assert.ok(documentWarningsOf(validateDocument(docOf([empty]))).some((entry) => entry.code === "roster-empty"));
+
+  const roster = mutable(createBlock("rosterText", "b2"));
+  assert.ok(roster.type === "rosterText");
+  roster.members = [{ id: "person-1", name: { th: "", en: "" }, role: { th: "กรรมการผู้จัดการ", en: "" }, image: null }];
+  const issues = validateDocument(docOf([roster]));
+  const errors = documentErrorsOf(issues).map((entry) => entry.code);
+  const warnings = documentWarningsOf(issues).map((entry) => entry.code);
+  assert.ok(errors.includes("empty-th"));
+  assert.ok(warnings.includes("missing-en"), "ตำแหน่งต้องมีคำแปลอังกฤษ");
+});
+
+test("block-types: validate รายชื่อ — ภาพรายบุคคลต้องมีพาธในโปรเจกต์ + alt", () => {
+  const roster = mutable(createBlock("rosterText", "b1"));
+  assert.ok(roster.type === "rosterText");
+  roster.members = [
+    {
+      id: "person-1",
+      name: { th: "สมชาย", en: "Somchai" },
+      role: { th: "กรรมการ", en: "Director" },
+      image: { path: "https://example.com/p.jpg", altTh: "", altEn: "", hasWatermark: false },
+    },
+  ];
+  const errors = documentErrorsOf(validateDocument(docOf([roster]))).map((entry) => entry.code);
+  assert.ok(errors.includes("media-path-is-url"));
+  assert.ok(errors.includes("missing-alt"));
+});
+
+test("block-types: กระดานงาน — เพิ่ม/ลบ/ย้ายตำแหน่ง + แก้ข้อความ/อัตรา/การจัดกลุ่ม", () => {
+  let doc = docOf([createBlock("jobBoard", "b1")]);
+  const boardOf = (value: BlockDocument) => {
+    const block = value.blocks[0];
+    assert.ok(block !== undefined && block.type === "jobBoard");
+    return block;
+  };
+
+  doc = addJobItem(doc, "b1");
+  doc = addJobItem(doc, "b1");
+  assert.equal(boardOf(doc).items.length, 2);
+
+  doc = setJobItemText(doc, "b1", 0, "title", "th", "พนักงานขับรถ");
+  doc = setJobItemText(doc, "b1", 0, "department", "en", "Sales");
+  doc = setJobItemOpenings(doc, "b1", 0, 2);
+  assert.equal(boardOf(doc).items[0]?.title.th, "พนักงานขับรถ");
+  assert.equal(boardOf(doc).items[0]?.department.en, "Sales");
+  assert.equal(boardOf(doc).items[0]?.openings, 2);
+
+  doc = setJobItemOpenings(doc, "b1", 0, 5000);
+  assert.equal(boardOf(doc).items[0]?.openings, 999, "อัตราถูกจำกัดช่วง");
+  doc = setJobItemOpenings(doc, "b1", 0, -3);
+  assert.equal(boardOf(doc).items[0]?.openings, 0);
+
+  const second = boardOf(doc).items[1]?.id;
+  doc = moveJobItem(doc, "b1", 1, 0);
+  assert.equal(boardOf(doc).items[0]?.id, second, "ย้ายตำแหน่งขึ้นบนสุด");
+
+  doc = setJobBoardGrouping(doc, "b1", false);
+  assert.equal(boardOf(doc).groupByDepartment, false);
+
+  doc = removeJobItem(doc, "b1", 0);
+  assert.equal(boardOf(doc).items.length, 1);
+
+  assert.equal(removeJobItem(doc, "b1", 9), doc, "index นอกช่วง = ไม่แตะเอกสาร");
+});
+
+test("block-types: รายชื่อ — เพิ่ม/ลบ/ย้ายคน + แก้ชื่อ/ตำแหน่ง/ภาพ/คอลัมน์", () => {
+  let doc = docOf([createBlock("rosterText", "b1")]);
+  const rosterOf = (value: BlockDocument) => {
+    const block = value.blocks[0];
+    assert.ok(block !== undefined && block.type === "rosterText");
+    return block;
+  };
+
+  doc = addRosterMember(doc, "b1");
+  doc = setRosterMemberText(doc, "b1", 0, "name", "th", "สมชาย ใจดี");
+  doc = setRosterMemberText(doc, "b1", 0, "role", "en", "Managing Director");
+  assert.equal(rosterOf(doc).members[0]?.name.th, "สมชาย ใจดี");
+  assert.equal(rosterOf(doc).members[0]?.role.en, "Managing Director");
+
+  doc = setRosterMemberImage(doc, "b1", 0, { path: "/media/1", altTh: "ภาพผู้บริหาร", altEn: "Executive photo" });
+  assert.equal(rosterOf(doc).members[0]?.image?.path, "/media/1");
+
+  doc = setRosterMemberImage(doc, "b1", 0, { path: "" });
+  assert.equal(rosterOf(doc).members[0]?.image, null, "พาธว่าง = เอารูปออก");
+
+  doc = setRosterColumns(doc, "b1", 4);
+  assert.equal(rosterOf(doc).columns, 4);
+  doc = setRosterColumns(doc, "b1", 9);
+  assert.equal(rosterOf(doc).columns, 3, "คอลัมน์ที่ไม่รองรับถูกปรับเป็น 3");
+
+  doc = addRosterMember(doc, "b1");
+  const second = rosterOf(doc).members[1]?.id;
+  doc = moveRosterMember(doc, "b1", 1, 0);
+  assert.equal(rosterOf(doc).members[0]?.id, second);
+
+  doc = removeRosterMember(doc, "b1", 0);
+  assert.equal(rosterOf(doc).members.length, 1);
+  assert.equal(removeRosterMember(doc, "b1", 5), doc, "index นอกช่วง = ไม่แตะเอกสาร");
+});
+
+test("block-types: แคตตาล็อกและ BLOCK_TYPES มีชนิดใหม่ของรอบที่ 88", () => {
+  for (const type of ["jobBoard", "rosterText"] as const) {
+    assert.ok((BLOCK_TYPES as readonly string[]).includes(type), `ขาดชนิด ${type}`);
+    assert.ok(BLOCK_CATALOG.some((entry) => entry.type === type), `แคตตาล็อกขาด ${type}`);
+  }
+  assert.ok(MAX_JOB_ITEMS >= 20, "ต้องรองรับตำแหน่งจริง 20 ตำแหน่ง");
+  assert.ok(MAX_ROSTER_MEMBERS > 0);
 });

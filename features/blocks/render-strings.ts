@@ -31,6 +31,14 @@ export type GalleryStrings = {
   readonly dialog: string;
 };
 
+/** ข้อความของบล็อก "กระดานรับสมัครงาน" — ยืมป้ายจากพื้นที่ `careers` (ต้นทางเดียว ไม่พิมพ์ซ้ำ) */
+export type JobBoardStrings = {
+  readonly openingsUnit: string;
+  readonly departmentLabel: string;
+  readonly qualificationsLabel: string;
+  readonly experienceLabel: string;
+};
+
 export type FormBlockStrings = {
   readonly contact: {
     readonly fields: ContactFieldStrings;
@@ -47,6 +55,7 @@ export type FormBlockStrings = {
 export type BlockRenderStrings = {
   readonly gallery: GalleryStrings;
   readonly form: FormBlockStrings;
+  readonly jobBoard: JobBoardStrings;
 };
 
 type CareersMessages = typeof careersTh;
@@ -134,11 +143,21 @@ function galleryStringsOf(area: BlocksMessages): GalleryStrings {
   return { open: area.galleryOpen, close: area.galleryClose, dialog: area.galleryDialog };
 }
 
+function jobBoardStringsOf(careers: CareersMessages): JobBoardStrings {
+  return {
+    openingsUnit: careers.openingsUnit,
+    departmentLabel: careers.stats.departments,
+    qualificationsLabel: careers.fields.qualifications,
+    experienceLabel: careers.fields.experience,
+  };
+}
+
 /** ข้อความทั้งหมดที่ตัวเรนเดอร์บล็อกใช้ — แยกตามภาษา (ทั้งสองภาษาเป็นข้อมูลล้วน) */
 export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings {
   if (language === "en") {
     return {
       gallery: galleryStringsOf(blocksEn),
+      jobBoard: jobBoardStringsOf(careersEn),
       form: {
         contact: contactStringsOf(contactEn),
         newsletter: newsletterStringsOf(newsletterEn, coreEn),
@@ -149,6 +168,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
 
   return {
     gallery: galleryStringsOf(blocksTh),
+    jobBoard: jobBoardStringsOf(careersTh),
     form: {
       contact: contactStringsOf(contactTh),
       newsletter: newsletterStringsOf(newsletterTh, coreTh),
