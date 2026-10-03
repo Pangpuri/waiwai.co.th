@@ -48,4 +48,8 @@ export const adminBlockTypes = {
   blockMemberRole: "Role",
   blockRosterColumns: "Columns",
   blockMemberPhotoHint: "Personal photo (optional)",
+  /* Page layout (X1.8) */
+  layoutLabel: "Page layout",
+  layoutHint:
+    "Full width = blocks stacked as usual · Sidebar = a table of contents built automatically from page headings · Landing = first block as configured, the rest in a narrow centred column",
 };

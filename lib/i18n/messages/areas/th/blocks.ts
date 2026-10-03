@@ -9,4 +9,6 @@ export const blocks = {
   galleryOpen: "เปิดภาพ",
   galleryClose: "ปิด",
   galleryDialog: "ดูภาพขยาย",
+  /* เลย์เอาต์ "มีสารบัญด้านข้าง" (X1.8) — ป้ายของสารบัญที่สร้างจากหัวข้อในหน้าอัตโนมัติ */
+  layoutTocLabel: "สารบัญหน้านี้",
 };

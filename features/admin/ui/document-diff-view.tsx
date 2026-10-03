@@ -1,6 +1,7 @@
 "use client";
 
 import type { DiffEntry, DiffEntryKind, DocumentDiff } from "@/lib/blocks/diff";
+import { LAYOUT_DIFF_BLOCK_TYPE } from "@/lib/blocks/diff";
 import { BLOCK_CATALOG, isBlockType } from "@/lib/blocks/types";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -37,19 +38,29 @@ function kindLabel(strings: Messages["admin"], kind: DiffEntryKind): string {
   }
 }
 
-function typeLabel(type: string): string {
+/**
+ * ชื่อที่แสดงของ "สิ่งที่ถูกแก้" — ปกติคือชนิดบล็อก
+ * ⚠️ ความต่างระดับหน้า (เลย์เอาต์ · X1.8) ไม่ผูกกับบล็อก ⇒ ต้องมีป้ายของตัวเอง (ไม่ใช่คำว่า "layout" ดิบ ๆ)
+ */
+function typeLabel(strings: Messages["admin"], type: string): string {
+  if (type === LAYOUT_DIFF_BLOCK_TYPE) return strings.draftDiffLayout;
   return isBlockType(type) ? (BLOCK_CATALOG.find((entry) => entry.type === type)?.label ?? type) : type;
 }
 
 function EntryView({ entry, strings }: { readonly entry: DiffEntry; readonly strings: Messages["admin"] }) {
+  /* เลย์เอาต์เป็นการเปลี่ยนระดับหน้า — ไม่มี "ลำดับบล็อก" ให้แสดง */
+  const isPageLevel = entry.blockType === LAYOUT_DIFF_BLOCK_TYPE;
+
   return (
     <li className="border-line flex flex-col gap-1 rounded-lg border p-2">
       <p className="text-fg text-xs font-semibold">
-        {kindLabel(strings, entry.kind)} · {typeLabel(entry.blockType)}{" "}
-        <span className="text-fg-muted font-normal">
-          #{entry.index + 1}
-          {entry.columnIndex === null ? "" : ` · ${fillTemplate(strings.draftInColumn, { n: entry.columnIndex + 1 })}`}
-        </span>
+        {kindLabel(strings, entry.kind)} · {typeLabel(strings, entry.blockType)}{" "}
+        {isPageLevel ? null : (
+          <span className="text-fg-muted font-normal">
+            #{entry.index + 1}
+            {entry.columnIndex === null ? "" : ` · ${fillTemplate(strings.draftInColumn, { n: entry.columnIndex + 1 })}`}
+          </span>
+        )}
       </p>
 
       {entry.fields.length === 0 ? null : (

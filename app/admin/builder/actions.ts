@@ -262,7 +262,24 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   const parsed = parseBlockDocument(page, template);
   if (!parsed.ok) redirect(pathOf(page));
 
-  await saveDraft(page, parsed.document, user.email);
+  /*
+    เก็บ "เลย์เอาต์ของหน้า" ที่ผู้ใช้เลือกไว้ (X1.8) — เทมเพลตคือเรื่องเนื้อหา ไม่ควรทำให้เลย์เอาต์รีเซ็ต
+    (อ่านฉบับร่างเดิมก่อนเขียนทับ · อ่านไม่ได้ = ใช้ค่าเริ่มต้นของเทมเพลต ไม่ทำให้ปุ่มพัง)
+  */
+  let nextDocument: BlockDocument = parsed.document;
+  try {
+    const current = await loadDocumentRow(page, "draft");
+    if (current !== null) {
+      const currentParsed = parseBlockDocument(page, current.raw);
+      if (currentParsed.ok && currentParsed.document.layout !== undefined) {
+        nextDocument = { ...parsed.document, layout: currentParsed.document.layout };
+      }
+    }
+  } catch {
+    /* อ่านฉบับร่างเดิมไม่ได้ = ไม่เป็นไร ใช้เลย์เอาต์ของเทมเพลต */
+  }
+
+  await saveDraft(page, nextDocument, user.email);
   revalidatePath(pathOf(page));
   redirect(pathOf(page));
 }

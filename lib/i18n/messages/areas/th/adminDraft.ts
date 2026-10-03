@@ -31,5 +31,7 @@ export const adminDraft = {
   draftKindChanged: "แก้บล็อก",
   draftKindMoved: "ย้ายบล็อก",
   draftInColumn: "คอลัมน์ที่ {n}",
+  /* ความต่างระดับหน้า (X1.8): เลย์เอาต์ไม่ผูกกับบล็อกใด ๆ จึงมีป้ายของตัวเอง */
+  draftDiffLayout: "เลย์เอาต์ของหน้า",
   draftRestoredApplied: "กู้คืนแล้ว — ฉบับร่างบนหน้าจอถูกแทนด้วยรุ่นที่กู้คืน (ยังไม่เผยแพร่)",
 };

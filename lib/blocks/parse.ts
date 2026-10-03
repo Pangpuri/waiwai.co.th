@@ -7,6 +7,7 @@ import {
   BLOCK_SPACINGS,
   BLOCK_WIDTHS,
   DEFAULT_BLOCK_STYLE,
+  DEFAULT_PAGE_LAYOUT,
   FORM_BLOCK_KINDS,
   LEGACY_BLOCK_SCHEMA_VERSION,
   MAX_BLOCKS_PER_COLUMN,
@@ -20,10 +21,12 @@ import {
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
+  PAGE_LAYOUTS,
   countBlocks,
   emptyText,
   equalColumnWidth,
   isBlockType,
+  isPageLayout,
   nextPrefixedId,
   readVisibility,
   type Block,
@@ -36,6 +39,7 @@ import {
   type BlockStyle,
   type BlockTableRow,
   type JobBoardItem,
+  type PageLayout,
   type RosterMember,
 } from "@/lib/blocks/types";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
@@ -732,6 +736,21 @@ function readBlockList(
   return blocks;
 }
 
+/**
+ * อ่านเลย์เอาต์ของหน้า (X1.8)
+ * - ไม่ระบุ หรือ `full` ⇒ **ไม่ใส่ฟิลด์** (ค่าเริ่มต้น ⇒ รูปทรงข้อมูลเดิม เอกสารเดิมไม่เปลี่ยนรูป)
+ * - ค่าที่ไม่รู้จัก ⇒ รายงานปัญหา + ถือว่า `full` (ไม่เดา ไม่ทำให้ทั้งหน้าพัง)
+ */
+function readLayout(source: Record<string, unknown>, problems: string[]): PageLayout | undefined {
+  const value = source["layout"];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || !isPageLayout(value)) {
+    problems.push(`layout: ต้องเป็นหนึ่งใน ${PAGE_LAYOUTS.join(" | ")}`);
+    return undefined;
+  }
+  return value === DEFAULT_PAGE_LAYOUT ? undefined : value;
+}
+
 export function parseBlockDocument(page: string, raw: unknown): BlockParseOutcome {
   const problems: string[] = [];
 
@@ -756,11 +775,13 @@ export function parseBlockDocument(page: string, raw: unknown): BlockParseOutcom
     problems.push(`จำนวนบล็อกรวมทุกชั้นเกินที่อนุญาต (${total} > ${MAX_BLOCKS_TOTAL}) — ตัดส่วนเกินทิ้ง`);
   }
 
+  const layout = readLayout(source, problems);
+
   if (problems.length > 0) {
     return { ok: false, problems };
   }
 
-  return { ok: true, document: { page, blocks } };
+  return { ok: true, document: layout === undefined ? { page, blocks } : { page, blocks, layout } };
 }
 
 /** แปลงเอกสารกลับเป็นค่าที่ส่งเป็น JSON ได้ (ใช้กับฟอร์ม/PG jsonb) */

@@ -52,10 +52,17 @@ export type FormBlockStrings = {
   };
 };
 
+/** ข้อความของ "เลย์เอาต์หน้า" (X1.8) */
+export type LayoutStrings = {
+  /** ป้ายของสารบัญด้านข้าง (เลย์เอาต์ `sidebar`) */
+  readonly tocLabel: string;
+};
+
 export type BlockRenderStrings = {
   readonly gallery: GalleryStrings;
   readonly form: FormBlockStrings;
   readonly jobBoard: JobBoardStrings;
+  readonly layout: LayoutStrings;
 };
 
 type CareersMessages = typeof careersTh;
@@ -158,6 +165,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
     return {
       gallery: galleryStringsOf(blocksEn),
       jobBoard: jobBoardStringsOf(careersEn),
+      layout: { tocLabel: blocksEn.layoutTocLabel },
       form: {
         contact: contactStringsOf(contactEn),
         newsletter: newsletterStringsOf(newsletterEn, coreEn),
@@ -169,6 +177,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
   return {
     gallery: galleryStringsOf(blocksTh),
     jobBoard: jobBoardStringsOf(careersTh),
+    layout: { tocLabel: blocksTh.layoutTocLabel },
     form: {
       contact: contactStringsOf(contactTh),
       newsletter: newsletterStringsOf(newsletterTh, coreTh),

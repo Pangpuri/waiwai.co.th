@@ -61,6 +61,7 @@ import {
   setJobBoardGrouping,
   setJobItemOpenings,
   setJobItemText,
+  setPageLayout,
   setRosterColumns,
   setRosterMemberImage,
   setRosterMemberText,
@@ -68,7 +69,7 @@ import {
   setTableColumnText,
   setTableFirstColumnHeader,
 } from "@/lib/blocks/edit";
-import { STYLE_CHOICES } from "@/lib/blocks/style";
+import { LAYOUT_CHOICES, STYLE_CHOICES } from "@/lib/blocks/style";
 import type { BlockPreset } from "@/lib/blocks/presets";
 import type { StoredVersionSummary } from "@/lib/blocks/migrate";
 import {
@@ -84,12 +85,14 @@ import {
   MAX_TABLE_ROWS,
   countBlocks,
   isRowBlock,
+  layoutOf,
   walkBlocks,
   type Block,
   type BlockColumnWidth,
   type BlockDocument,
   type BlockLocation,
   type BlockType,
+  type PageLayout,
 } from "@/lib/blocks/types";
 import { documentErrorsOf, documentWarningsOf, missingEnglishCount, validateDocument } from "@/lib/blocks/validate";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -1596,6 +1599,26 @@ export function BlockBuilder({
         {/* เลเยอร์ */}
         <section className="border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-2 md:row-start-2">
           <h2 className="text-fg text-sm font-semibold">{strings.layers}</h2>
+
+          {/* เลย์เอาต์ของหน้า (X1.8) — ตั้งระดับหน้า ไม่ใช่ระดับบล็อก ⇒ อยู่เหนือรายการบล็อก */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="builder-layout" className="text-fg-muted text-xs">
+              {strings.layoutLabel}
+            </label>
+            <select
+              id="builder-layout"
+              value={layoutOf(document)}
+              onChange={(event) => update(setPageLayout(document, event.target.value as PageLayout))}
+              className="border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {LAYOUT_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-fg-muted text-xs">{strings.layoutHint}</p>
+          </div>
 
           {/*
             ⚠️ รอบที่ 56: "แถบเมนู" และ "ป้ายประกาศ" ย้ายไปหน้าจอ "ส่วนกลางของเว็บ" (/admin/builder/chrome)

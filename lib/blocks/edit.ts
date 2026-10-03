@@ -13,9 +13,11 @@ import {
   collectBlockIds,
   countBlocks,
   createBlock,
+  DEFAULT_PAGE_LAYOUT,
   emptyText,
   equalColumnWidth,
   findBlockLocation,
+  layoutOf,
   nextBlockIdFrom,
   nextColumnId,
   nextPrefixedId,
@@ -27,6 +29,7 @@ import {
   type BlockStyle,
   type BlockType,
   type BlockVisibility,
+  type PageLayout,
 } from "@/lib/blocks/types";
 
 /**
@@ -46,7 +49,7 @@ type DeepMutable<T> = T extends readonly (infer U)[]
     : T;
 
 type MutableBlock = DeepMutable<Block>;
-type MutableDocument = { page: string; blocks: MutableBlock[] };
+type MutableDocument = { page: string; blocks: MutableBlock[]; layout?: PageLayout };
 
 export type BlockLanguage = "th" | "en";
 
@@ -911,4 +914,22 @@ export function setRosterColumns(document: BlockDocument, id: string, columns: n
     if (block.type !== "rosterText") return;
     block.columns = columns === 2 ? 2 : columns === 4 ? 4 : 3;
   });
+}
+
+/* ── เลย์เอาต์ของทั้งหน้า (X1.8) ───────────────────────────────────────────── */
+
+/**
+ * เลือกเลย์เอาต์ของหน้า (X1.8) — ระดับหน้า ไม่ใช่ระดับบล็อก
+ *
+ * - ตั้ง `full` = **ลบฟิลด์ออก** (ค่าเริ่มต้น) ⇒ เอกสารกลับไปรูปทรงเดิมเป๊ะ ๆ
+ *   และทำให้ `documentDiff` ไม่เห็น "ความต่างหลอก" กับเอกสารเดิมที่ไม่มีฟิลด์นี้
+ * - ค่าอื่นเก็บใน `document.layout` (อยู่ใน JSONB เดิม — ไม่มี migration)
+ */
+export function setPageLayout(document: BlockDocument, layout: PageLayout): BlockDocument {
+  if (layoutOf(document) === layout) return document;
+
+  const next = clone(document);
+  if (layout === DEFAULT_PAGE_LAYOUT) delete next.layout;
+  else next.layout = layout;
+  return next as unknown as BlockDocument;
 }

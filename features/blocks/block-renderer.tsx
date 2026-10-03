@@ -3,8 +3,22 @@ import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
 import { CareerFormFields, ContactFormFields } from "@/features/forms/ui/form-fields";
 import { SubmitForm } from "@/features/forms/ui/submit-form";
 import { NewsletterForm } from "@/features/home/ui/newsletter-form";
-import { hiddenSizesOf, type Block, type BlockCard, type BlockDocument, type BlockMedia, type JobBoardItem } from "@/lib/blocks/types";
-import { alignClass, columnClass, containerClass, headingClass, heroHeightClass, rowGridClass, shellClass } from "@/lib/blocks/style";
+import { hiddenSizesOf, layoutOf, type Block, type BlockCard, type BlockDocument, type BlockMedia, type JobBoardItem } from "@/lib/blocks/types";
+import { pageOutline } from "@/lib/blocks/outline";
+import {
+  alignClass,
+  columnClass,
+  containerClass,
+  headingClass,
+  heroHeightClass,
+  landingTailClass,
+  pageLayoutClass,
+  rowGridClass,
+  shellClass,
+  sidebarAsideClass,
+  sidebarMainClass,
+  tocLinkClass,
+} from "@/lib/blocks/style";
 
 /**
  * ตัวเรนเดอร์บล็อก → HTML จริง (ใช้ **ทั้งหน้าจอพรีวิวในหลังบ้านและหน้าเว็บสาธารณะ**)
@@ -625,6 +639,8 @@ function BlockView({
 
   return (
     <section
+      /* anchor สำหรับสารบัญของเลย์เอาต์ `sidebar` (X1.8) — id ของบล็อกไม่ซ้ำกันทั้งหน้า (validator บังคับ) */
+      id={block.id}
       className={shell}
       data-block-id={block.id}
       data-block-type={block.type}
@@ -658,21 +674,69 @@ export function BlockDocumentView({
   if (document.blocks.length === 0) return null;
 
   const strings = blockRenderStringsFor(language);
+  const layout = layoutOf(document);
 
-  return (
-    <div className="bg-bg text-fg">
-      {document.blocks.map((block) => (
-        <BlockView
-          key={block.id}
-          block={block}
-          language={language}
-          editable={editable}
-          selectedBlockId={selectedBlockId}
-          strings={strings}
-        />
-      ))}
-    </div>
-  );
+  const renderBlocks = (blocks: readonly Block[]) =>
+    blocks.map((block) => (
+      <BlockView
+        key={block.id}
+        block={block}
+        language={language}
+        editable={editable}
+        selectedBlockId={selectedBlockId}
+        strings={strings}
+      />
+    ));
+
+  /*
+    เลย์เอาต์ "มีสารบัญด้านข้าง" (X1.8)
+    - สารบัญสร้างจากหัวข้อในบล็อกอัตโนมัติ (`pageOutline`) — ไม่มีข้อมูลซ้ำที่หลุดจากเนื้อหา
+    - วาง aside **ก่อน** เนื้อหาใน DOM ⇒ บนมือถือผู้ใช้เห็นสารบัญก่อน (ช่วยหน้าเนื้อหายาว)
+    - น้อยกว่า 2 หัวข้อ = ไม่แสดงสารบัญ (validator เตือนไว้แล้ว) และเนื้อหายังเต็มความกว้างปกติ
+  */
+  if (layout === "sidebar") {
+    const outline = pageOutline(document, language);
+
+    return (
+      <div className="bg-bg text-fg">
+        <div className={pageLayoutClass("sidebar")}>
+          {outline.length < 2 ? null : (
+            <nav aria-label={strings.layout.tocLabel} className={sidebarAsideClass()}>
+              <p className="text-fg-muted px-4 text-xs font-semibold tracking-wide uppercase">{strings.layout.tocLabel}</p>
+              <ul className="mt-2 flex flex-col">
+                {outline.map((entry) => (
+                  <li key={entry.id} className={entry.level === 2 ? "ps-4" : undefined}>
+                    <a href={`#${entry.id}`} className={tocLinkClass()}>
+                      {entry.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+          <div className={sidebarMainClass()}>{renderBlocks(document.blocks)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+    เลย์เอาต์ "หน้าแลนดิ้ง" (X1.8) — บล็อกแรกเต็มตามที่ตั้งไว้ (ปกติคือ hero เต็มความกว้าง)
+    ที่เหลือกึ่งกลางแคบ ⇒ สายตาจับจุดเริ่มแล้วอ่านยาวได้สบาย
+  */
+  if (layout === "landing") {
+    const [first, ...rest] = document.blocks;
+
+    return (
+      <div className="bg-bg text-fg">
+        {first === undefined ? null : renderBlocks([first])}
+        {rest.length === 0 ? null : <div className={landingTailClass()}>{renderBlocks(rest)}</div>}
+      </div>
+    );
+  }
+
+  /* `full` = ค่าเริ่มต้น (ไม่ระบุเลย์เอาต์) — บล็อกเรียงลงมาที่ความกว้างของแต่ละบล็อก (พฤติกรรมเดิมเป๊ะ) */
+  return <div className="bg-bg text-fg">{renderBlocks(document.blocks)}</div>;
 }
 
 export type { Language as BlockLanguage };

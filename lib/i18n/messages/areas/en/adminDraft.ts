@@ -35,5 +35,7 @@ export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
   draftKindChanged: "Block changed",
   draftKindMoved: "Block moved",
   draftInColumn: "Column {n}",
+  /* Page-level change (X1.8): the layout is not tied to any block, so it has its own label */
+  draftDiffLayout: "Page layout",
   draftRestoredApplied: "Restored — the draft on screen was replaced by the restored revision (not published yet)",
 };

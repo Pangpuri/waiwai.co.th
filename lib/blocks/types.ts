@@ -364,6 +364,25 @@ export type RosterTextBlock = BlockBase & {
   readonly members: readonly RosterMember[];
 };
 
+/* ── เลย์เอาต์ของทั้งหน้า (X1.8 · เอกสาร 5.5) ─────────────────────────────────
+ * ต้นทางกำหนดว่า "Layout templates selectable per page (full width, with sidebar, landing)
+ * — limited to what the template supports" ⇒ เราให้เลือก 3 แบบที่ทำได้จริงในโมเดลบล็อกนี้:
+ *
+ * - `full`    = ค่าเริ่มต้น: บล็อกเรียงลงมา ที่ความกว้างของแต่ละบล็อก (พฤติกรรมเดิมเป๊ะ)
+ * - `sidebar` = **สารบัญด้านข้าง** สร้างอัตโนมัติจากหัวข้อในหน้า (เดสก์ท็อป = 2 คอลัมน์ · มือถือ = สารบัญขึ้นก่อน)
+ * - `landing` = หน้าแลนดิ้ง: บล็อกแรกเต็มตามที่ตั้งไว้ · บล็อกที่เหลือ **กึ่งกลางแคบ** (อ่านสบาย)
+ *
+ * ⚠️ ไม่ระบุ = `full` ⇒ เอกสารเก่า/เทมเพลตเดิมและหน้าเว็บที่ใช้อยู่ **ไม่เปลี่ยน DOM**
+ * ⚠️ ไม่มี migration: เก็บใน `page_document.document` (JSONB) ที่มีอยู่แล้ว — เพิ่มฟิลด์ optional
+ */
+export const PAGE_LAYOUTS = ["full", "sidebar", "landing"] as const;
+export type PageLayout = (typeof PAGE_LAYOUTS)[number];
+export const DEFAULT_PAGE_LAYOUT: PageLayout = "full";
+
+export function isPageLayout(value: string): value is PageLayout {
+  return (PAGE_LAYOUTS as readonly string[]).includes(value);
+}
+
 export type Block =
   | HeroBlock
   | HeadingBlock
@@ -388,7 +407,17 @@ export function isRowBlock(block: Block): block is RowBlock {
 export type BlockDocument = {
   readonly page: string;
   readonly blocks: readonly Block[];
+  /**
+   * เลย์เอาต์ของทั้งหน้า (X1.8) — **ไม่ระบุ = `full`** (ค่าเริ่มต้น/เอกสารเดิม)
+   * ดูความหมายของแต่ละแบบที่ `PAGE_LAYOUTS`
+   */
+  readonly layout?: PageLayout;
 };
+
+/** เลย์เอาต์ที่ใช้จริงของเอกสาร (ไม่ระบุ = `full`) — ใช้ทั้งตัวเรนเดอร์และ validator */
+export function layoutOf(document: BlockDocument): PageLayout {
+  return document.layout ?? DEFAULT_PAGE_LAYOUT;
+}
 
 /* ── แคตตาล็อกบล็อก (ใช้สร้างเมนู "เพิ่มบล็อก" และสร้างค่าเริ่มต้น) ───────────── */
 

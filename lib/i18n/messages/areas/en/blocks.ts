@@ -8,4 +8,6 @@ export const blocks = {
   galleryOpen: "Open image",
   galleryClose: "Close",
   galleryDialog: "Image viewer",
+  /* "sidebar" page layout (X1.8) — label of the table of contents built from page headings */
+  layoutTocLabel: "On this page",
 };

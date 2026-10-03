@@ -3,11 +3,13 @@ import {
   collectBlockIds,
   countBlocks,
   isSafeHref,
+  layoutOf,
   walkBlocks,
   type Block,
   type BlockDocument,
   type BlockMedia,
 } from "@/lib/blocks/types";
+import { pageOutline } from "@/lib/blocks/outline";
 import type { LocalizedValue } from "@/lib/content/types";
 
 /**
@@ -299,6 +301,21 @@ export function validateDocument(document: BlockDocument): readonly BlockIssue[]
   /* เดินทุกบล็อก (รวมที่ซ้อนในคอลัมน์) — path ชี้จุดที่ผิดได้ตรงเสมอ */
   for (const node of walkBlocks(document.blocks)) {
     checkBlock(node.block, node.path, issues);
+  }
+
+  /*
+    เลย์เอาต์ "สารบัญด้านข้าง" (X1.8) ต้องมีหัวข้อพอให้สร้างสารบัญ
+    ⇒ น้อยกว่า 2 = เตือน (ไม่บล็อกการเผยแพร่ เพราะหน้าเว็บยังแสดงเนื้อหาครบ แค่ไม่มีสารบัญ)
+  */
+  if (layoutOf(document) === "sidebar" && pageOutline(document, "th").length < 2) {
+    issues.push(
+      issue(
+        "warning",
+        "layout-sidebar-few-headings",
+        "layout",
+        'เลย์เอาต์ "สารบัญด้านข้าง" แต่หน้านี้มีหัวข้อน้อยกว่า 2 ⇒ สารบัญจะไม่แสดง (เพิ่มบล็อกที่มีหัวข้อ หรือเปลี่ยนเป็นเต็มความกว้าง)',
+      ),
+    );
   }
 
   return issues;

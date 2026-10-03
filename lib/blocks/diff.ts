@@ -1,4 +1,4 @@
-import { isRowBlock, type Block, type BlockDocument } from "@/lib/blocks/types";
+import { isRowBlock, layoutOf, type Block, type BlockDocument } from "@/lib/blocks/types";
 
 /**
  * "ความต่างของสองรุ่นเอกสารบล็อก" — ตรรกะล้วน ไม่พึ่ง React/DB (X1.5)
@@ -20,6 +20,12 @@ import { isRowBlock, type Block, type BlockDocument } from "@/lib/blocks/types";
 export const MAX_DIFF_FIELDS_PER_BLOCK = 12;
 /** จำนวนบรรทัดความต่างสูงสุดที่รายงานทั้งใบ */
 export const MAX_DIFF_ENTRIES = 40;
+
+/**
+ * "ชนิด" ที่ใช้รายงานความต่างระดับหน้า (X1.8) — เลย์เอาต์ไม่ผูกกับบล็อกใด ๆ
+ * ⚠️ ต้องรายงานไม่งั้น `identical` จะเป็น true ⇒ **บันทึกอัตโนมัติจะข้ามการเปลี่ยนเลย์เอาต์**
+ */
+export const LAYOUT_DIFF_BLOCK_TYPE = "layout";
 
 export type DiffFieldChange = {
   /** เส้นทางในบล็อก เช่น `heading.th` · `items[0].title.en` · `style.background` */
@@ -233,6 +239,21 @@ export function documentDiff(base: BlockDocument, next: BlockDocument): Document
       index: entry.index,
       columnIndex: entry.columnIndex,
       fields: [],
+      truncated: false,
+    });
+  }
+
+  /* เลย์เอาต์ของทั้งหน้า (X1.8) — ความต่างระดับหน้า ไม่ผูกกับบล็อกใด ๆ */
+  const baseLayout = layoutOf(base);
+  const nextLayout = layoutOf(next);
+  if (baseLayout !== nextLayout) {
+    rawEntries.push({
+      kind: "changed",
+      blockId: "",
+      blockType: LAYOUT_DIFF_BLOCK_TYPE,
+      index: 0,
+      columnIndex: null,
+      fields: [{ path: "layout", before: baseLayout, after: nextLayout }],
       truncated: false,
     });
   }

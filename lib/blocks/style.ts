@@ -6,6 +6,7 @@ import type {
   BlockSpacing,
   BlockStyle,
   BlockWidth,
+  PageLayout,
 } from "@/lib/blocks/types";
 
 /**
@@ -147,3 +148,46 @@ export const STYLE_CHOICES = {
     { value: "full", label: "เต็มความกว้าง (12/12)" },
   ],
 } as const;
+
+/* ── เลย์เอาต์ของทั้งหน้า (X1.8) ─────────────────────────────────────────────
+ * เหตุผลที่รวมไว้ที่นี่: คลาสทั้งหมดต้องเป็น "พรีเซ็ตของแบรนด์" ⇒ ตรวจสอบได้ (ด่าน check:dark)
+ * และ Tailwind สแกนคลาสจากข้อความในโค้ด (ห้ามประกอบชื่อคลาสจากตัวแปร)
+ */
+
+const PAGE_LAYOUT_SHELL: Record<PageLayout, string> = {
+  full: "",
+  /* เดสก์ท็อป 4 คอลัมน์: สารบัญ 1 + เนื้อหา 3 · มือถือเรียงลงมา ⇒ เห็นสารบัญก่อนเนื้อหา */
+  sidebar: "lg:grid lg:grid-cols-4 lg:items-start lg:gap-10",
+  landing: "",
+};
+
+export function pageLayoutClass(layout: PageLayout): string {
+  return PAGE_LAYOUT_SHELL[layout];
+}
+
+/** คอลัมน์สารบัญ (เลย์เอาต์ `sidebar`) — ติดหนึบใต้หัวเว็บบนเดสก์ท็อป */
+export function sidebarAsideClass(): string {
+  return "lg:col-span-1 lg:sticky lg:top-24";
+}
+
+/** คอลัมน์เนื้อหาหลัก (เลย์เอาต์ `sidebar`) — `min-w-0` กันตาราง/ภาพล้นคอลัมน์กริด */
+export function sidebarMainClass(): string {
+  return "min-w-0 lg:col-span-3";
+}
+
+/** บล็อกจากตัวที่สองเป็นต้นไปของหน้าแลนดิ้ง — กึ่งกลางแคบ (อ่านสบายกว่า strech เต็มจอ) */
+export function landingTailClass(): string {
+  return "mx-auto w-full max-w-3xl";
+}
+
+/** ลิงก์ในสารบัญ — ต้องกดง่ายและเห็นโฟกัสชัด */
+export function tocLinkClass(): string {
+  return "text-fg-muted hover:text-fg focus-visible:ring-ring block rounded-lg px-4 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
+}
+
+/** ป้ายของเลย์เอาต์ทั้งสาม (ใช้ในตัวเลือกของหลังบ้าน) */
+export const LAYOUT_CHOICES = [
+  { value: "full", label: "เต็มความกว้าง (ค่าเริ่มต้น)" },
+  { value: "sidebar", label: "มีสารบัญด้านข้าง" },
+  { value: "landing", label: "หน้าแลนดิ้ง" },
+] as const;
