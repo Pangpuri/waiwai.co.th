@@ -381,3 +381,157 @@ export async function deleteProduct(id: string): Promise<void> {
 export async function deleteProductCategory(id: string): Promise<void> {
   await getPool().query("delete from product_category where id = $1", [id]);
 }
+
+/* ── หลังบ้าน (รอบที่ 131) — แก้สินค้า/ส่วนผสม/หมวด แบบ WordPress ───────────── */
+
+export type AdminProductListItem = {
+  readonly id: string;
+  readonly sourceId: string;
+  readonly categoryId: string;
+  readonly nameTh: string;
+  readonly nameEn: string;
+  readonly groupTh: string;
+  readonly imagePath: string | null;
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
+  readonly ingredientCount: number;
+  /** `YYYY-MM-DDTHH:MM` (เวลาไทย) หรือ null */
+  readonly updatedLocal: string | null;
+};
+
+export type AdminProductDetail = AdminProductListItem & {
+  readonly taglineTh: string;
+  readonly taglineEn: string;
+  readonly detailsTh: string;
+  readonly allergensTh: string;
+  readonly netWeightTh: string;
+  readonly fdaNumber: string;
+  readonly packagingTh: string;
+  readonly ingredients: readonly ProductIngredientRecord[];
+};
+
+const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th,
+       p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th,
+       m.id as image_id, m.width as image_width, m.height as image_height,
+       (select count(*)::int from product_ingredient i where i.product_id = p.id) as ingredient_count,
+       to_char(p.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local`;
+
+function toAdminProduct(row: Record<string, unknown>): AdminProductListItem | null {
+  const id = typeof row.id === "string" ? row.id.trim() : "";
+  if (id === "") return null;
+  const imageId = typeof row.image_id === "string" ? row.image_id.trim() : "";
+  const updatedLocal = typeof row.updated_local === "string" ? row.updated_local.trim() : "";
+  const num = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+
+  return {
+    id,
+    sourceId: typeof row.source_id === "string" ? row.source_id : "",
+    categoryId: typeof row.category_id === "string" ? row.category_id : "",
+    nameTh: typeof row.name_th === "string" ? row.name_th : "",
+    nameEn: typeof row.name_en === "string" ? row.name_en : "",
+    groupTh: typeof row.group_th === "string" ? row.group_th : "",
+    imagePath: imageId === "" ? null : `/media/${imageId}`,
+    imageWidth: num(row.image_width),
+    imageHeight: num(row.image_height),
+    ingredientCount: typeof row.ingredient_count === "number" ? row.ingredient_count : 0,
+    updatedLocal: updatedLocal === "" ? null : updatedLocal,
+  };
+}
+
+/** รายการสินค้าสำหรับหลังบ้าน (กรองตามหมวด + ค้นหา) */
+export async function listProductsForAdmin(input: {
+  readonly categoryId?: string;
+  readonly search?: string;
+}): Promise<{ readonly items: readonly AdminProductListItem[]; readonly total: number }> {
+  if (!isDatabaseConfigured()) return { items: [], total: 0 };
+
+  const params: unknown[] = [];
+  const where: string[] = [];
+
+  const category = (input.categoryId ?? "").trim();
+  if (category !== "") {
+    params.push(category);
+    where.push(`p.category_id = $${String(params.length)}`);
+  }
+  const term = (input.search ?? "").trim();
+  if (term !== "") {
+    params.push(`%${term}%`);
+    const index = params.length;
+    where.push(`(p.name_th ilike $${String(index)} or p.name_en ilike $${String(index)} or p.group_th ilike $${String(index)})`);
+  }
+
+  const clause = where.length === 0 ? "" : `where ${where.join(" and ")}`;
+
+  try {
+    const totalResult = await getPool().query<{ count: string }>(
+      `select count(*)::text as count from product p ${clause}`,
+      params,
+    );
+    const total = Number.parseInt(totalResult.rows[0]?.count ?? "0", 10);
+
+    const result = await getPool().query<Record<string, unknown>>(
+      `select ${ADMIN_PRODUCT_COLUMNS}
+         from product p
+         left join media m on m.id = p.image_media_id
+         ${clause}
+        order by p.category_id, p.sort_order, p.id`,
+      params,
+    );
+
+    const items: AdminProductListItem[] = [];
+    for (const row of result.rows) {
+      const item = toAdminProduct(row);
+      if (item !== null) items.push(item);
+    }
+    return { items, total: Number.isFinite(total) ? total : 0 };
+  } catch {
+    return { items: [], total: 0 };
+  }
+}
+
+/** สินค้า 1 ชิ้นพร้อมส่วนผสม (สำหรับหน้าจอแก้) */
+export async function loadProductForAdmin(id: string): Promise<AdminProductDetail | null> {
+  if (!isDatabaseConfigured()) return null;
+  const key = id.trim();
+  if (key === "") return null;
+
+  try {
+    const result = await getPool().query<Record<string, unknown>>(
+      `select ${ADMIN_PRODUCT_COLUMNS}
+         from product p
+         left join media m on m.id = p.image_media_id
+        where p.id = $1
+        limit 1`,
+      [key],
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    const base = toAdminProduct(row);
+    if (base === null) return null;
+
+    const ingredients = await getPool().query<Record<string, unknown>>(
+      `select sort_order, name_th, name_en, percent_text from product_ingredient where product_id = $1 order by sort_order`,
+      [key],
+    );
+
+    return {
+      ...base,
+      taglineTh: typeof row.tagline_th === "string" ? row.tagline_th : "",
+      taglineEn: typeof row.tagline_en === "string" ? row.tagline_en : "",
+      detailsTh: typeof row.details_th === "string" ? row.details_th : "",
+      allergensTh: typeof row.allergens_th === "string" ? row.allergens_th : "",
+      netWeightTh: typeof row.net_weight_th === "string" ? row.net_weight_th : "",
+      fdaNumber: typeof row.fda_number === "string" ? row.fda_number : "",
+      packagingTh: typeof row.packaging_th === "string" ? row.packaging_th : "",
+      ingredients: ingredients.rows.map((item) => ({
+        sortOrder: typeof item.sort_order === "number" ? item.sort_order : 0,
+        nameTh: typeof item.name_th === "string" ? item.name_th : "",
+        nameEn: typeof item.name_en === "string" ? item.name_en : "",
+        percentText: typeof item.percent_text === "string" ? item.percent_text : "",
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
