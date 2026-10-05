@@ -161,3 +161,25 @@ export function isVercelProtectionPage(html: string): boolean {
   ];
   return markers.some((marker) => html.includes(marker));
 }
+
+/**
+ * ดึง id ของภาพในคลัง (`/media/<id>`) จาก HTML เพื่อยิงตรวจจริง 1 รูป
+ *
+ * ⚠️ บทเรียนรอบที่ 122: ตัวดึงรุ่นแรกใช้แพตเทิร์นหลวม `/media/…` ⇒ ไปโดน path ของ **ฟอนต์** ที่ Next
+ * สร้างเอง (`/_next/static/media/411573…-s.woff2`) ⇒ ตรวจผิดว่า "รูปในคลังพัง" (และทำให้วินิจฉัยสับสน)
+ * ⇒ ต้องเลือกจาก URL ของ `next/image` (`/_next/image?url=%2Fmedia%2F<id>`) ก่อนเสมอ
+ *   และถ้าจะดูจาก path ตรง ๆ ต้องไม่ใช่ `/_next/static/...` และต้องไม่ลงท้ายด้วยนามสกุลไฟล์
+ */
+export function mediaIdFromHtml(html: string): string | null {
+  /* 1) เส้นทางที่แอปใช้จริง: next/image ครอบพาธ /media/<id> */
+  const viaNextImage = html.match(/\/_next\/image\?url=%2Fmedia%2F([A-Za-z0-9_-]+)/);
+  if (viaNextImage?.[1] !== undefined) return viaNextImage[1];
+
+  /* 2) path ตรง ๆ — ต้องไม่ใช่ของ Next (_next/static/media/…) และต้องไม่ใช่นามสกุลไฟล์ (ฟอนต์/ไอคอน) */
+  for (const match of html.matchAll(/(?:^|["'(])\/media\/([A-Za-z0-9_-]+)["')?]/g)) {
+    const id = match[1];
+    if (id !== undefined && !/\.[a-z0-9]{2,4}$/i.test(id)) return id;
+  }
+
+  return null;
+}

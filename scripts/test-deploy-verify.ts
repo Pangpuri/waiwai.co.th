@@ -6,6 +6,7 @@ import {
   assessNewsArticlePage,
   assessNewsListPage,
   isVercelProtectionPage,
+  mediaIdFromHtml,
   pooledEndpointWarning,
 } from "@/lib/deploy/verify";
 
@@ -111,4 +112,16 @@ test("deploy: ต้องจับหน้า login ของ Vercel (แบ�
   assert.equal(isVercelProtectionPage('<meta name="x"><title>Login - Vercel</title>'), true);
   /* และต้องไม่จับผิดหน้าเว็บจริงของเรา */
   assert.equal(isVercelProtectionPage('<html><head><title>ไวไว — หน้าแรก</title></head><body>ไวไว</body></html>'), false);
+});
+
+test("deploy: ดึง id รูปจากคลัง — ต้องไม่หลงไปโดน path ฟอนต์ของ Next (เคสจริงรอบ 122)", () => {
+  const realImage = '<img src="/_next/image?url=%2Fmedia%2FJIIKynFuOs4j&w=640&q=75">';
+  assert.equal(mediaIdFromHtml(realImage), "JIIKynFuOs4j");
+
+  /* เคสจริง: ฟอนต์ของ Next อยู่ที่ /_next/static/media/… ⇒ เคยถูกดึงมาเป็น "รูปในคลัง" แล้วได้ 404/500 */
+  const fontOnly = '<link rel="preload" href="/_next/static/media/411573def610439a-s.p.woff2" as="font">';
+  assert.equal(mediaIdFromHtml(fontOnly), null);
+
+  assert.equal(mediaIdFromHtml('<img src="/media/abc123">'), "abc123");
+  assert.equal(mediaIdFromHtml("<html>ไม่มีรูป</html>"), null);
 });

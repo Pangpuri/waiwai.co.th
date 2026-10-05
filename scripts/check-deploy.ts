@@ -3,6 +3,7 @@ import {
   assessNewsArticlePage,
   assessNewsListPage,
   isVercelProtectionPage,
+  mediaIdFromHtml,
   pooledEndpointWarning,
 } from "@/lib/deploy/verify";
 
@@ -110,9 +111,7 @@ async function main(): Promise<void> {
   /* รูปจากฐานข้อมูลคลาวด์: หา /media/<id> จากหน้าแรกแล้วยิงจริง */
   {
     const { body } = await fetchText(`${options.baseUrl}/th`);
-    const mediaMatch =
-      body.match(/\/_next\/image\?url=%2Fmedia%2F([A-Za-z0-9_-]+)/) ?? body.match(/\/media\/([A-Za-z0-9_-]{6,})/);
-    const mediaId = mediaMatch?.[1];
+    const mediaId = mediaIdFromHtml(body) ?? undefined;
     if (mediaId === undefined) {
       failures.push("ไม่พบรูปจากคลัง (/media/<id>) บนหน้าแรก — ภาพอาจไม่ขึ้น");
     } else {
