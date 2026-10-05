@@ -1,0 +1,72 @@
+/**
+ * Dictionary area: Admin — News & activities (round 123)
+ *
+ * Keys must match `areas/th/adminNews.ts` exactly (enforced by `npm run check:i18n`).
+ *
+ * ⚠️ ชนิดอ้างจาก "รายการคีย์ของไฟล์ไทย" ⇒ ขาด/เกินคีย์เดียว typecheck แดงทันที (แบบเดียวกับพื้นที่อื่น)
+ */
+import type { Messages } from "@/lib/i18n/messages/th";
+import type { adminNews as thAdminNews } from "@/lib/i18n/messages/areas/th/adminNews";
+
+export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
+  newsAdminTitle: "News & activities",
+  newsAdminSubtitle: "Add, edit and publish news — save and the site updates itself.",
+  newsAdminNew: "Add news",
+  newsAdminSearchPlaceholder: "Search title or excerpt",
+  newsAdminSearch: "Search",
+  newsAdminClearSearch: "Clear search",
+  newsAdminTabAll: "All",
+  newsAdminTabDraft: "Drafts",
+  newsAdminTabPublished: "Published",
+  newsAdminTabTrash: "Trash",
+  newsAdminEmpty: "No news in this view yet",
+  newsAdminEmptyTrash: "Trash is empty",
+  newsAdminColTitle: "Title",
+  newsAdminColStatus: "Status",
+  newsAdminColPublished: "Published",
+  newsAdminColUpdated: "Last updated",
+  newsAdminColActions: "Actions",
+  newsAdminStatusDraft: "Draft",
+  newsAdminStatusPublished: "Published",
+  newsAdminNoDate: "No date",
+  newsAdminSummary: "{blocks} blocks · {images} images",
+  newsAdminEdit: "Edit",
+  newsAdminView: "View on site",
+  newsAdminMoveToTrash: "Move to trash",
+  newsAdminRestore: "Restore",
+  newsAdminTrashedNote: "In trash — not visible on the site (you can restore it)",
+  newsAdminPageOf: "Page {page} of {pages}",
+  newsAdminPrev: "Previous",
+  newsAdminNext: "Next",
+  newsAdminBackToList: "Back to news list",
+  newsAdminHeadingNew: "Add news",
+  newsAdminHeadingEdit: "Edit news",
+  newsAdminFieldTitleTh: "Title (Thai)",
+  newsAdminFieldTitleEn: "Title (English)",
+  newsAdminFieldExcerptTh: "Excerpt (Thai)",
+  newsAdminFieldExcerptEn: "Excerpt (English)",
+  newsAdminFieldBody: "Body",
+  newsAdminBodyHint:
+    "Blank line = new paragraph · start a line with ## for a sub-heading · insert images from the library with the button below",
+  newsAdminImageSelect: "Library image",
+  newsAdminInsertImage: "Insert this image",
+  newsAdminNoImages: "No images in the library yet",
+  newsAdminFieldCover: "Cover image",
+  newsAdminCoverNone: "— No cover image —",
+  newsAdminFieldPublished: "Publish date & time (Thai time)",
+  newsAdminPublishedHint: "Leave empty to keep the date unset",
+  newsAdminFieldStatus: "Status",
+  newsAdminSave: "Save",
+  newsAdminSaved: "News saved.",
+  newsAdminSavedDraft: "Saved as draft (not visible on the site yet).",
+  newsAdminErrorTitle: "Cannot save — a Thai title is required.",
+  newsAdminErrorBody: "Cannot save — the body is too long (reduce paragraphs/images).",
+  newsAdminErrorDatabase: "Cannot save — the database is not configured.",
+  newsAdminErrorNotFound: "The news item to edit was not found.",
+  newsAdminTokenHelp: "Inserted images appear in the body as [[img:mediaId|alt]] and are replaced by the real image on the site.",
+  newsAdminTrashHint: "Items in trash are not deleted permanently — restore them from the Trash tab.",
+  auditNewsSave: "News saved",
+  auditNewsTrash: "News moved to trash",
+  auditNewsRestore: "News restored",
+  newsAdminCoverAlt: "News cover image",
+} as const;

@@ -47,7 +47,22 @@ import {
   upsertProductCategory,
 } from "@/lib/products/repository";
 import { newsIdOfSourceId, type NewsInput } from "@/lib/news/model";
-import { countNews, deleteNews, listNews, loadNewsBySourceId, upsertNews } from "@/lib/news/repository";
+import { parseNewsBody } from "@/lib/news/body";
+import { newsBlocksToText, newsTextToBlocks } from "@/lib/news/editor-text";
+import {
+  adminNewsCounts,
+  countNews,
+  createNewsForAdmin,
+  deleteNews,
+  listNews,
+  listNewsForAdmin,
+  listNewsSourceIds,
+  loadNewsBySourceId,
+  loadNewsForAdmin,
+  setNewsTrashed,
+  updateNewsForAdmin,
+  upsertNews,
+} from "@/lib/news/repository";
 import { recipeIdOfSourceId } from "@/lib/recipes/model";
 import { deleteRecipe, listRecipes, upsertRecipe } from "@/lib/recipes/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
@@ -263,6 +278,12 @@ async function main(): Promise<void> {
 
   /* 20) ข่าวสาร & กิจกรรม: เขียน (เนื้อหาเป็นบล็อก) → อ่านกลับ (เวลาไทย) → ภาพถูกใช้ที่ไหน → ลบ (หน้า /news · รอบที่ 105) */
   await checkNews();
+
+  /* 21) หลังบ้านข่าว: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บ (รอบที่ 123) */
+  await checkNewsAdmin();
+
+  /* 22) ข่าวจริงทุกชิ้น: ข้อความ ↔ บล็อก ไป-กลับไม่เพี้ยน (กันกดบันทึกแล้วเนื้อหาเดิมเสีย) */
+  await checkNewsEditorRoundTrip();
 
   await closePool();
 
@@ -2063,3 +2084,123 @@ async function loadPageLiveFlag(page: string): Promise<boolean> {
 }
 
 await main();
+
+/**
+ * 21) หลังบ้านข่าว (รอบที่ 123): สร้าง (ฉบับร่าง) → ยืนยันว่า **ยังไม่ขึ้นเว็บ** → เผยแพร่ → ขึ้นเว็บจริง →
+ *     ย้ายเข้าถังขยะ → หายจากเว็บแต่ยังกู้คืนได้ → ค้นหาในหลังบ้านเจอ → ลบถาวร
+ *
+ * ทำไมต้องมีรอบนี้: ตรรกะ "ร่าง/ถังขยะ" อยู่ที่ SQL ใน `lib/news/repository.ts`
+ * ⇒ ถ้าลืมกรองที่ใดที่หนึ่งใน 4 คำสั่งอ่านฝั่งเว็บ ข่าวที่ยังไม่พร้อมจะหลุดขึ้นเว็บทันที (ผิดทั้ง SEO และความน่าเชื่อถือ)
+ */
+async function checkNewsAdmin(): Promise<void> {
+  const created: string[] = [];
+
+  try {
+    const id = await createNewsForAdmin(
+      {
+        titleTh: "ข่าวทดสอบหลังบ้าน (ด่านตรวจ)",
+        titleEn: "Admin news check",
+        excerptTh: "คำโปรยทดสอบหลังบ้าน",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-01T10:30",
+        status: "draft",
+        body: [
+          { type: "paragraph", text: "ย่อหน้าแรกจากหลังบ้าน" },
+          { type: "heading", text: "หัวข้อย่อย" },
+        ],
+      },
+      NEWS_CHECK_ACTOR,
+    );
+    created.push(id);
+
+    const sourceId = id.startsWith("n") ? id.slice(1) : id;
+    assert.ok(/^\d{3,}$/.test(sourceId), "id ที่สร้างจากหลังบ้านต้องมี source_id เป็นตัวเลข (ใช้เป็นพาธ /news/<source_id>)");
+
+    const draft = await loadNewsForAdmin(id);
+    assert.ok(draft !== null, "หลังบ้านต้องอ่านข่าวที่สร้างเองได้");
+    assert.equal(draft.status, "draft", "ค่าเริ่มต้นของงานที่ยังไม่พร้อมต้องเป็นฉบับร่าง");
+    assert.equal(draft.trashed, false);
+    assert.equal(draft.body.length, 2, "เนื้อหาต้องถูกเก็บเป็นบล็อกตามที่ส่งไป");
+
+    /* ⚠️ ฉบับร่างต้อง **ไม่** ขึ้นเว็บ (ทั้งหน้ารวม หน้าข่าวรายชิ้น และรายการ static params) */
+    assert.equal(await loadNewsBySourceId(sourceId), null, "ฉบับร่างต้องไม่ขึ้นเว็บ");
+    assert.equal((await listNewsSourceIds()).includes(sourceId), false, "ฉบับร่างต้องไม่อยู่ในรายการ static params");
+
+    /* เผยแพร่ ⇒ ต้อง দেখাได้จากเว็บทันที */
+    await updateNewsForAdmin(
+      id,
+      {
+        titleTh: "ข่าวทดสอบหลังบ้าน (ด่านตรวจ)",
+        titleEn: "Admin news check",
+        excerptTh: "คำโปรยทดสอบหลังบ้าน",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-01T10:30",
+        status: "published",
+        body: [{ type: "paragraph", text: "เนื้อหาหลังเผยแพร่" }],
+      },
+      NEWS_CHECK_ACTOR,
+    );
+    const published = await loadNewsBySourceId(sourceId);
+    assert.ok(published !== null, "เผยแพร่แล้วต้องอ่านจากเว็บได้");
+    assert.equal(published.publishedLocal, "2026-06-01T10:30", "เวลาไทยต้องกลับมาค่าเดิม");
+
+    /* ค้นหาในหลังบ้านเจอ */
+    const found = await listNewsForAdmin({ tab: "published", search: "ทดสอบหลังบ้าน", page: 1 });
+    assert.ok(
+      found.items.some((item) => item.id === id),
+      "ค้นหาในหลังบ้านต้องเจอข่าวที่เพิ่งเผยแพร่",
+    );
+
+    /* ย้ายเข้าถังขยะ ⇒ หายจากเว็บ แต่หลังบ้านยังเห็น + กู้คืนได้ */
+    await setNewsTrashed(id, true, NEWS_CHECK_ACTOR);
+    assert.equal(await loadNewsBySourceId(sourceId), null, "ของในถังขยะต้องไม่ขึ้นเว็บ");
+    const trashed = await loadNewsForAdmin(id);
+    assert.ok(trashed !== null && trashed.trashed, "หลังบ้านต้องยังเห็นของในถังขยะ");
+
+    await setNewsTrashed(id, false, NEWS_CHECK_ACTOR);
+    assert.ok((await loadNewsBySourceId(sourceId)) !== null, "กู้คืนแล้วต้องกลับขึ้นเว็บ");
+
+    /* นับตามแท็บต้องสอดคล้อง */
+    const counts = await adminNewsCounts();
+    assert.ok(counts.all >= 1 && counts.published >= 1, "ตัวเลขบนแท็บต้องนับข่าวที่เผยแพร่แล้ว");
+
+    CHECKS.push("  ✓ หลังบ้านข่าว: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บได้จริง");
+  } finally {
+    for (const id of created) await deleteNews(id);
+    assert.equal(
+      (await listNewsForAdmin({ tab: "all", search: "ทดสอบหลังบ้าน", page: 1 })).items.length,
+      0,
+      "ลบข่าวทดสอบแล้วต้องไม่เหลือ",
+    );
+  }
+}
+
+/**
+ * 22) ข่าวจริงที่นำเข้ามาทั้งหมด: ข้อความ ↔ บล็อก ต้อง **ไป-กลับไม่เพี้ยน**
+ *
+ * ทำไมต้องมี: หลังบ้านใช้ "ฟอร์มง่าย" (ข้อความช่องเดียว) แต่ข้อมูลเก็บเป็นบล็อก
+ * ⇒ ถ้าตัวแปลงกลืน/เสียรูปอะไรกับ **ข้อมูลจริง** การตลาดกดบันทึกครั้งแรก = ข่าวเดิมเสียทันที
+ * เทสต์นี้จึงไล่ข่าวทุกชิ้นในฐานข้อมูล (ปัจจุบัน 151 ชิ้น) แล้วเทียบกลับแบบเป๊ะ
+ */
+async function checkNewsEditorRoundTrip(): Promise<void> {
+  const { rows } = await getPool().query<{ id: string; body: unknown }>(
+    "select id, body from news where deleted_at is null order by id",
+  );
+
+  assert.ok(rows.length > 0, "ต้องมีข่าวในฐานข้อมูลให้ตรวจ (รัน npm run news:import ก่อน)");
+
+  const broken: string[] = [];
+  for (const row of rows) {
+    const original = parseNewsBody(row.body);
+    const text = newsBlocksToText(original);
+    const back = newsTextToBlocks(text);
+    if (JSON.stringify(back) !== JSON.stringify(original)) {
+      broken.push(row.id);
+    }
+  }
+
+  assert.deepEqual(broken, [], `ข่าวที่แปลงไป-กลับแล้วไม่เหมือนเดิม (${String(broken.length)} ชิ้น): ${broken.slice(0, 5).join(", ")}`);
+  CHECKS.push(`  ✓ ข่าวจริงทั้ง ${String(rows.length)} ชิ้น: ข้อความ↔บล็อก ไป-กลับไม่เพี้ยน (ปลอดภัยต่อการกดบันทึก)`);
+}

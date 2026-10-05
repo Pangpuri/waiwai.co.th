@@ -19,6 +19,10 @@ export type AuditAction =
   | "restore-revision"
   | "preset-save"
   | "pages-update"
+  /* ข่าว/กิจกรรม (รอบที่ 123) */
+  | "news-save"
+  | "news-trash"
+  | "news-restore"
   /** ย้ายรุ่นรูปทรงบล็อกของข้อมูลที่เก็บไว้ (X1.1) */
   | "migrate-blocks"
   /** ลบข้อมูลที่หมดอายุตามนโยบายระยะเก็บ (X2b) — ร่องรอยว่าลบอะไรไปเท่าไร */

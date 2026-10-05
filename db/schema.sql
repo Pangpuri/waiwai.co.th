@@ -405,7 +405,10 @@ create table if not exists news (
   published_at    timestamptz,
   published_label text        not null default '',
   updated_at      timestamptz not null default now(),
-  updated_by      text
+  updated_by      text,
+  -- รอบที่ 123: หลังบ้านข่าว (แบบ WP Posts)
+  status text not null default 'published',   -- draft | published
+  deleted_at timestamptz
 );
 
 create index if not exists news_published_idx on news (published_at desc nulls last, id desc);
@@ -413,3 +416,6 @@ create index if not exists news_source_idx on news (source_id);
 
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล
+
+-- รอบที่ 123: ดัชนีหน้ารายการหลังบ้าน (กรองถังขยะ/สถานะ แล้วเรียงใหม่สุดก่อน)
+create index if not exists news_admin_idx on news (deleted_at, status, published_at desc nulls last, id desc);
