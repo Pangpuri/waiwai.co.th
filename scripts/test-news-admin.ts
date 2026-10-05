@@ -10,6 +10,7 @@ import {
   newsTextToBlocks,
   parseNewsImageToken,
 } from "@/lib/news/editor-text";
+import { countEditorImages, newsBlocksToEditor, parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
 
 /**
  * เทสต์หลังบ้านข่าว (รอบที่ 123) — "ฟอร์มง่าย" ที่ต้องไม่ทำข้อมูลเดิมเสียหาย
@@ -103,5 +104,59 @@ test("news admin: ทุก action ต้องตรวจสิทธิ์ + 
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
-  assert.ok(actions.includes("newsTextToBlocks("), "ต้องแปลงข้อความ→บล็อกฝั่งเซิร์ฟเวอร์ (ห้ามเชื่อเบราว์เซอร์)");
+  assert.ok(
+    actions.includes("parseNewsEditorBlocks("),
+    "ต้องตรวจบล็อกที่รับจากเบราว์เซอร์ด้วย parseNewsEditorBlocks (ห้ามเชื่อฝั่ง client)",
+  );
+});
+
+/* ── ตัวแก้แบบบล็อก (รอบที่ 125) ─────────────────────────────────────────── */
+
+test("news admin: บล็อกจาก DB ↔ ตัวแก้ และ JSON จากเบราว์เซอร์ต้องไป-กลับไม่เพี้ยน", () => {
+  const fromDb = [
+    { type: "paragraph", text: "ย่อหน้าแรก" },
+    { type: "heading", text: "หัวข้อย่อย" },
+    { type: "image", mediaId: "m1", alt: "คำบรรยาย" },
+    { type: "paragraph", text: "ปิดท้าย" },
+  ] as const;
+
+  const editor = newsBlocksToEditor(fromDb);
+  assert.deepEqual(
+    editor.map((item) => item.kind),
+    ["paragraph", "heading", "image", "paragraph"],
+    "ลำดับการ์ดต้องตรงกับบล็อกเดิม (ห้ามย้ายภาพไปท้ายข่าว)",
+  );
+
+  const asJson = JSON.stringify(
+    editor.map((item) =>
+      item.kind === "image" ? { kind: "image", mediaId: item.mediaId, alt: item.alt } : { kind: item.kind, text: item.text },
+    ),
+  );
+  assert.deepEqual(parseNewsEditorBlocks(JSON.parse(asJson)), fromDb, "JSON ที่ตัวแก้ส่งมา ต้องแปลงกลับเป็นบล็อกเดิมเป๊ะ");
+});
+
+test("news admin: ตรวจค่าจากเบราว์เซอร์ — ทิ้งของว่าง/ผิดชนิด และกันภาพไม่มีรหัส", () => {
+  assert.deepEqual(parseNewsEditorBlocks(null), []);
+  assert.deepEqual(parseNewsEditorBlocks("ไม่ใช่ array"), []);
+  assert.deepEqual(
+    parseNewsEditorBlocks([
+      { kind: "paragraph", text: "  เก็บ  " },
+      { kind: "paragraph", text: "   " },
+      { kind: "heading", text: "" },
+      { kind: "image", mediaId: "", alt: "ไม่มีรหัส" },
+      { kind: "image", mediaId: "ok1", alt: "" },
+      { kind: "อะไรก็ไม่รู้", text: "ถือเป็นย่อหน้า" },
+    ]),
+    [
+      { type: "paragraph", text: "เก็บ" },
+      { type: "image", mediaId: "ok1", alt: "" },
+      { type: "paragraph", text: "ถือเป็นย่อหน้า" },
+    ],
+  );
+});
+
+test("news admin: ภาพไม่มีคำบรรยาย = ยอมรับได้ (มติเจ้าของ: ไม่บังคับ)", () => {
+  const blocks = parseNewsEditorBlocks([{ kind: "image", mediaId: "m9", alt: "" }]);
+  assert.deepEqual(blocks, [{ type: "image", mediaId: "m9", alt: "" }]);
+  assert.equal(countEditorImages(newsBlocksToEditor(blocks)), 1);
 });

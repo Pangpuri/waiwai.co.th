@@ -8,7 +8,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath } from "@/lib/cache/refresh";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
-import { newsTextLosses, newsTextToBlocks } from "@/lib/news/editor-text";
+import { parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
 import {
   createNewsForAdmin,
   loadNewsForAdmin,
@@ -23,7 +23,7 @@ import {
  *
  * กติกาโปรเจกต์ที่ต้องถือ
  * - **ตรวจสิทธิ์ทุก action** (`requireAdminUser("content")`) — ตรวจฝั่งเซิร์ฟเวอร์เสมอ
- * - **ห้ามเชื่อข้อมูลจากเบราว์เซอร์**: เนื้อหาผ่าน `newsTextToBlocks()` (จำกัดจำนวน/ความยาวตามเพดานกลาง)
+ * - **ห้ามเชื่อข้อมูลจากเบราว์เซอร์**: เนื้อหาผ่าน `parseNewsEditorBlocks()` (จำกัดจำนวน/ความยาวตามเพดานกลาง)
  * - บันทึกแล้ว **ต้องบอกเว็บให้สร้างหน้าใหม่** ผ่าน `refreshPublicSite("page")`
  *   (นโยบายแคชอยู่ `lib/cache/plan.ts`) — ไม่งั้นกดบันทึกแล้วหน้าเว็บยังโชว์ของเก่าถึง 5 นาที
  * - ทุกการแก้เนื้อหาเขียน **audit log** (ใคร/ทำอะไร/กับข่าวไหน)
@@ -55,11 +55,20 @@ export async function saveNewsAction(_previous: NewsSaveState, formData: FormDat
   const titleTh = field(formData, "titleTh").trim();
   if (titleTh === "") return { status: "error", reason: "title", createdId: null };
 
-  const bodyText = field(formData, "body");
-  const body = newsTextToBlocks(bodyText);
-  /* เกินเพดานแล้วของถูกตัด ⇒ ไม่บันทึก (กันข้อมูลหายเงียบ ๆ) */
-  const losses = newsTextLosses(bodyText);
-  if (losses.droppedBlocks > 0 || losses.droppedImages > 0) {
+  /*
+    เนื้อหามาจาก **ตัวแก้แบบบล็อก** (การ์ด ข้อความ/ภาพ) ส่งมาเป็น JSON ในช่องซ่อน `bodyBlocks`
+    ⚠️ ห้ามเชื่อเบราว์เซอร์: `parseNewsEditorBlocks()` ตรวจชนิด/เพดาน/ต้องมีรหัสภาพ แล้วคืนบล็อกที่ปลอดภัย
+  */
+  const rawBodyBlocks = field(formData, "bodyBlocks").trim();
+  let parsedBlocks: unknown = [];
+  try {
+    parsedBlocks = JSON.parse(rawBodyBlocks === "" ? "[]" : rawBodyBlocks) as unknown;
+  } catch {
+    return { status: "error", reason: "body", createdId: null };
+  }
+  const body = parseNewsEditorBlocks(parsedBlocks);
+  /* ส่งมาไม่ว่างแต่แปลงได้ 0 บล็อก = รูปแบบผิด/มีแต่ของว่าง ⇒ ไม่บันทึก (กันข้อมูลหายเงียบ ๆ) */
+  if (body.length === 0 && parsedBlocks instanceof Array && parsedBlocks.length > 0) {
     return { status: "error", reason: "body", createdId: null };
   }
 

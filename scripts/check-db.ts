@@ -50,6 +50,7 @@ import {
 } from "@/lib/products/repository";
 import { newsIdOfSourceId, type NewsInput } from "@/lib/news/model";
 import { parseNewsBody } from "@/lib/news/body";
+import { newsBlocksToEditor, parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
 import { newsBlocksToText, newsTextToBlocks } from "@/lib/news/editor-text";
 import {
   adminNewsCounts,
@@ -1558,10 +1559,27 @@ async function checkAdminUsers(): Promise<void> {
       });
       assert.equal(solo.ok, true, "สร้างผู้ดูแลเดี่ยวต้องสำเร็จ");
       if (solo.ok) {
+        /*
+          ⚠️ ยึด **หลักจริง** ไม่เดาทิศทาง: ฐานข้อมูลจริงอาจมีบัญชีจาก env (`env-admin` — เกิดตอนเจ้าของล็อกอิน)
+          ⇒ สิ่งที่ต้องรับประกันคือ "หลังพยายามลบแล้ว ต้องยังเหลือผู้ดูแลอย่างน้อย 1 คน" (ห้ามเหลือศูนย์)
+          ส่วน "ลบได้หรือไม่" ขึ้นกับว่ามีบัญชีอื่นอยู่จริงหรือเปล่า — วัดด้วยค่าจริง ไม่ assume
+        */
+        const otherAdmins = await countActiveAdmins(solo.user.id);
+        const delResult = await deleteAdminUser({
+          id: solo.user.id,
+          actor: CHECK_ACTOR,
+          actorId: "check-db-other",
+          confirmEmail: solo.user.email,
+        });
+        const remainingAdmins = await countActiveAdmins();
+        assert.ok(
+          remainingAdmins > 0,
+          `ต้องเหลือผู้ดูแลอย่างน้อย 1 คนหลังพยายามลบ (เหลือ ${String(remainingAdmins)} · คนอื่นก่อนลบ ${String(otherAdmins)} · ผลลบ ${String(delResult.ok)})`,
+        );
         assert.equal(
-          (await deleteAdminUser({ id: solo.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: solo.user.email })).ok,
-          false,
-          "ห้ามลบผู้ดูแลคนสุดท้าย",
+          delResult.ok,
+          otherAdmins > 0,
+          otherAdmins > 0 ? "มีผู้ดูแลคนอื่นที่ยังใช้งานได้ ⇒ ต้องลบได้" : "เป็นผู้ดูแลคนสุดท้าย ⇒ ต้องถูกลบปฏิเสธ",
         );
 
         /* มีผู้ดูแลคนที่สองที่ยังใช้งานได้ ⇒ ลบได้ (ด่านไม่บล็อกเกินจำเป็น) */
@@ -2206,7 +2224,13 @@ async function checkNewsEditorRoundTrip(): Promise<void> {
     const original = parseNewsBody(row.body);
     const text = newsBlocksToText(original);
     const back = newsTextToBlocks(text);
-    if (JSON.stringify(back) !== JSON.stringify(original)) {
+    /* รอบที่ 125: ตัวแก้แบบบล็อกส่ง JSON มา ⇒ ตรวจเส้นทางนั้นด้วย (การ์ด ข้อความ/ภาพ เรียงตามเดิม) */
+    const editor = newsBlocksToEditor(original);
+    const editorJson = editor.map((item) =>
+      item.kind === "image" ? { kind: "image", mediaId: item.mediaId, alt: item.alt } : { kind: item.kind, text: item.text },
+    );
+    const backFromEditor = parseNewsEditorBlocks(JSON.parse(JSON.stringify(editorJson)) as unknown);
+    if (JSON.stringify(back) !== JSON.stringify(original) || JSON.stringify(backFromEditor) !== JSON.stringify(original)) {
       broken.push(row.id);
     }
   }

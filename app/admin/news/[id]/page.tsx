@@ -5,7 +5,6 @@ import { NewsEditorForm, type NewsEditorLibraryItem } from "@/features/admin/ui/
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
-import { newsBlocksToText } from "@/lib/news/editor-text";
 import { loadNewsForAdmin } from "@/lib/news/repository";
 
 /**
@@ -60,7 +59,7 @@ export default async function AdminNewsEditorPage({
           coverPath={existing?.coverPath ?? ""}
           publishedLocal={existing?.publishedLocal ?? ""}
           status={existing?.status ?? "draft"}
-          bodyText={existing === null ? "" : newsBlocksToText(existing.body)}
+          initialBody={existing?.body ?? []}
           library={library}
           trashed={existing?.trashed ?? false}
         />
