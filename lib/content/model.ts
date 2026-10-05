@@ -126,50 +126,6 @@ const PRODUCTS: SectionSpec = {
   ],
 };
 
-const BRAND: SectionSpec = {
-  key: "brand",
-  label: "เรื่องราวแบรนด์",
-  fields: [
-    sectionField("eyebrow", "ข้อความเล็กเหนือหัวข้อ", 40),
-    sectionField("title", "หัวข้อส่วน", 70),
-    sectionField("body", "เนื้อความ", 400),
-    sectionField("bodySecondary", "เนื้อความต่อ", 300),
-    sectionField("ctaLabel", "ป้ายปุ่ม", 30),
-  ],
-  items: [
-    {
-      key: "stats",
-      label: "ตัวเลขสถิติ",
-      maxItems: 6,
-      fields: [
-        itemField("value", "ตัวเลข/ค่า", 12, { localized: false }),
-        itemField("label", "คำอธิบายตัวเลข", 40),
-      ],
-    },
-  ],
-};
-
-const SUSTAINABILITY: SectionSpec = {
-  key: "sustainability",
-  label: "ความยั่งยืน",
-  fields: [
-    sectionField("eyebrow", "ข้อความเล็กเหนือหัวข้อ", 40),
-    sectionField("title", "หัวข้อส่วน", 70),
-    sectionField("body", "คำโปรย", 400),
-  ],
-  items: [
-    {
-      key: "points",
-      label: "หัวข้อย่อยความยั่งยืน",
-      maxItems: 8,
-      fields: [
-        itemField("title", "หัวข้อย่อย", 60),
-        itemField("description", "คำอธิบาย", 200),
-      ],
-    },
-  ],
-};
-
 const RECIPES: SectionSpec = {
   key: "recipes",
   label: "เมนูอาหาร (หน้าแรก)",
@@ -269,8 +225,6 @@ const SEO: SectionSpec = {
 export const HOME_SECTIONS: readonly SectionSpec[] = [
   HERO,
   PRODUCTS,
-  BRAND,
-  SUSTAINABILITY,
   RECIPES,
   NEWS,
   WHERE_TO_BUY,

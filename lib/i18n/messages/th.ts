@@ -1,5 +1,5 @@
 import { a11y, actions, cookie, footer, lang, meta, mourning, nav, notFound, theme, topbar } from "./areas/th/core.ts";
-import { brand, hero, news, newsletter, products, recipes, sustainability, whereToBuy } from "./areas/th/home.ts";
+import { hero, news, newsletter, products, recipes, whereToBuy } from "./areas/th/home.ts";
 import { about } from "./areas/th/about.ts";
 import { productsPage } from "./areas/th/catalog.ts";
 import { newsPage, recipesPage } from "./areas/th/contentPages.ts";
@@ -52,8 +52,6 @@ export const th = {
   newsPage,
   careersPage,
   contactPage,
-  brand,
-  sustainability,
   recipes,
   news,
   whereToBuy,

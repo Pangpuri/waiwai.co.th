@@ -1,4 +1,4 @@
-import { NEWS_ENTRIES, BRAND_STAT_ORDER, RECIPE_ORDER, SUSTAINABILITY_POINT_ORDER } from "@/features/home/content";
+import { NEWS_ENTRIES, RECIPE_ORDER } from "@/features/home/content";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { HERO_SLIDES } from "@/features/home/slides";
@@ -112,44 +112,6 @@ const products: SectionContent = {
   items: { categories: productCategories },
 };
 
-/* ── เรื่องราวแบรนด์ ────────────────────────────────────────────────── */
-
-const brandStats: readonly ItemContent[] = BRAND_STAT_ORDER.map((id, index) =>
-  item(index + 1, {
-    value: notLocalized(th.brand.stats[id].value),
-    label: text(th.brand.stats[id].label, en.brand.stats[id].label),
-  }),
-);
-
-const brand: SectionContent = {
-  fields: {
-    eyebrow: text(th.brand.eyebrow, en.brand.eyebrow),
-    title: text(th.brand.title, en.brand.title),
-    body: text(th.brand.body, en.brand.body),
-    bodySecondary: text(th.brand.bodySecondary, en.brand.bodySecondary),
-    ctaLabel: text(th.brand.ctaLabel, en.brand.ctaLabel),
-  },
-  items: { stats: brandStats },
-};
-
-/* ── ความยั่งยืน ────────────────────────────────────────────────────── */
-
-const sustainabilityPoints: readonly ItemContent[] = SUSTAINABILITY_POINT_ORDER.map((id, index) =>
-  item(index + 1, {
-    title: text(th.sustainability.points[id].title, en.sustainability.points[id].title),
-    description: text(th.sustainability.points[id].description, en.sustainability.points[id].description),
-  }),
-);
-
-const sustainability: SectionContent = {
-  fields: {
-    eyebrow: text(th.sustainability.eyebrow, en.sustainability.eyebrow),
-    title: text(th.sustainability.title, en.sustainability.title),
-    body: text(th.sustainability.body, en.sustainability.body),
-  },
-  items: { points: sustainabilityPoints },
-};
-
 /* ── เมนูอาหาร (หน้าแรก) ─────────────────────────────────────────────── */
 
 const recipeCards: readonly ItemContent[] = RECIPE_ORDER.map((id, index) =>
@@ -239,8 +201,6 @@ export const HOME_SEED: PageContent = {
   sections: {
     hero,
     products,
-    brand,
-    sustainability,
     recipes,
     news,
     whereToBuy,

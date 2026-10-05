@@ -20,26 +20,6 @@ import type { Messages } from "@/lib/i18n/messages/th";
 
 export type RecipeId = keyof Messages["recipes"]["items"];
 export type NewsId = keyof Messages["news"]["items"];
-export type SustainabilityPointId = keyof Messages["sustainability"]["points"];
-export type BrandStatId = keyof Messages["brand"]["stats"];
-
-/* ── ตัวเลขของแบรนด์ ─────────────────────────────────────── */
-
-export const BRAND_STAT_ORDER: readonly BrandStatId[] = [
-  "years",
-  "products",
-  "quality",
-  "reach",
-];
-
-/* ── ความยั่งยืน ──────────────────────────────────────────── */
-
-export const SUSTAINABILITY_POINT_ORDER: readonly SustainabilityPointId[] = [
-  "packaging",
-  "energy",
-  "people",
-];
-
 /* ── เมนูอาหาร (ทางถอยเมื่อไม่มีฐานข้อมูล) ────────────────── */
 
 export const RECIPE_ORDER: readonly RecipeId[] = [

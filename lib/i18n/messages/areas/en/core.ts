@@ -83,17 +83,13 @@ export const footer = {
       about: "About Wai Wai",
       executives: "Management team",
       certifications: "Certifications",
-      sustainability: "Sustainability",
       careers: "Careers",
       recipes: "Recipes",
       news: "News & activities",
       allProducts: "All products",
-      whereToBuy: "Where to buy",
       contact: "Contact us",
       faq: "FAQ",
       privacy: "Privacy policy",
-      cookies: "Cookie policy",
-      terms: "Terms of use",
     },
 };
 

@@ -69,6 +69,29 @@ test("links: ทุก path ในท้ายเว็บ (ค่าเริ�
   }
 });
 
+/*
+  รอบที่ 111 (เจ้าของสั่ง): เมนู/ท้ายเว็บ **ห้ามลิงก์ไปหน้าที่เป็น "กำลังจัดทำ"**
+  เหตุผล: หน้าเหล่านั้นยังไม่มีเนื้อหาจริง ⇒ ผู้ใช้กดแล้วเจอทางตัน (เจ้าของเลือก "เอาลิงก์ออกไปก่อน")
+  · หน้ายังเข้าถึงได้จากที่จำเป็น (เช่น นโยบายคุกกี้ เข้าจากแถบแจ้งคุกกี้) — เทสต์นี้คุมแค่ "เมนู/ท้ายเว็บ"
+  · พอมีเนื้อหาจริง: เอาชื่อออกจาก PENDING_PAGE_IDS แล้วใส่ลิงก์กลับได้ตามปกติ
+*/
+test("links: เมนู/ท้ายเว็บ ต้องไม่ลิงก์ไปหน้า 'กำลังจัดทำ'", () => {
+  const pendingPaths = new Set<string>(PENDING_PAGE_IDS.map((id) => pendingPagePath(id)));
+
+  for (const item of [...PRIMARY_NAV, HEADER_CTA]) {
+    assert.ok(!pendingPaths.has(item.path), `เมนู "${item.id}" ลิงก์ไป ${item.path} ซึ่งยังเป็นหน้า "กำลังจัดทำ"`);
+  }
+
+  for (const column of FOOTER_COLUMNS) {
+    for (const link of column.links) {
+      assert.ok(
+        !pendingPaths.has(link.path),
+        `ท้ายเว็บ คอลัมน์ "${column.id}" ลิงก์ "${link.labelKey}" ไป ${link.path} ซึ่งยังเป็นหน้า "กำลังจัดทำ"`,
+      );
+    }
+  }
+});
+
 test("links: หน้าที่เคยเสียทั้ง 4 มี route จริง และอยู่ในรายการกลาง", () => {
   assert.deepEqual([...PENDING_PAGE_IDS], ["sustainability", "whereToBuy", "cookiePolicy", "terms"]);
 

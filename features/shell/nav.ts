@@ -146,7 +146,15 @@ export function activeNavId(
   return bestId;
 }
 
-/* ── เมนูส่วนท้าย ─────────────────────────────────────────── */
+/*
+  ── เมนูส่วนท้าย ───────────────────────────────────────────
+
+  ⚠️ รอบที่ 111 (เจ้าของสั่ง): **ตัด 4 ลิงก์ที่พาไปหน้าที่เป็น "กำลังจัดทำ" ออกก่อน**
+  (`/sustainability` · `/where-to-buy` · `/cookie-policy` · `/terms`)
+  · หน้าปลายทาง (PENDING_PAGE_IDS) **ยังอยู่** — ไม่ลบ route เพื่อไม่กระทบหน้าอื่น และพร้อมใส่ลิงก์กลับเมื่อมีเนื้อหาจริง
+  · นโยบายคุกกี้ยังเข้าถึงได้จาก **แถบแจ้งคุกกี้** (เป็นหน้าที่จำเป็นต่อการใช้งาน ไม่ใช่ลิงก์ในเมนู)
+  · พอได้เนื้อหาจริงของหน้าไหน ⇒ ใส่ลิงก์กลับเข้าคอลัมน์ที่ถูกต้อง + เอาชื่อออกจาก PENDING_PAGE_IDS
+*/
 
 type FooterColumnTitleKey = "companyColumn" | "productsColumn" | "supportColumn";
 
@@ -169,7 +177,6 @@ export const FOOTER_COLUMNS: readonly FooterColumnDefinition[] = [
       { labelKey: "about", path: "/about" },
       { labelKey: "executives", path: "/about/executives" },
       { labelKey: "certifications", path: "/about/certifications" },
-      { labelKey: "sustainability", path: "/sustainability" },
       { labelKey: "careers", path: "/careers" },
     ],
   },
@@ -179,7 +186,6 @@ export const FOOTER_COLUMNS: readonly FooterColumnDefinition[] = [
     links: [
       { labelKey: "allProducts", path: "/products" },
       { labelKey: "recipes", path: "/recipes" },
-      { labelKey: "whereToBuy", path: "/where-to-buy" },
       { labelKey: "news", path: "/news" },
     ],
   },
@@ -190,8 +196,6 @@ export const FOOTER_COLUMNS: readonly FooterColumnDefinition[] = [
       { labelKey: "contact", path: "/contact" },
       { labelKey: "faq", path: "/contact" },
       { labelKey: "privacy", path: "/privacy" },
-      { labelKey: "cookies", path: "/cookie-policy" },
-      { labelKey: "terms", path: "/terms" },
     ],
   },
 ];

@@ -102,7 +102,8 @@ test("validate: ฟิลด์ที่ตั้ง required=false เว้น
 
 test("validate: EN หายในฟิลด์ระดับส่วน/หน้า = error", () => {
   const content = clone();
-  section(content, "brand").fields.bodySecondary = { th: "ไทย", en: "" };
+  /* รอบที่ 111: section "brand" ถูกลบออกจากสคีมา ⇒ ใช้ "products" (ฟิลด์ระดับส่วน) ทดสอบแทน */
+  section(content, "products").fields.title = { th: "ไทย", en: "" };
   assert.ok(errorCodes(content).includes("missing-en"));
 });
 
@@ -224,10 +225,11 @@ test("validate: ลิงก์ที่ไม่มี / หรือ https:// 
 
 test("validate: ข้อความยาวเกินกำหนด = error", () => {
   const content = clone();
-  const stat = first(section(content, "brand").items.stats ?? []);
-  const value = stat.fields.value;
+  /* รอบที่ 111: กลุ่ม "brand.stats" ถูกลบ ⇒ ใช้ "products.categories.name" (จำกัด 60 ตัวอักษร) */
+  const category = first(section(content, "products").items.categories ?? []);
+  const value = category.fields.name;
   assert.ok(value);
-  value.th = "9".repeat(20);
+  value.th = "9".repeat(200);
   assert.ok(errorCodes(content).includes("too-long"));
 });
 

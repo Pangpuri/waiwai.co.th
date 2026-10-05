@@ -15,8 +15,6 @@ import type { ItemContent } from "@/lib/content/types";
 const PAGE_ORDER: readonly string[] = [
   "hero",
   "products",
-  "brand",
-  "sustainability",
   "recipes",
   "news",
   "whereToBuy",
@@ -26,7 +24,11 @@ const PAGE_ORDER: readonly string[] = [
 
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
 
-test("model: หน้าแรกมี 9 section เรียงตามลำดับที่แสดงจริง", () => {
+/*
+  รอบที่ 111: หน้าแรกเหลือ 7 section — เจ้าของสั่งถอด "เรื่องราวของเรา" + "ความยั่งยืน"
+  (ลบทั้ง section ในสคีมา ไม่ใช่แค่ซ่อนบนหน้า) ⇒ อัปเดตทั้งลิสต์และจำนวนในชื่อเทสต์
+*/
+test("model: หน้าแรกมี 7 section เรียงตามลำดับที่แสดงจริง", () => {
   assert.equal(HOME_PAGE_SPEC.page, "home");
   assert.deepEqual(
     HOME_SECTIONS.map((section) => section.key),

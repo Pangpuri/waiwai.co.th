@@ -83,17 +83,13 @@ export const footer = {
       about: "เกี่ยวกับไวไว",
       executives: "คณะผู้บริหาร",
       certifications: "ใบรับรองมาตรฐาน",
-      sustainability: "ความยั่งยืน",
       careers: "ร่วมงานกับไวไว",
       recipes: "เมนูอาหาร",
       news: "ข่าวสาร & กิจกรรม",
       allProducts: "ผลิตภัณฑ์ทั้งหมด",
-      whereToBuy: "ที่ซื้อสินค้า",
       contact: "ติดต่อเรา",
       faq: "คำถามที่พบบ่อย",
       privacy: "นโยบายความเป็นส่วนตัว",
-      cookies: "นโยบายคุกกี้",
-      terms: "เงื่อนไขการใช้งาน",
     },
 };
 

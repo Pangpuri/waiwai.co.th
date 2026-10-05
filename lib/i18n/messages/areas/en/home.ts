@@ -79,32 +79,6 @@ export const products = {
     },
 };
 
-export const brand = {
-    eyebrow: "Our story",
-    title: "From a small factory to tables across the country",
-    body: "Wai Wai started with a simple intention: give Thai families a meal that is genuinely tasty and still affordable. We choose our ingredients carefully, control every step of production, and keep developing for Thai consumers.",
-    bodySecondary:
-      "That principle still holds today — food that is accessible, safe, and consistent in every packet you open.",
-    ctaLabel: "About the company",
-    stats: {
-      years: { value: "XX", label: "years beside Thai kitchens" },
-      products: { value: "XX", label: "flavours in the portfolio" },
-      quality: { value: "XX", label: "checked before it ships" },
-      reach: { value: "XX", label: "distributed through our partners" },
-    },
-};
-
-export const sustainability = {
-    eyebrow: "Sustainability",
-    title: "Doing business without leaving the impact behind",
-    body: "We focus on using resources well, cutting waste in the production line, and looking after the people inside and around our organisation.",
-    points: {
-      packaging: { title: "Packaging", description: "Test data" },
-      energy: { title: "Energy", description: "Test data" },
-      people: { title: "People & community", description: "Test data" },
-    },
-};
-
 export const recipes = {
     eyebrow: "Recipes",
     title: "What to cook with Wai Wai",

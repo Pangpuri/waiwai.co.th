@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
-import { BrandStory } from "@/features/home/ui/brand-story";
 import { Hero } from "@/features/home/ui/hero";
 import { NewsList } from "@/features/home/ui/news-list";
 import { Newsletter } from "@/features/home/ui/newsletter";
 import { ProductsShowcase } from "@/features/home/ui/products-showcase";
 import { Recipes } from "@/features/home/ui/recipes";
-import { Sustainability } from "@/features/home/ui/sustainability";
 import { WhereToBuy } from "@/features/home/ui/where-to-buy";
 import {
   homeCategoryCards,
@@ -110,8 +108,6 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
         highlights={highlights}
         countLabel={(count) => fillTemplate(messages.products.countLabel, { count })}
       />
-      <BrandStory locale={lang} messages={messages} />
-      <Sustainability messages={messages} />
       <Recipes locale={lang} messages={messages} items={recipes} />
       <NewsList locale={lang} messages={messages} items={news} />
       <WhereToBuy locale={lang} messages={messages} />

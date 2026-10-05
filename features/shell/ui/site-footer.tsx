@@ -167,12 +167,6 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
             >
               {view.labels.privacy}
             </Link>
-            <Link
-              href={view.cookiesHref}
-              className="text-xs text-fg-muted transition-colors hover:text-accent"
-            >
-              {view.labels.cookies}
-            </Link>
             <LangSwitch current={locale} variant="footer" />
           </div>
         </div>
