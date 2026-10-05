@@ -212,3 +212,19 @@ test("news admin: พรีวิวต้องใช้ตัวเรนเ�
   );
   assert.ok(form.includes("<NewsPreview"), "หน้าจอแก้ข่าวต้องแสดงพรีวิว");
 });
+
+test("news admin: ตัวแก้เนื้อหาต้องไม่มี <form> (กัน <form> ซ้อน <form> ⇒ hydration error)", () => {
+  /* เคสจริง (รอบที่ 129): กล่องอัปโหลดเคยเป็น <form> ซ้อนอยู่ในฟอร์มบันทึกข่าว
+     ⇒ React ขึ้น "In HTML, <form> cannot be a descendant of <form>" และเบราว์เซอร์ตัดฟอร์มชั้นในทิ้ง */
+  const blocks = readFileSync("features/admin/ui/news-body-blocks.tsx", "utf8");
+  const form = readFileSync("features/admin/ui/news-editor-form.tsx", "utf8");
+
+  /*
+    นับ "แท็กฟอร์มจริง" = `<form` ตามด้วยช่องว่างหรือขึ้นบรรทัดใหม่
+    (ในไฟล์มีคอมเมนต์ที่พูดถึง `<form>` ได้ จึงต้องไม่ใช้การนับแบบกว้าง)
+  */
+  const formTags = (value: string): number => (value.match(/<form[ \n]/g) ?? []).length;
+  assert.equal(formTags(blocks), 0, "ตัวแก้เนื้อหาต้องไม่มีแท็ก <form> เลย");
+  assert.equal(formTags(form), 1, "หน้าจอแก้ข่าวมีแท็ก <form> ได้เพียงตัวเดียว (ฟอร์มบันทึก)");
+  assert.ok(blocks.includes("uploadNewsImageAction("), "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>)");
+});

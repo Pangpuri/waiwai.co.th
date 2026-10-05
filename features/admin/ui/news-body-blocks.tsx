@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { uploadNewsImageAction } from "@/app/admin/news/actions";
 import { INITIAL_NEWS_UPLOAD_STATE } from "@/features/admin/news-state";
@@ -46,7 +46,30 @@ export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsB
   const [items, setItems] = useState<readonly NewsEditorBlock[]>(initial);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [counter, setCounter] = useState(0);
-  const [uploadState, uploadAction, uploading] = useActionState(uploadNewsImageAction, INITIAL_NEWS_UPLOAD_STATE);
+  const [uploadState, setUploadState] = useState(INITIAL_NEWS_UPLOAD_STATE);
+  const [uploading, setUploading] = useState(false);
+  const uploadBoxRef = useRef<HTMLDivElement | null>(null);
+
+  /** ส่งไฟล์ที่เลือก (ผ่านการย่อภาพของ ImageFileInput แล้ว) ไปที่ Server Action เอง */
+  async function submitUpload(): Promise<void> {
+    const input = uploadBoxRef.current?.querySelector<HTMLInputElement>('input[type="file"]');
+    const file = input?.files?.item(0) ?? null;
+    if (file === null) {
+      setUploadState({ status: "invalid", path: "", reason: "missing" });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      setUploadState(await uploadNewsImageAction(INITIAL_NEWS_UPLOAD_STATE, formData));
+    } catch {
+      setUploadState({ status: "failed", path: "", reason: "failed" });
+    } finally {
+      setUploading(false);
+    }
+  }
 
   /*
     อัปโหลดเสร็จ = ใส่การ์ดภาพให้ทันที (ไม่ต้องรีเฟรชและไม่เสียสิ่งที่พิมพ์ไว้)
@@ -65,6 +88,8 @@ export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsB
     /* อัปเดต state ตรงในนี้ (ไม่เรียก addImage) ⇒ effect ไม่ต้องพึ่งฟังก์ชันที่สร้างใหม่ทุกเรนเดอร์ */
     setItems((current) => [...current, { id: `upload-${String(Date.now())}`, kind: "image", mediaId, alt: "" }]);
     setPickerFor(null);
+    /* เคลียร์สถานะทันที กัน effect ใส่การ์ดซ้ำในการเรนเดอร์ถัดไป */
+    setUploadState(INITIAL_NEWS_UPLOAD_STATE);
   }, [uploadState]);
 
   function newId(): string {
@@ -238,14 +263,19 @@ export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsB
 
       <div className="border-line rounded-xl border border-dashed p-3">
         <p className="text-fg-muted mb-2 text-xs font-semibold">{m.newsAdminFromComputer}</p>
-        <form action={uploadAction} className="flex flex-wrap items-end gap-2">
+        {/*
+          ⚠️ ห้ามใช้ <form> ที่นี่ (รอบที่ 129): ตัวแก้ข่าวทั้งก้อนอยู่ใน <form> ของฟอร์มบันทึกอยู่แล้ว
+          ⇒ ซ้อน <form> ทำให้ React ขึ้น hydration error (และเบราว์เซอร์ตัดฟอร์มชั้นในทิ้ง)
+          ⇒ ใช้ปุ่มธรรมดา + เรียก Server Action เอง (ผลลัพธ์ยังกลับมาใส่การ์ดให้เหมือนเดิม)
+        */}
+        <div ref={uploadBoxRef} className="flex flex-wrap items-end gap-2">
           <div className="min-w-56 flex-1">
             <ImageFileInput className={FIELD_CLASS} label={m.newsAdminUpload} hint={m.newsAdminUploadHint} />
           </div>
-          <button type="submit" className={BUTTON_CLASS} disabled={uploading}>
+          <button type="button" onClick={submitUpload} className={BUTTON_CLASS} disabled={uploading}>
             {uploading ? m.newsAdminUploading : m.newsAdminUpload}
           </button>
-        </form>
+        </div>
         {uploadState.status === "invalid" || uploadState.status === "failed" ? (
           <p className="text-danger mt-2 text-xs">{m.newsAdminUploadFailed}</p>
         ) : null}
