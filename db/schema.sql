@@ -309,5 +309,59 @@ create unique index if not exists chrome_preset_kind_name_key on chrome_preset (
 create index if not exists chrome_preset_alive_idx on chrome_preset (kind, created_at desc) where deleted_at is null;
 create index if not exists chrome_preset_trash_idx on chrome_preset (deleted_at) where deleted_at is not null;
 
+-- ── สินค้าที่นำเข้าจากเว็บเดิม (S4 · migration 0016) ───────────────────────────
+-- ที่มา: เจ้าของสั่ง 2026-10-05 ให้นำเข้าข้อมูลสินค้าจาก waiwai.co.th (เว็บเดิม) ลงฐานข้อมูล แยกตามหมวด
+-- · `product_category` เก็บ **เฉพาะเนื้อหาที่นำเข้า** (คำอธิบาย/ภาพ) — **ชื่อหมวดอยู่ในโค้ด**
+--   `features/products/catalog.ts` (เจ้าของยืนยันแล้ว · กันชื่อหลุดจากกัน 2 ที่)
+-- · `product.id` = `p<source_id>` ⇒ นำเข้าซ้ำได้แบบ idempotent (`npm run products:import`)
+-- · รูปเก็บในตาราง `media` (มติ D11) · ที่นี่เก็บแค่ id ของภาพ (มติ D9) · `media.sha256` = ลายนิ้วมือไฟล์ (dedupe ตอนนำเข้า)
+-- · `product_category.image_media_id` / `product.image_media_id` = on delete set null (ลบภาพในถังขยะแล้วสินค้าไม่หาย)
+alter table media add column if not exists sha256 text;
+create index if not exists media_sha256_idx on media (sha256);
+
+create table if not exists product_category (
+  id             text        primary key,
+  source_id      text,
+  description_th text        not null default '',
+  description_en text        not null default '',
+  image_media_id text        references media (id) on delete set null,
+  updated_at     timestamptz not null default now(),
+  updated_by     text
+);
+
+create table if not exists product (
+  id             text        primary key,
+  category_id    text        not null references product_category (id) on delete cascade,
+  source_id      text        not null,
+  source_url     text        not null default '',
+  name_th        text        not null,
+  name_en        text        not null default '',
+  group_th       text        not null default '',
+  group_en       text        not null default '',
+  tagline_th     text        not null default '',
+  tagline_en     text        not null default '',
+  details_th     text        not null default '',
+  allergens_th   text        not null default '',
+  net_weight_th  text        not null default '',
+  fda_number     text        not null default '',
+  packaging_th   text        not null default '',
+  image_media_id text        references media (id) on delete set null,
+  sort_order     integer     not null default 0,
+  updated_at     timestamptz not null default now(),
+  updated_by     text
+);
+
+create index if not exists product_category_order_idx on product (category_id, sort_order, id);
+create index if not exists product_source_idx on product (source_id);
+
+create table if not exists product_ingredient (
+  product_id   text    not null references product (id) on delete cascade,
+  sort_order   integer not null,
+  name_th      text    not null,
+  name_en      text    not null default '',
+  percent_text text    not null default '',
+  primary key (product_id, sort_order)
+);
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

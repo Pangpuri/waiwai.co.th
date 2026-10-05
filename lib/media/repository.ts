@@ -46,10 +46,12 @@ export async function insertMedia(input: {
   readonly altTh: string;
   readonly altEn: string;
   readonly createdBy: string;
+  /** ลายนิ้วมือไฟล์ (S3 ส่วนที่ 3 · รอบที่ 103) — ใช้ตอนนำเข้าจากเว็บเดิมเพื่อไม่เก็บรูปซ้ำ */
+  readonly sha256?: string | null;
 }): Promise<void> {
   await getPool().query(
-    `insert into media (id, filename, mime, size_bytes, width, height, data, alt_th, alt_en, created_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `insert into media (id, filename, mime, size_bytes, width, height, data, alt_th, alt_en, created_by, sha256)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       input.id,
       input.filename,
@@ -61,8 +63,25 @@ export async function insertMedia(input: {
       input.altTh,
       input.altEn,
       input.createdBy,
+      input.sha256 ?? null,
     ],
   );
+}
+
+/**
+ * หา id ของภาพจากลายนิ้วมือไฟล์ (S3 ส่วนที่ 3 · รอบที่ 103)
+ * - ใช้ตอนนำเข้าจากเว็บเดิม: รูปเดิมที่เคยโหลดแล้วไม่ต้องโหลด/เก็บซ้ำ
+ * - คืน null ถ้าไม่พบ/ยังไม่มีคอลัมน์ (ฐานข้อมูลเก่าที่ยังไม่ migrate)
+ */
+export async function findMediaIdBySha256(sha256: string): Promise<string | null> {
+  const digest = sha256.trim();
+  if (digest === "") return null;
+  try {
+    const result = await getPool().query<{ id: string }>("select id from media where sha256 = $1 order by created_at limit 1", [digest]);
+    return result.rows[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getMediaBinary(id: string): Promise<MediaBinary | null> {
@@ -164,7 +183,7 @@ export async function updateMediaAlt(id: string, altTh: string, altEn: string): 
 
 /* ── คลังภาพ (X1.2) ───────────────────────────────────────────────────────── */
 
-export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset";
+export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset" | "product";
 
 export type MediaUsage = {
   /**
@@ -173,6 +192,7 @@ export type MediaUsage = {
    * - `og-image` / `favicon` — คอลัมน์ SEO ของหน้า / ตั้งค่าส่วนกลาง
    * - `block-preset` — **พรีเซ็ตบล็อก** (`block_preset`) ที่อ้างภาพนี้ (X2.4 ปิดจุดรั่ว รอบที่ 81)
    * - `chrome-preset` — **พรีเซ็ตของส่วนกลาง** (`chrome_preset`) เช่นโลโก้ในพรีเซ็ตแถบเมนู
+   * - `product` — **สินค้าที่นำเข้าจากเว็บเดิม** (`product` / `product_category` · S3 ส่วนที่ 3 รอบที่ 103)
    */
   readonly kind: MediaUsageKind;
   /** คีย์ที่ใช้เรียกในระบบ เช่น `home:draft` · `preset:งานปีใหม่` */
@@ -233,6 +253,26 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
       target: `chrome-preset:${row.name}`,
       detail: row.in_trash ? `${row.kind} · trash` : row.kind,
     });
+  }
+
+  /*
+    สินค้าที่นำเข้าจากเว็บเดิม (S3 ส่วนที่ 3 · รอบที่ 103) — ภาพของสินค้า/หมวดอยู่ในตาราง `product`/`product_category`
+    ⚠️ ถ้าไม่ตรวจตรงนี้ ผู้ดูแลจะกดลบภาพที่สินค้ายังใช้อยู่ได้ (สินค้าจะเหลือแต่ชื่อ ไม่มีรูป)
+  */
+  const productRows = await getPool().query<{ id: string; name_th: string }>(
+    `select id, name_th from product where image_media_id = $1 order by sort_order, id`,
+    [id],
+  );
+  for (const row of productRows.rows) {
+    usage.push({ kind: "product", target: `product:${row.id}`, detail: row.name_th });
+  }
+
+  const categoryRows = await getPool().query<{ id: string }>(
+    `select id from product_category where image_media_id = $1 order by id`,
+    [id],
+  );
+  for (const row of categoryRows.rows) {
+    usage.push({ kind: "product", target: `category:${row.id}`, detail: "category-image" });
   }
 
   const ogRows = await getPool().query<{ id: string }>(`select id from page where og_image_path = $1`, [path]);

@@ -13,6 +13,7 @@ export const adminMedia = {
   mediaUsage: "ใช้ที่",
   mediaUsageBlockPreset: "พรีเซ็ตบล็อก",
   mediaUsageChromePreset: "พรีเซ็ตส่วนกลาง",
+  mediaUsageProduct: "สินค้า (นำเข้าจากเว็บเดิม)",
   mediaUsageSeo: "SEO (ภาพแชร์/ไอคอน)",
   mediaUnused: "ยังไม่ถูกใช้",
   mediaPath: "พาธสำหรับใช้",

@@ -58,4 +58,17 @@ export const productsPage = {
       body: "This page only demonstrates that the link from the products page works. The product detail content has not been written yet — it is waiting for information and approval from the marketing team.",
       back: "Back to products",
     },
+    /* Products in this category — imported from the old site (S4, round 103) */
+    dbListTitle: "Products in this category",
+    dbListCount: "{count} items",
+    dbDetails: "Product details",
+    dbIngredients: "Ingredients",
+    dbIngredientName: "Ingredient name (Thai)",
+    dbIngredientNameEn: "Ingredient name (English)",
+    dbIngredientPercent: "Amount",
+    dbAllergens: "Allergen information",
+    dbNetWeight: "Net weight",
+    dbFda: "FDA number",
+    dbPackaging: "Packaging",
+    dbNoImage: "No product image yet",
 };

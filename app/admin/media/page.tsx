@@ -38,6 +38,8 @@ function usageKindLabel(kind: MediaUsageKind, strings: Messages["admin"]): strin
       return strings.mediaUsageBlockPreset;
     case "chrome-preset":
       return strings.mediaUsageChromePreset;
+    case "product":
+      return strings.mediaUsageProduct;
   }
 }
 

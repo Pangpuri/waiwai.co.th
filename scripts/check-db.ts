@@ -31,8 +31,19 @@ import {
   insertMedia,
   listMedia,
   mediaStats,
+  newMediaId,
   searchMedia,
 } from "@/lib/media/repository";
+import type { ProductInput } from "@/lib/products/model";
+import {
+  countProductsByCategory,
+  deleteProduct,
+  deleteProductCategory,
+  listProductsByCategory,
+  replaceProductIngredients,
+  upsertProduct,
+  upsertProductCategory,
+} from "@/lib/products/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
@@ -237,6 +248,9 @@ async function main(): Promise<void> {
 
   /* 17) ตั้งเวลาเผยแพร่: ตั้งกำหนดในอดีต → ครบกำหนด → เผยแพร่ครั้งเดียว → ล้างกำหนด (X2.7 · รอบที่ 100) */
   await checkScheduledPublish();
+
+  /* 18) สินค้าจากเว็บเดิม: หมวด → สินค้า + ส่วนผสม → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ (S3 ส่วนที่ 3 · รอบที่ 103) */
+  await checkProductCatalog();
 
   await closePool();
 
@@ -1699,6 +1713,119 @@ async function checkScheduledPublish(): Promise<void> {
       "ต้องไม่เหลือประวัติทดสอบ (ไม่งั้นรอบถัดไปนับปน)",
     );
     assert.equal(await countWhere("audit_log where target = $1", [SCHEDULE_TEST_PAGE]), 0, "ต้องไม่เหลือร่องรอยทดสอบ");
+  }
+}
+
+/**
+ * 18) สินค้าที่นำเข้าจากเว็บเดิม (S3 ส่วนที่ 3 · รอบที่ 103) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ว่าชั้นข้อมูลสินค้าครบวงจร: เขียนหมวด → เขียนสินค้า + ส่วนผสม → อ่านกลับ (ลำดับ/พาธภาพถูก)
+ * → นับต่อหมวด → **ภาพของสินค้าถูก `findMediaUsage` เห็น** (กันผู้ดูแลกดลบภาพที่สินค้ายังใช้)
+ * → เขียนซ้ำ/แทนที่ส่วนผสม = ผลเท่าเดิม (idempotent) → ลบแล้วต้องไม่เหลืออะไร
+ */
+const PRODUCT_CHECK_CATEGORY = "check-db-products";
+const PRODUCT_CHECK_ID = "p999999";
+const PRODUCT_CHECK_ACTOR = "check-db-products@example.invalid";
+
+async function checkProductCatalog(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const productInput: ProductInput = {
+    id: PRODUCT_CHECK_ID,
+    categoryId: PRODUCT_CHECK_CATEGORY,
+    sourceId: "999999",
+    sourceUrl: "/th/pages/999999-check",
+    nameTh: "สินค้าทดสอบ (ด่านตรวจ)",
+    nameEn: "Check-db product",
+    groupTh: "กลุ่มทดสอบ",
+    groupEn: "Check group",
+    taglineTh: "คำโปรยจากด่านตรวจ",
+    taglineEn: "",
+    detailsTh: "รายละเอียดจากด่านตรวจ",
+    allergensTh: "ไม่มี",
+    netWeightTh: "60 กรัม",
+    fdaNumber: "73-1-30323-2-0000",
+    packagingTh: "กล่อง 30 ซอง",
+    sortOrder: 3,
+  };
+
+  try {
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-product.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "สินค้าทดสอบ",
+      altEn: "Check product",
+      createdBy: PRODUCT_CHECK_ACTOR,
+    });
+
+    await upsertProductCategory(
+      { id: PRODUCT_CHECK_CATEGORY, sourceId: "999999", descriptionTh: "คำอธิบายหมวดทดสอบ", descriptionEn: "" },
+      PRODUCT_CHECK_ACTOR,
+      null,
+    );
+    await upsertProduct(productInput, PRODUCT_CHECK_ACTOR, mediaId);
+    await replaceProductIngredients(PRODUCT_CHECK_ID, [
+      { nameTh: "แป้งสาลี", nameEn: "Wheat Flour", percentText: "53.00%" },
+      { nameTh: "น้ำมันปาล์ม", nameEn: "Palm Oil", percentText: "16.00%" },
+    ]);
+
+    const items = await listProductsByCategory(PRODUCT_CHECK_CATEGORY);
+    assert.equal(items.length, 1, "ต้องอ่านสินค้าในหมวดได้");
+    const first = items[0];
+    assert.ok(first !== undefined, "ต้องมีสินค้า 1 รายการ");
+    assert.equal(first.id, PRODUCT_CHECK_ID);
+    assert.equal(first.imagePath, `/media/${mediaId}`, "ภาพต้องถูกส่งเป็นพาธ /media/<id> (มติ D9)");
+    assert.equal(first.imageWidth, 1, "ต้องอ่านขนาดภาพจากตาราง media ได้");
+    assert.equal(first.netWeightTh, "60 กรัม");
+    assert.deepEqual(
+      first.ingredients.map((entry) => entry.nameTh),
+      ["แป้งสาลี", "น้ำมันปาล์ม"],
+      "ส่วนผสมต้องเรียงตามที่บันทึก",
+    );
+
+    const counts = await countProductsByCategory();
+    assert.equal(counts[PRODUCT_CHECK_CATEGORY], 1, "นับสินค้าต่อหมวดได้");
+
+    const usage = await findMediaUsage(mediaId);
+    assert.ok(
+      usage.some((entry) => entry.kind === "product" && entry.target === `product:${PRODUCT_CHECK_ID}`),
+      "findMediaUsage ต้องเห็นภาพที่สินค้าใช้ (ไม่งั้นผู้ดูแลลบภาพที่ยังใช้ได้)",
+    );
+
+    /* เขียนซ้ำ = แถวเดิม (idempotent) · แทนที่ส่วนผสม = เหลือชุดใหม่เท่านั้น */
+    await upsertProduct(productInput, PRODUCT_CHECK_ACTOR, mediaId);
+    assert.equal(await countWhere("product where id = $1", [PRODUCT_CHECK_ID]), 1, "นำเข้าซ้ำต้องไม่สร้างแถวใหม่");
+    await replaceProductIngredients(PRODUCT_CHECK_ID, [{ nameTh: "เกลือ", nameEn: "Salt", percentText: "" }]);
+    const replaced = await listProductsByCategory(PRODUCT_CHECK_CATEGORY);
+    assert.deepEqual(
+      replaced[0]?.ingredients.map((entry) => entry.nameTh),
+      ["เกลือ"],
+      "แทนที่ส่วนผสมแล้วต้องเหลือชุดใหม่เท่านั้น",
+    );
+
+    done("สินค้าจากเว็บเดิม: หมวด → สินค้า + ส่วนผสม → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ", "พาธภาพ · ลำดับส่วนผสม · idempotent");
+  } finally {
+    await deleteProduct(PRODUCT_CHECK_ID);
+    assert.equal(
+      await countWhere("product_ingredient where product_id = $1", [PRODUCT_CHECK_ID]),
+      0,
+      "ส่วนผสมต้องถูกลบตามสินค้า (cascade)",
+    );
+    await deleteProductCategory(PRODUCT_CHECK_CATEGORY);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(await countWhere("product where category_id = $1", [PRODUCT_CHECK_CATEGORY]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+    assert.equal(await countWhere("product_category where id = $1", [PRODUCT_CHECK_CATEGORY]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
   }
 }
 
