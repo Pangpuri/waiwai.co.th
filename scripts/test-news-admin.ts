@@ -96,11 +96,11 @@ test("news admin: ฝั่งเว็บสาธารณะต้องก�
 test("news admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   /* 2 action ในไฟล์นี้ (บันทึก · ย้าย/กู้ถังขยะ) — นับแบบ >= เพราะมีการอ้างถึงในคอมเมนต์อธิบายกติกาด้วย */
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 2, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 3, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    2,
-    "ไฟล์นี้ควรมี 2 action เท่านั้น (ถ้าเพิ่ม ต้องตรวจสิทธิ์และมี audit ครบด้วย)",
+    3,
+    "ไฟล์นี้มี 3 action (บันทึก · ถังขยะ · อัปโหลดภาพ) เท่านั้น (ถ้าเพิ่ม ต้องตรวจสิทธิ์และมี audit ครบด้วย)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
@@ -159,4 +159,36 @@ test("news admin: ภาพไม่มีคำบรรยาย = ยอม�
   const blocks = parseNewsEditorBlocks([{ kind: "image", mediaId: "m9", alt: "" }]);
   assert.deepEqual(blocks, [{ type: "image", mediaId: "m9", alt: "" }]);
   assert.equal(countEditorImages(newsBlocksToEditor(blocks)), 1);
+});
+
+test("news admin: โทเคนภาพที่ค้างในข้อความเดิม ต้องกลายเป็นการ์ดภาพ (เคสจริง '5 บล็อก · 0 รูป')", () => {
+  /* ข่าวที่สร้างก่อนรอบ 125 มีโทเคนฝังในย่อหน้า ⇒ ตัวนับรูปใน DB ได้ 0 และคนใช้เห็นเป็นข้อความประหลาด */
+  const legacy = [
+    { type: "paragraph", text: "ย่อหน้าแรก" },
+    { type: "paragraph", text: "ก่อนภาพ [[img:m1|คำบรรยายภาพ]] หลังภาพ" },
+  ] as const;
+
+  const editor = newsBlocksToEditor(legacy);
+  assert.deepEqual(
+    editor.map((item) => (item.kind === "image" ? `image:${item.mediaId}` : `${item.kind}:${item.text}`)),
+    ["paragraph:ย่อหน้าแรก", "paragraph:ก่อนภาพ", "image:m1", "paragraph:หลังภาพ"],
+    "ต้องแยกโทเคนออกเป็นการ์ดภาพ และเก็บบรรทัดที่เหลือครบ",
+  );
+
+  /* พอบันทึก ต้องกลายเป็นบล็อกภาพจริง (นับรูปได้ 1) */
+  const saved = parseNewsEditorBlocks(
+    editor.map((item) =>
+      item.kind === "image" ? { kind: "image", mediaId: item.mediaId, alt: item.alt } : { kind: item.kind, text: item.text },
+    ),
+  );
+  assert.deepEqual(saved.map((block) => block.type), ["paragraph", "paragraph", "image", "paragraph"]);
+  assert.equal(countEditorImages(newsBlocksToEditor(saved)), 1);
+});
+
+test("news admin: อัปโหลดภาพจากเครื่อง — action ต้องตรวจสิทธิ์และใช้ท่อกลาง storeImageFile", () => {
+  assert.ok(actions.includes("uploadNewsImageAction"), "ต้องมี action อัปโหลดภาพในหน้าจอแก้ข่าว");
+  assert.ok(actions.includes("storeImageFile("), "ต้องใช้ท่ออัปโหลดกลาง (ย่อภาพ/ตรวจหัวไฟล์/เพดาน 5MB)");
+  const blocks = readFileSync("features/admin/ui/news-body-blocks.tsx", "utf8");
+  assert.ok(blocks.includes("ImageFileInput"), "ช่องอัปโหลดต้องใช้ ImageFileInput (ย่อภาพในเบราว์เซอร์ก่อนส่ง)");
+  assert.ok(blocks.includes("mediaIdFromPath"), "ต้องแปลงพาธ /media/<id> เป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9)");
 });

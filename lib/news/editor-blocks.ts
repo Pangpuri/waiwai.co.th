@@ -4,9 +4,10 @@ import {
   MAX_NEWS_TEXT_LENGTH,
   type NewsBlock,
 } from "@/lib/news/body";
+import { NEWS_IMAGE_TOKEN_PREFIX, parseNewsImageToken } from "@/lib/news/editor-text";
 
 /**
- * "บล็อกสำหรับตัวแก้ข่าว" (รอบที่ 125) — pure ล้วน (ทดสอบได้โดยไม่ต้องมี DB/React)
+ * "บล็อกสำหรับตัวแก้ข่าว" (รอบที่ 125–126) — pure ล้วน (ทดสอบได้โดยไม่ต้องมี DB/React)
  *
  * บริบท: เจ้าของทดลองใช้หลังบ้านแล้วบอกว่า **"ui ยังยากสำหรับคนไม่ได้สายเขียนเว็บ"**
  * (ไม่เห็นตัวอย่างภาพ · แทรกภาพผ่านชื่อไฟล์ · เห็นโทเคน `[[img:…]]`)
@@ -14,7 +15,9 @@ import {
  *   ซึ่งตรงกับข้อมูลจริงที่นำเข้ามา (ภาพแทรกอยู่ระหว่างข้อความ ⇒ ห้ามย้ายไปรวมท้ายข่าว)
  *
  * หน้าที่ของโมดูลนี้
- * 1. `newsBlocksToEditor()` — แปลงบล็อกจากฐานข้อมูล → รายการสำหรับวาดการ์ด (มี id ชั่วคราวไว้ใช้เป็น key)
+ * 1. `newsBlocksToEditor()` — แปลงบล็อกจากฐานข้อมูล → รายการสำหรับวาดการ์ด
+ *    · **แยกโทเคน `[[img:…]]` ที่ค้างอยู่ในข้อความเดิมออกเป็นการ์ดภาพ** (เคสจริง "5 บล็อก · 0 รูป")
+ *    · มี id ชั่วคราวไว้ใช้เป็น key ของ React (ไม่ถูกบันทึก)
  * 2. `parseNewsEditorBlocks()` — **ตรวจค่าที่รับจากเบราว์เซอร์** (ห้ามเชื่อ) แล้วคืนบล็อกที่ปลอดภัย
  *    · ต้องมี mediaId จริงสำหรับภาพ · ตัดความยาว/จำนวนตามเพดานกลาง · ทิ้งรายการที่ว่างเปล่า
  *    · ภาพที่ไม่มีคำบรรยาย = ปล่อยว่างได้ (มติเจ้าของ: "ไม่บังคับ — ใส่ก็ได้ เว้นก็ได้")
@@ -33,17 +36,49 @@ function nextEditorId(): string {
   return `blk${String(editorBlockCounter)}`;
 }
 
-/** บล็อกจากฐานข้อมูล → รายการสำหรับตัวแก้ */
+/**
+ * แยกโทเคน `[[img:<mediaId>|<alt>]]` ที่ **ค้างอยู่ในข้อความเดิม** ออกเป็นการ์ดภาพ
+ *
+ * ⚠️ เคสจริง (เจ้าของรายงาน "5 บล็อก · 0 รูป"): ข่าวที่สร้างด้วยตัวแก้รุ่นก่อนมีโทเคนฝังอยู่ในย่อหน้า
+ * ⇒ ตัวนับรูปในฐานข้อมูล (นับเฉพาะบล็อกชนิด image) ได้ 0 และคนใช้เห็นเป็นข้อความประหลาด
+ * การแยกตรงนี้ทำให้ **เปิดข่าวเดิมแล้วเห็นภาพเป็นการ์ดจริง** และพอสั่งบันทึกก็กลายเป็นบล็อกภาพถาวร
+ */
+function splitImageTokens(text: string, kind: "paragraph" | "heading"): readonly NewsEditorBlock[] {
+  const parts: NewsEditorBlock[] = [];
+  let rest = text;
+
+  while (true) {
+    const at = rest.indexOf(NEWS_IMAGE_TOKEN_PREFIX);
+    if (at < 0) break;
+    const end = rest.indexOf("]]", at);
+    if (end < 0) break;
+
+    const before = rest.slice(0, at).trim();
+    if (before !== "") parts.push({ id: nextEditorId(), kind, text: before });
+
+    const parsed = parseNewsImageToken(rest.slice(at, end + 2));
+    if (parsed !== null) {
+      parts.push({ id: nextEditorId(), kind: "image", mediaId: parsed.mediaId, alt: parsed.alt });
+    }
+    rest = rest.slice(end + 2);
+  }
+
+  const tail = rest.trim();
+  if (tail !== "") parts.push({ id: nextEditorId(), kind, text: tail });
+  return parts;
+}
+
+/** บล็อกจากฐานข้อมูล → รายการสำหรับตัวแก้ (โทเคนภาพที่ค้างในข้อความถูกแยกเป็นการ์ดให้ด้วย) */
 export function newsBlocksToEditor(blocks: readonly NewsBlock[]): readonly NewsEditorBlock[] {
-  return blocks.map((block) => {
+  const items: NewsEditorBlock[] = [];
+  for (const block of blocks) {
     if (block.type === "image") {
-      return { id: nextEditorId(), kind: "image", mediaId: block.mediaId, alt: block.alt };
+      items.push({ id: nextEditorId(), kind: "image", mediaId: block.mediaId, alt: block.alt });
+      continue;
     }
-    if (block.type === "heading") {
-      return { id: nextEditorId(), kind: "heading", text: block.text };
-    }
-    return { id: nextEditorId(), kind: "paragraph", text: block.text };
-  });
+    items.push(...splitImageTokens(block.text, block.type === "heading" ? "heading" : "paragraph"));
+  }
+  return items;
 }
 
 function readString(value: unknown): string {

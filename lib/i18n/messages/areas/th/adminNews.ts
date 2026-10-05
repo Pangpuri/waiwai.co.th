@@ -82,4 +82,9 @@ export const adminNews = {
   newsAdminCancel: "ยกเลิก",
   newsAdminBlockParagraphHint: "พิมพ์ข้อความย่อหน้านี้",
   newsAdminBlockHeadingHint: "พิมพ์หัวข้อย่อย",
+  newsAdminUpload: "อัปโหลดภาพจากเครื่อง",
+  newsAdminUploadHint: "PNG/JPEG/WebP ไม่เกิน 5MB (ระบบย่อภาพให้เอง)",
+  newsAdminUploading: "กำลังอัปโหลด…",
+  newsAdminUploadFailed: "อัปโหลดไม่สำเร็จ — ลองไฟล์อื่น",
+  newsAdminFromComputer: "หรืออัปโหลดจากเครื่อง",
 };

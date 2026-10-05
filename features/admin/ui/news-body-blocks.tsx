@@ -1,8 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
+import { uploadNewsImageAction } from "@/app/admin/news/actions";
+import { INITIAL_NEWS_UPLOAD_STATE } from "@/features/admin/news-state";
+import { ImageFileInput } from "@/features/admin/ui/image-file-input";
+import { mediaIdFromPath } from "@/lib/media/usage";
 import type { NewsEditorBlock } from "@/lib/news/editor-blocks";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -40,6 +44,20 @@ export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksP
   const [items, setItems] = useState<readonly NewsEditorBlock[]>(initial);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [counter, setCounter] = useState(0);
+  const [uploadState, uploadAction, uploading] = useActionState(uploadNewsImageAction, INITIAL_NEWS_UPLOAD_STATE);
+
+  /*
+    อัปโหลดเสร็จ = ใส่การ์ดภาพให้ทันที (ไม่ต้องรีเฟรชและไม่เสียสิ่งที่พิมพ์ไว้)
+    ⚠️ ตัว action คืน **พาธ** /media/<id> ⇒ ต้องแปลงเป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9: เก็บพาธ ไม่เก็บ URL)
+  */
+  useEffect(() => {
+    if (uploadState.status !== "ok") return;
+    const mediaId = mediaIdFromPath(uploadState.path);
+    if (mediaId === null) return;
+    /* อัปเดต state ตรงในนี้ (ไม่เรียก addImage) ⇒ effect ไม่ต้องพึ่งฟังก์ชันที่สร้างใหม่ทุกเรนเดอร์ */
+    setItems((current) => [...current, { id: `upload-${String(Date.now())}`, kind: "image", mediaId, alt: "" }]);
+    setPickerFor(null);
+  }, [uploadState]);
 
   function newId(): string {
     setCounter((value) => value + 1);
@@ -73,6 +91,17 @@ export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksP
 
   function addImage(mediaId: string): void {
     setItems((current) => [...current, { id: newId(), kind: "image", mediaId, alt: "" }]);
+    setPickerFor(null);
+  }
+
+  /**
+   * เลือกภาพให้การ์ดที่มีอยู่ = **แทนที่ภาพเดิม** (เคสจริง: ปุ่ม "เปลี่ยนภาพ" เดิมดันเพิ่มการ์ดใหม่)
+   * โดยคงคำบรรยายเดิมไว้ (มักยังใช้ได้) เพื่อไม่ให้คนใช้พิมพ์ซ้ำ
+   */
+  function replaceImage(targetId: string, mediaId: string): void {
+    setItems((current) =>
+      current.map((item) => (item.id === targetId && item.kind === "image" ? { ...item, mediaId } : item)),
+    );
     setPickerFor(null);
   }
 
@@ -166,7 +195,7 @@ export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksP
             {pickerFor === item.id ? (
               <div className="border-line mt-3 rounded-lg border p-3">
                 <p className="text-fg-muted mb-2 text-xs font-semibold">{m.newsAdminPickImage}</p>
-                <NewsImagePicker library={library} onPick={addImage} strings={m} />
+                <NewsImagePicker library={library} onPick={(mediaId) => replaceImage(item.id, mediaId)} strings={m} />
                 <button type="button" className={`${BUTTON_CLASS} mt-2`} onClick={() => setPickerFor(null)}>
                   {m.newsAdminCancel}
                 </button>
@@ -197,6 +226,22 @@ export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksP
           </button>
         </div>
       ) : null}
+
+
+      <div className="border-line rounded-xl border border-dashed p-3">
+        <p className="text-fg-muted mb-2 text-xs font-semibold">{m.newsAdminFromComputer}</p>
+        <form action={uploadAction} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-56 flex-1">
+            <ImageFileInput className={FIELD_CLASS} label={m.newsAdminUpload} hint={m.newsAdminUploadHint} />
+          </div>
+          <button type="submit" className={BUTTON_CLASS} disabled={uploading}>
+            {uploading ? m.newsAdminUploading : m.newsAdminUpload}
+          </button>
+        </form>
+        {uploadState.status === "invalid" || uploadState.status === "failed" ? (
+          <p className="text-danger mt-2 text-xs">{m.newsAdminUploadFailed}</p>
+        ) : null}
+      </div>
 
       <p className="text-fg-muted text-xs">{m.newsAdminBodyHint}</p>
     </div>

@@ -86,4 +86,9 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminCancel: "Cancel",
   newsAdminBlockParagraphHint: "Type this paragraph",
   newsAdminBlockHeadingHint: "Type a sub-heading",
+  newsAdminUpload: "Upload from computer",
+  newsAdminUploadHint: "PNG/JPEG/WebP up to 5MB (resized automatically)",
+  newsAdminUploading: "Uploading…",
+  newsAdminUploadFailed: "Upload failed — try another file",
+  newsAdminFromComputer: "Or upload from your computer",
 } as const;

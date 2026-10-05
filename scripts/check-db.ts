@@ -1394,16 +1394,11 @@ async function checkAdminUsers(): Promise<void> {
     });
     assert.equal(owner.ok, true, "สร้างผู้ดูแลทดสอบต้องสำเร็จ");
     if (owner.ok) {
-      /*
-        มีผู้ดูแลที่ยังใช้งานได้คนอื่นอยู่ไหม — **ต้องถามของจริง ไม่ assume**
-        ⚠️ เคสจริง (รอบที่ 124): ฐานข้อมูลอาจมีแถว  (บัญชีจาก env ที่ระบบสร้างให้ตอนล็อกอิน)
-        ⇒ ถ้า assume ว่ามีแถวเดียว เทสต์จะแดงทั้งที่ระบบถูก · ที่ถูกคือยึดหลัก "ห้ามเหลือศูนย์"
-      */
-      const others = await countActiveAdmins(owner.user.id);
+      /* มีผู้ดูแลที่ยังใช้งานได้ 1 คน (คนนี้) ⇒ ถอดบทบาท/ปิด ต้องถูกปฏิเสธ */
       const demote = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
-      assert.equal(demote.ok, others > 0, others > 0 ? "มีผู้ดูแลคนอื่น ⇒ ถอดบทบาทได้" : "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+      assert.equal(demote.ok, false, "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
       const disable = await setAdminUserDisabled({ id: owner.user.id, disabled: true, actor: CHECK_ACTOR });
-      assert.equal(disable.ok, others > 0, others > 0 ? "มีผู้ดูแลคนอื่น ⇒ ปิดได้" : "ปิดผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+      assert.equal(disable.ok, false, "ปิดผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
 
       /* มีผู้ดูแลคนที่สองแล้ว ⇒ ครั้งนี้ทำได้ */
       const second = await createAdminUser({
@@ -1559,27 +1554,10 @@ async function checkAdminUsers(): Promise<void> {
       });
       assert.equal(solo.ok, true, "สร้างผู้ดูแลเดี่ยวต้องสำเร็จ");
       if (solo.ok) {
-        /*
-          ⚠️ ยึด **หลักจริง** ไม่เดาทิศทาง: ฐานข้อมูลจริงอาจมีบัญชีจาก env (`env-admin` — เกิดตอนเจ้าของล็อกอิน)
-          ⇒ สิ่งที่ต้องรับประกันคือ "หลังพยายามลบแล้ว ต้องยังเหลือผู้ดูแลอย่างน้อย 1 คน" (ห้ามเหลือศูนย์)
-          ส่วน "ลบได้หรือไม่" ขึ้นกับว่ามีบัญชีอื่นอยู่จริงหรือเปล่า — วัดด้วยค่าจริง ไม่ assume
-        */
-        const otherAdmins = await countActiveAdmins(solo.user.id);
-        const delResult = await deleteAdminUser({
-          id: solo.user.id,
-          actor: CHECK_ACTOR,
-          actorId: "check-db-other",
-          confirmEmail: solo.user.email,
-        });
-        const remainingAdmins = await countActiveAdmins();
-        assert.ok(
-          remainingAdmins > 0,
-          `ต้องเหลือผู้ดูแลอย่างน้อย 1 คนหลังพยายามลบ (เหลือ ${String(remainingAdmins)} · คนอื่นก่อนลบ ${String(otherAdmins)} · ผลลบ ${String(delResult.ok)})`,
-        );
         assert.equal(
-          delResult.ok,
-          otherAdmins > 0,
-          otherAdmins > 0 ? "มีผู้ดูแลคนอื่นที่ยังใช้งานได้ ⇒ ต้องลบได้" : "เป็นผู้ดูแลคนสุดท้าย ⇒ ต้องถูกลบปฏิเสธ",
+          (await deleteAdminUser({ id: solo.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: solo.user.email })).ok,
+          false,
+          "ห้ามลบผู้ดูแลคนสุดท้าย",
         );
 
         /* มีผู้ดูแลคนที่สองที่ยังใช้งานได้ ⇒ ลบได้ (ด่านไม่บล็อกเกินจำเป็น) */

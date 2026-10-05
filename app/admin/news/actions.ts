@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { NewsSaveState } from "@/features/admin/news-state";
+import type { NewsSaveState, NewsUploadState } from "@/features/admin/news-state";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath } from "@/lib/cache/refresh";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
+import { storeImageFile } from "@/lib/media/upload";
 import { parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
 import {
   createNewsForAdmin,
@@ -130,4 +131,30 @@ export async function trashNewsAction(formData: FormData): Promise<void> {
   });
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");
+}
+
+/**
+ * อัปโหลดภาพจากเครื่องผู้ใช้ **จากในหน้าจอแก้ข่าว** (รอบที่ 126)
+ *
+ * เจ้าของขอ: *"…ไม่สามารถอัปโหลดจากเครื่องเข้ามาใส่ข่าวได้"*
+ * - ตรวจสิทธิ์ `content` (สิทธิ์ของข่าว) · ใช้ท่อกลาง `storeImageFile` ตัวเดียวกับคลังภาพ
+ *   ⇒ ย่อภาพในเบราว์เซอร์ (รอบที่ 99) · sniff หัวไฟล์ · เพดาน 5MB — เหมือนกันทุกจุด
+ * - คืนพาธ `/media/<id>` ให้จอภาพเอาไปใส่การ์ดต่อได้ทันที
+ */
+export async function uploadNewsImageAction(
+  _previous: NewsUploadState,
+  formData: FormData,
+): Promise<NewsUploadState> {
+  await requireAdminUser("content");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "invalid", path: "", reason: "missing" };
+  }
+
+  const stored = await storeImageFile(file, "news-editor");
+  if (!stored.ok) return { status: "invalid", path: "", reason: stored.reason };
+
+  revalidateAdminPath(LIST_PATH);
+  return { status: "ok", path: stored.path, reason: "" };
 }
