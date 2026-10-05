@@ -137,3 +137,27 @@ export function assessNewsArticlePage(input: {
 
   return { ok: true, reason: null };
 }
+
+/**
+ * ตรวจว่าได้ **หน้าป้องกันของ Vercel** แทนเว็บจริงหรือไม่ (รอบที่ 121 — เคสจริง)
+ *
+ * อาการ: `Deployment Protection (Vercel Authentication)` เปิดอยู่ ⇒ คำขอจากคนที่ไม่ได้ล็อกอิน
+ * จะได้หน้าแจ้ง "Protected by Vercel Authentication" (HTTP 200 · ~263 ไบต์) **ไม่ใช่เว็บของเรา**
+ * ⚠️ ถ้าไม่จับเคสนี้ก่อน เครื่องมือจะรายงานผิดว่า "หน้าเว็บว่าง / ฐานข้อมูลไม่ถูกตั้งค่า" (วินิจฉัยผิดคน)
+ * ⇒ และผลที่สำคัญที่สุด: **คนภายนอก (เช่น การตลาด) เปิดดูไม่ได้เลย** แม้ระบบจะทำงานถูกต้อง
+ */
+export function isVercelProtectionPage(html: string): boolean {
+  /* ทั้งสองแบบที่เจอจริง: (1) หน้าข้อความสั้น "Protected by Vercel Authentication"
+     (2) หน้า login เต็มของ Vercel (341 KB · <title>Login – Vercel</title> · data-dpl-id="dpl_…" · cookie _v-visitor-id) */
+  const markers = [
+    "Protected by Vercel Authentication",
+    "Login – Vercel",
+    "Login - Vercel",
+    "vercel.com/sso-api",
+    "sso-api?url=",
+    "web_fetch_vercel_url",
+    "_v-visitor-id",
+    "data-dpl-id=\"dpl_",
+  ];
+  return markers.some((marker) => html.includes(marker));
+}

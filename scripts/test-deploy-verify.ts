@@ -5,6 +5,7 @@ import {
   assessHomePage,
   assessNewsArticlePage,
   assessNewsListPage,
+  isVercelProtectionPage,
   pooledEndpointWarning,
 } from "@/lib/deploy/verify";
 
@@ -85,4 +86,29 @@ test("deploy: หน้าข่าวรายชิ้น — แยกข่�
   assert.ok((assessNewsArticlePage({ status: 404, html: notFoundHtml }).reason ?? "").includes("404"));
   assert.equal(assessNewsArticlePage({ status: 200, html: notFoundHtml }).ok, false, "200 ที่ไม่มี h1 ต้องไม่ผ่าน");
   assert.equal(assessNewsArticlePage({ status: 200, html: "<h1>ข่าว</h1>สั้น" }).ok, false, "เนื้อหาสั้นผิดปกติต้องไม่ผ่าน");
+});
+
+test("deploy: ต้องจับหน้า 'Protected by Vercel Authentication' ได้ (ไม่ให้วินิจฉัยผิดว่า DB ว่าง)", () => {
+  /* เนื้อหาจริงที่ดึงได้จาก deployment ที่ยังเปิด Deployment Protection (263 ไบต์) */
+  const protectedHtml =
+    "Protected by Vercel Authentication To access this deployment with an authenticated Vercel CLI, run: vercel curl <deployment-url>";
+
+  assert.equal(isVercelProtectionPage(protectedHtml), true);
+  assert.equal(isVercelProtectionPage("<html><body>Protected by Vercel Authentication</body></html>"), true);
+  assert.equal(isVercelProtectionPage('<a href="https://vercel.com/sso-api?url=x">login</a>'), true);
+  assert.equal(isVercelProtectionPage("<html><body>ไวไว</body></html>"), false);
+  assert.equal(isVercelProtectionPage(""), false);
+});
+
+test("deploy: ต้องจับหน้า login ของ Vercel (แบบเต็ม 341 KB) ได้ด้วย — เคสจริงที่พลาดรอบแรก", () => {
+  /* เนื้อหาจริงที่ดึงได้จาก deployment (ย่อ): Vercel Authentication ส่งหน้า login ของตัวเองมาแทนเว็บ */
+  const loginHtml =
+    '<!DOCTYPE html><html data-dpl-id="dpl_DaqY61CnpCD8fGN63NXtFj16kuWD" lang="en-US"><head><title>Login – Vercel</title></head>' +
+    '<body>set-cookie: _v-visitor-id=Engxcdv0RsJCQC6xKQvI7</body></html>';
+
+  assert.equal(isVercelProtectionPage(loginHtml), true, "ต้องจับ <title>Login – Vercel</title> ได้");
+  assert.equal(isVercelProtectionPage('<html data-dpl-id="dpl_abc"><title>x</title></html>'), true);
+  assert.equal(isVercelProtectionPage('<meta name="x"><title>Login - Vercel</title>'), true);
+  /* และต้องไม่จับผิดหน้าเว็บจริงของเรา */
+  assert.equal(isVercelProtectionPage('<html><head><title>ไวไว — หน้าแรก</title></head><body>ไวไว</body></html>'), false);
 });

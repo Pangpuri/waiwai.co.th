@@ -2,6 +2,7 @@ import {
   assessHomePage,
   assessNewsArticlePage,
   assessNewsListPage,
+  isVercelProtectionPage,
   pooledEndpointWarning,
 } from "@/lib/deploy/verify";
 
@@ -54,6 +55,22 @@ async function main(): Promise<void> {
 
   for (const locale of ["th", "en"] as const) {
     const { status, body } = await fetchText(`${options.baseUrl}/${locale}`);
+
+    /*
+      ⚠️ เคสจริง 2026-10-05: deployment เปิด Deployment Protection อยู่ ⇒ คำขอจากคนที่ไม่ได้ล็อกอิน
+      ได้หน้า "Protected by Vercel Authentication" (HTTP 200 · ~263 ไบต์) ไม่ใช่เว็บของเรา
+      ถ้าไม่จับก่อน เครื่องมือจะวินิจฉัยผิดว่า "หน้าเว็บว่างเพราะฐานข้อมูลไม่ถูกตั้งค่า" (ผิดคน)
+    */
+    if (isVercelProtectionPage(body)) {
+      process.stderr.write(
+        `\n✗ ${options.baseUrl} ถูกป้องกันด้วย **Vercel Authentication** (Deployment Protection)\n` +
+          "   ⇒ คนภายนอก (เช่น การตลาด) เปิดดูไม่ได้ และตรวจเนื้อหาไม่ได้เลย\n" +
+          "   วิธีแก้: Vercel → โปรเจกต์ → Settings → Deployment Protection → Vercel Authentication = Disabled\n" +
+          "   หรือใช้โดเมน production (เช่น <project>.vercel.app) แทน URL ของ deployment ที่มี hash\n",
+      );
+      process.exit(1);
+    }
+
     const assessment = assessHomePage(body);
     results.push(`/${locale} (HTTP ${status}) — ${assessment.summary}`);
     if (status !== 200) failures.push(`/${locale} ตอบ HTTP ${status}`);
@@ -62,6 +79,10 @@ async function main(): Promise<void> {
 
   {
     const { status, body } = await fetchText(`${options.baseUrl}/th/news`);
+    if (isVercelProtectionPage(body)) {
+      process.stderr.write("\n✗ /th/news ก็ถูกป้องกันด้วย Vercel Authentication (ตรวจเนื้อหาไม่ได้)\n");
+      process.exit(1);
+    }
     const news = assessNewsListPage(body);
     results.push(`/th/news (HTTP ${status}) — จำนวนข่าวทั้งหมด: ${news.total === null ? "อ่านไม่ได้" : String(news.total)}`);
     if (status !== 200) failures.push(`/th/news ตอบ HTTP ${status}`);
