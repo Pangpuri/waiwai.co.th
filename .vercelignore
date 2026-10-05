@@ -1,0 +1,54 @@
+# ไฟล์ที่ **ไม่ต้องอัปขึ้น** ตอน deploy ด้วย Vercel CLI (รอบที่ 117)
+#
+# ⚠️ ทำไมต้องมีไฟล์นี้ ทั้งที่มี .gitignore
+# - deploy ผ่าน **Git** (import repo) → Vercel ใช้ `.gitignore` ⇒ ปลอดภัยอยู่แล้ว
+# - deploy ผ่าน **CLI** (`vercel --prod`) → CLI อัปไฟล์จากโฟลเดอร์ในเครื่อง ⇒ ต้องกันเอง
+#   เคสอันตรายที่ต้องกันให้ได้: **`.env.local`** ถูกอัปขึ้น build ⇒ build จะอ่าน `DATABASE_URL`
+#   ของเครื่อง (localhost:55432) แทนค่าที่ตั้งไว้ในโปรเจกต์ Vercel ⇒ หน้าเว็บ prerender แบบ **ว่างเปล่า
+#   แต่ตอบ 200** (อาการ "ว่างเงียบ" ที่เครื่องมือ `npm run check:deploy` ถูกสร้างมาช่วยจับ)
+# - และ `backups/` มี **ข้อมูลส่วนบุคคล** (ผู้ติดต่อ/ผู้สมัครงาน + เรซูเม่) ⇒ ห้ามอัปขึ้นที่ใดทั้งสิ้น
+
+# ── ความลับ / ค่าประจำเครื่อง ────────────────────────────────────────────────
+.env*
+.vercel
+.deepcode/
+.deepcode
+
+# ── ข้อมูลส่วนบุคคล / ข้อมูลต้นทางจากบริษัท (สำเนาที่ใช้จริงอยู่ใน public/ แล้ว) ──
+backups/
+cer/
+provider/
+products/
+contact/
+company.txt
+Work with Wai Wai.txt
+slide/
+logo/
+rip/
+promo/
+
+# ── เอกสารภายใน (ไม่ขึ้น repo อยู่แล้ว ⇒ ไม่ต้องอัปขึ้น build) ────────────────
+AGENTS.md
+CLAUDE.md
+PRODUCT_ROADMAP.md
+CODING_RULES.en.md
+_CODINGRULES.md_Next.js.md
+BACKEND_DECISIONS.md
+WORK_PLAN.md
+PRODUCTROADMAP.md_Corporate_CMS_Backend_.md
+roadmapWP.txt
+
+# ── ของที่สร้างใหม่ได้ / ไฟล์ชั่วคราว ───────────────────────────────────────
+.next/
+out/
+build/
+coverage/
+node_modules/
+*.pem
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+scripts/tmp-*
+*.log
