@@ -30,14 +30,15 @@ type BrandMarkProps = {
   readonly locale: Locale;
   /** ใช้เป็น accessible name — ส่งข้อความที่แปลแล้วเข้ามา */
   readonly label: string;
-  readonly size?: "sm" | "md";
   /** true = รูปอยู่ในจอแรก (header) ⇒ โหลดก่อน ; footer ไม่ต้อง */
   readonly eager?: boolean;
 };
 
-export function BrandMark({ locale, label, size = "md", eager = false }: BrandMarkProps) {
-  const isSmall = size === "sm";
-
+/**
+ * ⚠️ รอบที่ 113: ตัด prop `size` ("sm" | "md") ออก — ไม่มีใครส่งค่านี้เลยหลังเปลี่ยนมาใช้ไฟล์โลโก้จริง
+ * (header และ footer ใช้สเกลเดียวกัน) ⇒ เหลือสเกลเดียวที่คิดระยะจอมาแล้ว ลดความสับสน
+ */
+export function BrandMark({ locale, label, eager = false }: BrandMarkProps) {
   return (
     <Link
       href={localePath(locale)}
@@ -53,11 +54,24 @@ export function BrandMark({ locale, label, size = "md", eager = false }: BrandMa
         loading={eager ? "eager" : "lazy"}
         fetchPriority={eager ? "high" : "auto"}
         /*
-          ⚠️ โลโก้จริง **กว้างกว่าตราตัวอักษรเดิมมาก** (สัดส่วน 5.52:1)
-          · md (header) = สูง 32px บนมือถือ → กว้าง ~177px (เหลือที่ให้ปุ่มเมนู/ภาษา/ธีม) แล้วค่อยใหญ่ขึ้นตามจอ
-          · sm (footer) = 36px คงที่
+          ⚠️ โลโก้จริง **กว้างกว่าตราตัวอักษรเดิมมาก** (สัดส่วน 800:145 = 5.52:1)
+          ⇒ ความกว้าง = ความสูง × 5.52 (ต้องคิดเผื่อเสมอ ไม่ใช่ดูแค่ความสูง)
+
+          รอบที่ 113 (เจ้าของแจ้งว่า "โลโก้ใน navbar ล้นจอบนมือถือ"):
+          · navbar มือถือ = แถวเดียว: โลโก้ + ปุ่มธีม (40px) + ปุ่มเมนู (40px) + ช่องว่าง
+
+          | ความสูง | ความกว้าง | ใช้ที่ |
+          |---|---|---|
+          | h-6 = 24px | 132px | (ไม่ใช้ — เล็กเกินไป) |
+          | **h-7 = 28px** | **154px** | **มือถือ (< sm)** — จอ 320px: 154+8+12+88+40 = 302 ✓ อยู่ในจอ |
+          | h-8 = 32px | 176px | จอ ≥ 640px — จอ 320px เดิมใช้ค่านี้ ⇒ 324px **ล้น 4px** (ต้นเหตุ) |
+          | h-11 = 44px | 243px | จอ ≥ 1024px (มีที่พอ เพราะเมนูหลักย้ายไปแถวที่ 2) |
+
+          + **ตัวกันล้นสำรอง**: \`max-w-[46vw]\` — ไม่ว่าไฟล์/จอจะกว้างเท่าไร โลโก้กินได้ไม่เกิน 46% ของจอ
+            (จำเป็นจริงบนจอแคบมาก เช่น Galaxy Fold ปิดฝา = 280px ⇒ เหลือที่ราว 140px)
+            ใช้คู่กับ \`object-contain object-left\` เพื่อ **ย่อทั้งรูปโดยไม่ตัด/ไม่ยืดสัดส่วน**
         */
-        className={["w-auto", isSmall ? "h-9" : "h-8 sm:h-9 lg:h-11"].join(" ")}
+        className="h-7 w-auto max-w-[46vw] object-contain object-left sm:h-8 lg:h-11"
       />
     </Link>
   );

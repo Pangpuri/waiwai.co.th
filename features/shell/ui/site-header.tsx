@@ -79,7 +79,8 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
               <img
                 src={view.logo.path}
                 alt={locale === "th" ? view.logo.altTh : view.logo.altEn.trim() === "" ? view.logo.altTh : view.logo.altEn}
-                className={`${view.logoHeightClass} w-auto`}
+                /* กันล้นมือถือเหมือนโลโก้ในโค้ด (BrandMark) — จำกัดความกว้างไม่เกิน 46% ของจอ + ย่อทั้งรูปโดยไม่ยืดสัดส่วน */
+                className={`${view.logoHeightClass} w-auto max-w-[46vw] object-contain object-left`}
               />
             </Link>
           )}

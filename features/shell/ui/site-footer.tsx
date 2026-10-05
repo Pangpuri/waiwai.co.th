@@ -62,7 +62,8 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
               <img
                 src={view.logo.path}
                 alt={locale === "th" ? view.logo.altTh : view.logo.altEn.trim() === "" ? view.logo.altTh : view.logo.altEn}
-                className="h-9 w-auto sm:h-10"
+                /* กันล้นมือถือ: โลโก้ท้ายเว็บอยู่แถวของตัวเอง แต่ยังกันไฟล์ที่กว้างผิดปกติ (46% ของจอ) */
+                className="h-9 w-auto max-w-[46vw] object-contain object-left sm:h-10"
               />
             </Link>
           )}
