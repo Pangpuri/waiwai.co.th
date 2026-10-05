@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { getPool } from "@/db/pool";
+import { getPool, isDatabaseConfigured } from "@/db/pool";
 import type { AllowedImageMime } from "@/lib/media/image-info";
 
 /**
@@ -34,6 +34,37 @@ export type MediaBinary = {
   readonly filename: string;
   readonly createdAt: string;
 };
+
+/** ขนาดภาพของหลาย id พร้อมกัน (ใช้ตอนแสดงเนื้อหาที่อ้างภาพหลายใบ เช่น ข่าว · รอบที่ 105) */
+export type MediaSize = {
+  readonly id: string;
+  readonly width: number | null;
+  readonly height: number | null;
+};
+
+/**
+ * โหลดขนาดภาพหลาย id ในคำสั่งเดียว — คืน Map (ไม่มี id = ไม่มีในคลัง)
+ * ⚠️ ใช้เป็น "ข้อมูลช่วยแสดงผล" เท่านั้น: ไม่มี DB/อ่านไม่สำเร็จ = Map ว่าง (หน้าต้องยังเปิดได้)
+ */
+export async function loadMediaSizes(ids: readonly string[]): Promise<ReadonlyMap<string, MediaSize>> {
+  const unique = [...new Set(ids.filter((id) => id.trim() !== ""))];
+  const sizes = new Map<string, MediaSize>();
+  if (unique.length === 0 || !isDatabaseConfigured()) return sizes;
+
+  try {
+    const result = await getPool().query<{ id: string; width: number | null; height: number | null }>(
+      "select id, width, height from media where id = any($1::text[])",
+      [unique],
+    );
+    for (const row of result.rows) {
+      sizes.set(row.id, { id: row.id, width: row.width, height: row.height });
+    }
+  } catch {
+    return sizes;
+  }
+  return sizes;
+}
+
 
 export async function insertMedia(input: {
   readonly id: string;
@@ -183,7 +214,7 @@ export async function updateMediaAlt(id: string, altTh: string, altEn: string): 
 
 /* ── คลังภาพ (X1.2) ───────────────────────────────────────────────────────── */
 
-export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset" | "product" | "recipe";
+export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset" | "product" | "recipe" | "news";
 
 export type MediaUsage = {
   /**
@@ -285,6 +316,21 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
   );
   for (const row of recipeRows.rows) {
     usage.push({ kind: "recipe", target: `recipe:${row.id}`, detail: row.title_th });
+  }
+
+  /*
+    ข่าวสาร & กิจกรรม (S5 · รอบที่ 105) — ภาพปกเป็นคอลัมน์ + รูปในเนื้อหาอยู่ใน `body` (JSONB)
+    ⚠️ ค้นด้วย `@>` บน JSONB (แม่นกว่า like บนข้อความ) เพราะใน body เก็บ **mediaId** ไม่ใช่พาธ /media/<id>
+  */
+  const newsRows = await getPool().query<{ id: string; title_th: string }>(
+    `select id, title_th from news
+      where cover_media_id = $1
+         or body @> $2::jsonb
+      order by published_at desc nulls last, id desc`,
+    [id, JSON.stringify([{ type: "image", mediaId: id }])],
+  );
+  for (const row of newsRows.rows) {
+    usage.push({ kind: "news", target: `news:${row.id}`, detail: row.title_th });
   }
 
   const ogRows = await getPool().query<{ id: string }>(`select id from page where og_image_path = $1`, [path]);

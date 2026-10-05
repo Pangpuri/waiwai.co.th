@@ -42,6 +42,8 @@ function usageKindLabel(kind: MediaUsageKind, strings: Messages["admin"]): strin
       return strings.mediaUsageProduct;
     case "recipe":
       return strings.mediaUsageRecipe;
+    case "news":
+      return strings.mediaUsageNews;
   }
 }
 

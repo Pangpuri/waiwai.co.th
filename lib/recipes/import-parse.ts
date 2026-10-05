@@ -15,54 +15,13 @@ import { attributeOf, decodeEntities, normalizeText, pathOfHref, textOf } from "
  * หมายเหตุ: ไฟล์นี้ **ไม่แตะเครือข่าย/ฐานข้อมูล**
  */
 
-const THAI_MONTHS: Readonly<Record<string, number>> = {
-  มกราคม: 1,
-  กุมภาพันธ์: 2,
-  มีนาคม: 3,
-  เมษายน: 4,
-  พฤษภาคม: 5,
-  มิถุนายน: 6,
-  กรกฎาคม: 7,
-  สิงหาคม: 8,
-  กันยายน: 9,
-  ตุลาคม: 10,
-  พฤศจิกายน: 11,
-  ธันวาคม: 12,
-  "ม.ค.": 1,
-  "ก.พ.": 2,
-  "มี.ค.": 3,
-  "เม.ย.": 4,
-  "พ.ค.": 5,
-  "มิ.ย.": 6,
-  "ก.ค.": 7,
-  "ส.ค.": 8,
-  "ก.ย.": 9,
-  "ต.ค.": 10,
-  "พ.ย.": 11,
-  "ธ.ค.": 12,
-};
+/*
+  วันที่ไทย (เดือนเต็ม/ย่อ + ปี พ.ศ.) ย้ายไปอยู่ที่ `lib/import/thai-date.ts` เมื่อรอบที่ 105
+  (ตัวนำเข้าข่าวใช้ตารางเดือนชุดเดียวกัน) — ที่นี่ re-export ชื่อเดิมไว้ให้ผู้เรียก/เทสต์เดิมไม่พัง
+*/
+export { parseThaiDate } from "@/lib/import/thai-date";
 
-/**
- * แปลงวันที่ไทยจากเว็บเดิมเป็น ISO (`9 ตุลาคม 2018 at 09:21` → `2018-10-09`)
- * - รับปี พ.ศ. ได้ด้วย (มากกว่า 2400 ⇒ ลบ 543) เพื่อกันข้อมูลที่พิมพ์ปีไทย
- * - อ่านไม่ได้/ไม่สมเหตุสมผล = null (ไม่เดา)
- */
-export function parseThaiDate(label: string): string | null {
-  const match = label.match(/(\d{1,2})\s+([ก-๙.]+)\s+(\d{4})/);
-  if (match === null) return null;
-
-  const day = Number.parseInt(match[1] ?? "", 10);
-  const month = THAI_MONTHS[(match[2] ?? "").trim()];
-  let year = Number.parseInt(match[3] ?? "", 10);
-  if (year > 2400) year -= 543;
-
-  if (!Number.isFinite(day) || day < 1 || day > 31) return null;
-  if (month === undefined) return null;
-  if (year < 1900 || year > 2100) return null;
-
-  const pad = (value: number): string => String(value).padStart(2, "0");
-  return `${year}-${pad(month)}-${pad(day)}`;
-}
+import { parseThaiDate } from "@/lib/import/thai-date";
 
 /** ดึง id วิดีโอ YouTube จาก URL ที่เว็บเดิมฝังไว้ (embed / nocookie / youtu.be / watch?v=) */
 export function youTubeIdOf(src: string): string {

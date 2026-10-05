@@ -28,7 +28,8 @@
     "maintenance:status": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/maintenance.ts status",
     "check:actions": "node --import ./scripts/alias-hook.mjs scripts/check-actions.ts",
     "products:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products.ts",
-    "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts"
+    "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts",
+    "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts"
   },
   "dependencies": {
     "next": "^16.3.8",

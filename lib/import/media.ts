@@ -35,6 +35,8 @@ export async function ensureImportedMedia(options: {
   readonly actor: string;
   readonly fetchBinary: (url: string) => Promise<Buffer>;
   readonly log: (message: string) => void;
+  /** เพดานขนาดไฟล์ (ไบต์) — เกิน = ข้าม + รายงาน (กันไฟล์ต้นฉบับยักษ์หลุดเข้ามา · รอบที่ 105) */
+  readonly maxBytes?: number;
 }): Promise<string | null> {
   const cached = options.cache.get(options.url);
   if (cached !== undefined) return cached;
@@ -45,6 +47,10 @@ export async function ensureImportedMedia(options: {
     const info = readImageInfo(bytes);
     if (info === null) {
       options.log(`   ⚠️ ข้ามภาพที่ไม่ใช่ PNG/JPEG/WebP: ${options.url}`);
+    } else if (options.maxBytes !== undefined && bytes.length > options.maxBytes) {
+      options.log(
+        `   ⚠️ ข้ามภาพที่ใหญ่เกิน ${Math.round(options.maxBytes / 1024)} KB (ได้ ${Math.round(bytes.length / 1024)} KB): ${options.url}`,
+      );
     } else {
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       const existing = await findMediaIdBySha256(sha256);

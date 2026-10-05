@@ -386,5 +386,30 @@ create table if not exists recipe (
 create index if not exists recipe_order_idx on recipe (sort_order, id);
 create index if not exists recipe_source_idx on recipe (source_id);
 
+-- ── ข่าวสาร & กิจกรรม ที่นำเข้าจากเว็บเดิม (S5 · migration 0018) ────────────────
+-- 151 ข่าว (2018–2026) · เนื้อหาเก็บเป็น **บล็อกเรียงลำดับ** (ย่อหน้า/หัวข้อ/รูป) ไม่เก็บ HTML ดิบ
+--   ⚠️ ต้นฉบับวางมาจาก Facebook (HTML เละ + รูปไม่มี alt) ⇒ ต้องผ่าน `parseNewsBody()` เสมอ
+-- · id = 'n' + source_id และพาธหน้าเว็บ = `/news/<source_id>` (ตัวเลขล้วน)
+-- · published_at เป็น timestamptz (ต้นฉบับเป็นเวลาไทย) · อ่านกลับด้วย `at time zone 'Asia/Bangkok'`
+-- · ภาพ (ปก/ในเนื้อหา) เก็บใน `media` · ใน `body` เก็บ **mediaId** (มติ D9/D11)
+create table if not exists news (
+  id              text        primary key,
+  source_id       text        not null,
+  source_url      text        not null default '',
+  title_th        text        not null,
+  title_en        text        not null default '',
+  excerpt_th      text        not null default '',
+  excerpt_en      text        not null default '',
+  cover_media_id  text        references media (id) on delete set null,
+  body            jsonb       not null default '[]'::jsonb,
+  published_at    timestamptz,
+  published_label text        not null default '',
+  updated_at      timestamptz not null default now(),
+  updated_by      text
+);
+
+create index if not exists news_published_idx on news (published_at desc nulls last, id desc);
+create index if not exists news_source_idx on news (source_id);
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

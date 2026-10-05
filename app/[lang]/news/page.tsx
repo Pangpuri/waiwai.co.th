@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
+import { NewsList, NewsListHeader, NewsPagination, newsListStringsOf } from "@/features/news/ui/news-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { countNews, listNews, NEWS_PER_PAGE } from "@/lib/news/repository";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
@@ -21,11 +23,14 @@ import { withPageSeo } from "@/lib/seo/page-seo";
 export const revalidate = 300;
 
 /**
- * หน้า /news (ข่าวสาร & กิจกรรม) — **หน้าตัวอย่าง (mockup) รอการอนุมัติ**
+ * หน้า /news (ข่าวสาร & กิจกรรม) — **เลย์เอาต์ยังเป็นหน้าตัวอย่าง รอการอนุมัติ** แต่มีข่าวจริงแล้ว
  *
- * ผู้ใช้สั่งรอบที่ 15: ทำการ์ดตัวอย่าง 3 ใบ × 2 แถว ไว้ดูโครง layout เท่านั้น
- * → ไม่มีข่าวจริง ไม่มีวันที่ที่แต่งขึ้น (ตั้งใจไม่มีช่องวันที่ จนกว่าจะได้ข้อมูลจริง)
- * และการ์ดไม่เป็นลิงก์ (ยังไม่มีปลายทาง) — รายละเอียด: PRODUCT_ROADMAP.md § 9
+ * ประวัติ
+ * - รอบที่ 15: การ์ดทดสอบ 3×2 ไว้ดูโครง layout เท่านั้น (ไม่มีข้อมูลจริง ไม่มีวันที่ที่แต่งขึ้น)
+ * - รอบที่ 105: **ข่าวจริง 151 ข่าวจากเว็บเดิมอยู่ในฐานข้อมูล** ⇒ แสดงการ์ดจริง + แบ่งหน้า
+ *   หน้า 2 เป็นต้นไปอยู่ที่ `/news/page/<n>` (static/ISR เช่นกัน) · ยังคง `noindex` (รอเจ้าของอนุมัติ)
+ *
+ * รายละเอียด/เหตุผลทั้งหมด: PRODUCT_ROADMAP.md § 10 รอบที่ 105
  */
 
 export async function generateMetadata({
@@ -56,21 +61,46 @@ export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
   // ภาษาที่ไม่รองรับ → 404 (ไม่ใช่ 500) เหมือนหน้าอื่น
   if (!isLocale(lang)) notFound();
   const messages = await getMessages(lang);
+  const m = messages.newsPage;
 
   /*
-    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 83) ────────────────────────────────
+    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 83 · รายการข่าวจริง เพิ่มรอบที่ 105) ──────────
     1. ถ้าหลังบ้าน **กดเผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง"** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
        (ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
     2. ถ้าไม่ ⇒ ใช้เลย์เอาต์ที่ออกแบบไว้ด้านล่างเหมือนเดิม **ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ**
-    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลดคืน null ให้เอง
+    **ทั้งสองทางต่อด้วยรายการข่าวจากฐานข้อมูล** (ข่าวที่นำเข้าจากเว็บเดิม · รอบที่ 105)
+      · เลย์เอาต์เดิม: ถ้ามีข่าวจริง ⇒ แสดงข่าวจริงแทนการ์ดทดสอบ (ไม่โชว์ของปลอมคู่ของจริง)
+    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลด/ตัวอ่านคืน null/0/[] ให้เอง
     ⚠️ เทมเพลตยังไม่ครอบคลุมทุกส่วน (ดู `blockCoverageGaps`) — หลังบ้านจะเตือนก่อนเปิดสวิตช์
   */
-  const liveDocument = await loadLiveBlockDocument("news");
-  if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
-  }
+  const [liveDocument, total, items] = await Promise.all([
+    loadLiveBlockDocument("news"),
+    countNews(),
+    listNews(NEWS_PER_PAGE, 0),
+  ]);
 
-  const m = messages.newsPage;
+  const listStrings = newsListStringsOf(m);
+  const pageCount = Math.max(1, Math.ceil(total / NEWS_PER_PAGE));
+
+  const listSection =
+    items.length === 0 ? null : (
+      <section className="container-site py-12 lg:py-16" aria-labelledby="news-list-title">
+        <NewsListHeader total={total} strings={listStrings} />
+        <div className="mt-8">
+          <NewsList items={items} language={lang} strings={listStrings} />
+        </div>
+        <NewsPagination page={1} pageCount={pageCount} basePath={localePath(lang, "/news")} strings={listStrings} />
+      </section>
+    );
+
+  if (liveDocument !== null) {
+    return (
+      <>
+        <BlockDocumentView document={liveDocument} language={lang} />
+        {listSection}
+      </>
+    );
+  }
 
   return (
     <>
@@ -101,16 +131,22 @@ export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
         </div>
       </section>
 
-      <section className="container-site py-16 lg:py-24">
-        <MockCardGrid
-          idPrefix="mock-news"
-          titlePrefix={m.cardTitle}
-          captionPrefix={m.figureCaption}
-          badge={m.figureBadge}
-          metaLabel={m.cardMeta}
-          icon="news"
-        />
-      </section>
+      {/*
+        มีข่าวจริงในฐานข้อมูลแล้ว (รอบที่ 105) ⇒ แสดงของจริงแทนการ์ดทดสอบ
+        ⚠️ ถ้าฐานข้อมูลว่าง/ล่ม ⇒ ยังเห็นการ์ดทดสอบเหมือนเดิม (ไม่ทำให้หน้าเว็บพัง)
+      */}
+      {listSection ?? (
+        <section className="container-site py-16 lg:py-24">
+          <MockCardGrid
+            idPrefix="mock-news"
+            titlePrefix={m.cardTitle}
+            captionPrefix={m.figureCaption}
+            badge={m.figureBadge}
+            metaLabel={m.cardMeta}
+            icon="news"
+          />
+        </section>
+      )}
     </>
   );
 }

@@ -38,16 +38,26 @@ export const recipesPage = {
 
 export const newsPage = {
     meta: {
-      title: "News & Activities — sample page",
+      title: "News & Activities",
       description:
-        "A sample news and activities layout for Wai Wai — pending approval, with no real content yet.",
+        "Wai Wai news and activities (the brand's own, imported from its previous site) — this page layout is still a sample pending approval.",
     },
     eyebrow: "News & Activities",
     title: "News & Activities",
     intro:
       "A sample of how the news cards will be laid out, for the marketing team to review before the real content is written.",
     notice:
-      "This page is a sample (mockup) pending approval — every card is test data; there is no real news yet.",
+      "This page is a sample (mockup) pending approval — the test cards below are placeholder data.",
+    /* The real news section from the database (round 105) — imported from the brand's previous site */
+    dbListTitle: "Wai Wai news and activities",
+    dbListCount: "{count} news items",
+    dbReadMore: "Read more",
+    dbNoCover: "No cover image yet",
+    dbPrevious: "Previous",
+    dbNext: "Next",
+    dbPageLabel: "Pagination",
+    dbPublished: "Published",
+    dbBackToNews: "Back to all news",
     cardTitle: "Test news headline",
     cardMeta: "XX",
     figureCaption: "Placeholder image for news item",

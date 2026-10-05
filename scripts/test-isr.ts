@@ -63,6 +63,7 @@ const DATABASE_MARKERS = [
   "@/lib/site-settings/loader",
   "@/lib/mourning/loader",
   "@/lib/pages/repository",
+  "@/lib/news/repository",
 ];
 
 function sourceOf(relativePath: string): string {
@@ -79,6 +80,8 @@ test("isr: ทุกหน้า/เลย์เอาต์สาธารณ�
     "app/[lang]/careers/page.tsx",
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
+    "app/[lang]/news/page/[page]/page.tsx",
+    "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",
@@ -115,6 +118,8 @@ test("isr: ไฟล์ที่อ่าน DB ในเส้นทางส�
     "app/[lang]/careers/page.tsx",
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
+    "app/[lang]/news/page/[page]/page.tsx",
+    "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",
@@ -143,6 +148,8 @@ test("isr: ค่า revalidate ในหน้าเว็บต้องเป
     "app/[lang]/careers/page.tsx",
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
+    "app/[lang]/news/page/[page]/page.tsx",
+    "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",

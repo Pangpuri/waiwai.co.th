@@ -44,6 +44,8 @@ import {
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
+import { newsIdOfSourceId, type NewsInput } from "@/lib/news/model";
+import { countNews, deleteNews, listNews, loadNewsBySourceId, upsertNews } from "@/lib/news/repository";
 import { recipeIdOfSourceId } from "@/lib/recipes/model";
 import { deleteRecipe, listRecipes, upsertRecipe } from "@/lib/recipes/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
@@ -256,6 +258,9 @@ async function main(): Promise<void> {
 
   /* 19) เมนูอาหาร (วิดีโอ) จากเว็บเดิม: เขียน → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ (S3 ส่วนที่ 4 · รอบที่ 104) */
   await checkRecipeVideos();
+
+  /* 20) ข่าวสาร & กิจกรรม: เขียน (เนื้อหาเป็นบล็อก) → อ่านกลับ (เวลาไทย) → ภาพถูกใช้ที่ไหน → ลบ (หน้า /news · รอบที่ 105) */
+  await checkNews();
 
   await closePool();
 
@@ -1911,6 +1916,116 @@ async function checkRecipeVideos(): Promise<void> {
 
     assert.equal(await countWhere("recipe where id = $1", [RECIPE_CHECK_ID]), 0, "ต้องไม่เหลือเมนูทดสอบ");
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
+  }
+}
+
+/**
+ * 20) ข่าวสาร & กิจกรรม (หน้า /news · รอบที่ 105) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ว่าชั้นข้อมูลข่าวครบวงจร: เขียนข่าว (เนื้อหาเป็นบล็อก + ภาพปก + รูปในเนื้อหา) → อ่านกลับ
+ * (**เวลาที่อ่านได้ต้องเป็น "เวลาไทย" ค่าเดิมเป๊ะ** — กันบั๊กเขตเวลาตอนย้ายเซิร์ฟเวอร์)
+ * → นับจำนวน/ดึงหน้าที่ 1 ได้ → **ทั้งภาพปกและรูปในเนื้อหาถูก `findMediaUsage` เห็น** → เขียนซ้ำ = แถวเดิม → ลบไม่เหลือ
+ */
+const NEWS_CHECK_SOURCE_ID = "999999";
+const NEWS_CHECK_ID = newsIdOfSourceId(NEWS_CHECK_SOURCE_ID);
+const NEWS_CHECK_ACTOR = "check-db-news@example.invalid";
+
+async function checkNews(): Promise<void> {
+  const coverId = newMediaId();
+  const bodyImageId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const input: NewsInput = {
+    id: NEWS_CHECK_ID,
+    sourceId: NEWS_CHECK_SOURCE_ID,
+    sourceUrl: `/th/news/${NEWS_CHECK_SOURCE_ID}-check`,
+    titleTh: "ข่าวทดสอบ (ด่านตรวจ)",
+    titleEn: "",
+    excerptTh: "คำโปรยทดสอบ",
+    excerptEn: "",
+    publishedLocal: "2026-12-31T09:45",
+    publishedLabel: "31 ธันวาคม 2026 09:45",
+  };
+
+  const body = [
+    { type: "paragraph", text: "ย่อหน้าแรกของข่าวทดสอบ" },
+    { type: "heading", text: "หัวข้อย่อย" },
+    { type: "image", mediaId: bodyImageId, alt: "ข่าวทดสอบ — ภาพที่ 1" },
+    { type: "paragraph", text: "ย่อหน้าปิดท้าย" },
+  ] as const;
+
+  try {
+    for (const [id, filename] of [
+      [coverId, "check-db-news-cover.png"],
+      [bodyImageId, "check-db-news-body.png"],
+    ] as const) {
+      await insertMedia({
+        id,
+        filename,
+        mime: "image/png",
+        sizeBytes: png.length,
+        width: 1,
+        height: 1,
+        data: png,
+        altTh: "ข่าวทดสอบ",
+        altEn: "Check news",
+        createdBy: NEWS_CHECK_ACTOR,
+      });
+    }
+
+    await upsertNews(input, NEWS_CHECK_ACTOR, coverId, body);
+
+    const loaded = await loadNewsBySourceId(NEWS_CHECK_SOURCE_ID);
+    assert.ok(loaded !== null, "ต้องอ่านข่าวจาก source id ได้");
+    assert.equal(loaded.titleTh, "ข่าวทดสอบ (ด่านตรวจ)");
+    assert.equal(loaded.coverPath, `/media/${coverId}`, "ภาพปกต้องเป็นพาธ /media/<id> (มติ D9)");
+    assert.equal(loaded.coverWidth, 1, "ต้องอ่านขนาดภาพปกจากตาราง media ได้");
+    assert.equal(
+      loaded.publishedLocal,
+      "2026-12-31T09:45",
+      "วันที่ต้องกลับมาเป็นเวลาไทยค่าเดิม (ห้ามเลื่อนเขตเวลา)",
+    );
+    assert.deepEqual(
+      loaded.body.map((block) => block.type),
+      ["paragraph", "heading", "image", "paragraph"],
+      "บล็อกต้องเรียงตามที่บันทึก",
+    );
+
+    assert.ok((await countNews()) >= 1, "นับจำนวนข่าวได้");
+
+    /* ข่าวใหม่สุดต้องอยู่บนสุดของหน้าแรก (published_at desc) */
+    const firstPage = await listNews(3, 0);
+    assert.equal(firstPage[0]?.id, NEWS_CHECK_ID, "ข่าวที่ใหม่สุดต้องมาก่อน");
+
+    const coverUsage = await findMediaUsage(coverId);
+    assert.ok(
+      coverUsage.some((entry) => entry.kind === "news" && entry.target === `news:${NEWS_CHECK_ID}`),
+      "findMediaUsage ต้องเห็นภาพปกของข่าว",
+    );
+    const bodyUsage = await findMediaUsage(bodyImageId);
+    assert.ok(
+      bodyUsage.some((entry) => entry.kind === "news" && entry.target === `news:${NEWS_CHECK_ID}`),
+      "findMediaUsage ต้องเห็นรูปในเนื้อหาข่าว (ค้นด้วย JSONB @>)",
+    );
+
+    /* เขียนซ้ำ = แถวเดิม · แก้หัวข้อ = ทับของเดิม */
+    await upsertNews(input, NEWS_CHECK_ACTOR, coverId, body);
+    assert.equal(await countWhere("news where id = $1", [NEWS_CHECK_ID]), 1, "นำเข้าซ้ำต้องไม่สร้างแถวใหม่");
+    await upsertNews({ ...input, titleTh: "ข่าวทดสอบ (แก้แล้ว)" }, NEWS_CHECK_ACTOR, null, body);
+    const updated = await loadNewsBySourceId(NEWS_CHECK_SOURCE_ID);
+    assert.equal(updated?.titleTh, "ข่าวทดสอบ (แก้แล้ว)");
+    assert.equal(updated?.coverPath, `/media/${coverId}`, "ส่ง cover = null ต้องไม่ลบภาพเดิม (coalesce)");
+
+    done("ข่าวสาร & กิจกรรม: เขียน → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ", "บล็อกเนื้อหา · เวลาไทย · JSONB usage");
+  } finally {
+    await deleteNews(NEWS_CHECK_ID);
+    await getPool().query("delete from media where id = any($1::text[])", [[coverId, bodyImageId]]);
+
+    assert.equal(await countWhere("news where id = $1", [NEWS_CHECK_ID]), 0, "ต้องไม่เหลือข่าวทดสอบ");
+    assert.equal(await countWhere("media where id = any($1::text[])", [[coverId, bodyImageId]]), 0, "ต้องไม่เหลือภาพทดสอบ");
   }
 }
 
