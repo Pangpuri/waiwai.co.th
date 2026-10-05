@@ -25,7 +25,7 @@ import { siteNameFor } from "@/lib/site-settings/model";
 import { loadMourningNotice } from "@/lib/mourning/loader";
 import { MOURNING_INIT_SCRIPT } from "@/lib/mourning-notice";
 import { REVEAL_INIT_SCRIPT } from "@/lib/scroll-reveal";
-import { BRAND_APPLE_TOUCH_ICON, BRAND_ICON, BRAND_OG_IMAGE } from "@/lib/brand/assets";
+import { BRAND_APPLE_TOUCH_ICON, BRAND_ICONS, BRAND_OG_IMAGE } from "@/lib/brand/assets";
 import { SITE } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme/theme";
 
@@ -73,13 +73,13 @@ export async function generateMetadata({
       ไอคอนเว็บ (รอบที่ 109) — ค่าเริ่มต้นคือ **โลโก้แบรนด์จริง** ที่เตรียมไว้ใน `public/brand/`
       · หลังบ้าน (ตั้งค่าส่วนกลาง) ยัง **override ได้** ด้วย `settings.favicon` (พฤติกรรมเดิม)
       · `favicon.ico` อยู่ที่ `public/favicon.ico` (เบราว์เซอร์ร้องขอพาธนี้เองโดยไม่ต้องประกาศ)
-      · `icon-192` = ขนาดมาตรฐานของ Android/Chrome · `apple-touch-icon` = พื้นขาว (iOS ทำพื้นโปร่งใสเป็นดำ)
+      · ไอคอน 192/512 มาจาก `logo/icon_web.png` (พื้นขาว) · `apple-touch-icon` = 180 พื้นขาว
     */
     icons:
       settings.favicon !== ""
         ? { icon: settings.favicon }
         : {
-            icon: [{ url: BRAND_ICON.path, type: "image/png", sizes: BRAND_ICON.sizes }],
+            icon: BRAND_ICONS.map((icon) => ({ url: icon.path, type: "image/png", sizes: icon.sizes })),
             apple: [{ url: BRAND_APPLE_TOUCH_ICON.path, sizes: BRAND_APPLE_TOUCH_ICON.sizes }],
           },
     title: {

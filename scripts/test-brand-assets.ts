@@ -7,7 +7,7 @@ import {
   BRAND_APPLE_TOUCH_ICON,
   BRAND_ASSET_PATHS,
   BRAND_FAVICON,
-  BRAND_ICON,
+  BRAND_ICONS,
   BRAND_LOGO,
   BRAND_OG_IMAGE,
 } from "@/lib/brand/assets";
@@ -53,24 +53,29 @@ test("brand: ไฟล์โลโก้/ไอคอน/การ์ดแช�
   assert.equal(og.height, BRAND_OG_IMAGE.height);
   assert.equal(og.width / og.height, BRAND_OG_IMAGE.width / BRAND_OG_IMAGE.height, "อัตราส่วนต้องคงเดิม");
 
-  /* ไอคอน: ขนาดที่ประกาศใน metadata ต้องตรงกับไฟล์จริง (192/180) */
-  const icon = readImageInfo(readFileSync(publicPathOf(BRAND_ICON.path)));
+  /* ไอคอน: ขนาดที่ประกาศใน metadata ต้องตรงกับไฟล์จริง (192/512/180) */
+  for (const icon of BRAND_ICONS) {
+    const info = readImageInfo(readFileSync(publicPathOf(icon.path)));
+    assert.ok(info !== null, `${icon.path} ต้องอ่านหัวไฟล์ได้`);
+    assert.equal(icon.sizes, `${info.width}x${info.height}`, `sizes ของ ${icon.path} ต้องตรงกับไฟล์จริง`);
+    assert.equal(info.width, info.height, "ไอคอนแท็บต้องเป็นจัตุรัส");
+    assert.equal(icon.width, info.width, "ความกว้างที่ประกาศต้องตรงกับไฟล์");
+  }
+
   const apple = readImageInfo(readFileSync(publicPathOf(BRAND_APPLE_TOUCH_ICON.path)));
-  assert.ok(icon !== null && apple !== null);
-  assert.equal(BRAND_ICON.sizes, `${icon.width}x${icon.height}`, "sizes ของไอคอนต้องตรงกับไฟล์จริง");
+  assert.ok(apple !== null);
   assert.equal(
     BRAND_APPLE_TOUCH_ICON.sizes,
     `${apple.width}x${apple.height}`,
     "sizes ของ apple-touch-icon ต้องตรงกับไฟล์จริง",
   );
-  assert.equal(icon.width, icon.height, "ไอคอนแท็บต้องเป็นจัตุรัส");
   assert.equal(apple.width, apple.height, "ไอคอนแอปต้องเป็นจัตุรัส");
 });
 
 test("brand: ไฟล์ไม่ใหญ่เกินงบ (บทเรียน: ต้นฉบับ 211 KB / 1.4 MB ใช้บนเว็บตรง ๆ ไม่ได้)", () => {
   const budgetKb: Readonly<Record<string, number>> = {
     [BRAND_LOGO.path]: 120,
-    [BRAND_ICON.path]: 120,
+    ...Object.fromEntries(BRAND_ICONS.map((icon) => [icon.path, 120])),
     [BRAND_APPLE_TOUCH_ICON.path]: 120,
     [BRAND_OG_IMAGE.path]: 150,
     [BRAND_FAVICON.path]: 20,
@@ -125,7 +130,7 @@ test("brand: navbar/footer ใช้โลโก้ภาพจริง (ไม
 test("brand: favicon/OG ตั้งเป็นค่าเริ่มต้นของแบรนด์ แต่หลังบ้านยัง override ได้", () => {
   const layout = sourceOf("app/[lang]/layout.tsx");
 
-  assert.ok(layout.includes("BRAND_ICON.path"), "ไอคอนเริ่มต้นต้องมาจากไฟล์แบรนด์");
+  assert.ok(layout.includes("BRAND_ICONS.map"), "ไอคอนเริ่มต้นต้องมาจากไฟล์แบรนด์ (ทุกระดับขนาด)");
   assert.ok(layout.includes("BRAND_APPLE_TOUCH_ICON.path"), "ต้องมี apple-touch-icon");
   assert.ok(layout.includes("BRAND_OG_IMAGE.path"), "การ์ดแชร์เริ่มต้นต้องมาจากไฟล์แบรนด์");
   assert.ok(
