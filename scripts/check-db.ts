@@ -1312,12 +1312,51 @@ const RBAC_TEST_EMAIL = "check-db-rbac@example.invalid";
 /** ผู้ทำรายการของด่านนี้ (แยกจากผู้ใช้อื่น เพื่อล้าง audit ได้ตรง) */
 const CHECK_ACTOR = "check-db@example.invalid";
 
+/**
+ * รันฉากทดสอบโดยให้ `keepId` เป็นผู้ดูแลที่ยังใช้งานได้ **คนเดียว** ชั่วคราว แล้วคืนค่าทุกกรณี (รอบที่ 127)
+ *
+ * ⚠️ เคสจริง: ด่าน RBAC รอบก่อน "เดา" ว่าตาราง `admin_user` มีเฉพาะบัญชีทดสอบ
+ * แต่ฐานข้อมูลจริงมี **บัญชีจาก env** (`env-admin` ที่ระบบสร้างตอนเจ้าของล็อกอิน) และอาจมีแถวค้างจากรันก่อน
+ * ⇒ ด่าน "ผู้ดูแลคนสุดท้าย" แดงทั้งที่ระบบถูก · ด่านที่เชื่อถือไม่ได้จะถูกปิดตาในที่สุด
+ * ⇒ ทางแก้ที่ถูกคือ **คุมสถานะเองในฉาก** แล้วคืนค่า (ไม่แก้ที่ข้อมูล)
+ */
+async function withSoloAdmin<T>(keepId: string, run: () => Promise<T>): Promise<T> {
+  const pool = getPool();
+  const { rows } = await pool.query<{ readonly id: string }>(
+    "select id from admin_user where role = 'admin' and disabled = false and id <> $1",
+    [keepId],
+  );
+  const disabled = rows.map((row) => row.id);
+  if (disabled.length > 0) {
+    await pool.query("update admin_user set disabled = true where id = any($1::text[])", [disabled]);
+  }
+  try {
+    return await run();
+  } finally {
+    if (disabled.length > 0) {
+      await pool.query("update admin_user set disabled = false where id = any($1::text[])", [disabled]);
+    }
+  }
+}
+
+/** ล้างบัญชีทดสอบ RBAC ที่อาจค้างจากรันก่อน + เปิดบัญชี env คืนถ้าเคยถูกปิดไว้ (ทำให้รันซ้ำได้เสมอ) */
+async function prepareAdminScenario(): Promise<void> {
+  const pool = getPool();
+  await pool.query("delete from admin_session where user_id in (select id from admin_user where email like $1)", [
+    "check-db-rbac%",
+  ]);
+  await pool.query("delete from admin_user where email like $1", ["check-db-rbac%"]);
+  /* ⚠️ ความปลอดภัย: ถ้ารันก่อนหน้าล้มกลางฉาก บัญชีจาก env อาจถูกปิดค้าง ⇒ เปิดคืน */
+  await pool.query("update admin_user set disabled = false where id = $1 and disabled = true", [ENV_ADMIN_ID]);
+}
+
 async function checkAdminUsers(): Promise<void> {
   const pool = getPool();
   const { equalizeTiming } = await import("@/lib/auth/user-store");
   const { attemptLogin } = await import("@/lib/auth/login");
 
-  /* กันร่องรอยจากรอบก่อน */
+  /* เตรียมฉาก: ล้างบัญชีทดสอบที่ค้าง + เปิดบัญชี env คืนถ้าเคยถูกปิดค้าง */
+  await prepareAdminScenario();
   await pool.query("delete from admin_user where lower(email) = $1", [RBAC_TEST_EMAIL]);
   await pool.query("delete from audit_log where target like 'usr_%' and actor_email = $1", [CHECK_ACTOR]);
 
@@ -1394,7 +1433,9 @@ async function checkAdminUsers(): Promise<void> {
     });
     assert.equal(owner.ok, true, "สร้างผู้ดูแลทดสอบต้องสำเร็จ");
     if (owner.ok) {
-      /* มีผู้ดูแลที่ยังใช้งานได้ 1 คน (คนนี้) ⇒ ถอดบทบาท/ปิด ต้องถูกปฏิเสธ */
+      /* ฉาก "ผู้ดูแลคนสุดท้าย" — ปิดบัญชีจริงชั่วคราวแล้วคืนค่าให้เสมอ (รอบที่ 127) */
+      await withSoloAdmin(owner.user.id, async () => {
+        /* มีผู้ดูแลที่ยังใช้งานได้ 1 คน (คนนี้) ⇒ ถอดบทบาท/ปิด ต้องถูกปฏิเสธ */
       const demote = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
       assert.equal(demote.ok, false, "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
       const disable = await setAdminUserDisabled({ id: owner.user.id, disabled: true, actor: CHECK_ACTOR });
@@ -1413,6 +1454,7 @@ async function checkAdminUsers(): Promise<void> {
         const demoteNow = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
         assert.equal(demoteNow.ok, true, "มีผู้ดูแลคนอื่นแล้ว ⇒ ถอดบทบาทได้");
       }
+      });
       await pool.query("delete from admin_user where email like 'check-db-rbac-owner%'");
     }
 
@@ -1554,10 +1596,12 @@ async function checkAdminUsers(): Promise<void> {
       });
       assert.equal(solo.ok, true, "สร้างผู้ดูแลเดี่ยวต้องสำเร็จ");
       if (solo.ok) {
+      /* ฉาก "ห้ามลบผู้ดูแลคนสุดท้าย" — ปิดบัญชีจริงชั่วคราวแล้วคืนค่าให้เสมอ (รอบที่ 127) */
+      await withSoloAdmin(solo.user.id, async () => {
         assert.equal(
           (await deleteAdminUser({ id: solo.user.id, actor: CHECK_ACTOR, actorId: "check-db-other", confirmEmail: solo.user.email })).ok,
           false,
-          "ห้ามลบผู้ดูแลคนสุดท้าย",
+          "ห้ามลบผู้ดูแลคนสุดท้าย (หลังแยกฉาก)",
         );
 
         /* มีผู้ดูแลคนที่สองที่ยังใช้งานได้ ⇒ ลบได้ (ด่านไม่บล็อกเกินจำเป็น) */
@@ -1574,6 +1618,7 @@ async function checkAdminUsers(): Promise<void> {
           true,
           "มีผู้ดูแลคนอื่นแล้ว ⇒ ลบได้",
         );
+      });
       }
 
       /* 4) ลบจริงสำเร็จ (อีเมลที่พิมพ์ต่างตัวพิมพ์ก็ต้องผ่าน — เทียบแบบ normalize) + บัญชีหายจากตาราง */
