@@ -32,6 +32,8 @@ type NewsBodyBlocksProps = {
   readonly strings: Messages["admin"];
   readonly initial: readonly NewsEditorBlock[];
   readonly library: readonly NewsEditorLibraryItem[];
+  /** รายงานค่าปัจจุบันขึ้นไปให้พรีวิว (ฝั่งฟอร์มเป็นเจ้าของพรีวิว) */
+  readonly onChange?: (items: readonly NewsEditorBlock[]) => void;
 };
 
 const CARD_CLASS = "border-line bg-surface rounded-xl border p-3";
@@ -40,7 +42,7 @@ const BUTTON_CLASS =
 const FIELD_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 
-export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksProps) {
+export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsBodyBlocksProps) {
   const [items, setItems] = useState<readonly NewsEditorBlock[]>(initial);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [counter, setCounter] = useState(0);
@@ -50,6 +52,12 @@ export function NewsBodyBlocks({ strings: m, initial, library }: NewsBodyBlocksP
     อัปโหลดเสร็จ = ใส่การ์ดภาพให้ทันที (ไม่ต้องรีเฟรชและไม่เสียสิ่งที่พิมพ์ไว้)
     ⚠️ ตัว action คืน **พาธ** /media/<id> ⇒ ต้องแปลงเป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9: เก็บพาธ ไม่เก็บ URL)
   */
+  /* รายงานขึ้นไปทุกครั้งที่รายการเปลี่ยน (พรีวิวต้องตรงกับสิ่งที่กำลังแก้) */
+  useEffect(() => {
+    onChange?.(items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onChange เป็น callback จากฝั่งฟอร์ม (ไม่ต้องอยู่ใน dep)
+  }, [items]);
+
   useEffect(() => {
     if (uploadState.status !== "ok") return;
     const mediaId = mediaIdFromPath(uploadState.path);

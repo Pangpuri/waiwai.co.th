@@ -87,4 +87,10 @@ export const adminNews = {
   newsAdminUploading: "กำลังอัปโหลด…",
   newsAdminUploadFailed: "อัปโหลดไม่สำเร็จ — ลองไฟล์อื่น",
   newsAdminFromComputer: "หรืออัปโหลดจากเครื่อง",
+  newsAdminPreview: "พรีวิวหน้าเว็บ",
+  newsAdminPreviewTh: "ไทย",
+  newsAdminPreviewEn: "อังกฤษ",
+  newsAdminPreviewUntitled: "(ยังไม่มีหัวข้อ)",
+  newsAdminPreviewEmpty: "ยังไม่มีเนื้อหา — เพิ่มย่อหน้าหรือภาพด้านซ้าย",
+  newsAdminPreviewHint: "แบบที่ผู้อ่านจะเห็นบนหน้าเว็บ (ใช้ตัวเรนเดอร์ตัวเดียวกับหน้าเว็บจริง)",
 };

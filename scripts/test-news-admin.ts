@@ -192,3 +192,23 @@ test("news admin: อัปโหลดภาพจากเครื่อง �
   assert.ok(blocks.includes("ImageFileInput"), "ช่องอัปโหลดต้องใช้ ImageFileInput (ย่อภาพในเบราว์เซอร์ก่อนส่ง)");
   assert.ok(blocks.includes("mediaIdFromPath"), "ต้องแปลงพาธ /media/<id> เป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9)");
 });
+
+test("news admin: พรีวิวต้องใช้ตัวเรนเดอร์เดียวกับหน้าเว็บจริง (กัน 'พรีวิวโกหก')", () => {
+  const preview = readFileSync("features/admin/ui/news-preview.tsx", "utf8");
+  const form = readFileSync("features/admin/ui/news-editor-form.tsx", "utf8");
+  const publicBody = readFileSync("features/news/ui/news-body.tsx", "utf8");
+
+  /* ตัวเรนเดอร์เนื้อหาหน้าเว็บจริง = NewsBody — พรีวิวต้อง import ตัวเดียวกัน ไม่เขียนใหม่ */
+  assert.ok(
+    /import \{ NewsBody \} from "@\/features\/news\/ui\/news-body"/.test(preview),
+    "พรีวิวต้องใช้ NewsBody ตัวเดียวกับหน้า /news/<id>",
+  );
+  assert.ok(preview.includes("<NewsBody blocks={props.blocks} sizes={sizes} />"), "ต้องเรนเดอร์เนื้อหาผ่าน NewsBody");
+  assert.ok(!preview.includes("dangerouslySetInnerHTML"), "พรีวิวห้ามตีความเป็น HTML");
+  assert.equal(
+    (publicBody.match(/export function NewsBody/g) ?? []).length,
+    1,
+    "ต้องมีตัวเรนเดอร์เนื้อหาเพียงตัวเดียวในระบบ",
+  );
+  assert.ok(form.includes("<NewsPreview"), "หน้าจอแก้ข่าวต้องแสดงพรีวิว");
+});

@@ -36,6 +36,9 @@ export default async function AdminNewsEditorPage({
     path: `/media/${item.id}`,
   }));
 
+  /* ขนาดรูปสำหรับพรีวิว — ใช้ข้อมูลจากคลังที่ดึงมาแล้ว (ไม่ต้องยิง DB เพิ่ม) */
+  const previewSizes = media.map((item) => ({ id: item.id, width: item.width, height: item.height }));
+
   return (
     <main className="container-site py-10">
       <p className="text-sm">
@@ -61,6 +64,7 @@ export default async function AdminNewsEditorPage({
           status={existing?.status ?? "draft"}
           initialBody={existing?.body ?? []}
           library={library}
+          previewSizes={previewSizes}
           trashed={existing?.trashed ?? false}
         />
       </div>

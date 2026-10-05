@@ -6,7 +6,8 @@ import { useActionState, useState } from "react";
 import { saveNewsAction } from "@/app/admin/news/actions";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { NewsBodyBlocks } from "@/features/admin/ui/news-body-blocks";
-import { newsBlocksToEditor } from "@/lib/news/editor-blocks";
+import { NewsPreview, type NewsPreviewSize } from "@/features/admin/ui/news-preview";
+import { newsBlocksToEditor, parseNewsEditorBlocks, type NewsEditorBlock } from "@/lib/news/editor-blocks";
 import type { NewsBlock } from "@/lib/news/body";
 import { INITIAL_NEWS_SAVE_STATE } from "@/features/admin/news-state";
 
@@ -38,6 +39,8 @@ type NewsEditorFormProps = {
   readonly status: "draft" | "published";
   readonly initialBody: readonly NewsBlock[];
   readonly library: readonly NewsEditorLibraryItem[];
+  /** ขนาดรูปสำหรับพรีวิว (ส่งเป็นรายการธรรมดา — Map ข้าม RSC boundary ไม่ได้) */
+  readonly previewSizes: readonly NewsPreviewSize[];
   readonly trashed: boolean;
 };
 
@@ -50,6 +53,13 @@ const BUTTON_CLASS =
 export function NewsEditorForm(props: NewsEditorFormProps) {
   const [state, formAction, pending] = useActionState(saveNewsAction, INITIAL_NEWS_SAVE_STATE);
   const [cover, setCover] = useState(props.coverPath);
+  /* ทุกช่องเป็น "ควบคุม" เพื่อให้พรีวิวสะท้อนสิ่งที่กำลังพิมพ์แบบทันที (รอบที่ 128) */
+  const [titleTh, setTitleTh] = useState(props.titleTh);
+  const [titleEn, setTitleEn] = useState(props.titleEn);
+  const [excerptTh, setExcerptTh] = useState(props.excerptTh);
+  const [excerptEn, setExcerptEn] = useState(props.excerptEn);
+  const [publishedLocal, setPublishedLocal] = useState(props.publishedLocal);
+  const [blocks, setBlocks] = useState<readonly NewsEditorBlock[]>(() => newsBlocksToEditor(props.initialBody));
   const m = props.strings;
 
   /* ข้อความผลลัพธ์ — มาจากพจนานุกรมเท่านั้น (Server Action ส่งกลับแค่รหัสเหตุผล) */
@@ -69,7 +79,8 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
           : "";
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
+    <form action={formAction} className="flex flex-col gap-8 lg:flex-row lg:items-start">
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
       <input type="hidden" name="id" value={props.id} />
 
       {statusMessage === "" ? null : (
@@ -92,17 +103,31 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="block">
           <span className={LABEL_CLASS}>{m.newsAdminFieldTitleTh}</span>
-          <input type="text" name="titleTh" defaultValue={props.titleTh} className={INPUT_CLASS} required />
+          <input
+            type="text"
+            name="titleTh"
+            value={titleTh}
+            onChange={(event) => setTitleTh(event.target.value)}
+            className={INPUT_CLASS}
+            required
+          />
         </label>
         <label className="block">
           <span className={LABEL_CLASS}>{m.newsAdminFieldTitleEn}</span>
-          <input type="text" name="titleEn" defaultValue={props.titleEn} className={INPUT_CLASS} />
+          <input
+            type="text"
+            name="titleEn"
+            value={titleEn}
+            onChange={(event) => setTitleEn(event.target.value)}
+            className={INPUT_CLASS}
+          />
         </label>
         <label className="block">
           <span className={LABEL_CLASS}>{m.newsAdminFieldExcerptTh}</span>
           <textarea
             name="excerptTh"
-            defaultValue={props.excerptTh}
+            value={excerptTh}
+            onChange={(event) => setExcerptTh(event.target.value)}
             rows={3}
             className={INPUT_CLASS}
             placeholder={m.newsAdminSearchPlaceholder}
@@ -110,7 +135,13 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
         </label>
         <label className="block">
           <span className={LABEL_CLASS}>{m.newsAdminFieldExcerptEn}</span>
-          <textarea name="excerptEn" defaultValue={props.excerptEn} rows={3} className={INPUT_CLASS} />
+          <textarea
+            name="excerptEn"
+            value={excerptEn}
+            onChange={(event) => setExcerptEn(event.target.value)}
+            rows={3}
+            className={INPUT_CLASS}
+          />
         </label>
       </div>
 
@@ -143,7 +174,8 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
           <input
             type="datetime-local"
             name="publishedLocal"
-            defaultValue={props.publishedLocal}
+            value={publishedLocal}
+            onChange={(event) => setPublishedLocal(event.target.value)}
             className={INPUT_CLASS}
           />
           <span className="text-fg-muted mt-1 block text-xs">{m.newsAdminPublishedHint}</span>
@@ -159,7 +191,7 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
 
       <div>
         <span className={LABEL_CLASS}>{m.newsAdminFieldBody}</span>
-        <NewsBodyBlocks strings={m} initial={newsBlocksToEditor(props.initialBody)} library={props.library} />
+        <NewsBodyBlocks strings={m} initial={blocks} library={props.library} onChange={setBlocks} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -167,6 +199,24 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
           {m.newsAdminSave}
         </button>
       </div>
+      </div>
+
+      <aside className="lg:w-[380px] lg:shrink-0">
+        <div className="lg:sticky lg:top-6">
+          <NewsPreview
+            strings={m}
+            titleTh={titleTh}
+            titleEn={titleEn}
+            excerptTh={excerptTh}
+            excerptEn={excerptEn}
+            coverPath={cover}
+            publishedLocal={publishedLocal}
+            blocks={parseNewsEditorBlocks(blocks.map((item) => (item.kind === "image" ? { kind: "image", mediaId: item.mediaId, alt: item.alt } : { kind: item.kind, text: item.text })))}
+            sizes={props.previewSizes}
+            defaultLanguage="th"
+          />
+        </div>
+      </aside>
     </form>
   );
 }
