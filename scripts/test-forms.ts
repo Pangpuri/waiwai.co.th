@@ -193,3 +193,89 @@ test("formatBytes: อ่านง่าย (B/KB/MB)", () => {
   assert.equal(formatBytes(2048), "2 KB");
   assert.equal(formatBytes(3 * 1024 * 1024), "3.0 MB");
 });
+
+/* ── ฟอร์ม + Server Action: ห้ามใส่ encType/method เอง (แก้รอบที่ 107) ────────────
+   React 19 เตือนว่า "React provides those automatically. They will get overridden."
+   ⇒ ต้องพิสูจน์ 2 ด้าน: (1) React เตือนจริงถ้าใส่เอง (2) ไม่ใส่แล้วไม่เตือน
+   และ (3) ทั้งโปรเจกต์ไม่มีที่ไหนใส่ `encType`/`method` บนฟอร์มที่ action เป็นฟังก์ชัน
+   ⚠️ React เตือนครั้งเดียวต่อโปรเซส (didWarn…) ⇒ ต้องเก็บ warning ของ "เคสผิด" ก่อน แล้วเช็คว่าเคสถูกไม่เพิ่ม warning
+   ⚠️ ค่าที่ React ใส่ให้เอง (method/encType/action) มาจาก metadata ของ Server Action ของ Next
+      ไม่ใช่จาก attribute ของเรา — ดูซอร์สจริง: react-server-dom-turbopack → { method: "POST", encType: "multipart/form-data" }
+   --------------------------------------------------------------------------- */
+
+test("ฟอร์ม: React 19 เตือนถ้าใส่ encType เอง — และไม่เตือนเมื่อไม่ใส่ (ล็อกกันใส่กลับ)", async () => {
+  const { createElement } = await import("react");
+  const { renderToString } = await import("react-dom/server");
+
+  const collected: string[] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    collected.push(args.map((value) => String(value)).join(" "));
+  };
+
+  const action = (): void => {};
+  let withEncType = "";
+  let without = "";
+
+  try {
+    withEncType = renderToString(
+      createElement("form", { action, encType: "multipart/form-data" }, createElement("input", { name: "x" })),
+    );
+    const warningCountAfterBadCase = collected.filter((line) => line.includes("Cannot specify a encType")).length;
+    assert.equal(warningCountAfterBadCase, 1, "React ต้องเตือนเมื่อเราส่ง encType มาคู่กับ action ที่เป็นฟังก์ชัน");
+
+    collected.length = 0;
+    without = renderToString(createElement("form", { action }, createElement("input", { name: "x" })));
+    assert.deepEqual(
+      collected.filter((line) => line.includes("Cannot specify a encType")),
+      [],
+      "ห้ามมี warning เมื่อไม่ส่ง encType/method เอง",
+    );
+  } finally {
+    console.error = originalError;
+  }
+
+  /*
+    หลักฐานว่า `encType` ที่เราใส่ "ถูกทิ้งจริง" (ไม่ใช่แค่ถูกทับ)
+    - ใน React เปล่า (ไม่มี metadata ของ Server Action) React ใส่ `action="javascript:throw …"` ให้ และ **ไม่ออก encType เลย**
+    - ในแอปจริง Next/RSC จะเติม `action="" method="POST" encType="multipart/form-data"` จาก metadata ของ Server Action
+      (ยืนยันจากซอร์ส `react-server-dom-turbopack` + HTML ที่เรนเดอร์จริงของ `/th/careers`)
+    ⇒ ของที่เราส่งไปหายทั้งสองกรณี — ใส่ไว้จึงไร้ประโยชน์และมีแต่ warning
+  */
+  assert.ok(withEncType.includes("<form"), "เคสผิดยังเรนเดอร์เป็นฟอร์ม");
+  assert.ok(
+    !withEncType.includes('encType="multipart/form-data"'),
+    "encType ที่เราส่งไปต้องถูกทิ้ง (React ใช้ค่าของตัวเอง) — ยืนยันว่าการใส่ไว้ไม่มีผล",
+  );
+  /* เคสถูก: ปล่อยให้ React/Next จัดการ attribute ให้หมด */
+  assert.ok(without.includes("<form"), "เคสถูกต้องเรนเดอร์เป็นฟอร์มปกติ");
+});
+
+test("ฟอร์ม: ทั้งโปรเจกต์ห้ามใส่ encType/method บน <form> ที่ action เป็นฟังก์ชัน/ตัวแปร", async () => {
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+
+  const root = process.cwd();
+  const offenders: string[] = [];
+
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!name.endsWith(".tsx")) continue;
+      const source = readFileSync(full, "utf8");
+      /* จับเฉพาะแท็ก <form …> ที่มี encType/method และ action ที่ไม่ใช่สตริง (เช่น action={formAction}) */
+      for (const match of source.matchAll(/<form\b[^>]*>/g)) {
+        const tag = match[0];
+        if (!/action=\{/.test(tag)) continue;
+        if (/\bencType=|\bmethod=/.test(tag)) offenders.push(`${full.replace(root, "")}: ${tag.slice(0, 120)}`);
+      }
+    }
+  };
+
+  for (const dir of ["app", "features", "lib"]) walk(join(root, dir));
+  assert.deepEqual(offenders, [], "ห้ามใส่ encType/method บนฟอร์มที่ action เป็นฟังก์ชัน (React จัดการให้เอง)");
+});

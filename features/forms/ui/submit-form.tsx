@@ -51,8 +51,17 @@ export function SubmitForm({
   const consentError = state.status === "invalid" && state.fields.includes("consent");
 
   return (
-    /* encType จำเป็นเมื่อปิด JS: ไฟล์ต้องส่งแบบ multipart จริง (ไม่ใช่ urlencoded) */
-    <form action={formAction} className={className} encType="multipart/form-data">
+    /*
+      ⚠️ **ห้ามใส่ `encType`/`method` บนฟอร์มที่ `action` เป็นฟังก์ชัน** (แก้รอบที่ 107)
+      - React 19 เตือน: "Cannot specify a encType or method for a form that specifies a function as the action.
+        React provides those automatically. They will get overridden." (เตือนเฉพาะใน dev)
+      - ที่ React ใส่ให้เอง (ยืนยันจากซอร์สที่ติดตั้งจริง `react-server-dom-turbopack`):
+        `{ method: "POST", encType: "multipart/form-data", action: "" }` ⇒ **ส่งไฟล์ได้จริงแม้ปิด JS**
+        (multipart มาจาก metadata ของ Server Action ไม่ใช่จาก attribute ของเรา)
+      - ของเดิมเราใส่ `encType="multipart/form-data"` ไว้เอง ⇒ ซ้ำซ้อน + ทำให้ dev ขึ้น warning ทุกครั้งที่เรนเดอร์
+      ⇒ เทสต์ล็อกไว้ที่ `scripts/test-forms.ts` (ทั้งระดับ React และการสแกนซอร์ส)
+    */
+    <form action={formAction} className={className}>
       <input type="hidden" name="form" value={formKind} />
 
       {/* กับดักบอต — ไม่แสดงให้มนุษย์เห็น แต่บอตมักกรอก */}
