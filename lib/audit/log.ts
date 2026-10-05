@@ -20,6 +20,9 @@ export type AuditAction =
   | "preset-save"
   | "pages-update"
   /* ข่าว/กิจกรรม (รอบที่ 123) */
+  /* สินค้า (รอบที่ 132) */
+  | "product-save"
+  | "product-category-save"
   | "news-save"
   | "news-trash"
   | "news-restore"

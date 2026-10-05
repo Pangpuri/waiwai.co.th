@@ -1,0 +1,178 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import {
+  INITIAL_ADMIN_UPLOAD_STATE,
+  type AdminUploadState,
+  type CategorySaveState,
+  type ProductSaveState,
+} from "@/features/admin/product-state";
+import { recordAudit } from "@/lib/audit/log";
+import { requireAdminUser } from "@/lib/auth/dal";
+import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
+import { isDatabaseConfigured } from "@/db/pool";
+import { mediaIdFromPath } from "@/lib/media/usage";
+import { storeImageFile } from "@/lib/media/upload";
+import { replaceProductIngredients, upsertProduct, upsertProductCategory } from "@/lib/products/repository";
+import {
+  isCatalogCategoryId,
+  validateIngredientInput,
+  validateProductInput,
+  type ProductIngredientInput,
+  type ProductInput,
+} from "@/lib/products/model";
+
+/**
+ * Server Action ของหลังบ้าน "สินค้า" (รอบที่ 132)
+ *
+ * กติกาเดียวกับหลังบ้านข่าว: ตรวจสิทธิ์ทุก action · ห้ามเชื่อข้อมูลจากเบราว์เซอร์ (ผ่าน validator กลาง)
+ * · เขียน audit ทุกครั้ง · บันทึกแล้วสั่ง `refreshPublicSite("page")` ให้หน้าเว็บอัปเดตทันที
+ * ⚠️ **ไม่ให้แก้ `id`/`source_id`** — URL `/products/<slug>` ต้องคงที่ (การเปลี่ยน slug ต้องมีตัวเปลี่ยนเส้นทาง 301 ซึ่งยังไม่มี)
+ */
+
+const LIST_PATH = "/admin/products";
+
+function field(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readInt(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+/** ส่วนผสมที่ส่งมาจากตัวแก้ (JSON) — ตรวจทีละรายการด้วย validator กลาง */
+function readIngredients(raw: string): readonly ProductIngredientInput[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw === "" ? "[]" : raw) as unknown;
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+
+  const items: ProductIngredientInput[] = [];
+  for (const entry of parsed) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const candidate: ProductIngredientInput = {
+      nameTh: typeof record["nameTh"] === "string" ? record["nameTh"].trim() : "",
+      nameEn: typeof record["nameEn"] === "string" ? record["nameEn"].trim() : "",
+      percentText: typeof record["percentText"] === "string" ? record["percentText"].trim() : "",
+    };
+    if (candidate.nameTh === "" && candidate.nameEn === "") continue;
+    if (validateIngredientInput(candidate, items.length).length > 0) return null;
+    items.push(candidate);
+  }
+  return items;
+}
+
+export async function saveProductAction(_previous: ProductSaveState, formData: FormData): Promise<ProductSaveState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database", createdId: null };
+
+  const id = field(formData, "id");
+  const categoryId = field(formData, "categoryId");
+  const nameTh = field(formData, "nameTh");
+  if (nameTh === "" || !isCatalogCategoryId(categoryId)) {
+    return { status: "error", reason: "title", createdId: null };
+  }
+
+  /* สร้างใหม่: id/source_id เป็นตัวเลขจากเวลา (รูปแบบเดียวกับที่นำเข้า: p<source_id>) */
+  const existingSourceId = field(formData, "sourceId");
+  const sourceId = existingSourceId === "" ? String(Date.now()) : existingSourceId;
+  const productId = id === "" ? `p${sourceId}` : id;
+
+  const ingredients = readIngredients(field(formData, "ingredients"));
+  if (ingredients === null) return { status: "error", reason: "ingredients", createdId: null };
+
+  const input: ProductInput = {
+    id: productId,
+    sourceId,
+    sourceUrl: "",
+    categoryId,
+    nameTh,
+    nameEn: field(formData, "nameEn"),
+    groupTh: field(formData, "groupTh"),
+    groupEn: field(formData, "groupEn"),
+    taglineTh: field(formData, "taglineTh"),
+    taglineEn: field(formData, "taglineEn"),
+    detailsTh: field(formData, "detailsTh"),
+    allergensTh: field(formData, "allergensTh"),
+    netWeightTh: field(formData, "netWeightTh"),
+    fdaNumber: field(formData, "fdaNumber"),
+    packagingTh: field(formData, "packagingTh"),
+    sortOrder: readInt(field(formData, "sortOrder")),
+  };
+
+  if (validateProductInput(input).length > 0) return { status: "error", reason: "title", createdId: null };
+
+  await upsertProduct(input, user.email, mediaIdFromPath(field(formData, "imagePath")));
+  await replaceProductIngredients(productId, ingredients);
+  await recordAudit({
+    action: "product-save",
+    actorEmail: user.email,
+    target: `product:${productId}`,
+    detail: id === "" ? "created" : "updated",
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${productId}`);
+  revalidatePath(`${LIST_PATH}/${productId}`);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: null, createdId: productId };
+}
+
+/** บันทึกคำอธิบาย/ภาพของหมวดสินค้า (ชื่อหมวดมาจากโค้ดเสมอ — กันชื่อหลุดจากกัน) */
+export async function saveProductCategoryAction(
+  _previous: CategorySaveState,
+  formData: FormData,
+): Promise<CategorySaveState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database" };
+
+  const categoryId = field(formData, "categoryId");
+  if (!isCatalogCategoryId(categoryId)) return { status: "error", reason: "invalid" };
+
+  await upsertProductCategory(
+    {
+      id: categoryId,
+      sourceId: field(formData, "sourceId"),
+      descriptionTh: field(formData, "descriptionTh"),
+      descriptionEn: field(formData, "descriptionEn"),
+    },
+    user.email,
+    mediaIdFromPath(field(formData, "imagePath")),
+  );
+  await recordAudit({
+    action: "product-category-save",
+    actorEmail: user.email,
+    target: `category:${categoryId}`,
+    detail: "updated",
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: null };
+}
+
+/** อัปโหลดภาพจากเครื่อง (ใช้ท่อกลาง storeImageFile — ย่อภาพ/ตรวจหัวไฟล์/เพดาน 5MB) */
+export async function uploadProductImageAction(
+  _previous: AdminUploadState,
+  formData: FormData,
+): Promise<AdminUploadState> {
+  await requireAdminUser("content");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ...INITIAL_ADMIN_UPLOAD_STATE, status: "invalid", reason: "missing" };
+  }
+
+  const stored = await storeImageFile(file, "product-editor");
+  if (!stored.ok) return { ...INITIAL_ADMIN_UPLOAD_STATE, status: "invalid", reason: stored.reason };
+
+  revalidateAdminPath(LIST_PATH);
+  return { status: "ok", path: stored.path, reason: "" };
+}

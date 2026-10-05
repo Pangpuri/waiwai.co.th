@@ -51,6 +51,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     { href: "/admin/builder/mourning", label: messages.admin.mourningTitle, permission: "presets" },
     { href: "/admin/content/home", label: messages.admin.contentTitle, permission: "content" },
     { href: "/admin/inbox", label: messages.admin.inboxTitle, permission: "inbox" },
+    { href: "/admin/products", label: messages.admin.adminProductsTitle, permission: "content" },
     { href: "/admin/news", label: messages.admin.newsAdminTitle, permission: "content" },
     { href: "/admin/media", label: messages.admin.mediaTitle, permission: "media" },
     { href: "/admin/trash", label: messages.admin.trashTitle, permission: "trash" },

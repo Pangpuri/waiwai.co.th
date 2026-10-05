@@ -36,6 +36,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "migrate-blocks": strings.auditBlockMigrate,
     "retention-purge": strings.auditRetentionPurge,
     "erase-subject": strings.auditEraseSubject,
+    "product-save": strings.auditProductSave,
+    "product-category-save": strings.auditProductCategorySave,
     "news-save": strings.auditNewsSave,
     "news-trash": strings.auditNewsTrash,
     "news-restore": strings.auditNewsRestore,
