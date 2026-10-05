@@ -57,4 +57,8 @@ export const adminProducts: Pick<Messages["admin"], keyof typeof thAdminProducts
   adminProductsPreviewHint: "How readers will see it on the site (same renderer as the live page)",
   auditProductSave: "Product saved",
   auditProductCategorySave: "Category description saved",
+  adminProductsUpload: "Upload from computer",
+  adminProductsUploadHint: "PNG/JPEG/WebP up to 5MB (resized automatically)",
+  adminProductsUploading: "Uploading…",
+  adminProductsUploadFailed: "Upload failed — try another file",
 };

@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { listBlockPresets, saveBlockPreset } from "@/lib/blocks/presets";
 import { ENV_ADMIN_ID } from "@/lib/auth/user-store";
-import { countActiveAdmins, ensureEnvAdminUser } from "@/lib/auth/users-repository";
+import { ensureEnvAdminUser } from "@/lib/auth/users-repository";
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 import { HOME_SEED } from "@/lib/content/home-seed";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";

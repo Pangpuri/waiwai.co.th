@@ -400,6 +400,7 @@ export type AdminProductListItem = {
 };
 
 export type AdminProductDetail = AdminProductListItem & {
+  readonly groupEn: string;
   readonly taglineTh: string;
   readonly taglineEn: string;
   readonly detailsTh: string;
@@ -410,7 +411,7 @@ export type AdminProductDetail = AdminProductListItem & {
   readonly ingredients: readonly ProductIngredientRecord[];
 };
 
-const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th,
+const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en,
        p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th,
        m.id as image_id, m.width as image_width, m.height as image_height,
        (select count(*)::int from product_ingredient i where i.product_id = p.id) as ingredient_count,
@@ -517,6 +518,7 @@ export async function loadProductForAdmin(id: string): Promise<AdminProductDetai
 
     return {
       ...base,
+      groupEn: typeof row.group_en === "string" ? row.group_en : "",
       taglineTh: typeof row.tagline_th === "string" ? row.tagline_th : "",
       taglineEn: typeof row.tagline_en === "string" ? row.tagline_en : "",
       detailsTh: typeof row.details_th === "string" ? row.details_th : "",

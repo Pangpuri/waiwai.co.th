@@ -54,4 +54,8 @@ export const adminProducts = {
   adminProductsPreviewHint: "แบบที่ผู้อ่านจะเห็นบนหน้าเว็บ (ใช้ตัวเรนเดอร์ตัวเดียวกับหน้าเว็บจริง)",
   auditProductSave: "บันทึกสินค้า",
   auditProductCategorySave: "บันทึกคำอธิบายหมวดสินค้า",
+  adminProductsUpload: "อัปโหลดภาพจากเครื่อง",
+  adminProductsUploadHint: "PNG/JPEG/WebP ไม่เกิน 5MB (ระบบย่อภาพให้เอง)",
+  adminProductsUploading: "กำลังอัปโหลด…",
+  adminProductsUploadFailed: "อัปโหลดไม่สำเร็จ — ลองไฟล์อื่น",
 };
