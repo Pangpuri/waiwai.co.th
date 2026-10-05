@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 import {
   BLOCK_COVERAGE_PART_IDS,
   BLOCK_TEMPLATE_PAGE_IDS,
@@ -37,10 +38,27 @@ function sourceOf(relativePath: string): string {
 
 /* ── 1) ทะเบียนเทมเพลต ─────────────────────────────────────────────────────── */
 
-test("templates: ทะเบียนครบทั้ง 9 หน้า และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
+test("templates: ทะเบียนครบ 9 หน้าเมนู + 6 หน้ารายละเอียดหมวด และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
   assert.deepEqual(
     [...BLOCK_TEMPLATE_PAGE_IDS],
-    ["home", "about", "careers", "contact", "products", "recipes", "news", "certifications", "executives"],
+    [
+      "home",
+      "about",
+      "careers",
+      "contact",
+      "products",
+      "recipes",
+      "news",
+      "certifications",
+      "executives",
+      /* หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — เรียงตามลำดับหมวดใน CATALOG_ITEMS */
+      "product-instant-noodles",
+      "product-dried-vermicelli",
+      "product-serda",
+      "product-quick-zabb",
+      "product-noodie",
+      "product-rod-ded",
+    ],
   );
 
   for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
@@ -238,8 +256,12 @@ test("templates: ตัวเลือกลิงก์พรีวิวคร
 /* ── 3) หน้าสาธารณะที่แปลงแล้ว ─────────────────────────────────────────────── */
 
 test("templates: ทุกหน้าที่มีเทมเพลตต้องเรนเดอร์เอกสารที่เผยแพร่ได้ และมีทางถอยเป็นเลย์เอาต์เดิม", () => {
-  /* หน้าแรกอยู่ที่ app/[lang]/page.tsx · หน้าอื่นมีโฟลเดอร์ของตัวเอง (certifications/executives อยู่ใต้ about) */
-  const routeFiles: Readonly<Record<string, string>> = {
+  /*
+    หน้าเมนู 9 หน้า → ไฟล์ route ของตัวเอง
+    หน้ารายละเอียดหมวด 6 หน้า → ใช้ไฟล์ร่วมกัน (`app/[lang]/products/[slug]/page.tsx`)
+      โดย id ของหน้าแตกต่างกัน (`product-<slug>`) ⇒ ตรวจแบบ "ไฟล์เดียวกัน + มี id ในโค้ด"
+  */
+  const menuRouteFiles: Readonly<Record<string, string>> = {
     home: "app/[lang]/page.tsx",
     about: "app/[lang]/about/page.tsx",
     careers: "app/[lang]/careers/page.tsx",
@@ -250,12 +272,21 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
     certifications: "app/[lang]/about/certifications/page.tsx",
     executives: "app/[lang]/about/executives/page.tsx",
   };
+  const productDetailRoute = "app/[lang]/products/[slug]/page.tsx";
+  const productDetailSource = sourceOf(productDetailRoute);
 
   for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
     assert.ok(PAGE_PATHS[page] !== undefined, `${page}: ต้องมี path ในเว็บ`);
 
-    const source = sourceOf(routeFiles[page] ?? "");
-    assert.ok(source.includes(`loadLiveBlockDocument("${page}")`), `${page}: ต้องโหลดเอกสารที่เผยแพร่`);
+    const detailPage = isProductDetailPageId(page);
+    const source = detailPage ? productDetailSource : sourceOf(menuRouteFiles[page] ?? "");
+
+    assert.ok(
+      detailPage
+        ? source.includes("loadLiveBlockDocument(productDetailPageId(")
+        : source.includes(`loadLiveBlockDocument("${page}")`),
+      `${page}: ต้องโหลดเอกสารที่เผยแพร่`,
+    );
     assert.ok(source.includes("<BlockDocumentView"), `${page}: ต้องใช้ตัวเรนเดอร์ตัวเดียวกับหน้าแรก`);
     assert.ok(source.includes("return ("), `${page}: ต้องมีเลย์เอาต์เดิมเป็นทางถอย`);
 
@@ -264,10 +295,18 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
     assert.ok(builder.includes("isPageLive(page)"), "หน้าจอสร้างต้องอ่านสถานะสวิตช์ของหน้านั้น");
   }
 
-  /* ทะเบียนกับไฟล์ route ต้องตรงกันเป๊ะ — ลืมเพิ่มหน้า = เทสต์แดงทันที */
-  assert.equal(Object.keys(routeFiles).length, BLOCK_TEMPLATE_PAGE_IDS.length);
-  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
-    assert.ok(routeFiles[page] !== undefined, `${page}: ต้องประกาศไฟล์ route ในเทสต์นี้ด้วย`);
+  /* ทะเบียนกับไฟล์ route ของหน้าเมนูต้องตรงกันเป๊ะ — ลืมเพิ่มหน้า = เทสต์แดงทันที */
+  const menuPages = BLOCK_TEMPLATE_PAGE_IDS.filter((page) => !isProductDetailPageId(page));
+  assert.equal(Object.keys(menuRouteFiles).length, menuPages.length, "หน้าเมนูต้องมีไฟล์ route ครบทุกหน้า");
+  for (const page of menuPages) {
+    assert.ok(menuRouteFiles[page] !== undefined, `${page}: ต้องประกาศไฟล์ route ในเทสต์นี้ด้วย`);
+  }
+
+  /* หน้ารายละเอียดหมวด: ทุก id ต้องมี path จริงตรงกับ slug ของตัวเอง */
+  const detailPages = BLOCK_TEMPLATE_PAGE_IDS.filter(isProductDetailPageId);
+  assert.ok(detailPages.length > 0, "ต้องมีหน้ารายละเอียดหมวดในทะเบียน");
+  for (const page of detailPages) {
+    assert.equal(PAGE_PATHS[page], `/products/${page.slice("product-".length)}`, `${page}: พาธต้องตรงกับ slug`);
   }
 });
 

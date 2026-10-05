@@ -122,8 +122,12 @@ test("ไฟล์ migration จริงในโปรเจกต์: ชื�
   /* ทุกไฟล์ต้อง idempotent (กันรันซ้ำแล้วพัง) */
   for (const entry of parsed) {
     const usesGuard =
-      entry.sql.includes("if not exists") || entry.sql.includes("add column if not exists") || entry.sql.includes("create or replace");
-    assert.ok(usesGuard, `${entry.id}-${entry.name} ต้องมี if not exists / add column if not exists`);
+      entry.sql.includes("if not exists") ||
+      entry.sql.includes("add column if not exists") ||
+      entry.sql.includes("create or replace") ||
+      /* insert ที่รันซ้ำได้ (รอบที่ 102): `on conflict … do nothing/update` = กลไก idempotent ของการเพิ่มข้อมูล */
+      entry.sql.includes("on conflict");
+    assert.ok(usesGuard, `${entry.id}-${entry.name} ต้องกันรันซ้ำ (if not exists / on conflict / create or replace)`);
   }
 });
 

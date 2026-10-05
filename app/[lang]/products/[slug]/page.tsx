@@ -3,24 +3,38 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { catalogSlugs, findCatalogItem } from "@/features/products/catalog";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
+import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
+import { productDetailPageId } from "@/lib/blocks/product-detail";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { loadPageSeo } from "@/lib/pages/repository";
+import { withPageSeo } from "@/lib/seo/page-seo";
 
 /**
- * หน้ารายละเอียดหมวดผลิตภัณฑ์ — **ยังเป็นเพียงหน้า "ตัวอย่างรอการอนุมัติ"**
+ * หน้ารายละเอียดหมวดผลิตภัณฑ์
  *
- * เหตุผลที่ทำเป็นหน้า (ไม่ปล่อยให้ลิงก์ไป 404): หน้านี้ถูกใช้เป็นเดโมให้ฝ่ายการตลาดดู
- * ถ้ากดการ์ดสินค้าแล้วเจอ 404 จะดูเหมือนเว็บพัง ทั้งที่จริง ๆ เราแค่ยังไม่มีเนื้อหา
- * → หน้าจึงบอกตรง ๆ ว่ายังไม่เปิดใช้งาน + รอข้อมูล/การอนุมัติ
+ * เนื้อหามาจาก 2 ทาง (เหมือนหน้าอื่นที่แปลงเป็นบล็อกแล้ว — S2):
+ * 1. หลังบ้าน **เผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง"** ⇒ เรนเดอร์เอกสารบล็อกของหมวดนั้น
+ *    (id ของหน้า = `product-<slug>` · ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็น = สิ่งที่ขึ้นเว็บ")
+ * 2. ยังไม่เปิด ⇒ เลย์เอาต์ "ตัวอย่างรอการอนุมัติ" ด้านล่าง (เดิม) — ไม่มี DB ก็ยังเปิดหน้าได้
  *
- * ⚠️ ยังไม่ใช่หน้ารายละเอียดสินค้าจริง — ต้องรอข้อมูลจากฝ่ายการตลาดก่อน
- *    และตั้งใจไม่ให้ search engine จัดทำดัชนี (robots: index false)
+ * ⚠️ **ยังคง `noindex` เสมอ** (มติเจ้าของ 2026-10-05): หน้าเดิมบอก "ยังไม่เปิดใช้งาน" อยู่
+ *    ⇒ กันเครื่องค้นหาเก็บข้อความนั้นก่อน · ค่า SEO รายหน้า (title/description/OG) ใช้ได้ แต่ช่อง `noindex`
+ *    ในหลังบ้านจะไม่มีผลจนกว่าจะมีมติเปิด index (ดู PRODUCT_ROADMAP.md § 10 รอบที่ 102)
  */
 
 /** รู้จักเฉพาะ slug ที่ประกาศไว้ — ที่เหลือให้ 404 โดยไม่ต้องเรนเดอร์ */
 export const dynamicParams = false;
+
+/*
+  ต่ออายุเพจนี้เองทุก 5 นาที — หน้านี้อ่านฐานข้อมูล (เอกสารบล็อกของหมวด)
+  ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
+     เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
+*/
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return catalogSlugs().map((slug) => ({ slug }));
@@ -38,11 +52,19 @@ export async function generateMetadata({
   const messages = await getMessagesFor(lang);
   const m = messages.productsPage;
 
-  return {
-    title: { absolute: `${m.items[item.id].name} — ${m.detailStub.title}` },
-    robots: { index: false, follow: false },
-    alternates: buildAlternates(lang, `/products/${item.slug}`),
-  };
+  return withPageSeo(
+    lang,
+    `/products/${item.slug}`,
+    {
+      title: { absolute: `${m.items[item.id].name} — ${m.detailStub.title}` },
+      description: m.detailStub.body,
+      /* ⚠️ บังคับ noindex ไว้ก่อน (มติ 2026-10-05) — `applySeoToMetadata` ไม่ตั้ง index:true
+         ⇒ ค่า SEO จากหลังบ้านทับได้แค่ title/description/OG (ช่อง noindex ในหลังบ้านยังไม่มีผล) */
+      robots: { index: false, follow: false },
+      alternates: buildAlternates(lang, `/products/${item.slug}`),
+    },
+    () => loadPageSeo(productDetailPageId(item.slug)),
+  );
 }
 
 export default async function ProductCategoryPage({
@@ -54,6 +76,17 @@ export default async function ProductCategoryPage({
 
   const item = findCatalogItem(slug);
   if (!item) notFound();
+
+  /*
+    ── เนื้อหาของหน้านี้มาจากไหน (S3 ส่วนที่ 2 · รอบที่ 102) ──────────────────────
+    1. หลังบ้านกดเผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง" ⇒ เรนเดอร์เอกสารบล็อกของหมวดนั้น
+    2. ถ้าไม่ ⇒ เลย์เอาต์ "ตัวอย่างรอการอนุมัติ" ด้านล่างเหมือนเดิม
+    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลดคืน null ให้เอง
+  */
+  const liveDocument = await loadLiveBlockDocument(productDetailPageId(item.slug));
+  if (liveDocument !== null) {
+    return <BlockDocumentView document={liveDocument} language={lang} />;
+  }
 
   const messages = await getMessages(lang);
   const m = messages.productsPage;

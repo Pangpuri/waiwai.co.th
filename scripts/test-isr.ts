@@ -82,6 +82,7 @@ test("isr: ทุกหน้า/เลย์เอาต์สาธารณ�
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",
+    "app/[lang]/products/[slug]/page.tsx",
     "app/[lang]/recipes/page.tsx",
     "app/sitemap.ts",
   ];
@@ -117,6 +118,7 @@ test("isr: ไฟล์ที่อ่าน DB ในเส้นทางส�
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",
+    "app/[lang]/products/[slug]/page.tsx",
     "app/[lang]/recipes/page.tsx",
     "app/sitemap.ts",
   ]);
@@ -144,6 +146,7 @@ test("isr: ค่า revalidate ในหน้าเว็บต้องเป
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
     "app/[lang]/products/page.tsx",
+    "app/[lang]/products/[slug]/page.tsx",
     "app/[lang]/recipes/page.tsx",
     "app/sitemap.ts",
   ];

@@ -1,3 +1,4 @@
+import { PRODUCT_DETAIL_PAGE_IDS, productDetailPathOfId } from "@/lib/blocks/product-detail";
 import { BLOCK_TEMPLATE_PAGE_IDS } from "@/lib/blocks/templates";
 
 /**
@@ -7,7 +8,8 @@ import { BLOCK_TEMPLATE_PAGE_IDS } from "@/lib/blocks/templates";
  * ⚠️ ถ้าเพิ่มหน้าใหม่ ต้องเพิ่มที่ `page` (migration/seed) และที่นี่
  */
 
-export const PAGE_PATHS: Readonly<Record<string, string>> = {
+/** หน้าเมนูหลัก 9 หน้า (id ตรงกับเมนูในโค้ด) */
+const MENU_PAGE_PATHS: Readonly<Record<string, string>> = {
   home: "",
   about: "/about",
   certifications: "/about/certifications",
@@ -17,6 +19,20 @@ export const PAGE_PATHS: Readonly<Record<string, string>> = {
   news: "/news",
   careers: "/careers",
   contact: "/contact",
+};
+
+/**
+ * หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — derive จากทะเบียนกลาง
+ * ⇒ เพิ่ม/ลบหมวดที่ `lib/blocks/product-detail.ts` แล้วพาธตามมาเอง (ไม่มีสตริงซ้ำให้หลุด)
+ * ⚠️ หน้าเหล่านี้ตั้ง `in_menu = false` (migration 0015) ⇒ `sitemap.xml` ข้ามให้อยู่แล้ว
+ */
+const PRODUCT_DETAIL_PAGE_PATHS: Readonly<Record<string, string>> = Object.fromEntries(
+  PRODUCT_DETAIL_PAGE_IDS.map((id) => [id, productDetailPathOfId(id)]),
+);
+
+export const PAGE_PATHS: Readonly<Record<string, string>> = {
+  ...MENU_PAGE_PATHS,
+  ...PRODUCT_DETAIL_PAGE_PATHS,
 };
 
 /**

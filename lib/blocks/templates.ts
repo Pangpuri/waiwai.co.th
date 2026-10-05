@@ -6,6 +6,8 @@ import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { buildNewsTemplate } from "@/lib/blocks/news-template";
 import { buildProductsTemplate } from "@/lib/blocks/products-template";
+import { buildProductDetailTemplate } from "@/lib/blocks/product-detail-template";
+import { PRODUCT_DETAIL_PAGE_IDS } from "@/lib/blocks/product-detail";
 import { buildRecipesTemplate } from "@/lib/blocks/recipes-template";
 import type { BlockDocument } from "@/lib/blocks/types";
 
@@ -23,7 +25,8 @@ import type { BlockDocument } from "@/lib/blocks/types";
  * - หน้าที่ไม่มีเทมเพลต = ยังใช้เลย์เอาต์ที่ออกแบบไว้ + หน้าจอเนื้อหาแบบฟิลด์เดิม (ไม่ใช่ข้อผิดพลาด)
  */
 
-export const BLOCK_TEMPLATE_PAGE_IDS = [
+/** หน้าเมนูหลักที่มีเทมเพลต (9 หน้าเดิม — S2 รอบที่ 83) */
+const MENU_TEMPLATE_PAGE_IDS = [
   "home",
   "about",
   "careers",
@@ -35,9 +38,18 @@ export const BLOCK_TEMPLATE_PAGE_IDS = [
   "executives",
 ] as const;
 
+/**
+ * ทะเบียนรวมของ "หน้าที่มีเทมเพลตบล็อก" — หน้าเมนู 9 หน้า + หน้ารายละเอียดหมวดสินค้า 6 หน้า
+ * (S3 ส่วนที่ 2 · รอบที่ 102 · มาจาก `PRODUCT_DETAIL_PAGE_IDS` ⇒ ไม่มีทางหลุดจาก `CATALOG_ITEMS`)
+ *
+ * ⚠️ ลำดับมีเทสต์บังคับ: หน้าเมนูก่อน แล้วต่อด้วยหน้า detail ตามลำดับหมวด
+ * ⚠️ `PAGE_PATHS` ต้องมีครบทุก id ในนี้ (มีเทสต์) — ไม่งั้นปุ่ม "เปิดหน้าเว็บ" จะพาไปหน้าแรกแทน
+ */
+export const BLOCK_TEMPLATE_PAGE_IDS = [...MENU_TEMPLATE_PAGE_IDS, ...PRODUCT_DETAIL_PAGE_IDS] as const;
+
 export type BlockTemplatePageId = (typeof BLOCK_TEMPLATE_PAGE_IDS)[number];
 
-const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, () => BlockDocument>> = {
+const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, () => BlockDocument | null>> = {
   home: buildHomeTemplate,
   about: buildAboutTemplate,
   careers: buildCareersTemplate,
@@ -47,6 +59,13 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, () => BlockDocumen
   news: buildNewsTemplate,
   certifications: buildCertificationsTemplate,
   executives: buildExecutivesTemplate,
+  /* หน้ารายละเอียดหมวด — เทมเพลตต่อหมวด (ใช้ชื่อ/ภาพจริง + คำอธิบาย "ยังไม่เปิดใช้งาน" ในพจนานุกรม) */
+  "product-instant-noodles": () => buildProductDetailTemplate("instant-noodles"),
+  "product-dried-vermicelli": () => buildProductDetailTemplate("dried-vermicelli"),
+  "product-serda": () => buildProductDetailTemplate("serda"),
+  "product-quick-zabb": () => buildProductDetailTemplate("quick-zabb"),
+  "product-noodie": () => buildProductDetailTemplate("noodie"),
+  "product-rod-ded": () => buildProductDetailTemplate("rod-ded"),
 };
 
 /**
@@ -90,6 +109,17 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
        ถ้าอนาคตต้องการรายชื่อเป็นข้อความ ต้องได้รายชื่อที่ยืนยันแล้วจากเจ้าของก่อน (บล็อก `rosterText` พร้อมใช้)
   */
   executives: [],
+  /*
+    หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — **ไม่ประกาศช่องว่าง**
+    เทมเพลต mirror หน้า stub เดิมครบ: ชื่อหมวด · ภาพ (มี alt) · คำอธิบาย "ยังไม่เปิดใช้งาน" · ปุ่มย้อนกลับ
+    ⇒ เปิดสวิตช์ "ใช้กับหน้าเว็บจริง" แล้วไม่มีส่วนไหนหายไป (เนื้อหารายละเอียดจริงรอเจ้าของเติมเอง)
+  */
+  "product-instant-noodles": [],
+  "product-dried-vermicelli": [],
+  "product-serda": [],
+  "product-quick-zabb": [],
+  "product-noodie": [],
+  "product-rod-ded": [],
 };
 
 /** หน้านี้มีเทมเพลตบล็อกให้เริ่มได้ไหม */
