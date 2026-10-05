@@ -126,8 +126,17 @@ test("ไฟล์ migration จริงในโปรเจกต์: ชื�
       entry.sql.includes("add column if not exists") ||
       entry.sql.includes("create or replace") ||
       /* insert ที่รันซ้ำได้ (รอบที่ 102): `on conflict … do nothing/update` = กลไก idempotent ของการเพิ่มข้อมูล */
-      entry.sql.includes("on conflict");
-    assert.ok(usesGuard, `${entry.id}-${entry.name} ต้องกันรันซ้ำ (if not exists / on conflict / create or replace)`);
+      entry.sql.includes("on conflict") ||
+      /*
+        migration ที่ "ซ่อมข้อมูล" (รอบที่ 106): ไม่มี DDL ให้ใช้ guard ⇒ ต้องประกาศกลไกไว้ชัด ๆ ด้วยคอมเมนต์
+        `idempotent: conditional-update` **และ** ต้องมีการจำกัดแถวด้วย `where`
+        (เงื่อนไข: แก้เฉพาะแถวที่ยังเป็นค่าผิด ⇒ รันซ้ำไม่มีผล และไม่ทับค่าที่มีคนแก้แล้ว)
+      */
+      (entry.sql.includes("idempotent: conditional-update") && entry.sql.includes("where"));
+    assert.ok(
+      usesGuard,
+      `${entry.id}-${entry.name} ต้องกันรันซ้ำ (if not exists / on conflict / create or replace / idempotent: conditional-update)`,
+    );
   }
 });
 

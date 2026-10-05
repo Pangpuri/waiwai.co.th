@@ -11,8 +11,10 @@ import {
   sourceIdOfNewsPath,
 } from "@/lib/news/import-parse";
 import { MAX_NEWS_BLOCKS, newsBodyImageIds, newsBodyPlainText, parseNewsBody, validateNewsBody } from "@/lib/news/body";
+import { applyNewsDateOverride, newsDateOverrideOf, NEWS_DATE_OVERRIDES } from "@/lib/news/date-overrides";
 import {
   formatNewsDate,
+  isFutureNewsDate,
   newsIdOfSourceId,
   newsInstantOf,
   newsPathOfId,
@@ -227,6 +229,54 @@ test("news: validateNewsBody จับเนื้อหาว่าง/รู�
 });
 
 /* ── 4) โมเดล/วันที่/ตัวตรวจ ──────────────────────────────────────────────── */
+
+test("news: ตารางแก้ไขวันที่ (เจ้าของยืนยัน) ทำงานถูก และโค้ดกับ migration ตรงกัน", () => {
+  /* เคสจริง: ต้นทางลง "29 ธันวาคม 2026" ซึ่งเป็นอนาคต ⇒ ต้องเป็น 29 ธันวาคม 2568 */
+  const fixed = applyNewsDateOverride("146142", "2026-12-29T17:36");
+  assert.equal(fixed.publishedLocal, "2025-12-29T17:36");
+  assert.equal(fixed.override?.sourceLocal, "2026-12-29T17:36");
+  assert.ok((fixed.override?.reason ?? "").includes("อนาคต"), "ต้องบันทึกเหตุผลว่าต้นทางลงเป็นอนาคต");
+
+  /* ข่าวอื่นต้องไม่ถูกแตะ */
+  assert.deepEqual(applyNewsDateOverride("148398", "2026-09-12T11:28"), {
+    publishedLocal: "2026-09-12T11:28",
+    override: null,
+  });
+  assert.equal(newsDateOverrideOf(" 146142 "), newsDateOverrideOf("146142"), "ตัดช่องว่างหัวท้ายได้");
+  assert.equal(newsDateOverrideOf("999999"), null);
+
+  /*
+    ⚠️ ค่าที่แก้ต้องอยู่ในโค้ด **และ** ใน migration ให้ตรงกัน
+    (ถ้าแก้แค่ DB การนำเข้าครั้งถัดไปจะทำให้วันที่ผิดกลับมา — migration มีไว้ซ่อมของเดิม)
+  */
+  const migration = sourceOf("db/migrations/0019-news-date-fix.sql");
+  assert.ok(migration.includes("update news"), "migration ต้องเป็นคำสั่งซ่อมข้อมูล");
+  for (const entry of NEWS_DATE_OVERRIDES) {
+    assert.ok(migration.includes(entry.sourceId), `migration ต้องมี source ${entry.sourceId}`);
+    assert.ok(
+      migration.includes(`${entry.publishedLocal}:00+07:00`),
+      `migration ต้องใช้วันที่เดียวกับโค้ด (${entry.publishedLocal})`,
+    );
+  }
+
+  /* ตัวนำเข้าต้องเรียกใช้ตารางนี้จริง + เตือนเมื่อเจอวันที่อนาคต */
+  const script = sourceOf("scripts/import-news.ts");
+  assert.ok(script.includes("applyNewsDateOverride(card.sourceId"), "ตัวนำเข้าต้องทับด้วยค่าที่แก้ไว้");
+  assert.ok(script.includes("isFutureNewsDate(publishedLocal, new Date())"), "ต้องเตือนวันที่อนาคต");
+});
+
+test("news: จับวันที่อนาคตได้ (เทียบวันนี้ตามเวลาไทย)", () => {
+  const now = new Date("2026-10-05T03:00:00Z"); // 5 ต.ค. 2026 10:00 เวลาไทย
+  assert.equal(isFutureNewsDate("2026-12-29T17:36", now), true, "29 ธ.ค. 2026 = อนาคต ขณะที่วันนี้ 5 ต.ค. 2026");
+  assert.equal(isFutureNewsDate("2026-09-12T11:28", now), false, "อดีตต้องไม่เตือน");
+  assert.equal(isFutureNewsDate("2026-10-05T23:59", now), false, "วันเดียวกัน (เวลาหลัง) ยังไม่ถือว่าเป็นอนาคต");
+  assert.equal(isFutureNewsDate("2026-10-06T00:01", now), true, "ข้ามวันแล้วจึงเป็นอนาคต");
+  assert.equal(isFutureNewsDate(null, now), false);
+  assert.equal(isFutureNewsDate("ไม่ใช่วันที่", now), false);
+
+  /* เขตเวลา: 23:30 UTC ของ 5 ต.ค. = 06:30 วันที่ 6 ต.ค. เวลาไทย ⇒ ข่าวของวันที่ 6 ยังไม่เป็นอนาคต */
+  assert.equal(isFutureNewsDate("2026-10-06T12:00", new Date("2026-10-05T23:30:00Z")), false);
+});
 
 test("news: id/พาธ ไป-กลับได้ และวันที่แปลงเป็นค่า timestamptz ของเวลาไทย", () => {
   assert.equal(newsIdOfSourceId("148398"), "n148398");

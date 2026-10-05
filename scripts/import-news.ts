@@ -2,7 +2,8 @@ import { closePool, isDatabaseConfigured } from "@/db/pool";
 import { ensureImportedMedia, type ImportMediaCache } from "@/lib/import/media";
 import { newsImageVariantUrl, parseNewsArticlePage, parseNewsListingPage } from "@/lib/news/import-parse";
 import { validateNewsBody, type NewsBlock } from "@/lib/news/body";
-import { newsIdOfSourceId, validateNewsInput, type NewsInput } from "@/lib/news/model";
+import { newsIdOfSourceId, isFutureNewsDate, validateNewsInput, type NewsInput } from "@/lib/news/model";
+import { applyNewsDateOverride } from "@/lib/news/date-overrides";
 import { upsertNews } from "@/lib/news/repository";
 
 /**
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
   }
 
   const mediaCache: ImportMediaCache = new Map();
-  const stats = { newImages: 0, reusedImages: 0, news: 0, skippedInvalid: 0, skippedImages: 0 };
+  const stats = { newImages: 0, reusedImages: 0, news: 0, skippedInvalid: 0, skippedImages: 0, futureDates: 0 };
   const issues: string[] = [];
 
   /* 1) เก็บการ์ดข่าวจากทุกหน้า (เว็บเดิมแบ่ง 15 ข่าว/หน้า · หน้าสุดท้าย 1) */
@@ -176,8 +177,24 @@ async function main(): Promise<void> {
 
     const article = parseNewsArticlePage(articleHtml);
     const titleTh = article.title.trim() === "" ? card.title : article.title;
-    const publishedLocal = article.publishedLocal ?? card.publishedLocal;
     const publishedLabel = article.publishedLabel !== "" ? article.publishedLabel : card.publishedLabel;
+
+    /*
+      วันที่: ใช้จากหน้าบทความก่อน แล้วถอยไปใช้ของหน้ารายการ
+      ⚠️ จากนั้น **ทับด้วยตารางแก้ไข** ถ้าข่าวนั้นต้นทางลงผิด (เจ้าของยืนยันแล้ว) — ดู `lib/news/date-overrides.ts`
+         (จำเป็นต้องอยู่ในโค้ด ไม่ใช่แก้ใน DB เฉย ๆ เพราะสคริปต์นี้เป็น idempotent · รันซ้ำจะเขียนทับ)
+    */
+    const fromSource = article.publishedLocal ?? card.publishedLocal;
+    const { publishedLocal, override } = applyNewsDateOverride(card.sourceId, fromSource);
+    if (override !== null) {
+      log(`   ⓘ แก้ไขวันที่ตามที่เจ้าของยืนยัน: ${override.sourceLocal} → ${override.publishedLocal} (source ${card.sourceId})`);
+    }
+    /* เตือน (ไม่แก้เอง) ถ้าวันที่ยังเป็นอนาคต — เคสแบบนี้เคยหลุดมาจากต้นทางมาแล้ว */
+    if (isFutureNewsDate(publishedLocal, new Date())) {
+      stats.futureDates += 1;
+      issues.push(`${card.sourceId}: วันที่เป็นอนาคต (${publishedLocal}) — ต้องให้เจ้าของยืนยัน`);
+      log(`   ⚠️ วันที่เป็นอนาคต: ${publishedLocal} (${titleTh.slice(0, 50)})`);
+    }
 
     const input: NewsInput = {
       id: newsIdOfSourceId(card.sourceId),
@@ -296,6 +313,7 @@ async function main(): Promise<void> {
       (stats.skippedImages > 0 ? ` · ข้ามภาพที่โหลดไม่ได้/ใหญ่เกิน ${stats.skippedImages}` : ""),
   );
   if (stats.skippedInvalid > 0) log(`      ข้ามข่าวเพราะข้อมูลไม่ผ่าน ${stats.skippedInvalid}`);
+  if (stats.futureDates > 0) log(`      ⚠️ ข่าวที่วันที่เป็นอนาคต ${stats.futureDates} รายการ (ดูรายการด้านล่าง — ต้องให้เจ้าของยืนยัน)`);
   if (options.dryRun) log("      (โหมด --dry-run: ไม่ได้เขียนลงฐานข้อมูล/ไม่ได้โหลดรูป)");
 
   if (issues.length > 0) {

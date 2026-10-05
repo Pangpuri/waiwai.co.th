@@ -58,6 +58,25 @@ export function newsInstantOf(publishedLocal: string | null): string | null {
 }
 
 /**
+ * วันที่นี้ "เป็นอนาคต" ไหม (เทียบกับ **วันนี้ตามเวลาไทย**) — ใช้เตือนตอนนำเข้า
+ *
+ * ที่มา (รอบที่ 106): เจอข่าวที่ต้นทางลงวันที่อนาคต (29 ธ.ค. 2026 ขณะที่วันนั้น 5 ต.ค. 2026)
+ * ⇒ ตัวนำเข้าต้อง **เตือน** ให้คนตรวจ ไม่ใช่เงียบ ๆ ใส่ค่าผิดลงฐานข้อมูล
+ * (⚠️ ไม่แก้อัตโนมัติ — เดาแทนเจ้าของไม่ได้ · ค่าที่แก้ให้อยู่ใน `lib/news/date-overrides.ts`)
+ */
+export function isFutureNewsDate(publishedLocal: string | null, now: Date): boolean {
+  if (publishedLocal === null || !/^\d{4}-\d{2}-\d{2}/.test(publishedLocal)) return false;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return publishedLocal.slice(0, 10) > today;
+}
+
+
+/**
  * แสดงวันที่ตามภาษา — `2026-09-12T11:28` (เวลาไทย) → `12 กันยายน 2569` / `12 September 2026`
  * ⚠️ ใช้ `timeZone: "UTC"` กับสตริงที่แปลว่า "เวลาไทยอยู่แล้ว" ⇒ ผลไม่ขึ้นกับเขตเวลาของเซิร์ฟเวอร์
  * ⚠️ ภาษาไทยที่ Intl ให้มาคือ **พุทธศักราช** (ตั้งใจ — ตรงกับที่หน้าเว็บเมนูอาหารแสดงอยู่)
