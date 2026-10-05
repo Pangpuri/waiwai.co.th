@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { hostOf, isLocalHost, redactUrl, validateRemoteTarget } from "@/lib/db/target";
+import { directEndpointOf, hostOf, isLocalHost, redactUrl, validateRemoteTarget } from "@/lib/db/target";
 
 /**
  * เทสต์ "การ์ดกันพลาดก่อนดันข้อมูลขึ้นคลาวด์" (รอบที่ 114)
@@ -76,4 +76,38 @@ test("target: ตัวช่วย hostOf/isLocalHost ทำงานตรง�
   assert.equal(isLocalHost("db.example.com"), false);
   assert.equal(isLocalHost("10.5.5.5"), true);
   assert.equal(isLocalHost("172.32.0.1"), false, "172.32 อยู่นอกช่วงส่วนตัว");
+});
+
+/*
+  รอบที่ 115 — บทเรียนจริงจากการดันข้อมูลขึ้น Neon (จับได้ตอนซ้อม ไม่ใช่ตอนเดโมพัง)
+  - pooler ของ Neon บังคับ `search_path = ''` ทุก connection ⇒ SQL ที่ไม่ระบุ schema (ทั้งโปรเจกต์ใช้แบบนี้)
+    ล้มด้วย `relation "news" does not exist`
+  - ตั้ง `options=-c search_path=public` **ถูก pooler ปฏิเสธ** ("unsupported startup parameter in options")
+  - `alter database … set search_path = public` ก็ถูก override กลับเป็นค่าว่าง
+  ⇒ ทางเดียวที่ได้ผลคือต่อ **endpoint ตรง** (ตัด `-pooler` ออกจากโฮสต์) — วัดจริง: pooled = "" · direct = "public"
+*/
+test("target: directEndpointOf ตัด -pooler ออกจากโฮสต์ (แต่เก็บรหัส/พารามิเตอร์เดิม)", () => {
+  const pooled =
+    "postgresql://neondb_owner:pass@ep-small-shadow-b3ooq1yz-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+  const direct = directEndpointOf(pooled);
+
+  assert.equal(
+    hostOf(direct),
+    "ep-small-shadow-b3ooq1yz.c-4.ap-southeast-1.aws.neon.tech",
+    "ต้องถอด -pooler ออกจากโฮสต์",
+  );
+  assert.ok(direct.includes("neondb_owner:pass@"), "ต้องคงชื่อผู้ใช้/รหัสผ่านเดิม");
+  assert.ok(direct.includes("sslmode=require"), "ต้องคงพารามิเตอร์เดิม");
+  assert.equal(directEndpointOf(direct), direct, "เรียกซ้ำต้องได้ค่าเดิม (idempotent)");
+});
+
+test("target: directEndpointOf ไม่แตะ URL ที่ไม่ใช่ pooler / อ่านไม่ได้", () => {
+  const local = "postgresql://waiwai:waiwai@localhost:55432/waiwai";
+  assert.equal(directEndpointOf(local), local, "URL ในเครื่องต้องไม่ถูกแก้");
+  assert.equal(
+    directEndpointOf("postgresql://u:p@db.example.com:5432/x"),
+    "postgresql://u:p@db.example.com:5432/x",
+    "โฮสต์ทั่วไปที่ไม่มี -pooler ต้องไม่ถูกแก้",
+  );
+  assert.equal(directEndpointOf("ไม่ใช่-url"), "ไม่ใช่-url", "อ่านไม่ได้ = คืนเดิม (ห้ามเดา)");
 });

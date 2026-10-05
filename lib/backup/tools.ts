@@ -271,8 +271,27 @@ export async function restoreFromFile(filePath: string, targetUrl: string): Prom
   });
 
   if (child.stdin === null) throw new Error("pg_restore: เขียน stdin ไม่ได้");
-  await pipeline(createReadStream(filePath), child.stdin);
-  await finished;
+
+  /*
+    ⚠️ รอบที่ 114 — บทเรียนจริง: เดิมโค้ดนี้ `await pipeline(...)` **ก่อน** `await finished`
+    ⇒ ถ้าเครื่องมือ "ตายทันที" (เช่นต่อฐานข้อมูลปลายทางไม่ได้ เพราะส่งค่าเชื่อมต่อผิด)
+      การเขียนไฟล์ลง stdin จะล้มด้วย `write EPIPE` ก่อน ⇒ ผู้ใช้เห็นแต่ EPIPE **ไม่เห็นสาเหตุจริง**
+      (เคสจริง: ดันข้อมูลขึ้น Neon แล้วเห็นแค่ EPIPE — ต้องมานั่งไล่เองว่าจริง ๆ คือต่อฐานข้อมูลไม่ได้)
+    ⇒ รอ "ทั้งสองฝั่ง" พร้อมกัน แล้วเลือกโยน error ที่ **มีข้อความจากเครื่องมือ (stderr)** ก่อนเสมอ
+  */
+  const writeFailure = pipeline(createReadStream(filePath), child.stdin).then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+  );
+  const exitFailure = finished.then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+  );
+
+  const [pipeError, toolError] = await Promise.all([writeFailure, exitFailure]);
+
+  if (toolError !== null) throw toolError;
+  if (pipeError !== null) throw pipeError;
 }
 
 export async function sha256OfFile(filePath: string): Promise<string> {

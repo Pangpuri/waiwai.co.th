@@ -130,3 +130,31 @@ export function validateRemoteTarget(
 
   return issues;
 }
+
+/**
+ * แปลง connection string ของ Neon จาก **pooler** (`…-pooler.…`) เป็น **endpoint ตรง**
+ * (รอบที่ 114 — บทเรียนจริงที่การซ้อมจับได้)
+ *
+ * ทำไมต้องมี
+ * - pooler ของ Neon บังคับ `search_path = ''` **ทุก connection** ⇒ คำสั่ง SQL ที่ไม่ระบุ schema
+ *   (ซึ่งทั้งโปรเจกต์นี้ใช้แบบนั้น เช่น `select … from news`) จะล้มด้วย `relation "news" does not exist`
+ * - การตั้ง `options=-c search_path=public` ใน connection string **ถูก pooler ปฏิเสธ**
+ *   ("unsupported startup parameter in options: search_path")
+ * - `alter database … set search_path = public` ก็ถูก override กลับเป็นค่าว่าง
+ * ⇒ ทางเดียวที่ใช้ได้จริงคือต่อ **endpoint ตรง** (ไม่ผ่าน pooler) ซึ่ง `search_path` = `public` ตามปกติ
+ *   (วัดจริง: pooled → ว่าง · direct → `public` และอ่านข้อมูลได้)
+ *
+ * ⚠️ ใช้เฉพาะ "งานที่รัน SQL แบบไม่ระบุ schema" (แอป + migration + ตรวจข้อมูล)
+ *    ส่วน `pg_restore` ระบุ schema มาในไฟล์สำรองอยู่แล้ว จึงใช้ URL ไหนก็ได้
+ * URL ที่ไม่ใช่ Neon/ไม่มี `-pooler` จะถูกคืนกลับเดิม (ไม่แตะ)
+ */
+export function directEndpointOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("-pooler")) return url;
+    parsed.hostname = parsed.hostname.replace("-pooler", "");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
