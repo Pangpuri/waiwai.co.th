@@ -29,7 +29,8 @@
     "check:actions": "node --import ./scripts/alias-hook.mjs scripts/check-actions.ts",
     "products:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products.ts",
     "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts",
-    "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts"
+    "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts",
+    "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts"
   },
   "dependencies": {
     "next": "^16.3.8",
