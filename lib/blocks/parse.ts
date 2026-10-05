@@ -18,6 +18,7 @@ import {
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
   MAX_JOB_ITEMS,
+  MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
@@ -40,6 +41,7 @@ import {
   type BlockTableRow,
   type JobBoardItem,
   type PageLayout,
+  type RecipeCardItem,
   type RosterMember,
 } from "@/lib/blocks/types";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
@@ -432,6 +434,55 @@ function readRosterMembers(entry: Record<string, unknown>, path: string, problem
   return members;
 }
 
+/** อ่านรายการเมนูอาหาร (บล็อก "เมนูอาหาร") — ใบที่ยังไม่มีภาพยังอยู่ได้ (validator เตือนเอง) */
+function readRecipeItems(entry: Record<string, unknown>, path: string, problems: string[]): readonly RecipeCardItem[] {
+  const value = entry["items"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.items: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_RECIPE_ITEMS) {
+    problems.push(`${path}.items: เกินที่อนุญาต (${value.length} > ${MAX_RECIPE_ITEMS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  const items: RecipeCardItem[] = [];
+  value.slice(0, MAX_RECIPE_ITEMS).forEach((raw, index) => {
+    const itemPath = `${path}.items[${index}]`;
+    if (!isRecord(raw)) {
+      problems.push(`${itemPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+
+    let id = readString(raw, "id", `${itemPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${itemPath}.id: ซ้ำกับเมนูก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("recipe", seen);
+    }
+    seen.add(id);
+
+    items.push({
+      id,
+      title: toText(raw["title"], `${itemPath}.title`, problems),
+      body: toText(raw["body"], `${itemPath}.body`, problems),
+      ingredients: toText(raw["ingredients"], `${itemPath}.ingredients`, problems),
+      steps: toText(raw["steps"], `${itemPath}.steps`, problems),
+      image: toMedia(raw["image"], `${itemPath}.image`, problems),
+    });
+  });
+
+  return items;
+}
+
+/** จำนวนคอลัมน์ของเมนูอาหาร (1 | 2 | 3) — การ์ดเมนูมีส่วนผสม/วิธีทำ จึงไม่ควรเกิน 3 คอลัมน์ */
+function readRecipeColumns(container: Record<string, unknown>, path: string, problems: string[]): 1 | 2 | 3 {
+  const value = readIntChoice(container, "columns", [1, 2, 3], 2, path, problems);
+  if (value === 1) return 1;
+  if (value === 3) return 3;
+  return 2;
+}
+
 /** จำนวนคอลัมน์ของแกลเลอรี (2 | 3 | 4) */
 function readGalleryColumns(container: Record<string, unknown>, path: string, problems: string[]): 2 | 3 | 4 {
   const value = readIntChoice(container, "columns", [2, 3, 4], 3, path, problems);
@@ -692,6 +743,15 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         /* ใช้ตัวอ่าน 2|3|4 ตัวเดียวกับแกลเลอรี (ความหมายเดียวกัน: จำนวนคอลัมน์ของกริด) */
         columns: readGalleryColumns(entry, `${path}.columns`, problems),
         members: readRosterMembers(entry, path, problems),
+      };
+    case "recipeCards":
+      return {
+        ...base,
+        type: "recipeCards",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+        columns: readRecipeColumns(entry, `${path}.columns`, problems),
+        items: readRecipeItems(entry, path, problems),
       };
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };

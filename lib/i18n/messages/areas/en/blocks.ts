@@ -10,4 +10,8 @@ export const blocks = {
   galleryDialog: "Image viewer",
   /* "sidebar" page layout (X1.8) — label of the table of contents built from page headings */
   layoutTocLabel: "On this page",
+  /* Recipe cards (round 101) — labels of the ingredients/method disclosure rendered by the block renderer */
+  recipeDetailsLabel: "Ingredients & method",
+  recipeIngredientsLabel: "Ingredients",
+  recipeStepsLabel: "Method",
 };

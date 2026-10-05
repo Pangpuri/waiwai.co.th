@@ -6,6 +6,7 @@ import {
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
   MAX_JOB_ITEMS,
+  MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
@@ -905,6 +906,102 @@ export function setRosterMemberImage(
     const base = member.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
     const merged = { ...base, ...patch };
     member.image = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/* ── เมนูอาหาร (รอบที่ 101) ───────────────────────────────────────────────── */
+
+export function canAddRecipeItem(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "recipeCards" && block.items.length < MAX_RECIPE_ITEMS;
+}
+
+/** เพิ่มเมนูว่าง (ยังไม่มีชื่อ/ภาพ — validator จะบังคับชื่อไทยก่อนเผยแพร่) */
+export function addRecipeItem(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddRecipeItem(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeCards") return;
+    const used = new Set(block.items.map((item) => item.id));
+    block.items.push({
+      id: nextPrefixedId("recipe", used),
+      title: emptyText(),
+      body: emptyText(),
+      ingredients: emptyText(),
+      steps: emptyText(),
+      image: null,
+    });
+  });
+}
+
+export function removeRecipeItem(document: BlockDocument, id: string, index: number): BlockDocument {
+  const location = findBlockLocation(document, id);
+  const block = location === null ? null : blockAt(document, location);
+  /* ไม่มีอะไรต้องทำ = คืนของเดิม (ไม่สร้างเอกสารใหม่ ⇒ ไม่ทำให้หน้าจอ re-render เปล่า) */
+  if (block === null || block.type !== "recipeCards" || index < 0 || index >= block.items.length) return document;
+
+  return withBlock(document, id, (target) => {
+    if (target.type !== "recipeCards") return;
+    target.items.splice(index, 1);
+  });
+}
+
+/** สลับลำดับเมนู (ใช้กับปุ่มเลื่อน/การลากวางในแผงแก้) */
+export function moveRecipeItem(document: BlockDocument, id: string, fromIndex: number, toIndex: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeCards") return;
+    const total = block.items.length;
+    if (fromIndex < 0 || fromIndex >= total) return;
+    const clamped = Math.max(0, Math.min(toIndex, total - 1));
+    if (clamped === fromIndex) return;
+    const [moved] = block.items.splice(fromIndex, 1);
+    if (moved === undefined) return;
+    block.items.splice(clamped, 0, moved);
+  });
+}
+
+export type RecipeItemTextField = "title" | "body" | "ingredients" | "steps";
+
+export function setRecipeItemText(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  field: RecipeItemTextField,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeCards") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item[field][language] = value;
+  });
+}
+
+/** ตั้งค่าภาพของเมนู — พาธว่าง = เอารูปออก */
+export function setRecipeItemImage(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  patch: { path?: string; altTh?: string; altEn?: string; hasWatermark?: boolean },
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeCards") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+
+    const base = item.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
+    const merged = { ...base, ...patch };
+    item.image = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/** จำนวนคอลัมน์ของเมนู (1 | 2 | 3) — ค่าที่ไม่รองรับถูกปรับเป็น 2 */
+export function setRecipeColumns(document: BlockDocument, id: string, columns: number): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeCards") return;
+    block.columns = columns === 1 ? 1 : columns === 3 ? 3 : 2;
   });
 }
 

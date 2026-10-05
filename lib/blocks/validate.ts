@@ -257,6 +257,26 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
       });
       return;
 
+    case "recipeCards":
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);
+
+      if (block.items.length === 0) {
+        issues.push(issue("warning", "recipeCards-empty", `${path}.items`, "บล็อกเมนูอาหารยังไม่มีเมนู"));
+      }
+      block.items.forEach((item, index) => {
+        const itemPath = `${path}.items[${index}]`;
+        checkText(item.title, `${itemPath}.title`, { required: true, englishRequired: true }, issues);
+        checkText(item.body, `${itemPath}.body`, { required: false, englishRequired: false }, issues);
+        checkText(item.ingredients, `${itemPath}.ingredients`, { required: false, englishRequired: false }, issues);
+        checkText(item.steps, `${itemPath}.steps`, { required: false, englishRequired: false }, issues);
+        checkMedia(item.image, `${itemPath}.image`, issues);
+        if (item.image === null) {
+          issues.push(issue("warning", "recipe-item-without-image", `${itemPath}.image`, "เมนูนี้ยังไม่ได้เลือกภาพ"));
+        }
+      });
+      return;
+
     case "row": {
       /* แถว: ตรวจโครงคอลัมน์ (ตัวบล็อกลูกถูกเดินตรวจด้านล่างผ่าน walkBlocks) */
       if (block.columns.length === 0) {

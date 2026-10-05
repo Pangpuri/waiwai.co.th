@@ -49,6 +49,18 @@ export const adminBlockTypes = {
   blockMemberRole: "ตำแหน่ง",
   blockRosterColumns: "จำนวนคอลัมน์",
   blockMemberPhotoHint: "ภาพรายบุคคล (ไม่บังคับ)",
+  /* เมนูอาหาร (รอบที่ 101) */
+  blockRecipeItems: "เมนู ({n}/{max})",
+  blockAddRecipe: "เพิ่มเมนู",
+  blockRemoveRecipe: "ลบเมนูนี้",
+  blockRecipeNumber: "เมนูที่ {n}",
+  blockRecipeTitle: "ชื่อเมนู",
+  blockRecipeBody: "คำโปรย (ไม่บังคับ)",
+  blockRecipeIngredients: "ส่วนผสม (บรรทัดละอย่าง)",
+  blockRecipeSteps: "วิธีทำ (บรรทัดละขั้นตอน)",
+  blockRecipeColumns: "จำนวนคอลัมน์",
+  blockRecipeImageLabel: "ภาพของเมนูนี้",
+  blockRecipePickHint: "คลิกเมนูที่ต้องการแก้ (หรือคลิกการ์ดเมนูในพรีวิวได้เลย)",
   /* เลย์เอาต์ของหน้า (X1.8) */
   layoutLabel: "เลย์เอาต์ของหน้านี้",
   layoutHint:

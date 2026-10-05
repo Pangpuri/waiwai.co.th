@@ -3,13 +3,15 @@ import { th } from "@/lib/i18n/messages/th";
 import { TEMPLATE_BLOCK_VERSION, templateBlockId, templateMedia, templateStyle } from "@/lib/blocks/template-kit";
 import type { Block, BlockDocument } from "@/lib/blocks/types";
 
-import { CATALOG_ITEMS, catalogHref } from "@/features/products/catalog";
+import { CATALOG_ITEMS } from "@/features/products/catalog";
 
 /**
- * เทมเพลตตั้งต้นของหน้า "ผลิตภัณฑ์" (/products) — S2 รอบที่ 83
+ * เทมเพลตตั้งต้นของหน้า "ผลิตภัณฑ์" (/products) — S2 รอบที่ 83 · แก้ href รอบที่ 101
  *
  * ที่มา: หมวดสินค้าจริง (`CATALOG_ITEMS` — slug/ไฟล์ภาพ) + ชื่อ/คำบรรยายภาพจากพจนานุกรม
  * ⚠️ หน้านี้เป็น **ตัวอย่างรอการอนุมัติ** (หน้ารายละเอียดสินค้ายังไม่มีเนื้อหา) ⇒ การ์ดจึงพาไปที่หน้ารออนุมัติเดิม
+ * ⚠️ `href` ต้องเป็น **พาธกลาง** (`/products/<slug>`) ไม่ใส่ prefix ภาษา — ตัวเรนเดอร์เติมภาษาของหน้าปัจจุบันให้เอง
+ *    (รอบที่ 101: เดิมใส่ `catalogHref("th", …)` ⇒ หน้า `/en/products` การ์ดพาไปหน้าไทย)
  */
 export function buildProductsTemplate(): BlockDocument {
   const blocks: Block[] = [
@@ -39,7 +41,7 @@ export function buildProductsTemplate(): BlockDocument {
           en: en.productsPage.items[item.id].name,
         },
         body: { th: "", en: "" },
-        href: catalogHref("th", item.slug),
+        href: `/products/${item.slug}`,
         image: templateMedia(
           item.image.src,
           th.productsPage.items[item.id].imageAlt,

@@ -4,6 +4,7 @@ import { CareerFormFields, ContactFormFields } from "@/features/forms/ui/form-fi
 import { SubmitForm } from "@/features/forms/ui/submit-form";
 import { NewsletterForm } from "@/features/home/ui/newsletter-form";
 import { hiddenSizesOf, layoutOf, type Block, type BlockCard, type BlockDocument, type BlockMedia, type JobBoardItem } from "@/lib/blocks/types";
+import { localizedBlockHref } from "@/lib/blocks/href";
 import { pageOutline } from "@/lib/blocks/outline";
 import {
   alignClass,
@@ -89,7 +90,7 @@ function actionLink(
       : "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring inline-block rounded-xl border px-5 py-2.5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none";
 
   return (
-    <a href={href} className={className} {...editAttrs(editable, field)}>
+    <a href={localizedBlockHref(href, language)} className={className} {...editAttrs(editable, field)}>
       {text(label, language)}
     </a>
   );
@@ -138,7 +139,7 @@ function CardView({
 
   return (
     <a
-      href={card.href}
+      href={localizedBlockHref(card.href, language)}
       className={`${shellClass} hover:bg-surface-raised focus-visible:ring-ring block focus-visible:ring-2 focus-visible:outline-none`}
       data-card-index={editable ? index : undefined}
     >
@@ -598,6 +599,83 @@ function BlockView({
                 ))}
               </ul>
             )}
+          </div>
+        );
+      }
+
+      /* ── เมนูอาหาร (รอบที่ 101) — การ์ดเมนู + ส่วนผสม/วิธีทำแบบพับได้ (ไม่ต้องใช้ JS) ── */
+      case "recipeCards": {
+        const gridClass =
+          block.columns === 1
+            ? "grid gap-5"
+            : block.columns === 2
+              ? "grid gap-5 sm:grid-cols-2"
+              : "grid gap-5 sm:grid-cols-2 lg:grid-cols-3";
+
+        return (
+          <div className={`${container} flex flex-col gap-5`}>
+            <div className={`flex flex-col gap-2 ${align}`}>
+              {hasText(block.heading) ? (
+                <h2 className={heading} {...editAttrs(editable, "heading")}>
+                  {text(block.heading, language)}
+                </h2>
+              ) : null}
+              {hasText(block.body) ? (
+                <p className="text-fg-muted text-base" {...editAttrs(editable, "body")}>
+                  {text(block.body, language)}
+                </p>
+              ) : null}
+            </div>
+
+            <ul className={gridClass}>
+              {block.items.map((item, index) => (
+                <li
+                  key={item.id}
+                  /* data-card-index ใช้ทั้งคลิกเลือกในพรีวิว และลากภาพมาวางทับ (เหมือนบล็อกการ์ด) */
+                  data-card-index={editable ? index : undefined}
+                  className="border-line bg-surface flex flex-col rounded-2xl border p-4"
+                >
+                  {item.image === null ? null : (
+                    <span {...editAttrs(editable, "image", { cardIndex: index, media: true })}>
+                      {image(item.image, language, "bg-bg-subtle aspect-[4/3] w-full rounded-xl object-cover")}
+                    </span>
+                  )}
+
+                  {hasText(item.title) ? (
+                    <h3 className="text-fg mt-3 text-base font-semibold" {...editAttrs(editable, "title", { cardIndex: index })}>
+                      {text(item.title, language)}
+                    </h3>
+                  ) : null}
+                  {hasText(item.body) ? (
+                    <p className="text-fg-muted mt-1 text-sm" {...editAttrs(editable, "body", { cardIndex: index })}>
+                      {text(item.body, language)}
+                    </p>
+                  ) : null}
+
+                  {hasText(item.ingredients) || hasText(item.steps) ? (
+                    <details className="border-line mt-3 rounded-xl border px-3 py-2">
+                      <summary className="text-fg focus-visible:ring-ring cursor-pointer text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
+                        {strings.recipe.detailsLabel}
+                      </summary>
+                      <div className="mt-3 flex flex-col gap-3">
+                        {hasText(item.ingredients) ? (
+                          <div {...editAttrs(editable, "ingredients", { cardIndex: index })}>
+                            <p className="text-fg-muted text-xs font-semibold">{strings.recipe.ingredientsLabel}</p>
+                            <p className="text-fg mt-1 text-sm whitespace-pre-line">{text(item.ingredients, language)}</p>
+                          </div>
+                        ) : null}
+                        {hasText(item.steps) ? (
+                          <div {...editAttrs(editable, "steps", { cardIndex: index })}>
+                            <p className="text-fg-muted text-xs font-semibold">{strings.recipe.stepsLabel}</p>
+                            <p className="text-fg mt-1 text-sm whitespace-pre-line">{text(item.steps, language)}</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           </div>
         );
       }

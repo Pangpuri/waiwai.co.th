@@ -21,12 +21,14 @@ import {
   addColumn,
   addGalleryItem,
   addJobItem,
+  addRecipeItem,
   addRosterMember,
   addTableColumn,
   addTableRow,
   canAddCard,
   canAddGalleryItem,
   canAddJobItem,
+  canAddRecipeItem,
   canAddRosterMember,
   canAddTableColumn,
   canAddTableRow,
@@ -38,11 +40,13 @@ import {
   moveBlock,
   moveBlockToLocation,
   moveCardTo,
+  moveRecipeItem,
   removeBlock,
   removeCard,
   removeColumn,
   removeGalleryItem,
   removeJobItem,
+  removeRecipeItem,
   removeRosterMember,
   removeTableColumn,
   removeTableRow,
@@ -63,6 +67,9 @@ import {
   setJobItemOpenings,
   setJobItemText,
   setPageLayout,
+  setRecipeColumns,
+  setRecipeItemImage,
+  setRecipeItemText,
   setRosterColumns,
   setRosterMemberImage,
   setRosterMemberText,
@@ -81,6 +88,7 @@ import {
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
   MAX_JOB_ITEMS,
+  MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
@@ -181,6 +189,8 @@ type Props = {
  * (ลาก "บล็อก" ย้ายไปอยู่ใน `block-layer-list.tsx` แล้ว เพราะการวางต้องเลือกภาชนะได้ด้วย)
  */
 const DRAG_CARD_MIME = "application/x-waiwai-card";
+/** ลากการ์ดเมนู (บล็อก `recipeCards`) สลับลำดับ — คนละชนิดกับการ์ดปกติ จึงไม่หลุดไปหากัน */
+const DRAG_RECIPE_MIME = "application/x-waiwai-recipe";
 
 const PREVIEW_SIZES = [
   { key: "wide", width: 1920, height: 1080, labelKey: "widthWide" },
@@ -638,11 +648,16 @@ export function BlockBuilder({
     const path = uploadState.path;
     const altTh = (uploadState.filename ?? "").replace(/\.[a-z0-9]+$/i, "");
 
-    setDocument((current) =>
-      target.cardIndex === null
-        ? setBlockImage(current, target.blockId, { path, altTh, altEn: "" })
-        : setCardImage(current, target.blockId, target.cardIndex, { path, altTh, altEn: "" }),
-    );
+    setDocument((current) => {
+      if (target.cardIndex === null) return setBlockImage(current, target.blockId, { path, altTh, altEn: "" });
+
+      /* การ์ดเมนู (recipeCards) มีช่องภาพของตัวเอง — ต้องเลือกฟังก์ชันให้ตรงชนิด ไม่งั้นภาพไปไม่ถึง */
+      const cardBlock = walkBlocks(current.blocks).find((node) => node.block.id === target.blockId)?.block ?? null;
+      if (cardBlock !== null && cardBlock.type === "recipeCards") {
+        return setRecipeItemImage(current, target.blockId, target.cardIndex, { path, altTh, altEn: "" });
+      }
+      return setCardImage(current, target.blockId, target.cardIndex, { path, altTh, altEn: "" });
+    });
   }, [uploadState.status, uploadState.path, uploadState.filename]);
 
   const payload = JSON.stringify(document);
@@ -1091,6 +1106,161 @@ export function BlockBuilder({
                   ))}
                 </ul>
                 <p className="text-fg-muted text-xs">{strings.pickCardHint}</p>
+              </div>
+            </>
+          );
+        case "recipeCards":
+          /*
+            เลือกเมนูใบไหน → แก้เฉพาะใบนั้น
+            ใช้ `selectedCard` ชุดเดียวกับบล็อกการ์ด ⇒ คลิกการ์ดเมนูในพรีวิวแล้วเปิดช่องแก้ให้ทันที
+            (พรีวิวส่ง `data-card-index` ของการ์ดเมนูมาเหมือนกัน — ดู block-renderer.tsx)
+          */
+          if (selectedCard !== null) {
+            const item = block.items[selectedCard];
+            if (item !== undefined) {
+              const itemBase = `${base}-card-${selectedCard}`;
+              return (
+                <div className="border-brand-red flex flex-col gap-3 rounded-xl border-2 p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-fg text-sm font-semibold">{fillTemplate(strings.blockRecipeNumber, { n: selectedCard + 1 })}</p>
+                    <div className="flex flex-wrap gap-1">
+                      <TinyButton label="◀" disabled={selectedCard === 0} onClick={() => setSelectedCard(selectedCard - 1)} />
+                      <TinyButton
+                        label="▶"
+                        disabled={selectedCard >= block.items.length - 1}
+                        onClick={() => setSelectedCard(selectedCard + 1)}
+                      />
+                      <TinyButton
+                        label={strings.blockRemoveRecipe}
+                        onClick={() => {
+                          update(removeRecipeItem(document, block.id, selectedCard));
+                          setSelectedCard(null);
+                        }}
+                      />
+                      <TinyButton label={strings.backToBlock} onClick={() => setSelectedCard(null)} />
+                    </div>
+                  </div>
+
+                  <TextPair
+                    idBase={`${itemBase}-title`}
+                    label={strings.blockRecipeTitle}
+                    value={item.title}
+                    highlight={focusTarget?.id === `${itemBase}-title-th`}
+                    onChange={(language, next) => update(setRecipeItemText(document, block.id, selectedCard, "title", language, next))}
+                  />
+                  <TextPair
+                    idBase={`${itemBase}-body`}
+                    label={strings.blockRecipeBody}
+                    value={item.body}
+                    highlight={focusTarget?.id === `${itemBase}-body-th`}
+                    onChange={(language, next) => update(setRecipeItemText(document, block.id, selectedCard, "body", language, next))}
+                  />
+                  <TextPair
+                    idBase={`${itemBase}-ingredients`}
+                    label={strings.blockRecipeIngredients}
+                    value={item.ingredients}
+                    multiline
+                    highlight={focusTarget?.id === `${itemBase}-ingredients-th`}
+                    onChange={(language, next) => update(setRecipeItemText(document, block.id, selectedCard, "ingredients", language, next))}
+                  />
+                  <TextPair
+                    idBase={`${itemBase}-steps`}
+                    label={strings.blockRecipeSteps}
+                    value={item.steps}
+                    multiline
+                    highlight={focusTarget?.id === `${itemBase}-steps-th`}
+                    onChange={(language, next) => update(setRecipeItemText(document, block.id, selectedCard, "steps", language, next))}
+                  />
+                  <div id={`${itemBase}-image`}>
+                    <ImageDrop
+                      strings={strings}
+                      compact
+                      label={strings.blockRecipeImageLabel}
+                      value={item.image}
+                      onChange={(patch) => update(setRecipeItemImage(document, block.id, selectedCard, patch))}
+                    />
+                  </div>
+                </div>
+              );
+            }
+          }
+
+          return (
+            <>
+              <TextPair
+                idBase={`${base}-heading`}
+                label={`heading (${strings.optionalHint})`}
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-body`}
+                label={`body (${strings.optionalHint})`}
+                value={block.body}
+                onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
+              />
+              <SelectField
+                idBase={`${base}-columns`}
+                label={strings.blockRecipeColumns}
+                value={block.columns}
+                options={[1, 2, 3].map((value) => ({ value, label: String(value) }))}
+                onChange={(next) => update(setRecipeColumns(document, block.id, Number(next)))}
+              />
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-fg-muted text-xs font-semibold">
+                    {fillTemplate(strings.blockRecipeItems, { n: block.items.length, max: MAX_RECIPE_ITEMS })}
+                  </p>
+                  <TinyButton
+                    label={strings.blockAddRecipe}
+                    disabled={!canAddRecipeItem(document, block.id)}
+                    onClick={() => update(addRecipeItem(document, block.id))}
+                  />
+                </div>
+
+                <ul className="flex flex-wrap gap-1">
+                  {block.items.map((item, index) => (
+                    <li
+                      key={item.id}
+                      /* ลาก-วางสลับลำดับเมนู (ต้องเรียก setData ใน dragstart — บทเรียน Firefox) */
+                      onDragOver={(event) => {
+                        if (!event.dataTransfer.types.includes(DRAG_RECIPE_MIME)) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(event) => {
+                        const payload = event.dataTransfer.getData(DRAG_RECIPE_MIME);
+                        const [owner, fromText] = payload.split(":");
+                        /* ลากข้ามบล็อกไม่ได้ (เมนูอยู่กับบล็อกของมัน) */
+                        if (owner !== block.id || fromText === undefined) return;
+                        event.preventDefault();
+                        update(moveRecipeItem(document, block.id, Number.parseInt(fromText, 10), index));
+                        setSelectedCard(index);
+                        setDragCardIndex(null);
+                      }}
+                      className={`flex items-center gap-0.5 rounded-lg ${dragCardIndex === index ? "opacity-40" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(event) => {
+                          setDragCardIndex(index);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData(DRAG_RECIPE_MIME, `${block.id}:${index}`);
+                        }}
+                        onDragEnd={() => setDragCardIndex(null)}
+                        aria-label={strings.dragToMove}
+                        title={strings.dragToMove}
+                        className="text-fg-muted hover:text-fg focus-visible:ring-ring cursor-grab text-xs focus-visible:ring-2 focus-visible:outline-none active:cursor-grabbing"
+                      >
+                        ⠿
+                      </button>
+                      <TinyButton label={fillTemplate(strings.blockRecipeNumber, { n: index + 1 })} onClick={() => setSelectedCard(index)} />
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-fg-muted text-xs">{strings.blockRecipePickHint}</p>
               </div>
             </>
           );

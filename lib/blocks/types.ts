@@ -33,6 +33,7 @@ export const BLOCK_TYPES = [
   "gallery",
   "jobBoard",
   "rosterText",
+  "recipeCards",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -364,6 +365,40 @@ export type RosterTextBlock = BlockBase & {
   readonly members: readonly RosterMember[];
 };
 
+/* ── ชนิดบล็อกใหม่ รอบที่ 101 (เมนูอาหาร) ───────────────────────────────────── */
+
+/**
+ * เมนูอาหารหนึ่งรายการในบล็อก "เมนูอาหาร"
+ *
+ * - ข้อความทุกช่องเป็น TH/EN (มติ D3 — EN เป็น *คำเตือน* ไม่บล็อกการเผยแพร่)
+ * - `image = null` = ยังไม่ได้เลือกภาพ (validator เตือน · หน้าเว็บยังแสดงการ์ดโดยไม่มีภาพ)
+ * - `ingredients`/`steps` เป็น **ข้อความหลายบรรทัด** (ขึ้นบรรทัดใหม่ตามที่ผู้ใช้พิมพ์)
+ *   ⇒ หน้าเว็บแสดงแบบ **พับ/ขยายได้** (`<details>`) เพื่อไม่ให้หน้าเมนูยาวเกินอ่าน
+ */
+export type RecipeCardItem = {
+  readonly id: string;
+  readonly title: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly ingredients: LocalizedValue;
+  readonly steps: LocalizedValue;
+  readonly image: BlockMedia | null;
+};
+
+/**
+ * บล็อก "เมนูอาหาร" — การ์ดเมนู + ส่วนผสม + วิธีทำ
+ *
+ * ต่างจากบล็อก "การ์ด" (`cards`) ตรงที่มี **ส่วนผสม/วิธีทำ** ต่อเมนู และไม่มีลิงก์ออก
+ * (หน้าเมนูอาหารไม่มีหน้ารายละเอียดแยก — ตกลงกับเจ้าของรอบที่ 101)
+ * ⚠️ EN ไม่บังคับสำหรับเนื้อหาที่การตลาดเพิ่มเอง (มติ D3) — ตัวตรวจจะเตือนอย่างเดียว
+ */
+export type RecipeCardsBlock = BlockBase & {
+  readonly type: "recipeCards";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly columns: 1 | 2 | 3;
+  readonly items: readonly RecipeCardItem[];
+};
+
 /* ── เลย์เอาต์ของทั้งหน้า (X1.8 · เอกสาร 5.5) ─────────────────────────────────
  * ต้นทางกำหนดว่า "Layout templates selectable per page (full width, with sidebar, landing)
  * — limited to what the template supports" ⇒ เราให้เลือก 3 แบบที่ทำได้จริงในโมเดลบล็อกนี้:
@@ -398,7 +433,8 @@ export type Block =
   | FormBlock
   | GalleryBlock
   | JobBoardBlock
-  | RosterTextBlock;
+  | RosterTextBlock
+  | RecipeCardsBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -459,6 +495,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox)" },
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
+  { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
 ];
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
@@ -494,6 +531,8 @@ export const MAX_GALLERY_ITEMS = 24;
 export const MAX_JOB_ITEMS = 60;
 /** จำนวนคนสูงสุดในบล็อก "รายชื่อคณะผู้บริหาร" */
 export const MAX_ROSTER_MEMBERS = 24;
+/** จำนวนเมนูสูงสุดในบล็อก "เมนูอาหาร" (เทศกาลหนึ่งไม่ควรมีเกินนี้) */
+export const MAX_RECIPE_ITEMS = 24;
 
 export function emptyText(): LocalizedValue {
   return { th: "", en: "" };
@@ -504,8 +543,8 @@ export function createBlock(type: BlockType, id: string): Block {
   const style: BlockStyle =
     type === "hero"
       ? { ...DEFAULT_BLOCK_STYLE, size: "lg", width: "full" }
-      : /* ตาราง/แกลเลอรี/กระดานงาน/รายชื่อ เริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุด/รายการอ่านยากถ้าแคบ */
-        type === "table" || type === "gallery" || type === "jobBoard" || type === "rosterText"
+      : /* ตาราง/แกลเลอรี/กระดานงาน/รายชื่อ/เมนูอาหาร เริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุด/รายการอ่านยากถ้าแคบ */
+        type === "table" || type === "gallery" || type === "jobBoard" || type === "rosterText" || type === "recipeCards"
         ? { ...DEFAULT_BLOCK_STYLE, width: "wide" }
         : { ...DEFAULT_BLOCK_STYLE };
   const base = { id, version: BLOCK_SCHEMA_VERSION, style };
@@ -561,6 +600,9 @@ export function createBlock(type: BlockType, id: string): Block {
       return { ...base, type: "jobBoard", heading: emptyText(), body: emptyText(), groupByDepartment: true, items: [] };
     case "rosterText":
       return { ...base, type: "rosterText", heading: emptyText(), body: emptyText(), columns: 3, members: [] };
+    case "recipeCards":
+      /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
+      return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
   }
 }
 

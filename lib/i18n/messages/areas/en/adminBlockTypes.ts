@@ -48,6 +48,18 @@ export const adminBlockTypes = {
   blockMemberRole: "Role",
   blockRosterColumns: "Columns",
   blockMemberPhotoHint: "Personal photo (optional)",
+  /* Recipe cards (round 101) */
+  blockRecipeItems: "Recipes ({n}/{max})",
+  blockAddRecipe: "Add recipe",
+  blockRemoveRecipe: "Remove recipe",
+  blockRecipeNumber: "Recipe {n}",
+  blockRecipeTitle: "Recipe name",
+  blockRecipeBody: "Short description (optional)",
+  blockRecipeIngredients: "Ingredients (one per line)",
+  blockRecipeSteps: "Method (one step per line)",
+  blockRecipeColumns: "Columns",
+  blockRecipeImageLabel: "Photo of this recipe",
+  blockRecipePickHint: "Pick a recipe to edit (or click its card in the preview)",
   /* Page layout (X1.8) */
   layoutLabel: "Page layout",
   layoutHint:

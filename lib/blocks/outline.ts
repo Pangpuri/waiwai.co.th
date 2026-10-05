@@ -53,6 +53,7 @@ function headingTextOf(block: Block): LocalizedValue | null {
     case "gallery":
     case "jobBoard":
     case "rosterText":
+    case "recipeCards":
     case "form":
       return block.heading;
     case "quote":

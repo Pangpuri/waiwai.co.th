@@ -58,10 +58,18 @@ export type LayoutStrings = {
   readonly tocLabel: string;
 };
 
+/** ข้อความของ "เมนูอาหาร" (รอบที่ 101) — ป้ายที่ตัวเรนเดอร์แสดง (ไม่ใช่เนื้อหาที่แก้จากหลังบ้าน) */
+export type RecipeStrings = {
+  readonly detailsLabel: string;
+  readonly ingredientsLabel: string;
+  readonly stepsLabel: string;
+};
+
 export type BlockRenderStrings = {
   readonly gallery: GalleryStrings;
   readonly form: FormBlockStrings;
   readonly jobBoard: JobBoardStrings;
+  readonly recipe: RecipeStrings;
   readonly layout: LayoutStrings;
 };
 
@@ -159,12 +167,21 @@ function jobBoardStringsOf(careers: CareersMessages): JobBoardStrings {
   };
 }
 
+function recipeStringsOf(area: BlocksMessages): RecipeStrings {
+  return {
+    detailsLabel: area.recipeDetailsLabel,
+    ingredientsLabel: area.recipeIngredientsLabel,
+    stepsLabel: area.recipeStepsLabel,
+  };
+}
+
 /** ข้อความทั้งหมดที่ตัวเรนเดอร์บล็อกใช้ — แยกตามภาษา (ทั้งสองภาษาเป็นข้อมูลล้วน) */
 export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings {
   if (language === "en") {
     return {
       gallery: galleryStringsOf(blocksEn),
       jobBoard: jobBoardStringsOf(careersEn),
+      recipe: recipeStringsOf(blocksEn),
       layout: { tocLabel: blocksEn.layoutTocLabel },
       form: {
         contact: contactStringsOf(contactEn),
@@ -177,6 +194,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
   return {
     gallery: galleryStringsOf(blocksTh),
     jobBoard: jobBoardStringsOf(careersTh),
+    recipe: recipeStringsOf(blocksTh),
     layout: { tocLabel: blocksTh.layoutTocLabel },
     form: {
       contact: contactStringsOf(contactTh),

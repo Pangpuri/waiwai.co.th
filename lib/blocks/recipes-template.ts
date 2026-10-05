@@ -4,11 +4,11 @@ import { TEMPLATE_BLOCK_VERSION, templateBlockId, templateStyle } from "@/lib/bl
 import type { Block, BlockDocument } from "@/lib/blocks/types";
 
 /**
- * เทมเพลตตั้งต้นของหน้า "เมนูอาหาร" (`/recipes`) — S2 รอบที่ 83
+ * เทมเพลตตั้งต้นของหน้า "เมนูอาหาร" (`/recipes`) — S2 รอบที่ 83 · เพิ่มบล็อกเมนู รอบที่ 101
  *
- * ⚠️ หน้านี้เป็น **หน้าตัวอย่าง (mockup) รอการอนุมัติ** — การ์ดในหน้านั้นเป็นข้อมูลทดสอบ
- *    ⇒ เทมเพลตนี้ให้เฉพาะ "ส่วนหัว + คำเตือนตัวอย่าง" และ **ไม่แต่งการ์ดข่าว/เมนูขึ้นเอง**
- *    (ผู้ใช้ต้องเพิ่มบล็อกและใส่เนื้อหาจริงเองเมื่อมีข้อมูล)
+ * ⚠️ หน้านี้เป็น **หน้าตัวอย่าง (mockup) รอการอนุมัติ** ⇒ เทมเพลต **ไม่แต่งเมนูปลอมขึ้นเอง**
+ *    แต่ให้ "ส่วนหัว + บล็อกเมนูอาหารว่าง" ⇒ การตลาดกด "เพิ่มเมนู" แล้วใส่ชื่อ/ภาพ/ส่วนผสม/วิธีทำเองได้ทันที
+ *    (ตอนเปิดใช้กับหน้าเว็บจริง การ์ดตัวอย่างเดิมจะหายไป — `blockCoverageGaps("recipes")` เตือนไว้แล้ว)
  */
 export function buildRecipesTemplate(): BlockDocument {
   const blocks: Block[] = [
@@ -26,6 +26,16 @@ export function buildRecipesTemplate(): BlockDocument {
     },
     {
       id: templateBlockId(1),
+      version: TEMPLATE_BLOCK_VERSION,
+      type: "recipeCards",
+      style: templateStyle({ width: "wide" }),
+      heading: { th: th.recipesPage.eyebrow, en: en.recipesPage.eyebrow },
+      body: { th: "", en: "" },
+      columns: 2,
+      items: [],
+    },
+    {
+      id: templateBlockId(2),
       version: TEMPLATE_BLOCK_VERSION,
       type: "cta",
       style: templateStyle(),
