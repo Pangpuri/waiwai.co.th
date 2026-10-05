@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { ignoredRuleFor as ignoredRuleBy, parseIgnoreRules } from "@/lib/deploy/vercel-ignore";
+
 /**
  * เทสต์กันพลาดก่อน deploy ขึ้น Vercel
  *
@@ -12,36 +14,13 @@ import { test } from "node:test";
  * 2. ⚠️ **เคสที่เกิดจริง 2026-10-05: build บน Vercel ล้มทั้งบิลด์** เพราะเขียนกฎ `.vercelignore`
  *    แบบไม่มี `/` นำหน้า (`products/` · `contact/`) ⇒ ไปตัด `features/products/` และ `features/contact/`
  *    ⇒ "Module not found: @/features/products/catalog · @/features/contact/content"
- *    ⇒ เทสต์นี้จึง **จำลองการแมตช์แบบ gitignore** แล้วยืนยันว่า "ไฟล์ของแอปไม่ถูกตัด"
+ *    ⇒ เทสต์นี้จึงตรวจว่า "ไฟล์ของแอปไม่ถูกตัด" (ตัวแมตช์ร่วมอยู่ที่ lib/deploy/vercel-ignore.ts)
  */
 
-const raw = readFileSync(".vercelignore", "utf8");
-const rules = raw
-  .split(/\r?\n/)
-  .map((line) => line.trim())
-  .filter((line) => line !== "" && !line.startsWith("#"));
-
-/** จำลองการแมตช์ของ gitignore (พอเพียงกับกฎที่เราใช้: `*` เดียว, ลงท้ายด้วย `/` = โฟลเดอร์) */
-function ignoredBy(rule: string, path: string): boolean {
-  const isDir = rule.endsWith("/");
-  const body = isDir ? rule.slice(0, -1) : rule;
-  const anchored = body.startsWith("/");
-  const clean = body.replace(/^\//, "");
-
-  const escaped = clean.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
-  /* ไม่มี / นำหน้า = แมตช์ที่ชั้นใดก็ได้ (ความหมายแบบ gitignore) */
-  const prefix = anchored ? "^" : "^(?:.*/)?";
-  /*
-    กฎที่ไม่ลงท้ายด้วย `/` ใน gitignore ยังแมตช์ "โฟลเดอร์" ชื่อนั้นด้วย (จึงกันไฟล์ข้างในทั้งหมด)
-    เช่น `.vercel` ต้องกัน `.vercel/project.json` — จำเป็นต่อเทสต์นี้
-  */
-  const suffix = "(?:/.*)?$";
-  return new RegExp(`${prefix}${escaped}${suffix}`).test(path);
-}
+const rules = parseIgnoreRules(readFileSync(".vercelignore", "utf8"));
 
 function ignoredRuleFor(path: string): string | null {
-  for (const rule of rules) if (ignoredBy(rule, path)) return rule;
-  return null;
+  return ignoredRuleBy(path, rules);
 }
 
 test("vercelignore: ต้องกันไฟล์ความลับและข้อมูลส่วนบุคคลออกจาก build", () => {
