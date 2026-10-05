@@ -14,6 +14,8 @@ export const hero = {
     // ── สไลด์ภาพฉากหลัง hero (ดู features/home/slides.ts) ──
     galleryLabel: "ภาพประชาสัมพันธ์ของไวไว",
     gotoSlide: "ไปที่ภาพที่",
+    sampleImageBadge: "ภาพตัวอย่าง · รออนุมัติ",
+    watermarkedImageBadge: "ภาพมีลายน้ำต้นทาง · รอเปลี่ยน",
     pauseSlides: "หยุดสไลด์ภาพ",
     playSlides: "เล่นสไลด์ภาพต่อ",
     slides: {
@@ -46,6 +48,7 @@ export const products = {
     eyebrow: "ผลิตภัณฑ์",
     title: "เลือกให้ตรงกับมื้อของคุณ",
     body: "บะหมี่และอาหารกึ่งสำเร็จรูปหลากหมวด พร้อมรสชาติที่คนไทยคุ้นเคย",
+    countLabel: "{count} รายการ",
     categoriesTitle: "หมวดสินค้า",
     featuredTitle: "สินค้าแนะนำ",
     categories: {

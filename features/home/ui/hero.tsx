@@ -53,6 +53,8 @@ export function Hero({ locale, messages }: HeroProps) {
             gotoSlide: m.gotoSlide,
             pause: m.pauseSlides,
             play: m.playSlides,
+            sampleBadge: m.sampleImageBadge,
+            watermarkBadge: m.watermarkedImageBadge,
           }}
         />
 

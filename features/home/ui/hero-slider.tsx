@@ -33,6 +33,10 @@ type HeroSliderLabels = {
   readonly gotoSlide: string;
   readonly pause: string;
   readonly play: string;
+  /** ป้ายบนสไลด์ที่ยังรอเจ้าของอนุมัติ (รอบที่ 108) */
+  readonly sampleBadge: string;
+  /** ป้ายบนสไลด์ที่ยังมีลายน้ำของเพจต้นทาง */
+  readonly watermarkBadge: string;
 };
 
 type HeroSliderProps = {
@@ -74,6 +78,7 @@ export function HeroSlider({ slides, labels }: HeroSliderProps) {
               key={slide.id}
               data-hero-slide=""
               data-state={isActive ? "active" : "idle"}
+              data-review-status={slide.reviewStatus}
               aria-hidden={!isActive}
               className="absolute inset-0"
             >
@@ -88,6 +93,17 @@ export function HeroSlider({ slides, labels }: HeroSliderProps) {
                 loading={position === 0 ? "eager" : "lazy"}
                 fetchPriority={position === 0 ? "high" : "auto"}
               />
+
+              {/*
+                ป้าย "ภาพตัวอย่างรออนุมัติ" (รอบที่ 108) — แสดงเฉพาะภาพที่ยังไม่ผ่าน
+                ผู้ใช้ (เจ้าของ) สั่งว่า "คงไว้ก่อน แต่ทำเครื่องหมายให้ชัด" ⇒ เห็นได้ทันทีตอนตรวจหน้าเว็บ
+                ข้อความมาจากพจนานุกรม (สองภาษา) · ป้ายอยู่ในภาพที่ `aria-hidden` อยู่แล้ว
+                ⇒ ไม่รบกวนโปรแกรมอ่านหน้าจอ และไม่ถูกอ่านซ้ำ
+              */}
+              <span className="pointer-events-none absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-overlay/80 px-3 py-1.5 text-xs font-bold text-on-brand">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-yellow" />
+                {slide.reviewStatus === "watermarked" ? labels.watermarkBadge : labels.sampleBadge}
+              </span>
             </div>
           );
         })}

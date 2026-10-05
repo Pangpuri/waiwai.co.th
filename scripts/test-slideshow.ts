@@ -152,11 +152,26 @@ test("HERO_SLIDES: ไฟล์ภาพมีจริง เป็น JPEG แ
   }
 });
 
-test("HERO_SLIDES: รูปที่มีลายน้ำของเพจต้นทางต้องถูกทำเครื่องหมายไว้", () => {
-  // ภาพตัวอย่างรอการตลาดอนุมัติ — ถ้ามีการเปลี่ยนไฟล์ ต้องอัปเดตทั้งข้อมูลและ PRODUCT_ROADMAP § 9
+test("HERO_SLIDES: ทุกภาพต้องประกาศสถานะอนุมัติ และรูปที่มีลายน้ำต้องถูกทำเครื่องหมาย", () => {
+  /*
+    รอบที่ 108: เปลี่ยนจากธง `watermarked: boolean` เป็น `reviewStatus` ที่บอกชัดว่า
+    "รอเจ้าของอนุมัติ" หรือ "มีลายน้ำต้นทาง" — เจ้าของสั่งให้ทำเครื่องหมายภาพรออนุมัติให้ชัด
+    ⚠️ ถ้ามีการเปลี่ยนไฟล์ภาพ ต้องอัปเดตสถานะ + PRODUCT_ROADMAP § 9 ด้วย
+  */
+  for (const slide of HERO_SLIDES) {
+    assert.ok(
+      slide.reviewStatus === "pending-owner" || slide.reviewStatus === "watermarked",
+      `${slide.id}: ต้องประกาศสถานะอนุมัติ (ห้ามเว้นว่าง)`,
+    );
+  }
+
   assert.deepEqual(
-    HERO_SLIDES.filter((slide) => slide.watermarked).map((slide) => slide.id),
+    HERO_SLIDES.filter((slide) => slide.reviewStatus === "watermarked").map((slide) => slide.id),
     ["event"],
+  );
+  assert.ok(
+    HERO_SLIDES.some((slide) => slide.reviewStatus === "pending-owner"),
+    "ต้องมีภาพที่รอเจ้าของอนุมัติอย่างน้อยหนึ่งใบ (ปัจจุบันทั้งชุดยังเป็นภาพตัวอย่าง)",
   );
 });
 

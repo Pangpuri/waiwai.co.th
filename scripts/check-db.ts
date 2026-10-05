@@ -39,6 +39,8 @@ import {
   countProductsByCategory,
   deleteProduct,
   deleteProductCategory,
+  listProductCategoryCards,
+  listProductHighlights,
   listProductsByCategory,
   replaceProductIngredients,
   upsertProduct,
@@ -1804,6 +1806,28 @@ async function checkProductCatalog(): Promise<void> {
 
     const counts = await countProductsByCategory();
     assert.equal(counts[PRODUCT_CHECK_CATEGORY], 1, "นับสินค้าต่อหมวดได้");
+
+    /*
+      ตัวอ่านที่ "หน้าแรก" ใช้ (รอบที่ 108) — ต้องได้หมวด + จำนวน + ภาพ และสินค้าเด่น 1 ตัวต่อหมวด
+      ⚠️ จุดสำคัญ: DB คืน `product_category.id` = slug ⇒ หน้าแรกต้องจับคู่กับ CATALOG_ITEMS ด้วย slug
+         (ถ้าจับคู่ผิดคีย์ จำนวน/คำอธิบาย/ภาพจะไม่ขึ้นสักหมวด — เคยพลาดจริงและเทสต์จับได้)
+    */
+    const categoryCards = await listProductCategoryCards();
+    const tempCard = categoryCards.find((card) => card.id === PRODUCT_CHECK_CATEGORY);
+    assert.ok(tempCard !== undefined, "ต้องเห็นหมวดทดสอบในการ์ดหมวดของหน้าแรก");
+    assert.equal(tempCard.productCount, 1, "การ์ดหมวดต้องบอกจำนวนสินค้าจริง");
+    assert.equal(tempCard.descriptionTh, "คำอธิบายหมวดทดสอบ", "การ์ดหมวดต้องได้คำอธิบายจริง");
+
+    const highlights = await listProductHighlights();
+    const tempHighlight = highlights.find((row) => row.categoryId === PRODUCT_CHECK_CATEGORY);
+    assert.ok(tempHighlight !== undefined, "สินค้าเด่นของหมวดทดสอบต้องถูกเลือก (1 ตัวต่อหมวด)");
+    assert.equal(tempHighlight.id, PRODUCT_CHECK_ID);
+    assert.equal(tempHighlight.imagePath, `/media/${mediaId}`, "สินค้าเด่นต้องมีภาพ (พาธ /media/<id>)");
+    assert.equal(
+      highlights.filter((row) => row.categoryId === PRODUCT_CHECK_CATEGORY).length,
+      1,
+      "ต้องได้หมวดละ 1 ตัวเท่านั้น",
+    );
 
     const usage = await findMediaUsage(mediaId);
     assert.ok(

@@ -14,6 +14,8 @@ export const hero = {
     // ── Hero background slideshow (see features/home/slides.ts) ──
     galleryLabel: "Wai Wai promotional images",
     gotoSlide: "Go to image",
+    sampleImageBadge: "Sample image · pending approval",
+    watermarkedImageBadge: "Source watermark · pending replacement",
     pauseSlides: "Pause the slideshow",
     playSlides: "Resume the slideshow",
     slides: {
@@ -46,6 +48,7 @@ export const products = {
     eyebrow: "Products",
     title: "Pick what fits your meal",
     body: "A range of noodle and ready-to-eat categories, in the flavours Thai homes already know.",
+    countLabel: "{count} items",
     categoriesTitle: "Categories",
     featuredTitle: "Featured products",
     categories: {

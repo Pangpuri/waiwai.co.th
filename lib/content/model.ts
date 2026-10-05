@@ -105,6 +105,13 @@ const PRODUCTS: SectionSpec = {
     sectionField("categoriesTitle", "หัวข้อย่อย: หมวดสินค้า", 60),
     sectionField("featuredTitle", "หัวข้อย่อย: สินค้าแนะนำ", 60),
   ],
+  /*
+    รอบที่ 108 — ตัด 2 อย่างออกจากสคีมานี้ เพราะ "ของจริงมาจากฐานข้อมูล" แล้ว
+    · `description` ของหมวด → คำอธิบายจริงอยู่ใน `product_category.description_th` (นำเข้าจากเว็บเดิม)
+    · กลุ่ม `featured` (สินค้าแนะนำ) → หน้าแรกดึงสินค้าเด่นจากฐานข้อมูล (`listProductHighlights()`)
+    ⇒ ที่เหลือคือสิ่งที่เจ้าของแก้ได้ปลอดภัยในหน้านี้: ชื่อหมวด · โทนสี · ปลายทาง
+      (หน้าแรกอ่านค่าจากฐานข้อมูล + `features/products/catalog.ts` เป็นหลัก)
+  */
   items: [
     {
       key: "categories",
@@ -112,20 +119,8 @@ const PRODUCTS: SectionSpec = {
       maxItems: 12,
       fields: [
         itemField("name", "ชื่อหมวด", 60),
-        itemField("description", "คำอธิบายหมวด", 200),
         itemField("tone", "โทนสีของการ์ด", 20, { localized: false }),
         itemUrl("href", "ปลายทางของหมวด"),
-      ],
-    },
-    {
-      key: "featured",
-      label: "การ์ดสินค้าแนะนำ",
-      maxItems: 12,
-      fields: [
-        itemField("name", "ชื่อสินค้า", 60),
-        itemField("tagline", "คำโปรยสินค้า", 80),
-        itemField("category", "หมวดที่สังกัด", 40, { localized: false }),
-        itemField("tone", "โทนสีของซอง", 20, { localized: false }),
       ],
     },
   ],

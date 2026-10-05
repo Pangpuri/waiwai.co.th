@@ -265,6 +265,7 @@ test("validate: กลุ่มรายการที่โมเดลไม�
 
 test("validate: กลุ่มรายการที่ต้องมีแต่หายไป = error", () => {
   const content = clone();
-  delete section(content, "products").items.featured;
+  /* รอบที่ 108: กลุ่ม `products.featured` ถูกตัดออกจากโมเดล (ของจริงมาจากฐานข้อมูล) ⇒ ใช้ `categories` แทน */
+  delete section(content, "products").items.categories;
   assert.ok(errorCodes(content).includes("missing-item-group"));
 });

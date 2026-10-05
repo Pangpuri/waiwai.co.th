@@ -10,13 +10,23 @@ import { ProductsShowcase } from "@/features/home/ui/products-showcase";
 import { Recipes } from "@/features/home/ui/recipes";
 import { Sustainability } from "@/features/home/ui/sustainability";
 import { WhereToBuy } from "@/features/home/ui/where-to-buy";
+import {
+  homeCategoryCards,
+  homeNewsItems,
+  homeProductHighlights,
+  homeRecipeItems,
+} from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { countNews, listNews } from "@/lib/news/repository";
 import { JsonLd } from "@/features/shell/ui/json-ld";
 import { loadPageSeo } from "@/lib/pages/repository";
+import { listProductCategoryCards, listProductHighlights } from "@/lib/products/repository";
+import { listRecipes } from "@/lib/recipes/repository";
 import { loadSiteSettings } from "@/lib/site-settings/loader";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { fillTemplate } from "@/lib/i18n/template";
 
 /*
   ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
@@ -25,6 +35,13 @@ import { withPageSeo } from "@/lib/seo/page-seo";
      เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
 */
 export const revalidate = 300;
+
+/**
+ * จำนวนรายการจริงที่แสดงบนหน้าแรก (รอบที่ 108) — เจ้าของเลือก "ของจริงมาแสดง"
+ * · เมนู/ข่าว = 3 ใบ (เท่ากับจำนวนการ์ดในเลย์เอาต์เดิม → ไม่ต้องปรับดีไซน์)
+ */
+const HOME_RECIPE_LIMIT = 3;
+const HOME_NEWS_LIMIT = 3;
 
 export async function generateMetadata({
   params,
@@ -62,16 +79,41 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
     return <BlockDocumentView document={liveDocument} language={lang} />;
   }
 
+  /*
+    ── ของจริงจากฐานข้อมูลสำหรับ 3 ส่วน (S6 · รอบที่ 108) ────────────────────────
+    ⚠️ บทเรียนรอบที่ 108: หน้าแรกเคยแสดง "ข้อมูลทดสอบ" ทั้ง 3 ส่วน และการ์ดหมวดสินค้า
+       ฝัง slug เก่า (`/products/cup-noodles` ฯลฯ) ที่ไม่มีอยู่จริง ⇒ **ลิงก์เสีย 4 เส้น**
+    ⇒ ตอนนี้ดึงของจริงคู่ขนาน (คำสั่งเดียวต่อส่วน) แล้วแปลงด้วย `features/home/view-models.ts`
+       · ทุกตัวอ่านไม่สำเร็จ/ไม่มี DB ⇒ คืน [] ⇒ หน้าถอยไปใช้การ์ดตัวอย่างเดิม (ไม่พัง)
+  */
+  const [categoryRows, highlightRows, recipeRows, newsRows] = await Promise.all([
+    listProductCategoryCards(),
+    listProductHighlights(),
+    listRecipes(),
+    countNews().then(async (total) => (total === 0 ? [] : await listNews(HOME_NEWS_LIMIT, 0))),
+  ]);
+
+  const categories = homeCategoryCards(categoryRows, lang, messages);
+  const highlights = homeProductHighlights(highlightRows, lang, messages);
+  const recipes = homeRecipeItems(recipeRows, lang, HOME_RECIPE_LIMIT);
+  const news = homeNewsItems(newsRows, lang, HOME_NEWS_LIMIT);
+
   return (
     <>
       {/* JSON-LD (X1.4): องค์กร + เว็บไซต์ — ค่ามาจาก "ตั้งค่าส่วนกลาง" ในหลังบ้าน */}
       <JsonLd kind="organization" locale={lang} settings={await loadSiteSettings(lang)} />
       <Hero locale={lang} messages={messages} />
-      <ProductsShowcase locale={lang} messages={messages} />
+      <ProductsShowcase
+        locale={lang}
+        messages={messages}
+        categories={categories}
+        highlights={highlights}
+        countLabel={(count) => fillTemplate(messages.products.countLabel, { count })}
+      />
       <BrandStory locale={lang} messages={messages} />
       <Sustainability messages={messages} />
-      <Recipes locale={lang} messages={messages} />
-      <NewsList locale={lang} messages={messages} />
+      <Recipes locale={lang} messages={messages} items={recipes} />
+      <NewsList locale={lang} messages={messages} items={news} />
       <WhereToBuy locale={lang} messages={messages} />
       <Newsletter messages={messages} />
     </>

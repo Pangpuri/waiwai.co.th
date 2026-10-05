@@ -176,6 +176,123 @@ export async function countProductsByCategory(): Promise<Readonly<Record<string,
   }
 }
 
+/**
+ * การ์ดหมวดสำหรับ **หน้าแรก** (รอบที่ 108) — หมวด + คำอธิบาย + ภาพ + จำนวนสินค้า ใน **คิวรีเดียว**
+ *
+ * ทำไมต้องมีตัวนี้: หน้าแรกเคยใช้ข้อมูลจำลองในโค้ด (`features/home/content.ts`) ซึ่งมี slug เก่า
+ * ที่ไม่มีอยู่จริง (`/products/cup-noodles` ฯลฯ) ⇒ **ลิงก์เสีย 4 เส้น** · ตัวนี้ดึงของจริงจากฐานข้อมูล
+ * (หมวด/ภาพ/คำอธิบายมาจากการนำเข้าเว็บเดิม · `product_category.image_media_id` → `/media/<id>`)
+ * ⚠️ ลำดับการแสดง **ไม่ได้** มาจากฐานข้อมูล — ผู้เรียกเรียงตาม `CATALOG_ITEMS` ในโค้ด (แหล่งความจริงเดียวของ slug)
+ */
+export type ProductCategoryCardRecord = {
+  readonly id: string;
+  readonly descriptionTh: string;
+  readonly descriptionEn: string;
+  /** `/media/<id>` หรือ null */
+  readonly imagePath: string | null;
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
+  readonly productCount: number;
+};
+
+export async function listProductCategoryCards(): Promise<readonly ProductCategoryCardRecord[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{
+      id: string;
+      descriptionTh: string;
+      descriptionEn: string;
+      imageId: string | null;
+      imageWidth: number | null;
+      imageHeight: number | null;
+      productCount: string;
+    }>(
+      `select c.id,
+              c.description_th as "descriptionTh",
+              c.description_en as "descriptionEn",
+              m.id             as "imageId",
+              m.width          as "imageWidth",
+              m.height         as "imageHeight",
+              count(p.id)::text as "productCount"
+         from product_category c
+         left join media m on m.id = c.image_media_id
+         left join product p on p.category_id = c.id
+        group by c.id, m.id, m.width, m.height`,
+    );
+
+    const cards: ProductCategoryCardRecord[] = [];
+    for (const row of result.rows) {
+      const count = Number.parseInt(row.productCount, 10);
+      cards.push({
+        id: row.id,
+        descriptionTh: row.descriptionTh,
+        descriptionEn: row.descriptionEn,
+        imagePath: mediaPath(row.imageId),
+        imageWidth: row.imageWidth,
+        imageHeight: row.imageHeight,
+        productCount: Number.isFinite(count) ? count : 0,
+      });
+    }
+    return cards;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * สินค้าเด่นสำหรับ **หน้าแรก** — 1 ตัวต่อหมวด (ตัวแรกตามลำดับในหมวด) ใน **คิวรีเดียว**
+ * · เอาเฉพาะสินค้าที่มีภาพ (การ์ดต้องมีภาพจึงจะดูดี) · ผู้เรียกเรียงตาม `CATALOG_ITEMS` เอง
+ */
+export type ProductHighlightRecord = {
+  readonly id: string;
+  readonly categoryId: string;
+  readonly nameTh: string;
+  readonly nameEn: string;
+  readonly imagePath: string | null;
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
+};
+
+export async function listProductHighlights(): Promise<readonly ProductHighlightRecord[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{
+      id: string;
+      categoryId: string;
+      nameTh: string;
+      nameEn: string;
+      imageId: string | null;
+      imageWidth: number | null;
+      imageHeight: number | null;
+    }>(
+      /* `distinct on` = เลือกแถวแรกของแต่ละหมวดตามลำดับ sort_order */
+      `select distinct on (p.category_id)
+              p.id,
+              p.category_id as "categoryId",
+              p.name_th     as "nameTh",
+              p.name_en     as "nameEn",
+              m.id          as "imageId",
+              m.width       as "imageWidth",
+              m.height      as "imageHeight"
+         from product p
+         join media m on m.id = p.image_media_id
+        order by p.category_id, p.sort_order, p.id`,
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      categoryId: row.categoryId,
+      nameTh: row.nameTh,
+      nameEn: row.nameEn,
+      imagePath: mediaPath(row.imageId),
+      imageWidth: row.imageWidth,
+      imageHeight: row.imageHeight,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /* ── ฝั่งเขียน (ใช้โดยสคริปต์นำเข้า) — โยน error ออกไปถ้าล้มเหลว (ห้ามกลืน) ────── */
 
 export async function upsertProductCategory(input: ProductCategoryInput, actor: string, imageMediaId: string | null): Promise<void> {

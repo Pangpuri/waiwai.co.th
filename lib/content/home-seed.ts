@@ -1,4 +1,5 @@
-import { NEWS_ENTRIES, BRAND_STAT_ORDER, FEATURED_PRODUCTS, PRODUCT_CATEGORIES, RECIPE_ORDER, SUSTAINABILITY_POINT_ORDER } from "@/features/home/content";
+import { NEWS_ENTRIES, BRAND_STAT_ORDER, RECIPE_ORDER, SUSTAINABILITY_POINT_ORDER } from "@/features/home/content";
+import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { HERO_SLIDES } from "@/features/home/slides";
 import { en } from "@/lib/i18n/messages/en";
@@ -51,7 +52,7 @@ const heroSlides: readonly ItemContent[] = HERO_SLIDES.map((slide, index) =>
     index + 1,
     { focus: notLocalized(slide.objectPosition) },
     {
-      image: image(slide.src, th.hero.slides[slide.id].alt, en.hero.slides[slide.id].alt, slide.watermarked),
+      image: image(slide.src, th.hero.slides[slide.id].alt, en.hero.slides[slide.id].alt, slide.reviewStatus === "watermarked"),
     },
   ),
 );
@@ -78,26 +79,25 @@ const hero: SectionContent = {
   items: { slides: heroSlides, card: heroCard },
 };
 
-/* ── หมวดสินค้า + สินค้าแนะนำ ───────────────────────────────────────── */
+/* ── หมวดสินค้า ─────────────────────────────────────────────────────── */
 
-const productCategories: readonly ItemContent[] = PRODUCT_CATEGORIES.map((category, index) =>
-  item(index + 1, {
-    name: text(th.products.categories[category.id].name, en.products.categories[category.id].name),
-    description: text(
-      th.products.categories[category.id].description,
-      en.products.categories[category.id].description,
-    ),
-    tone: notLocalized(category.tone),
-    href: notLocalized(category.path),
-  }),
-);
+/*
+  ⚠️ รอบที่ 108 — เปลี่ยนแหล่งข้อมูลของส่วนนี้
+  - เดิมใช้ `PRODUCT_CATEGORIES` + `FEATURED_PRODUCTS` จาก `features/home/content.ts`
+    ซึ่งฝัง slug เก่าที่ไม่มีจริง (`/products/cup-noodles` ฯลฯ) และมี "ข้อมูลทดสอบ" ปนอยู่
+  - ตอนนี้หมวดมาจาก **`CATALOG_ITEMS`** (แหล่งความจริงเดียวของ slug/ลำดับ) ชื่อจาก `productsPage.items`
+  - **ไม่ใส่ `description` ที่นี่** — คำอธิบายหมวดจริงอยู่ในฐานข้อมูล (`product_category.description_th`
+    จากการนำเข้าเว็บเดิม) ⇒ ไม่แต่งข้อความขึ้นเอง
+  - **ตัดกลุ่ม `featured` (สินค้าแนะนำ) ออก**: สินค้าเด่นของหน้าแรกดึงจากฐานข้อมูลจริง
+    (`listProductHighlights()`) ⇒ ไม่มีเหตุให้มีรายการที่แต่งขึ้นในเนื้อหาแบบฟิลด์มีโครงอีก
+*/
+const PACK_TONES = ["yellow", "red", "cream"] as const;
 
-const featuredProducts: readonly ItemContent[] = FEATURED_PRODUCTS.map((product, index) =>
+const productCategories: readonly ItemContent[] = CATALOG_ITEMS.map((catalogItem, index) =>
   item(index + 1, {
-    name: text(th.products.items[product.id].name, en.products.items[product.id].name),
-    tagline: text(th.products.items[product.id].tagline, en.products.items[product.id].tagline),
-    category: notLocalized(product.category),
-    tone: notLocalized(product.tone),
+    name: text(th.productsPage.items[catalogItem.id].name, en.productsPage.items[catalogItem.id].name),
+    href: notLocalized(`/products/${catalogItem.slug}`),
+    tone: notLocalized(PACK_TONES[index % PACK_TONES.length] ?? "yellow"),
   }),
 );
 
@@ -109,7 +109,7 @@ const products: SectionContent = {
     categoriesTitle: text(th.products.categoriesTitle, en.products.categoriesTitle),
     featuredTitle: text(th.products.featuredTitle, en.products.featuredTitle),
   },
-  items: { categories: productCategories, featured: featuredProducts },
+  items: { categories: productCategories },
 };
 
 /* ── เรื่องราวแบรนด์ ────────────────────────────────────────────────── */

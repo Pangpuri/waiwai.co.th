@@ -24,8 +24,13 @@ export type HeroSlide = {
    * ภาพจะถูกครอปเพราะกรอบ hero กว้างกว่าภาพ → ต้องเลือกจุดที่ยังเห็นหน้าคน/ซองสินค้า
    */
   readonly objectPosition: string;
-  /** ⚠️ true = ยังมีลายน้ำของเพจต้นทางติดอยู่ในภาพ */
-  readonly watermarked: boolean;
+  /**
+   * สถานะการอนุมัติภาพ (รอบที่ 108) — เจ้าของสั่งให้ "ทำเครื่องหมายรอภาพ" ให้ชัด
+   * - `"pending-owner"` = ภาพตัวอย่าง ยังรอเจ้าของ/การตลาดอนุมัติ
+   * - `"watermarked"`  = **ยังมีลายน้ำของเพจต้นทางติดอยู่ในภาพ** ⇒ ห้ามใช้ขึ้นจริงก่อนเปลี่ยน
+   * ทั้งสองกรณี หน้าเว็บจะติดป้ายกำกับบนสไลด์ให้เห็น (ข้อความในพจนานุกรม `hero.sampleImageBadge`/`hero.watermarkedImageBadge`)
+   */
+  readonly reviewStatus: "pending-owner" | "watermarked";
 };
 
 export const HERO_SLIDES: readonly HeroSlide[] = [
@@ -36,7 +41,7 @@ export const HERO_SLIDES: readonly HeroSlide[] = [
     height: 845,
     // ป้าย 2 รสซ้าย/ขวา — เอาตรงกลางไว้ให้เห็นทั้งสองฝั่ง (ฝั่งซ้ายจะถูกฉากมืดกับข้อความทับ)
     objectPosition: "center center",
-    watermarked: false,
+    reviewStatus: "pending-owner",
   },
   {
     id: "event",
@@ -45,7 +50,7 @@ export const HERO_SLIDES: readonly HeroSlide[] = [
     height: 720,
     // ผู้บริหารถือซอง WOW หน้าเวที "54th ANNIVERSARY" — ผู้แสดงอยู่ค่อนไปทางขวา จึงดันกรอบขึ้นเล็กน้อย
     objectPosition: "center 35%",
-    watermarked: true,
+    reviewStatus: "watermarked",
   },
   {
     id: "promotion",
@@ -54,7 +59,7 @@ export const HERO_SLIDES: readonly HeroSlide[] = [
     height: 675,
     // ป้ายเปิดตัว WOW 3 รส (พื้นเหลือง) — หัวข้ออยู่ช่วงบน จึงดันกรอบขึ้นเล็กน้อยไม่ให้ข้อความถูกตัด
     objectPosition: "center 35%",
-    watermarked: false,
+    reviewStatus: "pending-owner",
   },
 ];
 

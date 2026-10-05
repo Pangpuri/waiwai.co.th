@@ -4,20 +4,25 @@
  * เขียนเนื้อหา **หน้าแรก** (seed จากพจนานุกรมเดิม) ลงฐานข้อมูล Postgres
  *
  * ลำดับการใช้งาน (ครั้งแรก)
- *   1. สร้างฐานข้อมูล (Neon) แล้วเอา connection string ใส่ `.env.local` เป็น `DATABASE_URL=...`
+ *   1. สร้างฐานข้อมูล แล้วเอา connection string ใส่ `.env.local` เป็น `DATABASE_URL=...`
  *      ⚠️ ห้าม commit ไฟล์นี้ · ห้ามส่งค่า connection string ในแชท/เอกสาร (ใส่ env เท่านั้น)
- *   2. `psql "$DATABASE_URL" -f db/schema.sql`  — สร้างตาราง
+ *   2. `npm run db:migrate`                    — สร้าง/อัปเดตตาราง
  *   3. `npm run db:seed`                        — เขียนเนื้อหาหน้าแรก (รันซ้ำได้ ไม่สร้างข้อมูลซ้ำ)
  *
  * หมายเหตุ: สคริปต์นี้เป็น "ตัวรัน" ล้วน — ตรรกะทั้งหมดอยู่ใน lib/content/ (ทดสอบได้โดยไม่ต้องมี DB)
  * และจะ **ไม่เขียนอะไรลง DB ถ้าเนื้อหาไม่ผ่าน validator** (กันข้อมูลพังไหลเข้าไปแล้วต้องมานั่งลบ)
+ *
+ * ⚠️ รอบที่ 108 — เปลี่ยนมาใช้ `savePageContent()` (เส้นทางเดียวกับหน้าจอหลังบ้าน)
+ *    เดิมสคริปต์นี้เขียนเองด้วย `pg.Client` แล้ว **ไม่อะไรลบ** ⇒ พอตัดฟิลด์/กลุ่มรายการออกจากสคีมา
+ *    (เคสจริง: ตัด `products.categories[].description` + กลุ่ม `products.featured`) แถวเก่า **28 แถว**
+ *    ค้างอยู่ในฐานข้อมูล และด่าน `check:db` จับได้ (คาด 0 แถวกำพร้า · เจอ 28)
+ *    ⇒ ใช้ `savePageContent()` ที่ upsert + ลบแถวกำพร้า (`planOrphanKeys`) ในทรานแซกชันเดียว
  */
-import pg from "pg";
-
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { HOME_SEED } from "@/lib/content/home-seed";
-import { SEED_ACTOR, buildUpsertStatements, countRows } from "@/lib/content/sql";
+import { countPageRows, savePageContent } from "@/lib/content/repository";
 import { errorsOf, validateContent } from "@/lib/content/validate";
+import { closePool } from "@/db/pool";
 
 const ENV_NAME = "DATABASE_URL";
 
@@ -44,32 +49,14 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const statements = buildUpsertStatements(HOME_PAGE_SPEC, HOME_SEED, SEED_ACTOR);
-  const client = new pg.Client({ connectionString });
-
-  await client.connect();
-
-  try {
-    await client.query("begin");
-    for (const statement of statements) {
-      await client.query(statement.text, [...statement.values]);
-    }
-    await client.query("commit");
-  } catch (error) {
-    await client.query("rollback");
-    await client.end();
-    process.stderr.write("✗ seed ล้มเหลว — ยกเลิกทั้งชุดแล้ว (rollback) ฐานข้อมูลไม่ถูกแก้\n");
-    throw error;
-  }
-
-  const { rows } = await client.query<{ count: string }>("select count(*)::text as count from content_field where page = $1", [
-    HOME_PAGE_SPEC.page,
-  ]);
-  await client.end();
+  const result = await savePageContent(HOME_PAGE_SPEC, HOME_SEED, "seed:home");
+  const total = await countPageRows(HOME_PAGE_SPEC.page);
+  await closePool();
 
   process.stdout.write(
-    `✓ seed หน้า ${HOME_PAGE_SPEC.page} แล้ว: ${countRows(statements)} แถวจาก ${statements.length} คำสั่ง ` +
-      `· ในตารางมี ${rows[0]?.count ?? "?"} แถวของหน้านี้\n`,
+    `✓ seed หน้า ${HOME_PAGE_SPEC.page} แล้ว: เขียน/อัปเดต ${result.written} แถว` +
+      (result.deleted > 0 ? ` · ลบแถวที่ไม่อยู่ในสคีมาแล้ว ${result.deleted} แถว` : "") +
+      ` · ในตารางมี ${total} แถวของหน้านี้\n`,
   );
 }
 
