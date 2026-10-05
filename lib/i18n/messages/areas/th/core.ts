@@ -35,7 +35,6 @@ export const actions = {
     viewAllNews: "ดูข่าวสารทั้งหมด",
     viewAllRecipes: "ดูเมนูทั้งหมด",
     readMore: "อ่านต่อ",
-    findStore: "ค้นหาร้านใกล้บ้าน",
     shopOnline: "สั่งซื้อออนไลน์",
     learnMore: "ทำความรู้จักไวไว",
     subscribe: "สมัครรับข่าวสาร",

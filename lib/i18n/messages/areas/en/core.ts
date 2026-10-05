@@ -35,7 +35,6 @@ export const actions = {
     viewAllNews: "Read all news",
     viewAllRecipes: "See all recipes",
     readMore: "Read more",
-    findStore: "Find a store nearby",
     shopOnline: "Shop online",
     learnMore: "About Wai Wai",
     subscribe: "Subscribe",

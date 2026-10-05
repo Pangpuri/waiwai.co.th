@@ -17,11 +17,6 @@ export const pendingPages = {
       description:
         "Our sustainability page (environment · community · governance) — waiting for confirmed copy and figures from the owner.",
     },
-    whereToBuy: {
-      title: "Where to buy",
-      description:
-        "Where to buy our products (stores · supermarkets · online) — meanwhile the header button points to the real channels listed on the home page.",
-    },
     cookiePolicy: {
       title: "Cookie policy",
       description: "Cookie policy — waiting for a wording review together with the privacy policy.",

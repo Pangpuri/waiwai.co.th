@@ -8,17 +8,21 @@
  *   ที่บอกความจริงว่า "กำลังจัดทำ" (ไม่แต่งเนื้อหาขึ้นเอง — ตามข้อตกลงเรื่องข้อความ placeholder)
  *
  * ⚠️ หน้าที่นี่ **ห้ามขึ้น sitemap และต้อง noindex** (ยังไม่มีเนื้อหาจริง · มีเทสต์คุม)
+ * ⚠️ รอบที่ 111: เมนู/ท้ายเว็บ **ไม่ลิงก์มาที่นี่แล้ว** (เจ้าของสั่งเอาลิงก์ออก) — หน้ายังอยู่เพื่อไม่ให้ URL เดิมพัง
+ * ⚠️ รอบที่ 112: **`where-to-buy` ถูกลบทั้งหน้าตามคำสั่งเจ้าของ** (สินค้าขายตามร้านทั่วไปอยู่แล้ว
+ *    การทำ "ค้นหาร้านใกล้บ้าน" ต้องปักพิกัด/ดูแลข้อมูลทุกร้านต่อเนื่อง ⇒ เกินขอบเขตของเว็บนี้)
+ *    ⇒ URL `/where-to-buy` ตกไปที่หน้า 404 ของเว็บเอง (`app/[lang]/[...rest]`) — ถ้าต้องการย้ายแบบ 301
+ *      ให้ทำพร้อมงาน "ประวัติ slug" (X2.7 ส่วนที่ 2)
  * ⚠️ พอได้ข้อความจริงจากเจ้าของ: เปลี่ยนหน้าปลายทางเป็นเนื้อหาจริง แล้วเอาชื่อออกจากรายการนี้
  */
 
-export const PENDING_PAGE_IDS = ["sustainability", "whereToBuy", "cookiePolicy", "terms"] as const;
+export const PENDING_PAGE_IDS = ["sustainability", "cookiePolicy", "terms"] as const;
 
 export type PendingPageId = (typeof PENDING_PAGE_IDS)[number];
 
 /** path จริงบนเว็บของแต่ละหน้า (ที่เดียวที่รู้ — ใช้ทั้งตอนสร้าง route และตอนเทสต์) */
 export const PENDING_PAGE_PATHS: Readonly<Record<PendingPageId, string>> = {
   sustainability: "/sustainability",
-  whereToBuy: "/where-to-buy",
   cookiePolicy: "/cookie-policy",
   terms: "/terms",
 };

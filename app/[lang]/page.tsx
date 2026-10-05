@@ -110,7 +110,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
       />
       <Recipes locale={lang} messages={messages} items={recipes} />
       <NewsList locale={lang} messages={messages} items={news} />
-      <WhereToBuy locale={lang} messages={messages} />
+      <WhereToBuy messages={messages} />
       <Newsletter messages={messages} />
     </>
   );

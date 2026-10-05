@@ -119,12 +119,12 @@ export function Hero({ locale, messages }: HeroProps) {
               <span aria-hidden="true">→</span>
             </Link>
 
-            <Link
-              href={localePath(locale, "/where-to-buy")}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-line-strong px-6 py-3.5 text-sm font-bold text-fg transition-colors hover:bg-bg-subtle"
-            >
-              {messages.actions.findStore}
-            </Link>
+            {/*
+              ⚠️ รอบที่ 112: **ถอดปุ่ม "ค้นหาร้านใกล้บ้าน" ออก** ตามคำสั่งเจ้าของ
+              เหตุผล (คำเจ้าของ): สินค้าขายตามร้านค้าทั่วไปอยู่แล้ว · ถ้าคงปุ่มนี้ไว้จะมีภาระต้องปักพิกัด
+              ทุกร้านและดูแลต่อเนื่อง — เกินขอบเขตของเว็บองค์กรนี้
+              ⇒ ปุ่มหลักของ hero เหลือ "ดูผลิตภัณฑ์ทั้งหมด" (ช่องทางซื้อออนไลน์ยังอยู่ในส่วน "ที่ซื้อสินค้า" ด้านล่าง)
+            */}
           </div>
 
           <p className="mt-6 text-xs text-fg-muted">{m.note}</p>
