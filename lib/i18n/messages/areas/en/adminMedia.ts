@@ -18,6 +18,7 @@ export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaUsageBlockPreset: "Block preset",
   mediaUsageChromePreset: "Site-wide preset",
   mediaUsageProduct: "Product (imported from the old site)",
+  mediaUsageRecipe: "Recipe video (imported from the old site)",
   mediaUsageSeo: "SEO (share image / icon)",
   mediaUnused: "Not used yet",
   mediaPath: "Path to use",

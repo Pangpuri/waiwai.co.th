@@ -363,5 +363,28 @@ create table if not exists product_ingredient (
   primary key (product_id, sort_order)
 );
 
+-- ── เมนูอาหาร (วิดีโอ) ที่นำเข้าจากเว็บเดิม (S3 ส่วนที่ 4 · migration 0017) ─────
+-- ⚠️ ของจริงคือ **วิดีโอ** ไม่ใช่สูตรข้อความ — 18 บทความในหมวด 12586 มีแต่ iframe YouTube
+--  · เก็บ **id ของวิดีโอ** ไม่เก็บ URL (ประกอบ URL ในโค้ด · ผู้ใช้กดก่อนจึงโหลด = youtube-nocookie)
+--  · ภาพปกเก็บใน `media` (มติ D11) · ที่นี่เก็บแค่ id (มติ D9) · นำเข้าซ้ำได้ผ่าน `npm run recipes:import`
+--  · เมนูแบบข้อความที่การตลาดพิมพ์เองยังใช้บล็อก `recipeCards` บนหน้า `/recipes` (มติรอบที่ 101)
+create table if not exists recipe (
+  id             text        primary key,
+  source_id      text        not null,
+  source_url     text        not null default '',
+  title_th       text        not null,
+  title_en       text        not null default '',
+  cover_media_id text        references media (id) on delete set null,
+  video_provider text        not null default 'youtube' check (video_provider in ('youtube')),
+  video_id       text        not null,
+  published_on   date,
+  sort_order     integer     not null default 0,
+  updated_at     timestamptz not null default now(),
+  updated_by     text
+);
+
+create index if not exists recipe_order_idx on recipe (sort_order, id);
+create index if not exists recipe_source_idx on recipe (source_id);
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล

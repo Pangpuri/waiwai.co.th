@@ -183,7 +183,7 @@ export async function updateMediaAlt(id: string, altTh: string, altEn: string): 
 
 /* ── คลังภาพ (X1.2) ───────────────────────────────────────────────────────── */
 
-export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset" | "product";
+export type MediaUsageKind = "document" | "og-image" | "favicon" | "block-preset" | "chrome-preset" | "product" | "recipe";
 
 export type MediaUsage = {
   /**
@@ -273,6 +273,18 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
   );
   for (const row of categoryRows.rows) {
     usage.push({ kind: "product", target: `category:${row.id}`, detail: "category-image" });
+  }
+
+  /*
+    เมนูอาหาร (วิดีโอ) ที่นำเข้าจากเว็บเดิม (S3 ส่วนที่ 4 · รอบที่ 104) — ภาพปกอยู่ในตาราง `recipe`
+    ⚠️ ถ้าไม่ตรวจตรงนี้ ผู้ดูแลจะกดลบภาพปกที่เมนูยังใช้อยู่ได้
+  */
+  const recipeRows = await getPool().query<{ id: string; title_th: string }>(
+    `select id, title_th from recipe where cover_media_id = $1 order by sort_order, id`,
+    [id],
+  );
+  for (const row of recipeRows.rows) {
+    usage.push({ kind: "recipe", target: `recipe:${row.id}`, detail: row.title_th });
   }
 
   const ogRows = await getPool().query<{ id: string }>(`select id from page where og_image_path = $1`, [path]);

@@ -12,15 +12,24 @@
   */
 export const recipesPage = {
     meta: {
-      title: "Recipes — sample page",
-      description: "A sample recipe layout for Wai Wai — pending approval, with no real content yet.",
+      title: "Recipes — Wai Wai recipe videos",
+      description:
+        "Wai Wai recipe videos (the brand's own, imported from its previous site) — this page layout is still a sample pending approval.",
     },
     eyebrow: "Recipes",
     title: "Recipes from Wai Wai",
     intro:
       "A sample of how the recipe cards will be laid out, for the marketing team to review before the real content is written.",
     notice:
-      "This page is a sample (mockup) pending approval — every card is test data; there are no real recipes yet.",
+      "This page is a sample (mockup) pending approval — the test cards below are placeholder data.",
+    /* The "recipe videos" section from the database (round 104) — imported from the brand's previous site */
+    dbListTitle: "Recipe videos from Wai Wai",
+    dbListCount: "{count} recipes",
+    dbPlay: "Play video",
+    dbPrivacyNote: "The video loads from YouTube after you press play",
+    dbWatch: "Open in YouTube",
+    dbPublished: "Published",
+    dbNoCover: "No cover image yet",
     cardTitle: "Test recipe",
     cardMeta: "XX",
     figureCaption: "Placeholder image for recipe",

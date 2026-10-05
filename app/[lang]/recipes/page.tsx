@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
+import { RecipeVideoList, recipeVideoListStringsOf } from "@/features/recipes/ui/recipe-video-list";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
@@ -10,6 +11,7 @@ import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
+import { listRecipes } from "@/lib/recipes/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
 /*
@@ -21,11 +23,12 @@ import { withPageSeo } from "@/lib/seo/page-seo";
 export const revalidate = 300;
 
 /**
- * หน้า /recipes (เมนูอาหาร) — **หน้าตัวอย่าง (mockup) รอการอนุมัติ**
+ * หน้า /recipes (เมนูอาหาร) — **เลย์เอาต์ยังเป็นหน้าตัวอย่าง รอการอนุมัติ** แต่มีเมนูจริงแล้ว
  *
- * ผู้ใช้สั่งรอบที่ 15: ทำการ์ดตัวอย่าง 3 ใบ × 2 แถว ไว้ดูโครง layout เท่านั้น
- * → ไม่มีข้อมูลเมนูจริง ไม่มีคำบรรยายที่แต่งขึ้น และการ์ดไม่เป็นลิงก์ (ยังไม่มีปลายทาง)
- * รายละเอียดเพิ่มเติม: PRODUCT_ROADMAP.md § 9
+ * ประวัติ
+ * - รอบที่ 15: ทำการ์ดตัวอย่าง 3 ใบ × 2 แถว ไว้ดูโครง layout เท่านั้น (ไม่มีข้อมูลจริง ไม่มีคำบรรยายที่แต่งขึ้น)
+ * - รอบที่ 104: **มีเมนูวิดีโอจริง 18 เมนูในฐานข้อมูล** (นำเข้าจากเว็บเดิมของแบรนด์) ⇒
+ *   แสดงของจริงแทนการ์ดทดสอบ (ยังคง `noindex` ไว้ — หน้าตัวอย่าง · ดู PRODUCT_ROADMAP.md § 9)
  */
 
 export async function generateMetadata({
@@ -58,19 +61,27 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
   const messages = await getMessages(lang);
 
   /*
-    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 83) ────────────────────────────────
+    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 83 · ส่วนเมนูวิดีโอ เพิ่มรอบที่ 104) ──────────
     1. ถ้าหลังบ้าน **กดเผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง"** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
        (ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
     2. ถ้าไม่ ⇒ ใช้เลย์เอาต์ที่ออกแบบไว้ด้านล่างเหมือนเดิม **ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ**
-    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลดคืน null ให้เอง
+    **ทั้งสองทางต่อด้วย "เมนูวิดีโอ" จากฐานข้อมูล** (18 เมนูที่นำเข้าจากเว็บเดิม · รอบที่ 104)
+      · เลย์เอาต์เดิม: ถ้ามีเมนูจริง ⇒ แสดงเมนูจริงแทนการ์ดทดสอบ (ไม่โชว์ของปลอมคู่ของจริง)
+    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลด/ตัวอ่านคืน null/[] ให้เอง
     ⚠️ เทมเพลตยังไม่ครอบคลุมทุกส่วน (ดู `blockCoverageGaps`) — หลังบ้านจะเตือนก่อนเปิดสวิตช์
   */
-  const liveDocument = await loadLiveBlockDocument("recipes");
-  if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
-  }
-
+  const [liveDocument, recipes] = await Promise.all([loadLiveBlockDocument("recipes"), listRecipes()]);
   const m = messages.recipesPage;
+  const listStrings = recipeVideoListStringsOf(m);
+
+  if (liveDocument !== null) {
+    return (
+      <>
+        <BlockDocumentView document={liveDocument} language={lang} />
+        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -101,16 +112,24 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
         </div>
       </section>
 
-      <section className="container-site py-16 lg:py-24">
-        <MockCardGrid
-          idPrefix="mock-recipe"
-          titlePrefix={m.cardTitle}
-          captionPrefix={m.figureCaption}
-          badge={m.figureBadge}
-          metaLabel={m.cardMeta}
-          icon="recipe"
-        />
-      </section>
+      {/*
+        มีเมนูจริงในฐานข้อมูลแล้ว (รอบที่ 104) ⇒ แสดงของจริงแทนการ์ดทดสอบ
+        ⚠️ ถ้าฐานข้อมูลว่าง/ล่ม ⇒ ยังเห็นการ์ดทดสอบเหมือนเดิม (ไม่ทำให้หน้าเว็บพัง)
+      */}
+      {recipes.length > 0 ? (
+        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} />
+      ) : (
+        <section className="container-site py-16 lg:py-24">
+          <MockCardGrid
+            idPrefix="mock-recipe"
+            titlePrefix={m.cardTitle}
+            captionPrefix={m.figureCaption}
+            badge={m.figureBadge}
+            metaLabel={m.cardMeta}
+            icon="recipe"
+          />
+        </section>
+      )}
     </>
   );
 }

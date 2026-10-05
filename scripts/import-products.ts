@@ -1,8 +1,5 @@
-import { createHash } from "node:crypto";
-
 import { closePool, isDatabaseConfigured } from "@/db/pool";
-import { extensionFor, readImageInfo } from "@/lib/media/image-info";
-import { findMediaIdBySha256, insertMedia, newMediaId } from "@/lib/media/repository";
+import { ensureImportedMedia, type ImportMediaCache } from "@/lib/import/media";
 import { normalizeText, parseCategoryPage, parseDetailPage } from "@/lib/products/import-parse";
 import {
   productIdOfSourceId,
@@ -114,66 +111,15 @@ async function fetchWithRetry(url: string): Promise<Response> {
   throw lastError instanceof Error ? lastError : new Error(`ดึงไม่สำเร็จ: ${url}`);
 }
 
-function filenameFromUrl(url: string): string {
-  const raw = url.split("?")[0]?.split("/").pop() ?? "";
-  const decoded = decodeURIComponent(raw);
-  return decoded.trim() === "" ? "import" : decoded.slice(0, 120);
-}
-
-type MediaCache = Map<string, string | null>;
-
-/**
- * ทำให้ภาพอยู่ในคลัง (คืน id ของ `media`)
- * ขั้นตอน: ดาวน์โหลด → ตรวจว่าเป็นภาพจริง (sniff หัวไฟล์) → ดู sha256 ว่าเคยเก็บแล้วไหม → เก็บ
- */
+/** ทำให้ภาพอยู่ในคลังของเรา (ใช้ตัวช่วยกลางร่วมกับตัวนำเข้าเมนูอาหาร) */
 async function ensureMedia(
   url: string,
   altTh: string,
   altEn: string,
-  cache: MediaCache,
+  cache: ImportMediaCache,
   stats: { newImages: number; reusedImages: number },
 ): Promise<string | null> {
-  const cached = cache.get(url);
-  if (cached !== undefined) return cached;
-
-  let mediaId: string | null = null;
-  try {
-    const bytes = await fetchBinary(url);
-    const info = readImageInfo(bytes);
-    if (info === null) {
-      log(`   ⚠️ ข้ามภาพที่ไม่ใช่ PNG/JPEG/WebP: ${url}`);
-    } else {
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-      const existing = await findMediaIdBySha256(sha256);
-      if (existing !== null) {
-        mediaId = existing;
-        stats.reusedImages += 1;
-      } else {
-        const id = newMediaId();
-        const rawName = filenameFromUrl(url);
-        await insertMedia({
-          id,
-          filename: rawName.includes(".") ? rawName : `${rawName}.${extensionFor(info.mime)}`,
-          mime: info.mime,
-          sizeBytes: bytes.length,
-          width: info.width,
-          height: info.height,
-          data: bytes,
-          altTh,
-          altEn,
-          createdBy: ACTOR,
-          sha256,
-        });
-        mediaId = id;
-        stats.newImages += 1;
-      }
-    }
-  } catch (error) {
-    log(`   ⚠️ ดาวน์โหลดภาพไม่สำเร็จ (ข้าม): ${url} — ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  cache.set(url, mediaId);
-  return mediaId;
+  return ensureImportedMedia({ url, altTh, altEn, cache, stats, actor: ACTOR, fetchBinary, log });
 }
 
 async function main(): Promise<void> {
@@ -185,7 +131,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const mediaCache: MediaCache = new Map();
+  const mediaCache: ImportMediaCache = new Map();
   const stats = { newImages: 0, reusedImages: 0, products: 0, ingredients: 0, skippedDuplicates: 0, skippedInvalid: 0 };
   const issues: string[] = [];
 

@@ -14,6 +14,7 @@ export const adminMedia = {
   mediaUsageBlockPreset: "พรีเซ็ตบล็อก",
   mediaUsageChromePreset: "พรีเซ็ตส่วนกลาง",
   mediaUsageProduct: "สินค้า (นำเข้าจากเว็บเดิม)",
+  mediaUsageRecipe: "เมนูอาหาร (นำเข้าจากเว็บเดิม)",
   mediaUsageSeo: "SEO (ภาพแชร์/ไอคอน)",
   mediaUnused: "ยังไม่ถูกใช้",
   mediaPath: "พาธสำหรับใช้",

@@ -44,6 +44,8 @@ import {
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
+import { recipeIdOfSourceId } from "@/lib/recipes/model";
+import { deleteRecipe, listRecipes, upsertRecipe } from "@/lib/recipes/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
@@ -251,6 +253,9 @@ async function main(): Promise<void> {
 
   /* 18) สินค้าจากเว็บเดิม: หมวด → สินค้า + ส่วนผสม → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ (S3 ส่วนที่ 3 · รอบที่ 103) */
   await checkProductCatalog();
+
+  /* 19) เมนูอาหาร (วิดีโอ) จากเว็บเดิม: เขียน → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ (S3 ส่วนที่ 4 · รอบที่ 104) */
+  await checkRecipeVideos();
 
   await closePool();
 
@@ -1825,6 +1830,86 @@ async function checkProductCatalog(): Promise<void> {
 
     assert.equal(await countWhere("product where category_id = $1", [PRODUCT_CHECK_CATEGORY]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
     assert.equal(await countWhere("product_category where id = $1", [PRODUCT_CHECK_CATEGORY]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
+  }
+}
+
+/**
+ * 19) เมนูอาหาร (วิดีโอ) ที่นำเข้าจากเว็บเดิม (S3 ส่วนที่ 4 · รอบที่ 104) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ว่าชั้นข้อมูลเมนูครบวงจร: เขียนเมนู (พร้อมภาพปก) → อ่านกลับ (พาธภาพ/วันที่/วีดีโอถูก)
+ * → **ภาพปกถูก `findMediaUsage` เห็น** (กันผู้ดูแลกดลบภาพที่เมนูยังใช้) → เขียนซ้ำ = แถวเดิม → ลบแล้วไม่เหลือ
+ */
+const RECIPE_CHECK_ID = "r999999";
+const RECIPE_CHECK_SOURCE_ID = "999999";
+const RECIPE_CHECK_ACTOR = "check-db-recipes@example.invalid";
+
+async function checkRecipeVideos(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const recipeInput = {
+    id: recipeIdOfSourceId(RECIPE_CHECK_SOURCE_ID),
+    sourceId: RECIPE_CHECK_SOURCE_ID,
+    sourceUrl: `/th/articles/${RECIPE_CHECK_SOURCE_ID}-check`,
+    titleTh: "เมนูทดสอบ (ด่านตรวจ)",
+    titleEn: "",
+    videoId: "6XkLdl6C_Xo",
+    publishedOn: "2018-10-09",
+    sortOrder: 99,
+  };
+
+  try {
+    assert.equal(recipeInput.id, RECIPE_CHECK_ID, "id ของเมนูต้องมาจาก source id (r<source>)");
+
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-recipe.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "เมนูทดสอบ",
+      altEn: "Check recipe",
+      createdBy: RECIPE_CHECK_ACTOR,
+    });
+
+    await upsertRecipe(recipeInput, RECIPE_CHECK_ACTOR, mediaId);
+
+    const items = await listRecipes();
+    const found = items.find((entry) => entry.id === RECIPE_CHECK_ID);
+    assert.ok(found !== undefined, "ต้องอ่านเมนูที่เพิ่งเขียนได้");
+    assert.equal(found.coverPath, `/media/${mediaId}`, "ภาพปกต้องถูกส่งเป็นพาธ /media/<id> (มติ D9)");
+    assert.equal(found.coverWidth, 1, "ต้องอ่านขนาดภาพปกจากตาราง media ได้");
+    assert.equal(found.videoId, "6XkLdl6C_Xo");
+    assert.equal(found.publishedOn, "2018-10-09", "วันที่ต้องเป็นสตริง ISO ไม่ถูกเลื่อนเขตเวลา");
+    assert.equal(found.sortOrder, 99);
+
+    const usage = await findMediaUsage(mediaId);
+    assert.ok(
+      usage.some((entry) => entry.kind === "recipe" && entry.target === `recipe:${RECIPE_CHECK_ID}`),
+      "findMediaUsage ต้องเห็นภาพปกที่เมนูใช้ (ไม่งั้นผู้ดูแลลบภาพที่ยังใช้ได้)",
+    );
+
+    await upsertRecipe(recipeInput, RECIPE_CHECK_ACTOR, mediaId);
+    assert.equal(await countWhere("recipe where id = $1", [RECIPE_CHECK_ID]), 1, "นำเข้าซ้ำต้องไม่สร้างแถวใหม่");
+
+    /* อัปเดตได้: เปลี่ยนชื่อ + วันที่ ต้องทับของเดิม (ไม่เพิ่มแถว) */
+    await upsertRecipe({ ...recipeInput, titleTh: "เมนูทดสอบ (แก้แล้ว)", publishedOn: "2024-08-24" }, RECIPE_CHECK_ACTOR, mediaId);
+    const updated = (await listRecipes()).find((entry) => entry.id === RECIPE_CHECK_ID);
+    assert.equal(updated?.titleTh, "เมนูทดสอบ (แก้แล้ว)");
+    assert.equal(updated?.publishedOn, "2024-08-24");
+
+    done("เมนูอาหาร (วิดีโอ) จากเว็บเดิม: เขียน → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ", "พาธภาพ · วันที่ ISO · idempotent");
+  } finally {
+    await deleteRecipe(RECIPE_CHECK_ID);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(await countWhere("recipe where id = $1", [RECIPE_CHECK_ID]), 0, "ต้องไม่เหลือเมนูทดสอบ");
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
   }
 }
