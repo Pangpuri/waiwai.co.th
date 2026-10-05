@@ -104,7 +104,7 @@ export function NewsPreview(props: NewsPreviewProps) {
             {props.blocks.length === 0 ? (
               <p className="text-fg-muted text-sm">{m.newsAdminPreviewEmpty}</p>
             ) : (
-              <NewsBody blocks={props.blocks} sizes={sizes} />
+              <NewsBody blocks={props.blocks} sizes={sizes} captionPlaceholder={m.newsAdminCaptionSample} />
             )}
           </div>
         </div>

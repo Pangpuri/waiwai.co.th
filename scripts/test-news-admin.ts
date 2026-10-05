@@ -203,7 +203,7 @@ test("news admin: พรีวิวต้องใช้ตัวเรนเ�
     /import \{ NewsBody \} from "@\/features\/news\/ui\/news-body"/.test(preview),
     "พรีวิวต้องใช้ NewsBody ตัวเดียวกับหน้า /news/<id>",
   );
-  assert.ok(preview.includes("<NewsBody blocks={props.blocks} sizes={sizes} />"), "ต้องเรนเดอร์เนื้อหาผ่าน NewsBody");
+  assert.ok(/<NewsBody blocks={props.blocks} sizes={sizes}/.test(preview), "ต้องเรนเดอร์เนื้อหาผ่าน NewsBody");
   assert.ok(!preview.includes("dangerouslySetInnerHTML"), "พรีวิวห้ามตีความเป็น HTML");
   assert.equal(
     (publicBody.match(/export function NewsBody/g) ?? []).length,
@@ -227,4 +227,23 @@ test("news admin: ตัวแก้เนื้อหาต้องไม่�
   assert.equal(formTags(blocks), 0, "ตัวแก้เนื้อหาต้องไม่มีแท็ก <form> เลย");
   assert.equal(formTags(form), 1, "หน้าจอแก้ข่าวมีแท็ก <form> ได้เพียงตัวเดียว (ฟอร์มบันทึก)");
   assert.ok(blocks.includes("uploadNewsImageAction("), "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>)");
+});
+
+test("news admin: คำบรรยายใต้ภาพต้องแสดงจริงทั้งหน้าเว็บและพรีวิว (รอบที่ 130)", () => {
+  const body = readFileSync("features/news/ui/news-body.tsx", "utf8");
+  const preview = readFileSync("features/admin/ui/news-preview.tsx", "utf8");
+
+  /* หน้าเว็บจริง: ผู้อ่านต้องเห็นคำบรรยาย (ไม่ใช่ซ่อนใน alt อย่างเดียว) */
+  assert.ok(body.includes("<figcaption"), "ภาพที่มีคำบรรยายต้องเรนเดอร์ <figcaption> ให้เห็นจริง");
+  assert.ok(body.includes("const caption = block.alt.trim();"), "ต้องใช้ alt เป็นข้อความคำบรรยาย");
+  assert.ok(
+    body.includes("captionPlaceholder === undefined ? null"),
+    "ภาพที่ไม่มีคำบรรยายบนหน้าเว็บจริง = ต้องไม่แสดงบรรทัดว่าง",
+  );
+
+  /* พรีวิว: ต้องส่งข้อความตัวอย่าง เพื่อให้คนแก้เห็นตำแหน่งที่คำบรรยายจะไปโผล่ */
+  assert.ok(
+    preview.includes("captionPlaceholder={m.newsAdminCaptionSample}"),
+    "พรีวิวต้องแสดง 'ตัวอย่างคำบรรยาย' เมื่อช่องคำบรรยายว่าง",
+  );
 });

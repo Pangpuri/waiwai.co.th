@@ -97,4 +97,5 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminPreviewUntitled: "(no title yet)",
   newsAdminPreviewEmpty: "No content yet — add a paragraph or image on the left",
   newsAdminPreviewHint: "How readers will see it on the site (uses the same renderer as the live page)",
+  newsAdminCaptionSample: "Sample caption",
 } as const;
