@@ -17,6 +17,8 @@ import assert from "node:assert/strict";
 
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { listBlockPresets, saveBlockPreset } from "@/lib/blocks/presets";
+import { ENV_ADMIN_ID } from "@/lib/auth/user-store";
+import { countActiveAdmins, ensureEnvAdminUser } from "@/lib/auth/users-repository";
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 import { HOME_SEED } from "@/lib/content/home-seed";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
@@ -284,6 +286,9 @@ async function main(): Promise<void> {
 
   /* 22) ข่าวจริงทุกชิ้น: ข้อความ ↔ บล็อก ไป-กลับไม่เพี้ยน (กันกดบันทึกแล้วเนื้อหาเดิมเสีย) */
   await checkNewsEditorRoundTrip();
+
+  /* 23) บัญชีโหมด env ต้องล็อกอินได้ (FK admin_session → admin_user) */
+  await checkEnvAdminSession();
 
   await closePool();
 
@@ -1388,11 +1393,16 @@ async function checkAdminUsers(): Promise<void> {
     });
     assert.equal(owner.ok, true, "สร้างผู้ดูแลทดสอบต้องสำเร็จ");
     if (owner.ok) {
-      /* มีผู้ดูแลที่ยังใช้งานได้ 1 คน (คนนี้) ⇒ ถอดบทบาท/ปิด ต้องถูกปฏิเสธ */
+      /*
+        มีผู้ดูแลที่ยังใช้งานได้คนอื่นอยู่ไหม — **ต้องถามของจริง ไม่ assume**
+        ⚠️ เคสจริง (รอบที่ 124): ฐานข้อมูลอาจมีแถว  (บัญชีจาก env ที่ระบบสร้างให้ตอนล็อกอิน)
+        ⇒ ถ้า assume ว่ามีแถวเดียว เทสต์จะแดงทั้งที่ระบบถูก · ที่ถูกคือยึดหลัก "ห้ามเหลือศูนย์"
+      */
+      const others = await countActiveAdmins(owner.user.id);
       const demote = await setAdminUserRole({ id: owner.user.id, role: "editor", actor: CHECK_ACTOR });
-      assert.equal(demote.ok, false, "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+      assert.equal(demote.ok, others > 0, others > 0 ? "มีผู้ดูแลคนอื่น ⇒ ถอดบทบาทได้" : "ถอดบทบาทผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
       const disable = await setAdminUserDisabled({ id: owner.user.id, disabled: true, actor: CHECK_ACTOR });
-      assert.equal(disable.ok, false, "ปิดผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
+      assert.equal(disable.ok, others > 0, others > 0 ? "มีผู้ดูแลคนอื่น ⇒ ปิดได้" : "ปิดผู้ดูแลคนสุดท้ายต้องถูกปฏิเสธ");
 
       /* มีผู้ดูแลคนที่สองแล้ว ⇒ ครั้งนี้ทำได้ */
       const second = await createAdminUser({
@@ -2203,4 +2213,43 @@ async function checkNewsEditorRoundTrip(): Promise<void> {
 
   assert.deepEqual(broken, [], `ข่าวที่แปลงไป-กลับแล้วไม่เหมือนเดิม (${String(broken.length)} ชิ้น): ${broken.slice(0, 5).join(", ")}`);
   CHECKS.push(`  ✓ ข่าวจริงทั้ง ${String(rows.length)} ชิ้น: ข้อความ↔บล็อก ไป-กลับไม่เพี้ยน (ปลอดภัยต่อการกดบันทึก)`);
+}
+
+/**
+ * 23) บัญชีโหมด env ต้องล็อกอินได้: สร้างแถว `admin_user` ให้ (`env-admin`) → สร้างเซสชันได้จริง
+ *
+ * ⚠️ บั๊กจริงบนคลาวด์ (2026-10-05): `admin_session.user_id` มี FK → `admin_user(id)`
+ * แต่ฐานข้อมูลที่เพิ่งย้ายขึ้นคลาวด์มี `admin_user` ว่าง ⇒ ล็อกอินไม่ผ่านทั้งที่รหัสถูก
+ * (หน้า login ขึ้น "เกิดข้อผิดพลาดในระบบ") — เครื่อง dev ไม่เจอเพราะเคยมีแถวจากงาน RBAC มาก่อน
+ */
+async function checkEnvAdminSession(): Promise<void> {
+  const email = "check-db-env@example.invalid";
+  const sid = `check-db-env-${String(Date.now())}`;
+
+  try {
+    const ensured = await ensureEnvAdminUser({
+      id: ENV_ADMIN_ID,
+      email,
+      displayName: "Check DB",
+      role: "admin",
+    });
+    assert.ok(ensured, "ต้องสร้างแถว admin_user ให้บัญชีโหมด env ได้");
+
+    /* ⚠️ FK: ถ้าไม่มีแถวใน admin_user การสร้างเซสชันจะล้ม (นี่คือบั๊กจริงบนคลาวด์) */
+    const created = await createAdminSession({
+      userId: ENV_ADMIN_ID,
+      sid,
+      expiresAt: new Date(Date.now() + 60_000),
+      userAgent: "check-db",
+    });
+    assert.ok(created, "บัญชีโหมด env ต้องสร้างเซสชันได้ (ถ้าล้ม = ล็อกอินไม่ได้ทั้งระบบ)");
+
+    const found = await findAdminSession(sid);
+    assert.ok(found !== null, "ต้องอ่านเซสชันที่เพิ่งสร้างกลับได้");
+    CHECKS.push("  ✓ บัญชีจาก env: สร้างแถว admin_user + เซสชันได้จริง (FK admin_session ครบ)");
+  } finally {
+    await getPool().query("delete from admin_session where user_agent = 'check-db'");
+    /* ⚠️ ลบแถวที่สร้างเฉพาะกรณีที่เพิ่งสร้างใหม่ (ถ้ามีอยู่ก่อนแล้ว = ของเจ้าของ ห้ามแตะ) */
+    await getPool().query("delete from admin_user where id = $1 and email = $2", [ENV_ADMIN_ID, email]);
+  }
 }

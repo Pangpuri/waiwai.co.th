@@ -356,3 +356,40 @@ export async function touchAdminLastLogin(id: string): Promise<void> {
   if (id.startsWith("env-")) return;
   await getPool().query("update admin_user set last_login_at = now() where id = $1", [id]).catch(() => undefined);
 }
+
+/**
+ * สร้างแถวในตาราง `admin_user` ให้ **บัญชีโหมด env** (`env-admin`) ถ้ายังไม่มี (รอบที่ 124)
+ *
+ * ⚠️ บั๊กจริงบนคลาวด์ (2026-10-05): `admin_session.user_id` มี FK → `admin_user(id)`
+ * แต่บัญชีจาก env ไม่มีแถวในตาราง ⇒ `insert into admin_session` ล้มด้วย FK
+ * ⇒ `createAdminSession()` คืน `false` ⇒ `startSession()` โยน error ⇒ หน้า login ขึ้น
+ * **"เกิดข้อผิดพลาดในระบบ — ลองใหม่อีกครั้ง"** ทั้งที่อีเมล/รหัสถูกต้อง
+ * (เครื่อง dev ไม่เจอเพราะฐานข้อมูลในเครื่องเคยมีแถวจากงาน RBAC มาก่อน)
+ *
+ * หลักการ
+ * - ใช้ `on conflict (id) do nothing` ⇒ **ไม่ทับของเดิม** (บทบาท/ชื่อที่แก้ไว้ในตารางต้องคงอยู่)
+ * - `password_hash` ใส่ค่าที่ **ยืนยันไม่ได้** (`env-only`) โดยเจตนา: รหัสผ่านของบัญชีนี้มาจาก env เท่านั้น
+ *   ⇒ ต่อให้มีใครอ่านแถวนี้ ก็เอาไปล็อกอินไม่ได้ (และไม่เปิดช่อง bypass รหัสผ่าน)
+ */
+export async function ensureEnvAdminUser(input: {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly role: string;
+}): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  if (input.id.trim() === "" || !isUsableAdminEmail(input.email) || !isAdminRole(input.role)) return false;
+
+  try {
+    await getPool().query(
+      `insert into admin_user (id, email, display_name, password_hash, role)
+         values ($1, $2, $3, 'env-only', $4)
+       on conflict (id) do nothing`,
+      [input.id.trim(), normalizeAdminEmail(input.email), input.displayName.trim(), input.role],
+    );
+    return true;
+  } catch {
+    /* ⚠️ อีเมลซ้ำกับบัญชีอื่นในตาราง (unique email) = ไม่ใช่เรื่อง fatal ของการล็อกอิน — บอกให้ผู้เรียกรู้ */
+    return false;
+  }
+}

@@ -13,7 +13,7 @@ import {
   revokeAdminSessions,
   touchAdminSession,
 } from "@/lib/auth/sessions-repository";
-import { createDbUserStore } from "@/lib/auth/users-repository";
+import { createDbUserStore, ensureEnvAdminUser } from "@/lib/auth/users-repository";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import {
   MAINTENANCE_BYPASS_COOKIE,
@@ -30,7 +30,7 @@ import {
   sessionCookieOptions,
   sessionExpiry,
 } from "@/lib/auth/session";
-import { createEnvUserStore, createFallbackUserStore, type AdminUserStore } from "@/lib/auth/user-store";
+import { ENV_ADMIN_ID, createEnvUserStore, createFallbackUserStore, type AdminUserStore } from "@/lib/auth/user-store";
 import type { AdminUser } from "@/lib/auth/types";
 
 /**
@@ -229,6 +229,19 @@ export async function requireAdminUser(permission: AdminPermission): Promise<Adm
 
 /** ตั้งคุกกี้เซสชัน — เรียกได้เฉพาะใน Server Action / Route Handler เท่านั้น */
 export async function startSession(user: AdminUser): Promise<void> {
+  /*
+    ⚠️ บัญชีโหมด env ไม่มีแถวในตาราง admin_user ⇒ แถวเซสชันจะผิด FK แล้วล็อกอินล้ม
+    (เคสจริงบนคลาวด์ 2026-10-05: หน้า login ขึ้น "เกิดข้อผิดพลาดในระบบ" ทั้งที่รหัสถูก)
+  */
+  if (user.id === ENV_ADMIN_ID) {
+    await ensureEnvAdminUser({
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+    });
+  }
+
   const secret = readSecret();
   if (secret === null) {
     throw new Error("SESSION_SECRET is missing or too short");
