@@ -25,6 +25,7 @@ import { siteNameFor } from "@/lib/site-settings/model";
 import { loadMourningNotice } from "@/lib/mourning/loader";
 import { MOURNING_INIT_SCRIPT } from "@/lib/mourning-notice";
 import { REVEAL_INIT_SCRIPT } from "@/lib/scroll-reveal";
+import { BRAND_APPLE_TOUCH_ICON, BRAND_ICON, BRAND_OG_IMAGE } from "@/lib/brand/assets";
 import { SITE } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme/theme";
 
@@ -68,8 +69,19 @@ export async function generateMetadata({
 
   return {
     metadataBase: new URL(SITE.url),
-    /* ไอคอนเว็บ: ใส่เฉพาะเมื่อตั้งไว้ (ไม่ตั้ง = พฤติกรรมเดิม) */
-    ...(settings.favicon === "" ? {} : { icons: { icon: settings.favicon } }),
+    /*
+      ไอคอนเว็บ (รอบที่ 109) — ค่าเริ่มต้นคือ **โลโก้แบรนด์จริง** ที่เตรียมไว้ใน `public/brand/`
+      · หลังบ้าน (ตั้งค่าส่วนกลาง) ยัง **override ได้** ด้วย `settings.favicon` (พฤติกรรมเดิม)
+      · `favicon.ico` อยู่ที่ `public/favicon.ico` (เบราว์เซอร์ร้องขอพาธนี้เองโดยไม่ต้องประกาศ)
+      · `icon-192` = ขนาดมาตรฐานของ Android/Chrome · `apple-touch-icon` = พื้นขาว (iOS ทำพื้นโปร่งใสเป็นดำ)
+    */
+    icons:
+      settings.favicon !== ""
+        ? { icon: settings.favicon }
+        : {
+            icon: [{ url: BRAND_ICON.path, type: "image/png", sizes: BRAND_ICON.sizes }],
+            apple: [{ url: BRAND_APPLE_TOUCH_ICON.path, sizes: BRAND_APPLE_TOUCH_ICON.sizes }],
+          },
     title: {
       default: messages.meta.defaultTitle,
       template: `%s | ${siteName}`,
@@ -83,8 +95,14 @@ export async function generateMetadata({
       locale: LOCALE_HTML_LANG[lang],
       title: messages.meta.defaultTitle,
       description: messages.meta.defaultDescription,
-      /* รูปแชร์เริ่มต้น: ใช้เมื่อหน้าบางหน้าไม่ได้ตั้งของตัวเอง */
-      ...(settings.defaultOgImage === "" ? {} : { images: [settings.defaultOgImage] }),
+      /*
+        รูปแชร์เริ่มต้น: หลังบ้านตั้งไว้ = ใช้ของหลังบ้าน · ไม่ตั้ง = ใช้การ์ดแบรนด์ที่เตรียมไว้ (รอบที่ 109)
+        (หน้าที่ย่อยตั้ง OG ของตัวเอง — เช่น หน้าข่าว — จะทับค่านี้ตามเดิม)
+      */
+      images:
+        settings.defaultOgImage === ""
+          ? [{ url: BRAND_OG_IMAGE.path, width: BRAND_OG_IMAGE.width, height: BRAND_OG_IMAGE.height, alt: siteName }]
+          : [settings.defaultOgImage],
     },
   };
 }

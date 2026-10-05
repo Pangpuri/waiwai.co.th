@@ -71,7 +71,7 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
       <div className="relative">
         <div className={`container-site flex items-center justify-between gap-3 ${view.rowClass}`}>
           {view.logo === null ? (
-            <BrandMark locale={locale} label={messages.meta.siteName} />
+            <BrandMark locale={locale} label={messages.meta.siteName} eager />
           ) : (
             <Link href={localePath(locale, "/")} className="flex shrink-0 items-center">
               {/* โลโก้ที่อัปโหลดจากหลังบ้าน — ใช้ <img> เพราะขนาดจริงมาจากไฟล์ (กัน layout shift ด้วยความสูงคงที่) */}

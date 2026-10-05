@@ -58,6 +58,9 @@ next-env.d.ts
 # ภาพต้นทางสำหรับสไลด์หน้าแรก ภาพประกาศไว้อาลัย และภาพการ์ดประกาศบน hero
 # (สำเนาที่ใช้จริงถูกคัดลอกเข้า public/slide/ · public/rip/ · public/promo/ แล้ว)
 /slide/
+# ไฟล์โลโก้ต้นทางจากเจ้าของ (8192px GIF + 1.4 MB PNG)
+# (สำเนาที่เตรียมสำหรับเว็บอยู่ที่ public/brand/ + public/favicon.ico แล้ว — ดู lib/brand/assets.ts)
+/logo/
 /rip/
 /promo/
 
