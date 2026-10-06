@@ -35,10 +35,15 @@ export type ProductInput = {
   readonly taglineTh: string;
   readonly taglineEn: string;
   readonly detailsTh: string;
+  /* ช่องภาษาอังกฤษ (รอบที่ 141) — การตลาดกรอกเอง · ว่าง = หน้า EN ถอยไปใช้ไทย */
+  readonly detailsEn: string;
   readonly allergensTh: string;
+  readonly allergensEn: string;
   readonly netWeightTh: string;
+  readonly netWeightEn: string;
   readonly fdaNumber: string;
   readonly packagingTh: string;
+  readonly packagingEn: string;
   readonly sortOrder: number;
 };
 

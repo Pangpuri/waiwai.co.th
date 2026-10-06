@@ -1868,6 +1868,10 @@ async function checkProductCatalog(): Promise<void> {
     netWeightTh: "60 กรัม",
     fdaNumber: "73-1-30323-2-0000",
     packagingTh: "กล่อง 30 ซอง",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
     sortOrder: 3,
   };
 
@@ -2379,6 +2383,11 @@ async function checkProductAdmin(): Promise<void> {
     netWeightTh: "",
     fdaNumber: "",
     packagingTh: "",
+    /* รอบที่ 141: ช่อง EN (การตลาดกรอกเอง) — ตั้งค่าไว้เพื่อพิสูจน์ว่าไป-กลับได้จริง */
+    detailsEn: "Admin details EN",
+    allergensEn: "Contains wheat",
+    netWeightEn: "55 g",
+    packagingEn: "Box of 5",
     sortOrder: 5,
   };
 
@@ -2430,6 +2439,17 @@ async function checkProductAdmin(): Promise<void> {
     assert.equal(detail.sourceId, "999998", "ต้องคืน source id ให้ฟอร์มส่งกลับ (id ถูก derive จากค่านี้)");
     assert.equal(detail.imagePath, `/media/${mediaId}`, "พาธภาพต้องเป็น /media/<id> (มติ D9)");
     assert.equal(detail.detailsTh, "รายละเอียดหลังบ้าน");
+    /* รอบที่ 141: ช่อง EN ต้องไป-กลับได้ (การตลาดกรอกเอง · ทีมเว็บไม่แปล) */
+    assert.equal(detail.detailsEn, "Admin details EN", "รายละเอียด EN ต้องอ่านกลับได้");
+    assert.equal(detail.allergensEn, "Contains wheat", "สารก่อภูมิแพ้ EN ต้องอ่านกลับได้");
+    assert.equal(detail.netWeightEn, "55 g", "น้ำหนัก EN ต้องอ่านกลับได้");
+    assert.equal(detail.packagingEn, "Box of 5", "บรรจุภัณฑ์ EN ต้องอ่านกลับได้");
+    /* ตัวอ่านฝั่งเว็บต้องคืนค่า EN ด้วย (หน้า EN ใช้ค่านี้) */
+    const publicRow = (await listProductsByCategory(PRODUCT_ADMIN_CHECK_CATEGORY)).find(
+      (item) => item.id === PRODUCT_ADMIN_CHECK_ID,
+    );
+    assert.equal(publicRow?.detailsEn, "Admin details EN", "ตัวอ่านฝั่งเว็บต้องคืนฟิลด์ EN");
+    assert.equal(publicRow?.packagingEn, "Box of 5", "ตัวอ่านฝั่งเว็บต้องคืนฟิลด์ EN ครบ");
     /* เคสจริงรอบที่ 134: หน้าจอแก้เคยส่ง sortOrder = 0 คงที่ ⇒ แก้สินค้าแล้วลำดับในหมวดหาย */
     assert.equal(detail.sortOrder, 5, "ต้องอ่านลำดับการแสดงกลับมาได้ (แก้สินค้าแล้วลำดับต้องไม่หาย)");
     assert.deepEqual(
@@ -2650,6 +2670,10 @@ async function checkTrashForever(): Promise<void> {
     netWeightTh: "",
     fdaNumber: "",
     packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
     sortOrder: -99999,
   };
 
@@ -2813,6 +2837,10 @@ async function checkProductImportGuard(): Promise<void> {
     netWeightTh: "",
     fdaNumber: "",
     packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
     sortOrder: 3,
   };
   const humanEdit: ProductInput = {

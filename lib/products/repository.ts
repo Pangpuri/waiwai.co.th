@@ -33,10 +33,15 @@ export type ProductRecord = {
   readonly taglineTh: string;
   readonly taglineEn: string;
   readonly detailsTh: string;
+  /** ช่องภาษาอังกฤษ (รอบที่ 141) — ว่าง = หน้า EN ถอยไปใช้ไทย */
+  readonly detailsEn: string;
   readonly allergensTh: string;
+  readonly allergensEn: string;
   readonly netWeightTh: string;
+  readonly netWeightEn: string;
   readonly fdaNumber: string;
   readonly packagingTh: string;
+  readonly packagingEn: string;
   /** พาธของภาพ (`/media/<id>`) หรือ null */
   readonly imagePath: string | null;
   /** ขนาดจริงของภาพ (อ่านจากหัวไฟล์ตอนนำเข้า) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด */
@@ -58,7 +63,7 @@ export type ProductCategoryRecord = {
   "column reference \"id\" is ambiguous" แล้วหน้าจะไม่แสดงสินค้าเลยทั้งที่ข้อมูลอยู่ (เจอจริงตอนเขียนด่าน check:db)
 */
 const PRODUCT_COLUMNS =
-  "p.id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th, p.image_media_id, p.sort_order";
+  "p.id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.sort_order";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -97,10 +102,14 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
     taglineTh: text(row.tagline_th),
     taglineEn: text(row.tagline_en),
     detailsTh: text(row.details_th),
+    detailsEn: text(row.details_en),
     allergensTh: text(row.allergens_th),
+    allergensEn: text(row.allergens_en),
     netWeightTh: text(row.net_weight_th),
+    netWeightEn: text(row.net_weight_en),
     fdaNumber: text(row.fda_number),
     packagingTh: text(row.packaging_th),
+    packagingEn: text(row.packaging_en),
     imagePath: mediaPath(row.image_media_id),
     imageWidth: typeof row.image_width === "number" && row.image_width > 0 ? row.image_width : null,
     imageHeight: typeof row.image_height === "number" && row.image_height > 0 ? row.image_height : null,
@@ -397,9 +406,11 @@ export async function upsertProduct(
       upserted as (
         insert into product (
           id, category_id, source_id, source_url, name_th, name_en, group_th, group_en,
-          tagline_th, tagline_en, details_th, allergens_th, net_weight_th, fda_number, packaging_th,
+          tagline_th, tagline_en, details_th, details_en, allergens_th, allergens_en,
+          net_weight_th, net_weight_en, fda_number, packaging_th, packaging_en,
           image_media_id, sort_order, updated_at, updated_by
-        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18)
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+                  $20, $21, now(), $22)
         on conflict (id) do update set
           category_id    = ${guardedColumn(options.writeMode, "category_id")},
           source_id      = excluded.source_id,
@@ -411,10 +422,14 @@ export async function upsertProduct(
           tagline_th     = ${guardedColumn(options.writeMode, "tagline_th")},
           tagline_en     = ${guardedColumn(options.writeMode, "tagline_en")},
           details_th     = ${guardedColumn(options.writeMode, "details_th")},
+          details_en     = ${guardedColumn(options.writeMode, "details_en")},
           allergens_th   = ${guardedColumn(options.writeMode, "allergens_th")},
+          allergens_en   = ${guardedColumn(options.writeMode, "allergens_en")},
           net_weight_th  = ${guardedColumn(options.writeMode, "net_weight_th")},
+          net_weight_en  = ${guardedColumn(options.writeMode, "net_weight_en")},
           fda_number     = ${guardedColumn(options.writeMode, "fda_number")},
           packaging_th   = ${guardedColumn(options.writeMode, "packaging_th")},
+          packaging_en   = ${guardedColumn(options.writeMode, "packaging_en")},
           image_media_id = ${imageWriteExpression(options.imageMode, "product")},
           sort_order     = ${guardedColumn(options.writeMode, "sort_order")},
           updated_at     = ${guardedNow(options.writeMode)},
@@ -435,10 +450,14 @@ export async function upsertProduct(
       input.taglineTh,
       input.taglineEn,
       input.detailsTh,
+      input.detailsEn,
       input.allergensTh,
+      input.allergensEn,
       input.netWeightTh,
+      input.netWeightEn,
       input.fdaNumber,
       input.packagingTh,
+      input.packagingEn,
       imageMediaId,
       input.sortOrder,
       actor,
@@ -518,14 +537,19 @@ export type AdminProductDetail = AdminProductListItem & {
   readonly taglineEn: string;
   readonly detailsTh: string;
   readonly allergensTh: string;
+  readonly netWeightEn: string;
   readonly netWeightTh: string;
   readonly fdaNumber: string;
   readonly packagingTh: string;
+  readonly packagingEn: string;
+  readonly detailsEn: string;
+  readonly allergensEn: string;
   readonly ingredients: readonly ProductIngredientRecord[];
 };
 
 const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en,
-       p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th, p.sort_order,
+       p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en,
+       p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.sort_order,
        (p.deleted_at is not null) as trashed,
        m.id as image_id, m.width as image_width, m.height as image_height,
        (select count(*)::int from product_ingredient i where i.product_id = p.id) as ingredient_count,
@@ -681,10 +705,14 @@ export async function loadProductForAdmin(id: string): Promise<AdminProductDetai
       taglineTh: typeof row.tagline_th === "string" ? row.tagline_th : "",
       taglineEn: typeof row.tagline_en === "string" ? row.tagline_en : "",
       detailsTh: typeof row.details_th === "string" ? row.details_th : "",
+      detailsEn: typeof row.details_en === "string" ? row.details_en : "",
       allergensTh: typeof row.allergens_th === "string" ? row.allergens_th : "",
+      allergensEn: typeof row.allergens_en === "string" ? row.allergens_en : "",
       netWeightTh: typeof row.net_weight_th === "string" ? row.net_weight_th : "",
+      netWeightEn: typeof row.net_weight_en === "string" ? row.net_weight_en : "",
       fdaNumber: typeof row.fda_number === "string" ? row.fda_number : "",
       packagingTh: typeof row.packaging_th === "string" ? row.packaging_th : "",
+      packagingEn: typeof row.packaging_en === "string" ? row.packaging_en : "",
       ingredients: ingredients.rows.map((item) => ({
         sortOrder: typeof item.sort_order === "number" ? item.sort_order : 0,
         nameTh: typeof item.name_th === "string" ? item.name_th : "",

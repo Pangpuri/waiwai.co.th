@@ -193,6 +193,11 @@ async function main(): Promise<void> {
         netWeightTh: "",
         fdaNumber: "",
         packagingTh: "",
+        /* ต้นฉบับเว็บเดิมมีแต่ไทย — ช่อง EN การตลาดกรอกเอง (รอบที่ 141) */
+        detailsEn: "",
+        allergensEn: "",
+        netWeightEn: "",
+        packagingEn: "",
         sortOrder: order,
       };
 

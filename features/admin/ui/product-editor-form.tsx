@@ -44,10 +44,14 @@ export type ProductEditorInitial = {
   readonly taglineTh: string;
   readonly taglineEn: string;
   readonly detailsTh: string;
+  readonly detailsEn: string;
   readonly allergensTh: string;
+  readonly allergensEn: string;
   readonly netWeightTh: string;
+  readonly netWeightEn: string;
   readonly fdaNumber: string;
   readonly packagingTh: string;
+  readonly packagingEn: string;
   readonly sortOrder: number;
   readonly imagePath: string;
   readonly ingredients: readonly { readonly nameTh: string; readonly nameEn: string; readonly percentText: string }[];
@@ -87,10 +91,14 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     taglineTh: props.initial.taglineTh,
     taglineEn: props.initial.taglineEn,
     detailsTh: props.initial.detailsTh,
+    detailsEn: props.initial.detailsEn,
     allergensTh: props.initial.allergensTh,
+    allergensEn: props.initial.allergensEn,
     netWeightTh: props.initial.netWeightTh,
+    netWeightEn: props.initial.netWeightEn,
     fdaNumber: props.initial.fdaNumber,
     packagingTh: props.initial.packagingTh,
+    packagingEn: props.initial.packagingEn,
     sortOrder: String(props.initial.sortOrder),
     imagePath: props.initial.imagePath,
   });
@@ -103,6 +111,8 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     })),
   );
   const [uploadState, setUploadState] = useState(INITIAL_ADMIN_UPLOAD_STATE);
+  /* ภาษาของพรีวิว (รอบที่ 141) — การตลาดใส่ EN เองแล้วต้องเห็นว่าหน้า EN ออกมาอย่างไร */
+  const [previewLanguage, setPreviewLanguage] = useState<"th" | "en">(props.language);
   const [uploading, setUploading] = useState(false);
 
   function setField(key: keyof typeof fields, value: string): void {
@@ -169,10 +179,14 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     taglineTh: fields.taglineTh,
     taglineEn: fields.taglineEn,
     detailsTh: fields.detailsTh,
+    detailsEn: fields.detailsEn,
     allergensTh: fields.allergensTh,
+    allergensEn: fields.allergensEn,
     netWeightTh: fields.netWeightTh,
+    netWeightEn: fields.netWeightEn,
     fdaNumber: fields.fdaNumber,
     packagingTh: fields.packagingTh,
+    packagingEn: fields.packagingEn,
     imagePath: fields.imagePath === "" ? null : fields.imagePath,
     imageWidth: null,
     imageHeight: null,
@@ -325,6 +339,17 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             className={INPUT_CLASS}
           />
         </label>
+        <label className="block">
+          <span className={LABEL_CLASS}>{m.adminProductsFieldDetailsEn}</span>
+          <textarea
+            name="detailsEn"
+            value={fields.detailsEn}
+            onChange={(event) => setField("detailsEn", event.target.value)}
+            rows={5}
+            className={INPUT_CLASS}
+          />
+          <span className="text-fg-muted mt-1 block text-xs">{m.adminProductsFieldEnHint}</span>
+        </label>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="block">
@@ -334,6 +359,16 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
               name="netWeightTh"
               value={fields.netWeightTh}
               onChange={(event) => setField("netWeightTh", event.target.value)}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.adminProductsFieldNetWeightEn}</span>
+            <input
+              type="text"
+              name="netWeightEn"
+              value={fields.netWeightEn}
+              onChange={(event) => setField("netWeightEn", event.target.value)}
               className={INPUT_CLASS}
             />
           </label>
@@ -358,12 +393,32 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             />
           </label>
           <label className="block">
+            <span className={LABEL_CLASS}>{m.adminProductsFieldPackagingEn}</span>
+            <input
+              type="text"
+              name="packagingEn"
+              value={fields.packagingEn}
+              onChange={(event) => setField("packagingEn", event.target.value)}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
             <span className={LABEL_CLASS}>{m.adminProductsFieldAllergens}</span>
             <input
               type="text"
               name="allergensTh"
               value={fields.allergensTh}
               onChange={(event) => setField("allergensTh", event.target.value)}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.adminProductsFieldAllergensEn}</span>
+            <input
+              type="text"
+              name="allergensEn"
+              value={fields.allergensEn}
+              onChange={(event) => setField("allergensEn", event.target.value)}
               className={INPUT_CLASS}
             />
           </label>
@@ -495,8 +550,25 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
 
       <aside className="lg:w-[420px] lg:shrink-0">
         <div className="border-line bg-bg-subtle rounded-2xl border p-3 lg:sticky lg:top-6">
-          <h2 className="text-fg-muted mb-3 text-xs font-semibold uppercase">{m.adminProductsPreview}</h2>
-          <ProductListSection products={[previewRecord]} language={props.language} strings={props.publicStrings} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-fg-muted text-xs font-semibold uppercase">{m.adminProductsPreview}</h2>
+            <span className="flex items-center gap-1" role="group" aria-label={m.adminProductsPreview}>
+              {(["th", "en"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setPreviewLanguage(item)}
+                  aria-pressed={previewLanguage === item}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                    previewLanguage === item ? "border-line bg-surface text-fg" : "border-line text-fg-muted"
+                  }`}
+                >
+                  {item === "th" ? m.adminProductsPreviewTh : m.adminProductsPreviewEn}
+                </button>
+              ))}
+            </span>
+          </div>
+          <ProductListSection products={[previewRecord]} language={previewLanguage} strings={props.publicStrings} />
           <p className="text-fg-muted mt-2 text-xs">{m.adminProductsPreviewHint}</p>
         </div>
       </aside>

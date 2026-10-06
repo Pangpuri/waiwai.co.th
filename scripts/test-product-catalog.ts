@@ -180,6 +180,10 @@ const validProduct: ProductInput = {
   netWeightTh: "60 กรัม",
   fdaNumber: "73-1-30323-2-0059",
   packagingTh: "กล่อง 30 ซอง",
+  detailsEn: "",
+  allergensEn: "",
+  netWeightEn: "",
+  packagingEn: "",
   sortOrder: 0,
 };
 

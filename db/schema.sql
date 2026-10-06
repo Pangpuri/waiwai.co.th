@@ -341,10 +341,15 @@ create table if not exists product (
   tagline_th     text        not null default '',
   tagline_en     text        not null default '',
   details_th     text        not null default '',
+  /* ช่องภาษาอังกฤษ (migration 0023 · รอบที่ 141) — การตลาดกรอกเอง · ว่าง = หน้า EN ถอยไปใช้ไทย */
+  details_en     text        not null default '',
   allergens_th   text        not null default '',
+  allergens_en   text        not null default '',
   net_weight_th  text        not null default '',
+  net_weight_en  text        not null default '',
   fda_number     text        not null default '',
   packaging_th   text        not null default '',
+  packaging_en   text        not null default '',
   image_media_id text        references media (id) on delete set null,
   sort_order     integer     not null default 0,
   /* ถังขยะของสินค้า (migration 0022 · รอบที่ 139) — null = ใช้งาน · มีค่า = อยู่ในถัง (กู้คืนได้) */

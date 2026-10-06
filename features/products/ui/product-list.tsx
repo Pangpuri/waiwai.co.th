@@ -1,6 +1,15 @@
 import Image from "next/image";
 
 import { fillTemplate } from "@/lib/i18n/template";
+import {
+  productAllergensOf,
+  productDetailsOf,
+  productGroupOf,
+  productNameOf,
+  productNetWeightOf,
+  productPackagingOf,
+  productTaglineOf,
+} from "@/lib/products/display";
 import type { Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import type { ProductRecord } from "@/lib/products/repository";
@@ -48,17 +57,10 @@ export function productListStringsOf(page: Messages["productsPage"]): ProductLis
   };
 }
 
-function nameOf(product: ProductRecord, language: Locale): string {
-  const english = product.nameEn.trim();
-  return language === "en" && english !== "" ? english : product.nameTh;
-}
-
-function groupOf(product: ProductRecord, language: Locale): string {
-  const english = product.groupEn.trim();
-  const thai = product.groupTh.trim();
-  if (language === "en" && english !== "") return english;
-  return thai !== "" ? thai : english;
-}
+/*
+  เลือกข้อความตามภาษา — ตรรกะอยู่ที่ `lib/products/display.ts` (ที่เดียวของทั้งระบบ · รอบที่ 141)
+  ⚠️ เคยพลาด: `taglineEn`/`details` ฯลฯ ถูกอ่านเป็นภาษาไทยตรง ๆ ⇒ ผู้อ่าน EN ไม่เห็นค่าที่กรอกไว้
+*/
 
 function SpecRow({ label, value }: { readonly label: string; readonly value: string }) {
   if (value === "") return null;
@@ -91,8 +93,10 @@ export function ProductListSection({
 
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => {
-            const label = nameOf(product, language);
-            const group = groupOf(product, language);
+            const label = productNameOf(product, language);
+            const group = productGroupOf(product, language);
+            const tagline = productTaglineOf(product, language);
+            const details = productDetailsOf(product, language);
 
             return (
               <li key={product.id} className="border-line bg-bg flex flex-col rounded-2xl border p-4">
@@ -118,7 +122,7 @@ export function ProductListSection({
                   </summary>
 
                   <div className="mt-3 flex flex-col gap-4">
-                    {product.taglineTh === "" ? null : <p className="text-fg text-sm">{product.taglineTh}</p>}
+                    {tagline === "" ? null : <p className="text-fg text-sm">{tagline}</p>}
 
                     {product.ingredients.length === 0 ? null : (
                       <div>
@@ -153,14 +157,14 @@ export function ProductListSection({
                     )}
 
                     <dl className="flex flex-col gap-1">
-                      <SpecRow label={strings.netWeight} value={product.netWeightTh} />
+                      <SpecRow label={strings.netWeight} value={productNetWeightOf(product, language)} />
                       <SpecRow label={strings.fda} value={product.fdaNumber} />
-                      <SpecRow label={strings.packaging} value={product.packagingTh} />
-                      <SpecRow label={strings.allergens} value={product.allergensTh} />
+                      <SpecRow label={strings.packaging} value={productPackagingOf(product, language)} />
+                      <SpecRow label={strings.allergens} value={productAllergensOf(product, language)} />
                     </dl>
 
-                    {product.detailsTh === "" ? null : (
-                      <p className="text-fg-muted text-xs leading-relaxed">{product.detailsTh}</p>
+                    {details === "" ? null : (
+                      <p className="text-fg-muted text-xs leading-relaxed">{details}</p>
                     )}
                   </div>
                 </details>

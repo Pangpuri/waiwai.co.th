@@ -39,6 +39,10 @@ test("products admin: validator กลางปฏิเสธเมื่อ id
     netWeightTh: "",
     fdaNumber: "",
     packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
     sortOrder: 0,
   };
 
@@ -269,4 +273,28 @@ test("products admin: หลังบ้านต้องยังเขีย�
   /* ถ้าหลังบ้านเผลอส่ง protect-edited: กดบันทึกจากหลังบ้านจะไม่ทับค่าที่นำเข้ามา = ผู้ดูแลแก้ไม่ได้ */
   assert.ok(!/writeMode:\s*"protect-edited"/.test(actions), "action ของหลังบ้านห้ามใช้โหมดป้องกัน");
   assert.ok(actions.includes('imageMode: "set"'), "หลังบ้านต้องใช้โหมดภาพ set (ค่าเริ่มต้นของ writeMode = replace)");
+});
+
+/* ── รอบที่ 141: ช่อง EN ให้การตลาดกรอกเอง (ทีมเว็บไม่แปล) ──────────────────── */
+
+test("products admin: จอแก้ต้องมีช่อง EN ครบ 5 ช่อง (รายละเอียด/สารก่อภูมิแพ้/น้ำหนัก/บรรจุภัณฑ์ + คำโปรยเดิม)", () => {
+  for (const name of ["detailsEn", "allergensEn", "netWeightEn", "packagingEn", "taglineEn", "nameEn", "groupEn"]) {
+    assert.ok(editorForm.includes(`name="${name}"`), `จอแก้ต้องมีช่อง ${name}`);
+  }
+  assert.ok(editorForm.includes("adminProductsFieldEnHint"), "ต้องบอกว่าช่องอังกฤษเว้นว่างได้ (ถอยไปใช้ไทย)");
+  /* ค่าที่พิมพ์ต้องส่งกลับเซิร์ฟเวอร์ + เข้าพรีวิว (ไม่งั้นกรอกแล้วเหมือนไม่บันทึก) */
+  assert.ok(editorForm.includes("fields.detailsEn"), "ต้องส่งค่า EN กลับเซิร์ฟเวอร์");
+  assert.ok(editorForm.includes("detailsEn: fields.detailsEn"), "พรีวิวต้องใช้ค่าที่พิมพ์");
+});
+
+test("products admin: action ต้องรับ-บันทึกฟิลด์ EN (ไม่ทิ้งค่าที่การตลาดกรอก)", () => {
+  for (const name of ["detailsEn", "allergensEn", "netWeightEn", "packagingEn"]) {
+    assert.ok(actions.includes(`field(formData, "${name}")`), `action ต้องอ่าน ${name} จากฟอร์ม`);
+  }
+});
+
+test("products admin: พรีวิวสลับ ไทย/EN ได้ (การตลาดตรวจงานตัวเองได้)", () => {
+  assert.ok(editorForm.includes("setPreviewLanguage"), "ต้องมี state ภาษาของพรีวิว");
+  assert.ok(editorForm.includes("language={previewLanguage}"), "ต้องส่งภาษาที่เลือกเข้า ProductListSection");
+  assert.ok(editorForm.includes("aria-pressed={previewLanguage === item}"), "ปุ่มสลับต้องบอกสถานะให้ screen reader");
 });

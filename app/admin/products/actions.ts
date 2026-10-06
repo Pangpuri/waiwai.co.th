@@ -112,10 +112,15 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
     taglineTh: field(formData, "taglineTh"),
     taglineEn: field(formData, "taglineEn"),
     detailsTh: field(formData, "detailsTh"),
+    /* ช่อง EN (รอบที่ 141) — การตลาดกรอกเองผ่านหลังบ้าน */
+    detailsEn: field(formData, "detailsEn"),
     allergensTh: field(formData, "allergensTh"),
+    allergensEn: field(formData, "allergensEn"),
     netWeightTh: field(formData, "netWeightTh"),
+    netWeightEn: field(formData, "netWeightEn"),
     fdaNumber: field(formData, "fdaNumber"),
     packagingTh: field(formData, "packagingTh"),
+    packagingEn: field(formData, "packagingEn"),
     sortOrder: readInt(field(formData, "sortOrder")),
   };
 
