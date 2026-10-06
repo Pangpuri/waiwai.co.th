@@ -2,20 +2,23 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { requireAdminUser } from "@/lib/auth/dal";
+import { ProductCategoryForm } from "@/features/admin/ui/product-category-form";
+import type { ProductLibraryItem } from "@/features/admin/ui/product-editor-form";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
+import { listMedia } from "@/lib/media/repository";
 import { isCatalogCategoryId } from "@/lib/products/model";
-import { listProductsForAdmin } from "@/lib/products/repository";
+import { listProductCategoriesForAdmin, listProductsForAdmin } from "@/lib/products/repository";
 
 /**
- * หลังบ้าน — รายการ "สินค้า" (รอบที่ 133)
+ * หลังบ้าน — รายการ "สินค้า" (รอบที่ 133) + ส่วน "คำอธิบาย/ภาพปก 6 หมวด" (รอบที่ 134)
  *
  * เจ้าของเลือกจอแบบ **การ์ด** (เห็นรูปสินค้า) + ค้นหา + กรองตามหมวด
  * - ทุกอย่างตรวจสิทธิ์ด้วย `requireAdminUser("content")` ก่อนอ่านข้อมูล
  * - ลิงก์ไปหน้าจอแก้ `/admin/products/<id>` (และ `/admin/products/new` สำหรับเพิ่ม)
  * - การ์ดใช้ `<img>` (ไม่ใช้ next/image) เพราะเป็นภาพหลังบ้าน ไม่ต้องปรับขนาด/แคชของหน้าเว็บ
- * ⚠️ ส่วน "คำอธิบาย/ภาพปกหมวด" ยังไม่ได้ทำในรอบนี้ (รอบถัดไป) — บันทึกไว้ใน roadmap
+ * - ส่วนล่าง = **ฟอร์มหมวด** 6 ใบ (ฟอร์มย่อยของตัวเอง — ห้าม `<form>` ซ้อน ตามบทเรียนรอบที่ 129)
  */
 
 export default async function AdminProductsPage({
@@ -32,7 +35,18 @@ export default async function AdminProductsPage({
   const rawCategory = (query.category ?? "").trim();
   const categoryId = isCatalogCategoryId(rawCategory) ? rawCategory : "";
 
-  const listed = await listProductsForAdmin({ categoryId, search });
+  const [listed, categoryRows, media] = await Promise.all([
+    listProductsForAdmin({ categoryId, search }),
+    listProductCategoriesForAdmin(),
+    listMedia(60),
+  ]);
+
+  const library: readonly ProductLibraryItem[] = media.map((item) => ({
+    id: item.id,
+    filename: item.filename,
+    path: `/media/${item.id}`,
+  }));
+  const categoryBySlug = new Map(categoryRows.map((row) => [row.id, row]));
 
   const categoryName = (slug: string): string => {
     const item = CATALOG_ITEMS.find((entry) => entry.slug === slug);
@@ -144,6 +158,37 @@ export default async function AdminProductsPage({
           ))}
         </ul>
       )}
+
+      {/* ── ส่วน "คำอธิบาย/ภาพปก 6 หมวด" (รอบที่ 134) ────────────────────────────
+          ฟอร์มย่อยของตัวเอง (client) — ไม่ได้ซ้อนอยู่ในฟอร์มค้นหา (บทเรียนรอบที่ 129) */}
+      <details className="border-line bg-bg-subtle mt-10 rounded-2xl border p-4">
+        <summary className="text-fg cursor-pointer text-base font-semibold">
+          {m.adminProductsCategoriesHeading}
+        </summary>
+        <p className="text-fg-muted mt-2 text-sm">{m.adminProductsCategoriesHint}</p>
+
+        <div className="mt-4 flex flex-col gap-4">
+          {CATALOG_ITEMS.map((item) => {
+            const row = categoryBySlug.get(item.slug);
+            return (
+              <ProductCategoryForm
+                key={item.slug}
+                strings={m}
+                categoryId={item.slug}
+                categoryName={messages.productsPage.items[item.id].name}
+                productCount={row?.productCount ?? 0}
+                library={library}
+                initial={{
+                  sourceId: row?.sourceId ?? "",
+                  descriptionTh: row?.descriptionTh ?? "",
+                  descriptionEn: row?.descriptionEn ?? "",
+                  imagePath: row?.imagePath ?? "",
+                }}
+              />
+            );
+          })}
+        </div>
+      </details>
     </main>
   );
 }

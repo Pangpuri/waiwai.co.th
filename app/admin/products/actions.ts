@@ -17,6 +17,7 @@ import { storeImageFile } from "@/lib/media/upload";
 import { replaceProductIngredients, upsertProduct, upsertProductCategory } from "@/lib/products/repository";
 import {
   isCatalogCategoryId,
+  productIdOfSourceId,
   validateIngredientInput,
   validateProductInput,
   type ProductIngredientInput,
@@ -80,10 +81,15 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
     return { status: "error", reason: "title", createdId: null };
   }
 
-  /* สร้างใหม่: id/source_id เป็นตัวเลขจากเวลา (รูปแบบเดียวกับที่นำเข้า: p<source_id>) */
+  /*
+    ⚠️ **รหัสสินค้าถูกล็อก** (รอบที่ 134) — ห้ามใช้ค่าที่ส่งมาจากเบราว์เซอร์เป็น id ตรง ๆ
+    มิฉะนั้นฟอร์มที่ถูกแก้จะสร้างสินค้าใหม่/เปลี่ยน URL ของสินค้าเดิมได้ (ขัดกติกา "ห้ามแก้ slug")
+    ⇒ id ต้อง derive จาก source_id เสมอ · ค่าที่ส่งมาใช้เป็น "เบาะแส" ว่าเป็นการสร้างหรือแก้เท่านั้น
+  */
   const existingSourceId = field(formData, "sourceId");
   const sourceId = existingSourceId === "" ? String(Date.now()) : existingSourceId;
-  const productId = id === "" ? `p${sourceId}` : id;
+  const productId = productIdOfSourceId(sourceId);
+  if (id !== "" && id !== productId) return { status: "error", reason: "id", createdId: null };
 
   const ingredients = readIngredients(field(formData, "ingredients"));
   if (ingredients === null) return { status: "error", reason: "ingredients", createdId: null };
@@ -109,7 +115,8 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
 
   if (validateProductInput(input).length > 0) return { status: "error", reason: "title", createdId: null };
 
-  await upsertProduct(input, user.email, mediaIdFromPath(field(formData, "imagePath")));
+  /* imageMode "set" = ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง (สคริปต์นำเข้าใช้โหมด "keep") */
+  await upsertProduct(input, user.email, mediaIdFromPath(field(formData, "imagePath")), { imageMode: "set" });
   await replaceProductIngredients(productId, ingredients);
   await recordAudit({
     action: "product-save",
@@ -145,6 +152,7 @@ export async function saveProductCategoryAction(
     },
     user.email,
     mediaIdFromPath(field(formData, "imagePath")),
+    { imageMode: "set" },
   );
   await recordAudit({
     action: "product-category-save",

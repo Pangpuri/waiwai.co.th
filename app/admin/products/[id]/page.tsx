@@ -79,7 +79,7 @@ export default async function AdminProductEditorPage({
             netWeightTh: existing?.netWeightTh ?? "",
             fdaNumber: existing?.fdaNumber ?? "",
             packagingTh: existing?.packagingTh ?? "",
-            sortOrder: 0,
+            sortOrder: existing?.sortOrder ?? 0,
             imagePath: existing?.imagePath ?? "",
             ingredients:
               existing?.ingredients.map((item) => ({

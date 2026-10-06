@@ -5,7 +5,7 @@
  * (แยกไฟล์เพราะไฟล์ `"use server"` ส่งออกได้เฉพาะ async function)
  */
 
-export type ProductSaveReason = "title" | "ingredients" | "database" | "not-found" | null;
+export type ProductSaveReason = "title" | "id" | "ingredients" | "database" | "not-found" | null;
 
 export type ProductSaveState = {
   readonly status: "idle" | "saved" | "error";

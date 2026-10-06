@@ -41,9 +41,12 @@ import {
   countProductsByCategory,
   deleteProduct,
   deleteProductCategory,
+  listProductCategoriesForAdmin,
   listProductCategoryCards,
   listProductHighlights,
   listProductsByCategory,
+  listProductsForAdmin,
+  loadProductForAdmin,
   replaceProductIngredients,
   upsertProduct,
   upsertProductCategory,
@@ -290,6 +293,9 @@ async function main(): Promise<void> {
 
   /* 23) บัญชีโหมด env ต้องล็อกอินได้ (FK admin_session → admin_user) */
   await checkEnvAdminSession();
+
+  /* 24) หลังบ้านสินค้า: ตัวอ่านของจอ (การ์ด/แก้ไข/หมวด) + โหมดเขียนภาพ keep/set (รอบที่ 134) */
+  await checkProductAdmin();
 
   await closePool();
 
@@ -1811,6 +1817,11 @@ const PRODUCT_CHECK_CATEGORY = "check-db-products";
 const PRODUCT_CHECK_ID = "p999999";
 const PRODUCT_CHECK_ACTOR = "check-db-products@example.invalid";
 
+/* 24) หลังบ้านสินค้า (รอบที่ 134) — ประกาศไว้ตรงนี้เพราะ `main()` ถูกเรียกก่อนนิยามฟังก์ชันส่วนท้าย */
+const PRODUCT_ADMIN_CHECK_CATEGORY = "check-db-products-admin";
+const PRODUCT_ADMIN_CHECK_ID = "p999998";
+const PRODUCT_ADMIN_CHECK_ACTOR = "check-db-products-admin@example.invalid";
+
 async function checkProductCatalog(): Promise<void> {
   const mediaId = newMediaId();
   const png = Buffer.from(
@@ -2298,5 +2309,145 @@ async function checkEnvAdminSession(): Promise<void> {
     await getPool().query("delete from admin_session where user_agent = 'check-db'");
     /* ⚠️ ลบแถวที่สร้างเฉพาะกรณีที่เพิ่งสร้างใหม่ (ถ้ามีอยู่ก่อนแล้ว = ของเจ้าของ ห้ามแตะ) */
     await getPool().query("delete from admin_user where id = $1 and email = $2", [ENV_ADMIN_ID, email]);
+  }
+}
+
+/**
+ * 24) หลังบ้านสินค้า (รอบที่ 134) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ตัวอ่านของจอหลังบ้าน (การ์ด/แก้ไข/หมวด) + "โหมดเขียนภาพ" ที่ต้องแยกให้ชัด
+ *   · `listProductsForAdmin` — กรองหมวด + ค้นหา ใช้คู่กันได้ และไม่คืนของที่ไม่ตรง
+ *   · `loadProductForAdmin` — ทุกฟิลด์ + ส่วนผสมเรียงลำดับ + พาธภาพ `/media/<id>`
+ *   · `listProductCategoriesForAdmin` — sourceId/คำอธิบาย/ภาพ/จำนวนสินค้า ครบ (ฟอร์มใช้ 4 อย่างนี้)
+ *   · `imageMode "keep"` = ภาพ null ไม่ลบของเดิม (สคริปต์นำเข้า) · `"set"` = ล้างได้จริง (หลังบ้าน)
+ *   · ค่า `sourceId` ว่างจากฟอร์มต้อง **ไม่** ลบ source id เดิม
+ */
+async function checkProductAdmin(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const input: ProductInput = {
+    id: PRODUCT_ADMIN_CHECK_ID,
+    categoryId: PRODUCT_ADMIN_CHECK_CATEGORY,
+    sourceId: "999998",
+    sourceUrl: "",
+    nameTh: "สินค้าหลังบ้าน (ด่านตรวจ)",
+    nameEn: "Admin check product",
+    groupTh: "กลุ่มหลังบ้าน",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "รายละเอียดหลังบ้าน",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    sortOrder: 5,
+  };
+
+  const categoryInput = { id: PRODUCT_ADMIN_CHECK_CATEGORY, sourceId: "444444", descriptionTh: "หมวดหลังบ้าน", descriptionEn: "" };
+
+  try {
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-product-admin.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "สินค้าหลังบ้าน",
+      altEn: "Admin product",
+      createdBy: PRODUCT_ADMIN_CHECK_ACTOR,
+    });
+
+    await upsertProductCategory(categoryInput, PRODUCT_ADMIN_CHECK_ACTOR, mediaId, { imageMode: "set" });
+    await upsertProduct(input, PRODUCT_ADMIN_CHECK_ACTOR, mediaId, { imageMode: "set" });
+    await replaceProductIngredients(PRODUCT_ADMIN_CHECK_ID, [
+      { nameTh: "ส่วนผสมหนึ่ง", nameEn: "One", percentText: "10.00%" },
+      { nameTh: "ส่วนผสมสอง", nameEn: "Two", percentText: "" },
+    ]);
+
+    /* การ์ดหลังบ้าน: กรองหมวด / ค้นหา / กรอง+ค้นหาพร้อมกัน */
+    const byCategory = await listProductsForAdmin({ categoryId: PRODUCT_ADMIN_CHECK_CATEGORY });
+    assert.ok(
+      byCategory.items.some((item) => item.id === PRODUCT_ADMIN_CHECK_ID),
+      "กรองตามหมวดต้องเจอสินค้าทดสอบ",
+    );
+    assert.equal(byCategory.total, byCategory.items.length, "จำนวนรวมต้องตรงกับรายการที่คืน");
+    assert.equal(byCategory.items[0]?.ingredientCount, 2, "การ์ดต้องบอกจำนวนส่วนผสมจริง");
+
+    const bySearch = await listProductsForAdmin({ search: "สินค้าหลังบ้าน" });
+    assert.ok(
+      bySearch.items.some((item) => item.id === PRODUCT_ADMIN_CHECK_ID),
+      "ค้นหาด้วยชื่อไทยต้องเจอ",
+    );
+
+    const noneFound = await listProductsForAdmin({ categoryId: PRODUCT_ADMIN_CHECK_CATEGORY, search: "ไม่ตรงแน่นอน-zzz" });
+    assert.equal(noneFound.items.length, 0, "กรอง+ค้นหาพร้อมกันต้องไม่คืนของที่ไม่ตรง");
+
+    /* จอแก้ไข: ทุกฟิลด์ + ส่วนผสมเรียงลำดับ */
+    const detail = await loadProductForAdmin(PRODUCT_ADMIN_CHECK_ID);
+    assert.ok(detail !== null, "ต้องโหลดสินค้าสำหรับจอแก้ได้");
+    assert.equal(detail.id, PRODUCT_ADMIN_CHECK_ID);
+    assert.equal(detail.sourceId, "999998", "ต้องคืน source id ให้ฟอร์มส่งกลับ (id ถูก derive จากค่านี้)");
+    assert.equal(detail.imagePath, `/media/${mediaId}`, "พาธภาพต้องเป็น /media/<id> (มติ D9)");
+    assert.equal(detail.detailsTh, "รายละเอียดหลังบ้าน");
+    /* เคสจริงรอบที่ 134: หน้าจอแก้เคยส่ง sortOrder = 0 คงที่ ⇒ แก้สินค้าแล้วลำดับในหมวดหาย */
+    assert.equal(detail.sortOrder, 5, "ต้องอ่านลำดับการแสดงกลับมาได้ (แก้สินค้าแล้วลำดับต้องไม่หาย)");
+    assert.deepEqual(
+      detail.ingredients.map((item) => item.nameTh),
+      ["ส่วนผสมหนึ่ง", "ส่วนผสมสอง"],
+      "ส่วนผสมต้องเรียงตามลำดับที่บันทึก",
+    );
+
+    /* ฟอร์มหมวด: ต้องได้ sourceId + คำอธิบาย + ภาพ + จำนวนสินค้า */
+    const categories = await listProductCategoriesForAdmin();
+    const row = categories.find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.ok(row !== undefined, "ต้องเห็นหมวดทดสอบในตัวอ่านหลังบ้าน");
+    assert.equal(row.sourceId, "444444", "ต้องคืน sourceId ให้ช่องซ่อนของฟอร์ม");
+    assert.equal(row.descriptionTh, "หมวดหลังบ้าน");
+    assert.equal(row.imagePath, `/media/${mediaId}`);
+    assert.equal(row.productCount, 1, "ต้องนับจำนวนสินค้าในหมวด");
+
+    /* โหมด keep (ค่าตั้งต้น = สคริปต์นำเข้าต้องไม่ลบภาพที่ผู้ดูแลเลือก) */
+    await upsertProductCategory({ ...categoryInput, descriptionTh: "หมวดหลังบ้าน (แก้คำอธิบาย)" }, PRODUCT_ADMIN_CHECK_ACTOR, null);
+    const keptRow = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(keptRow?.imagePath, `/media/${mediaId}`, "โหมด keep: ภาพ null ต้องคงภาพเดิมไว้");
+    assert.equal(keptRow?.descriptionTh, "หมวดหลังบ้าน (แก้คำอธิบาย)", "คำอธิบายต้องถูกเขียนทับได้");
+
+    /* โหมด set (หลังบ้าน): ล้างภาพได้จริง + sourceId ว่างต้องไม่ลบ source id เดิม */
+    await upsertProductCategory(
+      { ...categoryInput, sourceId: "", descriptionTh: "หมวดหลังบ้าน (ล้างภาพ)" },
+      PRODUCT_ADMIN_CHECK_ACTOR,
+      null,
+      { imageMode: "set" },
+    );
+    const clearedRow = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(clearedRow?.imagePath, null, "โหมด set: เลือกไม่ใช้ภาพแล้วต้องล้างได้จริง");
+    assert.equal(clearedRow?.sourceId, "444444", "ส่ง sourceId ว่างมาต้องไม่ลบ source id เดิม");
+
+    /* สินค้า: ล้างภาพได้ และไม่กระทบส่วนผสม */
+    await upsertProduct(input, PRODUCT_ADMIN_CHECK_ACTOR, null, { imageMode: "set" });
+    const clearedProduct = await loadProductForAdmin(PRODUCT_ADMIN_CHECK_ID);
+    assert.equal(clearedProduct?.imagePath, null, "ล้างภาพสินค้าได้จริง");
+    assert.equal(clearedProduct?.ingredients.length, 2, "ล้างภาพต้องไม่กระทบส่วนผสม");
+
+    done("หลังบ้านสินค้า: การ์ด/แก้ไข/หมวด ครบ + โหมดภาพ keep/set ทำงานจริง", "กรอง · ค้นหา · จำนวนส่วนผสม · ล้างภาพ");
+  } finally {
+    await deleteProduct(PRODUCT_ADMIN_CHECK_ID);
+    await deleteProductCategory(PRODUCT_ADMIN_CHECK_CATEGORY);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(await countWhere("product where id = $1", [PRODUCT_ADMIN_CHECK_ID]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+    assert.equal(
+      await countWhere("product_category where id = $1", [PRODUCT_ADMIN_CHECK_CATEGORY]),
+      0,
+      "ต้องไม่เหลือหมวดทดสอบ",
+    );
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
   }
 }

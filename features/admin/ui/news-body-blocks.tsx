@@ -63,7 +63,21 @@ export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsB
     try {
       const formData = new FormData();
       formData.set("file", file);
-      setUploadState(await uploadNewsImageAction(INITIAL_NEWS_UPLOAD_STATE, formData));
+      const result = await uploadNewsImageAction(INITIAL_NEWS_UPLOAD_STATE, formData);
+      const mediaId = result.status === "ok" ? mediaIdFromPath(result.path) : null;
+      if (mediaId === null) {
+        setUploadState(result);
+        return;
+      }
+      /*
+        อัปโหลดเสร็จ = ใส่การ์ดภาพให้ทันที (ไม่ต้องรีเฟรชและไม่เสียสิ่งที่พิมพ์ไว้)
+        ⚠️ ตัว action คืน **พาธ** /media/<id> ⇒ ต้องแปลงเป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9)
+        ⚠️ รอบที่ 134: ย้ายจาก `useEffect` มาที่นี่ — การ setState ใน effect ทำให้เกิด cascading render
+           (lint `react-hooks/set-state-in-effect`) และเสี่ยงใส่การ์ดซ้ำถ้า effect ทำงานซ้ำ
+      */
+      setItems((current) => [...current, { id: `upload-${String(Date.now())}`, kind: "image", mediaId, alt: "" }]);
+      setPickerFor(null);
+      setUploadState(INITIAL_NEWS_UPLOAD_STATE);
     } catch {
       setUploadState({ status: "failed", path: "", reason: "failed" });
     } finally {
@@ -71,26 +85,11 @@ export function NewsBodyBlocks({ strings: m, initial, library, onChange }: NewsB
     }
   }
 
-  /*
-    อัปโหลดเสร็จ = ใส่การ์ดภาพให้ทันที (ไม่ต้องรีเฟรชและไม่เสียสิ่งที่พิมพ์ไว้)
-    ⚠️ ตัว action คืน **พาธ** /media/<id> ⇒ ต้องแปลงเป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9: เก็บพาธ ไม่เก็บ URL)
-  */
   /* รายงานขึ้นไปทุกครั้งที่รายการเปลี่ยน (พรีวิวต้องตรงกับสิ่งที่กำลังแก้) */
   useEffect(() => {
     onChange?.(items);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onChange เป็น callback จากฝั่งฟอร์ม (ไม่ต้องอยู่ใน dep)
   }, [items]);
-
-  useEffect(() => {
-    if (uploadState.status !== "ok") return;
-    const mediaId = mediaIdFromPath(uploadState.path);
-    if (mediaId === null) return;
-    /* อัปเดต state ตรงในนี้ (ไม่เรียก addImage) ⇒ effect ไม่ต้องพึ่งฟังก์ชันที่สร้างใหม่ทุกเรนเดอร์ */
-    setItems((current) => [...current, { id: `upload-${String(Date.now())}`, kind: "image", mediaId, alt: "" }]);
-    setPickerFor(null);
-    /* เคลียร์สถานะทันที กัน effect ใส่การ์ดซ้ำในการเรนเดอร์ถัดไป */
-    setUploadState(INITIAL_NEWS_UPLOAD_STATE);
-  }, [uploadState]);
 
   function newId(): string {
     setCounter((value) => value + 1);

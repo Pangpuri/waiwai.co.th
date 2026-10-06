@@ -191,9 +191,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
       : state.status === "error"
         ? state.reason === "title"
           ? m.adminProductsErrorTitle
-          : state.reason === "ingredients"
-            ? m.adminProductsErrorIngredients
-            : m.adminProductsErrorDatabase
+          : state.reason === "id"
+            ? m.adminProductsErrorId
+            : state.reason === "ingredients"
+              ? m.adminProductsErrorIngredients
+              : m.adminProductsErrorDatabase
         : "";
 
   return (

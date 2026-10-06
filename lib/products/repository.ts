@@ -295,22 +295,47 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
 
 /* ── ฝั่งเขียน (ใช้โดยสคริปต์นำเข้า) — โยน error ออกไปถ้าล้มเหลว (ห้ามกลืน) ────── */
 
-export async function upsertProductCategory(input: ProductCategoryInput, actor: string, imageMediaId: string | null): Promise<void> {
+/**
+ * วิธีเขียนภาพ (รอบที่ 134)
+ * - `keep` (ค่าตั้งต้น) — ภาพ `null` = **คงภาพเดิมไว้** ⇒ ใช้โดยสคริปต์นำเข้า
+ *   (เว็บเดิมมีหมวด/สินค้าที่ไม่มีภาพ ⇒ นำเข้าซ้ำต้องไม่ลบภาพที่ผู้ดูแลเลือกไว้)
+ * - `set` — เขียนทับตามค่าที่ส่งมา (`null` = ล้างภาพ) ⇒ ใช้โดย **หน้าจอหลังบ้าน**
+ *   (ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง ไม่ใช่เงียบ ๆ คงของเดิมไว้)
+ */
+export type ImageWriteMode = "keep" | "set";
+
+function imageWriteExpression(mode: ImageWriteMode | undefined, table: string): string {
+  if ((mode ?? "keep") === "set") return "excluded.image_media_id";
+  return `coalesce(excluded.image_media_id, ${table}.image_media_id)`;
+}
+
+export async function upsertProductCategory(
+  input: ProductCategoryInput,
+  actor: string,
+  imageMediaId: string | null,
+  options: { readonly imageMode?: ImageWriteMode } = {},
+): Promise<void> {
   await getPool().query(
     `insert into product_category (id, source_id, description_th, description_en, image_media_id, updated_at, updated_by)
        values ($1, $2, $3, $4, $5, now(), $6)
      on conflict (id) do update set
-       source_id      = excluded.source_id,
+       /* ค่าว่างต้องไม่ลบ source_id เดิม (แบบฟอร์มหลังบ้านส่งค่านี้ผ่านช่องซ่อน) */
+       source_id      = coalesce(nullif(excluded.source_id, ''), product_category.source_id),
        description_th = excluded.description_th,
        description_en = excluded.description_en,
-       image_media_id = coalesce(excluded.image_media_id, product_category.image_media_id),
+       image_media_id = ${imageWriteExpression(options.imageMode, "product_category")},
        updated_at     = now(),
        updated_by     = excluded.updated_by`,
     [input.id, input.sourceId, input.descriptionTh, input.descriptionEn, imageMediaId, actor],
   );
 }
 
-export async function upsertProduct(input: ProductInput, actor: string, imageMediaId: string | null): Promise<void> {
+export async function upsertProduct(
+  input: ProductInput,
+  actor: string,
+  imageMediaId: string | null,
+  options: { readonly imageMode?: ImageWriteMode } = {},
+): Promise<void> {
   await getPool().query(
     `insert into product (
         id, category_id, source_id, source_url, name_th, name_en, group_th, group_en,
@@ -332,7 +357,7 @@ export async function upsertProduct(input: ProductInput, actor: string, imageMed
         net_weight_th  = excluded.net_weight_th,
         fda_number     = excluded.fda_number,
         packaging_th   = excluded.packaging_th,
-        image_media_id = coalesce(excluded.image_media_id, product.image_media_id),
+        image_media_id = ${imageWriteExpression(options.imageMode, "product")},
         sort_order     = excluded.sort_order,
         updated_at     = now(),
         updated_by     = excluded.updated_by`,
@@ -395,6 +420,8 @@ export type AdminProductListItem = {
   readonly imageWidth: number | null;
   readonly imageHeight: number | null;
   readonly ingredientCount: number;
+  /** ลำดับการแสดงในหมวด — ต้องส่งกลับตอนบันทึก ไม่งั้นแก้สินค้าแล้วลำดับเพี้ยน (เคสจริงรอบที่ 134) */
+  readonly sortOrder: number;
   /** `YYYY-MM-DDTHH:MM` (เวลาไทย) หรือ null */
   readonly updatedLocal: string | null;
 };
@@ -412,7 +439,7 @@ export type AdminProductDetail = AdminProductListItem & {
 };
 
 const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en,
-       p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th,
+       p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th, p.sort_order,
        m.id as image_id, m.width as image_width, m.height as image_height,
        (select count(*)::int from product_ingredient i where i.product_id = p.id) as ingredient_count,
        to_char(p.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local`;
@@ -436,6 +463,7 @@ function toAdminProduct(row: Record<string, unknown>): AdminProductListItem | nu
     imageWidth: num(row.image_width),
     imageHeight: num(row.image_height),
     ingredientCount: typeof row.ingredient_count === "number" ? row.ingredient_count : 0,
+    sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
     updatedLocal: updatedLocal === "" ? null : updatedLocal,
   };
 }
@@ -535,5 +563,72 @@ export async function loadProductForAdmin(id: string): Promise<AdminProductDetai
     };
   } catch {
     return null;
+  }
+}
+
+export type AdminProductCategoryItem = {
+  /** slug ของหมวด (ตรงกับ `CATALOG_ITEMS` ในโค้ด) */
+  readonly id: string;
+  /** id ของหน้าในเว็บเดิม — ต้องส่งกลับตอนบันทึก (ไม่งั้นเขียนทับเป็นค่าว่าง) */
+  readonly sourceId: string;
+  readonly descriptionTh: string;
+  readonly descriptionEn: string;
+  readonly imagePath: string | null;
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
+  readonly productCount: number;
+};
+
+/**
+ * หมวดสินค้าสำหรับ **หน้าจอหลังบ้าน** (รอบที่ 134) — ใช้ทำแฟอร์ม "คำอธิบาย/ภาพปกหมวด"
+ *
+ * - คืนเฉพาะแถวที่มีใน DB ⇒ ผู้เรียกต้อง **ประกอบกับ `CATALOG_ITEMS`** เพื่อให้ครบ 6 หมวดเสมอ
+ *   (หมวดที่ยังไม่มีแถว = ยังไม่มีคำอธิบาย/ภาพ ⇒ ฟอร์มเริ่มจากช่องว่างได้)
+ * - `sourceId` ต้องคืนออกไปให้ฟอร์มส่งกลับ (repository กันค่าว่างเขียนทับอยู่แล้ว แต่ไม่ควรพึ่งชั้นเดียว)
+ * - ⚠️ ไม่มีชื่อหมวดในฐานข้อมูล (ชื่อมาจาก `features/products/catalog.ts` = แหล่งความจริงเดียว)
+ */
+export async function listProductCategoriesForAdmin(): Promise<readonly AdminProductCategoryItem[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{
+      id: string;
+      sourceId: string | null;
+      descriptionTh: string;
+      descriptionEn: string;
+      imageId: string | null;
+      imageWidth: number | null;
+      imageHeight: number | null;
+      productCount: string;
+    }>(
+      `select c.id,
+              c.source_id       as "sourceId",
+              c.description_th  as "descriptionTh",
+              c.description_en  as "descriptionEn",
+              m.id              as "imageId",
+              m.width           as "imageWidth",
+              m.height          as "imageHeight",
+              count(p.id)::text as "productCount"
+         from product_category c
+         left join media m on m.id = c.image_media_id
+         left join product p on p.category_id = c.id
+        group by c.id, c.source_id, c.description_th, c.description_en, m.id, m.width, m.height
+        order by c.id`,
+    );
+
+    return result.rows.map((row) => {
+      const count = Number.parseInt(row.productCount, 10);
+      return {
+        id: row.id,
+        sourceId: typeof row.sourceId === "string" ? row.sourceId : "",
+        descriptionTh: row.descriptionTh,
+        descriptionEn: row.descriptionEn,
+        imagePath: mediaPath(row.imageId),
+        imageWidth: row.imageWidth,
+        imageHeight: row.imageHeight,
+        productCount: Number.isFinite(count) ? count : 0,
+      };
+    });
+  } catch {
+    return [];
   }
 }
