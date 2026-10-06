@@ -44,10 +44,16 @@ export function RecipeVideoList({
   recipes,
   language,
   strings,
+  titlePlaceholder,
 }: {
   readonly recipes: readonly RecipeRecord[];
   readonly language: Locale;
   readonly strings: RecipeVideoListStrings;
+  /**
+   * ใช้เฉพาะ **พรีวิวหลังบ้าน** (รอบที่ 137) — ชื่อเมนูว่างแล้วโชว์ข้อความนี้แทน (แบบเดียวกับพรีวิวข่าว)
+   * ⚠️ หน้าเว็บจริงไม่ส่งค่านี้ ⇒ พฤติกรรมหน้าเว็บไม่เปลี่ยน (ชื่อว่าง = ชื่อว่าง)
+   */
+  readonly titlePlaceholder?: string;
 }) {
   if (recipes.length === 0) return null;
 
@@ -61,7 +67,8 @@ export function RecipeVideoList({
 
         <ul className="mt-8 grid list-none gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
           {recipes.map((recipe) => {
-            const title = recipeTitleOf(recipe.titleTh, recipe.titleEn, language);
+            const computedTitle = recipeTitleOf(recipe.titleTh, recipe.titleEn, language);
+            const title = computedTitle === "" && titlePlaceholder !== undefined ? titlePlaceholder : computedTitle;
             const published = formatRecipeDate(recipe.publishedOn, language);
             return (
               <li key={recipe.id} className="flex flex-col rounded-2xl border border-line bg-bg p-4">

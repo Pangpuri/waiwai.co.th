@@ -198,3 +198,23 @@ test("recipes admin: ใช้ตัวดึงรหัสกลางตั�
   assert.ok(importParse.includes("youTubeIdFromInput("), "สคริปต์นำเข้าต้องใช้ตัวดึงกลาง");
   assert.ok(!/match\(\/\(\?:youtube/.test(importParse), "ต้องไม่เหลือ regex ดึงลิงก์ชุดเก่าในสคริปต์นำเข้า");
 });
+
+/* ── รอบที่ 137: พรีวิวเมนูให้เหมือนพรีวิวข่าว (สลับ ไทย/EN + ชื่อว่างมีข้อความแทน) ── */
+
+test("recipes admin: พรีวิวสลับ ไทย/EN ได้ และส่ง placeholder ให้ตัวเรนเดอร์กลาง", () => {
+  assert.ok(editorForm.includes("setPreviewLanguage"), "ต้องมี state ภาษาของพรีวิว");
+  assert.ok(editorForm.includes("aria-pressed={previewLanguage === item}"), "ปุ่มสลับต้องบอกสถานะให้ screen reader");
+  assert.ok(editorForm.includes("language={previewLanguage}"), "ต้องส่งภาษาที่เลือกเข้า RecipeVideoList");
+  assert.ok(
+    editorForm.includes("titlePlaceholder={m.recipesAdminPreviewUntitled}"),
+    "ชื่อเมนูว่างต้องมีข้อความแทน (แบบเดียวกับพรีวิวข่าว)",
+  );
+  assert.ok(publicList.includes("titlePlaceholder?: string"), "ตัวเรนเดอร์กลางต้องรับ placeholder แบบไม่บังคับ");
+  assert.ok(publicList.includes("computedTitle"), "ต้องคิดชื่อก่อน แล้วค่อยใช้ placeholder เมื่อว่าง");
+});
+
+test("recipes admin: placeholder มีผลเฉพาะหลังบ้าน — หน้าเว็บจริงต้องไม่ส่งค่านี้", () => {
+  const publicPage = readFileSync("app/[lang]/recipes/page.tsx", "utf8");
+  assert.ok(!publicPage.includes("titlePlaceholder"), "หน้าเว็บจริงห้ามส่ง placeholder (ชื่อว่าง = ชื่อว่าง)");
+  assert.equal((publicPage.match(/<RecipeVideoList/g) ?? []).length, 2, "หน้าเว็บจริงเรียกตัวเรนเดอร์ 2 ที่ตามเดิม");
+});

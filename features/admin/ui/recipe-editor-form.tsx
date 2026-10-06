@@ -73,6 +73,8 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
   });
   const [uploadState, setUploadState] = useState(INITIAL_RECIPE_UPLOAD_STATE);
   const [uploading, setUploading] = useState(false);
+  /* ภาษาของพรีวิว (รอบที่ 137) — แยกจากค่าที่บันทึก: ดูด่าน EN ได้โดยไม่ต้องสลับทั้งหน้าจอ */
+  const [previewLanguage, setPreviewLanguage] = useState<"th" | "en">("th");
 
   function setField(key: keyof typeof fields, value: string): void {
     setFields((current) => ({ ...current, [key]: value }));
@@ -305,11 +307,33 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
         </div>
       </div>
 
-      {/* พรีวิว: ใช้ RecipeVideoList ตัวเดียวกับหน้า /recipes */}
+      {/* พรีวิว: ใช้ RecipeVideoList ตัวเดียวกับหน้า /recipes (สลับ ไทย/EN ได้ — แบบเดียวกับจอข่าว) */}
       <aside className="lg:w-[420px] lg:shrink-0">
         <div className="border-line bg-bg-subtle rounded-2xl border p-3 lg:sticky lg:top-6">
-          <h2 className="text-fg-muted mb-3 text-xs font-semibold uppercase">{m.recipesAdminPreview}</h2>
-          <RecipeVideoList recipes={[previewRecord]} language="th" strings={props.publicStrings} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-fg-muted text-xs font-semibold uppercase">{m.recipesAdminPreview}</h2>
+            <span className="flex items-center gap-1" role="group" aria-label={m.recipesAdminPreview}>
+              {(["th", "en"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setPreviewLanguage(item)}
+                  aria-pressed={previewLanguage === item}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                    previewLanguage === item ? "border-line bg-surface text-fg" : "border-line text-fg-muted"
+                  }`}
+                >
+                  {item === "th" ? m.recipesAdminPreviewTh : m.recipesAdminPreviewEn}
+                </button>
+              ))}
+            </span>
+          </div>
+          <RecipeVideoList
+            recipes={[previewRecord]}
+            language={previewLanguage}
+            strings={props.publicStrings}
+            titlePlaceholder={m.recipesAdminPreviewUntitled}
+          />
           <p className="text-fg-muted mt-2 text-xs">
             {fillTemplate(m.recipesAdminPreviewHint, { status: fields.status === "draft" ? m.recipesAdminStatusDraft : m.recipesAdminStatusPublished })}
           </p>
