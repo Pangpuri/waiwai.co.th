@@ -16,7 +16,7 @@ import {
   type AdminRecipeInput,
   type AdminRecipeStatus,
 } from "@/lib/recipes/repository";
-import { recipeIdOfSourceId, validateRecipeInput, type RecipeInput } from "@/lib/recipes/model";
+import { recipeIdOfSourceId, validateRecipeInput, youTubeIdFromInput, type RecipeInput } from "@/lib/recipes/model";
 
 /**
  * Server Action ของหลังบ้านเมนูอาหาร (รอบที่ 135 · แบบ WordPress "Posts")
@@ -65,10 +65,16 @@ export async function saveRecipeAction(_previous: RecipeSaveState, formData: For
   */
   const sourceId = existing?.sourceId ?? String(Date.now());
   const publishedOn = parseDate(field(formData, "publishedOn"));
+  /*
+    รอบที่ 136: ผู้ใช้วาง **ลิงก์ YouTube เต็ม** ได้ — ดึงรหัสให้เองที่นี่ (ที่เดียว ใช้ตัวดึงกลาง)
+    ⚠️ ถ้าดึงไม่ได้ ปล่อยค่าเดิมไปให้ validator กลางปฏิเสธ (ข้อความ error มาจากที่เดียว ไม่ต้องเดา)
+    ⚠️ เก็บเฉพาะ **รหัส** ลงฐานข้อมูล (มติ D20) ไม่เก็บ URL เต็ม
+  */
+  const videoIdInput = field(formData, "videoId").trim();
   const input: AdminRecipeInput = {
     titleTh: field(formData, "titleTh").trim(),
     titleEn: field(formData, "titleEn").trim(),
-    videoId: field(formData, "videoId").trim(),
+    videoId: youTubeIdFromInput(videoIdInput) ?? videoIdInput,
     publishedOn,
     sortOrder: readInt(field(formData, "sortOrder")),
     coverPath: field(formData, "coverPath").trim() === "" ? null : field(formData, "coverPath").trim(),

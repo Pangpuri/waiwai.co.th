@@ -10,6 +10,7 @@ import { RecipeVideoList, type RecipeVideoListStrings } from "@/features/recipes
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { mediaIdFromPath } from "@/lib/media/usage";
+import { youTubeIdFromInput } from "@/lib/recipes/model";
 import type { RecipeRecord } from "@/lib/recipes/repository";
 
 /**
@@ -100,6 +101,13 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     }
   }
 
+  /*
+    รอบที่ 136: ผู้ใช้วาง **ลิงก์ YouTube เต็ม** ได้ — ดึงรหัสให้เห็นสด ๆ ในฟอร์ม
+    และพรีวิวต้องใช้ **รหัสที่ดึงได้** (ไม่ใช่ลิงก์) ไม่งั้นผู้เล่นจะชี้ไป URL ที่ผิด
+  */
+  const detectedVideoId = youTubeIdFromInput(fields.videoId);
+  const videoIdTrimmed = fields.videoId.trim();
+
   /* พรีวิว: ประกอบเป็น RecipeRecord จากค่าที่กำลังพิมพ์ แล้วส่งให้ตัวเรนเดอร์ของหน้าเว็บจริง */
   const previewRecord: RecipeRecord = {
     id: props.initial.id === "" ? "preview" : props.initial.id,
@@ -111,7 +119,7 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     coverWidth: null,
     coverHeight: null,
     videoProvider: "youtube",
-    videoId: fields.videoId,
+    videoId: detectedVideoId ?? "",
     publishedOn: fields.publishedOn === "" ? null : fields.publishedOn,
     sortOrder: 0,
   };
@@ -198,6 +206,14 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
               required
             />
             <span className="text-fg-muted mt-1 block text-xs">{m.recipesAdminFieldVideoHint}</span>
+            {/* ผลการดึงรหัสจากสิ่งที่วาง (รอบที่ 136) — บอกทันทีว่าวางลิงก์แล้วได้รหัสอะไร */}
+            {videoIdTrimmed === "" ? null : detectedVideoId === null ? (
+              <span className="text-danger mt-1 block text-xs">{m.recipesAdminVideoNotFound}</span>
+            ) : detectedVideoId === videoIdTrimmed ? null : (
+              <span className="text-fg-muted mt-1 block text-xs">
+                {fillTemplate(m.recipesAdminVideoDetected, { id: detectedVideoId })}
+              </span>
+            )}
           </label>
           <label className="block">
             <span className={LABEL_CLASS}>{m.recipesAdminFieldPublishedOn}</span>

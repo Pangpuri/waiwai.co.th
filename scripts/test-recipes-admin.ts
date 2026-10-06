@@ -7,6 +7,7 @@ import {
   recipeIdOfSourceId,
   validateRecipeInput,
   youTubeEmbedUrlOf,
+  youTubeIdFromInput,
   youTubeWatchUrlOf,
   type RecipeInput,
 } from "@/lib/recipes/model";
@@ -149,4 +150,51 @@ test("recipes admin: audit ใหม่ต้องมีป้ายข้อ�
 test("recipes admin: หน้าจอหลังบ้านต้องตรวจสิทธิ์ที่หน้าเพจด้วย", () => {
   assert.ok(listPage.includes('requireAdminUser("content")'), "/admin/recipes ต้องตรวจสิทธิ์ก่อนอ่านข้อมูล");
   assert.ok(editorPage.includes('requireAdminUser("content")'), "/admin/recipes/[id] ต้องตรวจสิทธิ์ก่อนอ่านข้อมูล");
+});
+
+/* ── รอบที่ 136: วาง "ลิงก์ YouTube เต็ม" แล้วดึงรหัสให้เอง ─────────────────── */
+
+test("recipes admin: ดึงรหัสวิดีโอจากลิงก์ทุกรูปแบบที่ YouTube ให้คัดลอก", () => {
+  const id = "dQw4w9WgXcQ";
+  const inputs = [
+    "dQw4w9WgXcQ",
+    "  dQw4w9WgXcQ  ",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30s",
+    "https://www.youtube.com/watch?app=desktop&v=dQw4w9WgXcQ",
+    "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://music.youtube.com/watch?v=dQw4w9WgXcQ",
+    "www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ?t=42",
+    "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+    "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "https://www.youtube.com/live/dQw4w9WgXcQ",
+    "//www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+  ];
+  for (const value of inputs) assert.equal(youTubeIdFromInput(value), id, `ต้องดึงรหัสได้จาก: ${value}`);
+});
+
+test("recipes admin: ลิงก์ที่ไม่ใช่ YouTube / ของเสีย ต้องไม่ถูกเดาเป็นรหัส", () => {
+  const inputs = [
+    "",
+    "   ",
+    "สั้น",
+    "https://example.com/watch?v=dQw4w9WgXcQ",
+    "https://www.youtube.com/",
+    "https://www.youtube.com/watch?v=abc",
+    "javascript:alert(1)",
+    "https://vimeo.com/123456",
+  ];
+  for (const value of inputs) assert.equal(youTubeIdFromInput(value), null, `ต้องอ่านไม่ได้: ${value}`);
+});
+
+test("recipes admin: ใช้ตัวดึงรหัสกลางตัวเดียว — action · ฟอร์ม · สคริปต์นำเข้า (ไม่เขียน regex ซ้ำ)", () => {
+  assert.ok(actions.includes("youTubeIdFromInput("), "action ต้อง normalize ลิงก์ก่อนตรวจ");
+  assert.ok(editorForm.includes("youTubeIdFromInput("), "ฟอร์มต้องดึงรหัสให้เห็นสด ๆ");
+  assert.ok(editorForm.includes('videoId: detectedVideoId ?? ""'), "พรีวิวต้องใช้รหัสที่ดึงได้ ไม่ใช่ลิงก์");
+  assert.ok(editorForm.includes("recipesAdminVideoDetected"), "ต้องบอกผู้ใช้ว่าดึงรหัสได้อะไร");
+  const importParse = readFileSync("lib/recipes/import-parse.ts", "utf8");
+  assert.ok(importParse.includes("youTubeIdFromInput("), "สคริปต์นำเข้าต้องใช้ตัวดึงกลาง");
+  assert.ok(!/match\(\/\(\?:youtube/.test(importParse), "ต้องไม่เหลือ regex ดึงลิงก์ชุดเก่าในสคริปต์นำเข้า");
 });

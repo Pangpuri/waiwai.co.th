@@ -39,6 +39,38 @@ export function isYouTubeVideoId(value: string): boolean {
 }
 
 /**
+ * ดึง "รหัสวิดีโอ" จากสิ่งที่คนวางมา (รอบที่ 136)
+ *
+ * ที่มา: เจ้าของถามว่า *"รองรับลิงค์มาโชว์ได้ตามลักษณะคอนเท้นใช่ไหมครับ"* — เดิมช่องนี้รับเฉพาะ **รหัสล้วน**
+ * ⇒ การตลาดต้องตัดรหัสเองจากลิงก์ (พลาดง่าย) ⇒ ตัวนี้รับได้ทั้งรหัสล้วนและลิงก์ทุกรูปแบบที่ YouTube ให้คัดลอก
+ *   · `youtube.com/watch?v=<id>` (มีพารามิเตอร์ก่อน/หลังก็ได้ เช่น `?app=desktop&v=…` หรือ `?v=…&t=30s`)
+ *   · `youtu.be/<id>` · `youtube.com/shorts/<id>` · `…/embed/<id>` · `…/live/<id>` (รวม `m.`/`music.`/`-nocookie`)
+ *
+ * ⚠️ **ยังเก็บเฉพาะรหัสลงฐานข้อมูล** (มติ D20 · ไม่เก็บ URL เต็ม ⇒ เปลี่ยนโดเมน/ผู้ให้บริการได้)
+ * ⚠️ คืน `null` = อ่านไม่ได้ — ผู้เรียกต้องแจ้ง error เอง (ห้ามเดารหัสขึ้นมา)
+ */
+export function youTubeIdFromInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (VIDEO_ID_PATTERN.test(trimmed)) return trimmed;
+
+  const patterns: readonly RegExp[] = [
+    /* watch?v=<id> — รองรับพารามิเตอร์ที่มาก่อน/ตามหลัง v */
+    /(?:youtube\.com|youtube-nocookie\.com)\/watch\?(?:[^#\s]*&)?v=([A-Za-z0-9_-]{6,20})/i,
+    /* /embed/<id> · /shorts/<id> · /live/<id> · /v/<id> */
+    /(?:youtube\.com|youtube-nocookie\.com)\/(?:embed|shorts|live|v)\/([A-Za-z0-9_-]{6,20})/i,
+    /* ลิงก์ย่อ youtu.be/<id> */
+    /youtu\.be\/([A-Za-z0-9_-]{6,20})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match?.[1] !== undefined) return match[1];
+  }
+  return null;
+}
+
+/**
  * URL ของผู้เล่น — ใช้ **youtube-nocookie.com** (ไม่ตั้งคุกกี้โฆษณา) และ **โหลดเฉพาะตอนผู้ใช้กด**
  * ⚠️ ฟังก์ชันนี้คืน URL เฉย ๆ — การเอาไปฝังต้องผ่าน facade เท่านั้น (ห้ามฝังใน SSR)
  */

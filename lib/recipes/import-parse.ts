@@ -22,13 +22,15 @@ import { attributeOf, decodeEntities, normalizeText, pathOfHref, textOf } from "
 export { parseThaiDate } from "@/lib/import/thai-date";
 
 import { parseThaiDate } from "@/lib/import/thai-date";
+import { youTubeIdFromInput } from "@/lib/recipes/model";
 
-/** ดึง id วิดีโอ YouTube จาก URL ที่เว็บเดิมฝังไว้ (embed / nocookie / youtu.be / watch?v=) */
+/**
+ * ดึง id วิดีโอ YouTube จาก URL ที่เว็บเดิมฝังไว้
+ * ⚠️ รอบที่ 136: ใช้ **ตัวดึงกลาง** ตัวเดียวกับช่องกรอกของหลังบ้าน (`youTubeIdFromInput`)
+ *    ⇒ รูปแบบลิงก์ที่รองรับมีที่เดียว ไม่หลุดจากกัน (คืน "" = อ่านไม่ได้ ตามสัญญาเดิมของฟังก์ชันนี้)
+ */
 export function youTubeIdOf(src: string): string {
-  const match = src
-    .trim()
-    .match(/(?:youtube(?:-nocookie)?\.com\/embed\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{6,20})/i);
-  return match?.[1] ?? "";
+  return youTubeIdFromInput(src) ?? "";
 }
 
 export type ParsedRecipeCard = {
