@@ -75,7 +75,7 @@ export const adminProducts: Pick<Messages["admin"], keyof typeof thAdminProducts
   adminProductsErrorId: "Cannot save - the product code is not valid (links must stay stable).",
   adminProductsSlugLocked: "The product code / slug cannot be changed - so existing links keep working.",
   adminProductsPreview: "Product card preview",
-  adminProductsPreviewSiteWidth: "Preview at real site proportions (content width {width}px) - auto-scaled to fit, no horizontal scrolling",
+  adminProductsPreviewSiteWidth: "Preview at real card size ({width}px = 1/3 of the 1216px site content) - same font size as the live site",
   adminProductsPreviewHint: "How readers will see it on the site (same renderer as the live page)",
   auditProductSave: "Product saved",
   auditProductCategorySave: "Category description saved",

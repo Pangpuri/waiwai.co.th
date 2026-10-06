@@ -314,5 +314,14 @@ test("products admin: พรีวิวต้องเรนเดอร์ท�
   );
   assert.ok(frame.includes("scale("), "ต้องย่อด้วย transform scale (ไม่ปล่อยให้ล้น/ต้องเลื่อน)");
   assert.ok(!frame.includes("overflow-x-auto"), "ห้ามใช้การเลื่อนแนวนอน (ฟีดแบ็กเจ้าของ: ต้องย่อพอดีช่อง)");
-  assert.ok(frame.includes("1216"), "ความกว้างอ้างอิงต้องมาจากของจริง (container-site 80rem − padding = 1216px)");
+  assert.ok(frame.includes("1216"), "ความกว้างเนื้อหาเว็บต้องมาจากของจริง (80rem − padding = 1216px)");
+  assert.ok(
+    frame.includes("export const SITE_CARD_WIDTH"),
+    "ต้องมี 'ความกว้างการ์ดจริง' ที่คำนวณไว้ (พรีวิวการ์ดใช้ 1:1 ไม่ย่อทั้งหน้า)",
+  );
+  assert.ok(
+    editorForm.includes("width={SITE_CARD_WIDTH}") && editorForm.includes("singleCard"),
+    "พรีวิวการ์ดต้องเรนเดอร์ที่ความกว้างการ์ดจริง + โหมดการ์ดเดียว ⇒ ตัวอักษรเท่าหน้าเว็บ",
+  );
+  assert.ok(readFileSync("app/globals.css", "utf8").includes(".preview-single-card .product-card-grid"), "ต้องมีกฎบังคับกริด 1 คอลัมน์ในการ์ดเดียว");
 });

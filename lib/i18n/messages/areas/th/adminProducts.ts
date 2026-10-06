@@ -72,7 +72,7 @@ export const adminProducts = {
   adminProductsErrorId: "บันทึกไม่ได้ — รหัสสินค้าไม่ถูกต้อง (ลิงก์ต้องคงที่)",
   adminProductsSlugLocked: "รหัสสินค้า/ลิงก์ (slug) แก้ไม่ได้ — เพื่อไม่ให้ลิงก์เดิมเสีย",
   adminProductsPreview: "พรีวิวการ์ดสินค้า",
-  adminProductsPreviewSiteWidth: "พรีวิวสัดส่วนเท่าหน้าเว็บจริง (กว้างเนื้อหา {width}px) — ย่อพอดีช่องอัตโนมัติ ไม่ต้องเลื่อนแนวนอน",
+  adminProductsPreviewSiteWidth: "พรีวิวขนาดการ์ดเท่าหน้าเว็บจริง (กว้าง {width}px = 1/3 ของเนื้อหาเว็บ 1216px) — ขนาดตัวอักษรเท่าหน้าเว็บ",
   adminProductsPreviewHint: "แบบที่ผู้อ่านจะเห็นบนหน้าเว็บ (ใช้ตัวเรนเดอร์ตัวเดียวกับหน้าเว็บจริง)",
   auditProductSave: "บันทึกสินค้า",
   auditProductCategorySave: "บันทึกคำอธิบายหมวดสินค้า",

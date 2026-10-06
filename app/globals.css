@@ -544,3 +544,12 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
 .product-card-grid:has(details[open]) {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/*
+  พรีวิวหลังบ้าน: ให้กริดการ์ดแสดง "การ์ดเดียวเต็มความกว้างของกรอบ" (รอบที่ 148 · ฟีดแบ็กเจ้าของ)
+  ปัญหา: เรนเดอร์การ์ด 1 ใบในกรอบ 1216px ⇒ การ์ดกินแค่ 1/3 (ถูก ✓) แต่ถ้าย่อทั้งหน้าแทน ตัวอักษรจะเล็กอ่านไม่ออก
+  ทางแก้: กรอบพรีวิวตั้งความกว้าง = 395px (ความกว้างการ์ดจริง = (1216 − 2×16)/3) + บังคับกริด 1 คอลัมน์ ⇒ 1:1 เท่าหน้าเว็บ
+*/
+.preview-single-card .product-card-grid {
+  grid-template-columns: minmax(0, 1fr);
+}

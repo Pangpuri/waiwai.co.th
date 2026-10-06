@@ -25,13 +25,28 @@ import { useEffect, useRef, useState } from "react";
 /** ความกว้างเนื้อหาเว็บจริงบนเดสก์ท็อป (container-site 80rem − padding 2×2rem) */
 export const SITE_PREVIEW_WIDTH = 1216;
 
+/**
+ * ความกว้าง **การ์ดสินค้า 1 ใบ** เท่าหน้าเว็บจริง — ตัวเลขที่ต้องใช้กับ "พรีวิวการ์ด"
+ *
+ * คำนวณจากของจริง (ไม่เดา): เนื้อหาเว็บ 1216px ÷ 3 คอลัมน์ หักช่องว่างระหว่างการ์ด
+ *   (1216 − 2 × 16px) / 3 = 394.67px ⇒ ปัดเป็น **395px**
+ *
+ * ⚠️ บทเรียนรอบที่ 147→148: ถ้าเรนเดอร์ทั้งหน้า 1216px แล้วย่อทั้งภาพ ตัวอักษรจะเล็กอ่านไม่ออก
+ *    ⇒ พรีวิวการ์ดต้องเรนเดอร์ **การ์ดที่ 395px แบบ 1:1** (บังคับกริดเป็น 1 คอลัมน์ด้วยคลาส
+ *    `preview-single-card`) · ถ้าช่องหลังบ้านแคบกว่า 395px จึงค่อยย่อ (ไม่เกิน 1:1)
+ */
+export const SITE_CARD_WIDTH = 395;
+
 export function PreviewFrame({
   label,
   width = SITE_PREVIEW_WIDTH,
+  singleCard = false,
   children,
 }: {
   readonly label: string;
   readonly width?: number;
+  /** แสดง "การ์ดเดียว" ที่ความกว้างจริงของการ์ด (ใช้กับพรีวิวสินค้า) */
+  readonly singleCard?: boolean;
   readonly children: React.ReactNode;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -68,7 +83,7 @@ export function PreviewFrame({
         <div
           ref={innerRef}
           style={{ width, transform: `scale(${scale})`, transformOrigin: "top left" }}
-          className="bg-bg p-4"
+          className={singleCard ? "preview-single-card bg-bg p-4" : "bg-bg p-4"}
         >
           {children}
         </div>
