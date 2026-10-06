@@ -33,6 +33,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "product-revision-restore": "กู้คืนประวัติสินค้า",
 "recipe-revision-restore": "กู้คืนประวัติเมนูอาหาร",
 "news-revision-restore": "กู้คืนประวัติข่าว",
+"content-reorder": "จัดลำดับรายการ",
 "restore-revision": strings.auditRestore,
     "preset-save": strings.auditPresetSave,
     "pages-update": strings.auditPagesUpdate,

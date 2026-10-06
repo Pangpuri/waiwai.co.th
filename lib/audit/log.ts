@@ -17,6 +17,7 @@ export type AuditAction =
   | "logout"
   | "publish"
   | "restore-revision"
+  | "content-reorder"
   | "product-revision-restore"
   | "recipe-revision-restore"
   | "news-revision-restore"

@@ -263,3 +263,31 @@ test("recipes admin: พรีวิวต้องเรนเดอร์ท�
     "ต้องมีกฎ CSS บังคับกริดการ์ดเมนู 1 คอลัมน์ในพรีวิว",
   );
 });
+
+/* ── รอบที่ 153: หน้าจอจัดลำดับ (ลาก/เลื่อน แล้วบันทึก) ─────────────────────── */
+
+test("reorder: whitelist ชนิด + parse ค่าลำดับ + มี action ที่ตรวจสิทธิ์/audit/refresh", () => {
+  const lib = readFileSync("lib/admin/reorder.ts", "utf8");
+  const actions = readFileSync("app/admin/sort/actions.ts", "utf8");
+  const page = readFileSync("app/admin/sort/page.tsx", "utf8");
+  const ui = readFileSync("features/admin/ui/sortable-list.tsx", "utf8");
+
+  /* ความปลอดภัย: ชื่อตารางมาจาก whitelist + ค่าลำดับส่งเป็นพารามิเตอร์ */
+  assert.ok(lib.includes("TABLE_BY_KIND"), "ต้องมีตารางที่อนุญาต (whitelist)");
+  assert.ok(lib.includes("with ordinality"), "ต้องเขียนลำดับด้วย unnest + ordinality");
+  assert.ok(lib.includes("$1::text[]"), "ค่าลำดับต้องเป็นพารามิเตอร์ (กัน SQL injection)");
+  assert.ok(isReorderKindSafe(lib), "ต้องตรวจชนิดก่อนใช้");
+
+  assert.ok(actions.includes('requireAdminUser("content")'), "action ต้องตรวจสิทธิ์ content");
+  assert.ok(actions.includes("content-reorder"), "ต้องบันทึก audit");
+  assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
+
+  assert.ok(page.includes("requireAdminUser"), "หน้าจอต้องตรวจสิทธิ์");
+  assert.ok(ui.includes("draggable"), "ต้องลากได้ (drag & drop)");
+  assert.ok(ui.includes('name="order"'), "ต้องส่งลำดับทั้งชุดไปบันทึก");
+  assert.ok(ui.includes("aria-label"), "ปุ่มเลื่อนต้องมี aria-label (a11y · ลากอย่างเดียวใช้กับคีย์บอร์ดไม่ได้)");
+});
+
+function isReorderKindSafe(lib: string): boolean {
+  return lib.includes("isReorderKind(");
+}
