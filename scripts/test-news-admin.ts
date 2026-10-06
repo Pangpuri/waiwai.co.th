@@ -247,3 +247,26 @@ test("news admin: คำบรรยายใต้ภาพต้องแส�
     "พรีวิวต้องแสดง 'ตัวอย่างคำบรรยาย' เมื่อช่องคำบรรยายว่าง",
   );
 });
+
+/* ── รอบที่ 155: หน้าข่าวสาธารณะต้องเรียงตามลำดับที่จัดจากหลังบ้าน ────────────── */
+
+test("news: หน้าข่าวสาธารณะเรียงตาม sort_order (จัดจากหลังบ้านแล้วหน้าบ้านต้องขยับ)", () => {
+  const repo = readFileSync("lib/news/repository.ts", "utf8");
+  assert.ok(
+    repo.includes("PUBLIC_NEWS_ORDER"),
+    "ต้องมีค่าลำดับกลางสำหรับหน้าข่าวสาธารณะ (ที่เดียว ไม่กระจัดกระจาย)",
+  );
+  assert.ok(
+    repo.includes("case when n.sort_order = 0 then 1 else 0 end"),
+    "sort_order = 0 (ยังไม่จัด) ต้องอยู่ท้าย ไม่ใช่ขึ้นหน้า",
+  );
+  assert.ok(
+    repo.includes("n.sort_order, n.published_at desc nulls last"),
+    "จัดแล้วเรียงตาม sort_order แล้วค่อยถอยไปใช้วันที่",
+  );
+  /* ของเดิม 151 ข่าว sort_order = 0 ทั้งหมด ⇒ ลำดับต้องเหมือนเดิมเป๊ะ (ตามวันที่) */
+  assert.ok(
+    repo.includes("when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc"),
+    "ค่าเริ่มต้นต้องไม่เปลี่ยนลำดับข่าวเดิม",
+  );
+});

@@ -105,7 +105,8 @@ export async function listNews(limit = NEWS_PER_PAGE, offset = 0): Promise<reado
          from news n
          left join media m on m.id = n.cover_media_id
         where ${PUBLIC_NEWS_CONDITION}
-        order by n.published_at desc nulls last, n.id desc
+        /* รอบที่ 155: ตามลำดับที่จัดจากหลังบ้านก่อน (sort_order = 0 ทุกแถว = ใช้พฤติกรรมเดิม) */
+        order by case when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc
         limit $1 offset $2`,
       [Math.max(0, limit), Math.max(0, offset)],
     );
@@ -146,7 +147,7 @@ export async function listNewsSourceIds(): Promise<readonly string[]> {
   if (!isDatabaseConfigured()) return [];
   try {
     const result = await getPool().query<{ source_id: string }>(
-      `select n.source_id from news n where ${PUBLIC_NEWS_CONDITION} order by n.published_at desc nulls last, n.id desc`,
+      `select n.source_id from news n where ${PUBLIC_NEWS_CONDITION} ${PUBLIC_NEWS_ORDER}`,
     );
     return result.rows.map((row) => row.source_id).filter((value) => /^\d{3,}$/.test(value));
   } catch {
@@ -315,6 +316,14 @@ const ADMIN_NEWS_COLUMNS = `n.id, n.source_id, n.title_th, n.title_en, n.excerpt
        (select count(*) from jsonb_array_elements(n.body) e where e ->> 'type' = 'image') as image_count`;
 
 const ADMIN_NEWS_ORDER = "order by n.published_at desc nulls last, n.id desc";
+
+/**
+ * ลำดับของ **หน้าข่าวสาธารณะ** (รอบที่ 155 · ฟีดแบ็กเจ้าของ: จัดลำดับในหลังบ้านแล้วหน้าบ้านไม่ขยับ)
+ *
+ * `sort_order` = 0 ทุกแถว (ของเดิม 151 ข่าว) ⇒ เรียงตามวันที่เหมือนเดิมเป๊ะ
+ * พอจัดลำดับจากหลังบ้าน (1..N) ⇒ ตามลำดับนั้น แล้วค่อยถอยไปใช้วันที่/id
+ */
+const PUBLIC_NEWS_ORDER = "order by case when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc";
 
 function statusOf(value: unknown): AdminNewsStatus {
   return value === "draft" ? "draft" : "published";
