@@ -56,6 +56,52 @@ type MourningNoticeProps = {
 
 const store = createAttributeStore(MOURNING_ATTRIBUTE, MOURNING_STATE_SHOWN);
 
+/**
+ * แปลงภาพที่รับ "สด ๆ" จากแถบแก้ (รอบที่ 165) ให้เป็นรูปทรงที่ตัวแสดงผลใช้
+ *
+ * ⚠️ ค่าที่ส่งมาจากตัวแก้ยังไม่ผ่านการบันทึก ⇒ รูปร่างไม่เหมือนของที่เรนเดอร์จากเซิร์ฟเวอร์
+ *    (เคยทำให้เกิด "empty string passed to src" + "Received NaN for width/height" ในคอนโซล)
+ *  ⇒ รับได้ทั้ง src / path / mediaId · เดา alt จาก altTh · ขนาดไม่รู้ใช้ 3:1 มาตรฐาน
+ *  ⇒ ภาพที่ยังไม่มีแหล่งที่มา = **ข้าม** (ไม่เรนเดอร์เลย ดีกว่าส่ง src ว่างให้เบราว์เซอร์)
+ */
+function toLiveImage(raw: unknown): MourningNoticeImage | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const item = raw as {
+    readonly id?: unknown;
+    readonly src?: unknown;
+    readonly path?: unknown;
+    readonly mediaId?: unknown;
+    readonly alt?: unknown;
+    readonly altTh?: unknown;
+    readonly width?: unknown;
+    readonly height?: unknown;
+  };
+  const src =
+    typeof item.src === "string" && item.src !== ""
+      ? item.src
+      : typeof item.path === "string" && item.path !== ""
+        ? item.path
+        : typeof item.mediaId === "string" && item.mediaId !== ""
+          ? `/media/${item.mediaId}`
+          : "";
+  if (src === "") return null;
+  const width = typeof item.width === "number" && Number.isFinite(item.width) ? item.width : 1200;
+  const height = typeof item.height === "number" && Number.isFinite(item.height) ? item.height : 400;
+  const alt =
+    typeof item.alt === "string" && item.alt !== ""
+      ? item.alt
+      : typeof item.altTh === "string"
+        ? item.altTh
+        : "";
+  return {
+    id: typeof item.id === "string" && item.id !== "" ? item.id : src,
+    src,
+    alt,
+    width,
+    height,
+  };
+}
+
 export function MourningNotice({ images, labels }: MourningNoticeProps) {
   const total = images.length;
   const isShown = useSyncExternalStore(store.subscribe, store.read, store.readOnServer);
@@ -75,7 +121,12 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
       if (event.origin !== window.location.origin) return;
       const data = event.data as { readonly type?: string; readonly config?: { readonly images?: readonly MourningNoticeImage[] } } | null;
       if (data?.type !== MOURNING_MESSAGE) return;
-      setLiveImages(data.config?.images ?? []);
+      /* แปลง + กรองภาพที่ยังไม่มีแหล่งที่มา (กัน "empty src"/"NaN" ในคอนโซล) */
+      const raw = Array.isArray(data.config?.images) ? data.config.images : [];
+      const parsed = raw
+        .map((item) => toLiveImage(item))
+        .filter((item): item is MourningNoticeImage => item !== null);
+      setLiveImages(parsed);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);

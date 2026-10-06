@@ -404,3 +404,14 @@ test("preview: postLiveValues ต้องไม่เรียกตัวเ�
   assert.ok(ws.includes("onLoad={() => {"), "ต้องส่งค่าสดซ้ำตอน iframe โหลดเสร็จ");
   assert.ok(ws.includes("window.setTimeout(postLiveValues, 300)"), "ส่งซ้ำหลังเอกสารใหม่ hydrate");
 });
+
+/* ── รอบที่ 165: พรีวิวสดต้องไม่ส่งค่าเสียรูปทรงให้ตัวแสดงผล ─────────────────── */
+
+test("preview: ภาพสดของป้ายประกาศต้องถูกแปลง + กรองก่อนเรนเดอร์", () => {
+  const notice = readFileSync("features/shell/ui/mourning-notice.tsx", "utf8");
+  assert.ok(notice.includes("function toLiveImage("), "ต้องมีตัวแปลงรูปทรงของภาพที่รับสด ๆ จากแถบแก้");
+  assert.ok(notice.includes("if (src === \"\") return null;"), "ภาพที่ยังไม่มีแหล่งที่มา = ข้าม ไม่เรนเดอร์ (กัน empty src)");
+  assert.ok(notice.includes("Number.isFinite(item.width)"), "ขนาดที่ไม่ใช่ตัวเลขต้องไม่หลุดไปเป็น width/height");
+  assert.ok(notice.includes(".filter((item): item is MourningNoticeImage => item !== null)"), "ต้องกรองก่อน set state");
+  assert.ok(!notice.includes("setLiveImages(data.config?.images"), "ห้ามตั้งค่าดิบจากข้อความโดยตรง (รูปร่างไม่ตรง)");
+});
