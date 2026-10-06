@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -301,4 +302,20 @@ test("x1.5 diff: ใช้ร่วมกับ autosave ได้จริง (
 
   assert.equal(decideAutosave({ enabled: true, dirty: !documentsEqual(saved, edited), errorCount: 0, saving: false }), "schedule");
   assert.equal(decideAutosave({ enabled: true, dirty: !documentsEqual(edited, edited), errorCount: 0, saving: false }), "not-needed");
+});
+
+/* ── รอบที่ 149: a11y — หน้าที่เรนเดอร์จากบล็อกต้องมี <h1> ─────────────────── */
+
+test("blocks a11y: ตัวเรนเดอร์ต้องออก <h1> ของหน้าได้ (บล็อกใช้ h2/h3 เท่านั้น)", () => {
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes("heading?: string"), "ตัวเรนเดอร์ต้องรับชื่อหน้าสำหรับ h1");
+  assert.ok(/<h1 className="sr-only">\{heading\}<\/h1>/.test(renderer), "ต้องเรนเดอร์ h1 (sr-only) เมื่อมีชื่อหน้า");
+  assert.ok(renderer.includes('heading === ""'), "ไม่ส่งชื่อหน้า = ไม่มี h1 (พฤติกรรมเดิม)");
+
+  /* หน้าที่เคยขาด h1: หน้าแรก + /about (ทั้งคู่เรนเดอร์จากบล็อกได้) */
+  for (const file of ["app/[lang]/page.tsx", "app/[lang]/about/page.tsx"]) {
+    const page = readFileSync(file, "utf8");
+    if (!page.includes("<BlockDocumentView")) continue;
+    assert.ok(/<BlockDocumentView[\s\S]{0,200}heading=/.test(page), `${file} ต้องส่ง heading ให้ตัวเรนเดอร์`);
+  }
 });

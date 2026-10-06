@@ -74,7 +74,8 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   */
   const liveDocument = await loadLiveBlockDocument("home");
   if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
+    /* ส่งชื่อหน้าไปให้ตัวเรนเดอร์ออก <h1> (a11y · รอบที่ 149) — หน้าแรกจากบล็อกไม่มี h1 เลย */
+    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.meta.homeTitle} />;
   }
 
   /*

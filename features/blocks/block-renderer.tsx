@@ -742,12 +742,15 @@ export function BlockDocumentView({
   language = "th",
   editable = false,
   selectedBlockId = null,
+  heading = "",
 }: {
   readonly document: BlockDocument;
   readonly language?: Language;
   readonly editable?: boolean;
   /** บล็อกที่กำลังเลือกอยู่ในหลังบ้าน (ใช้ตีกรอบทึบในพรีวิว) */
   readonly selectedBlockId?: string | null;
+  /** ชื่อหน้าสำหรับ <h1> (a11y · รอบที่ 149) — ว่าง = ไม่มี h1 */
+  readonly heading?: string;
 }) {
   if (document.blocks.length === 0) return null;
 
@@ -778,6 +781,8 @@ export function BlockDocumentView({
 
     return (
       <div className="bg-bg text-fg">
+        {/* h1 ของหน้า (a11y · รอบที่ 149): หน้าที่เรนเดอร์จากบล็อกไม่มี h1 เลย ⇒ ใส่ให้ screen reader อ่านได้ โดยไม่กระทบดีไซน์ */}
+        {heading === "" ? null : <h1 className="sr-only">{heading}</h1>}
         <div className={pageLayoutClass("sidebar")}>
           {outline.length < 2 ? null : (
             <nav aria-label={strings.layout.tocLabel} className={sidebarAsideClass()}>

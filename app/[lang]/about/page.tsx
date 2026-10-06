@@ -64,7 +64,9 @@ export default async function AboutPage({ params }: PageProps<"/[lang]/about">) 
   */
   const liveDocument = await loadLiveBlockDocument("about");
   if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
+    return <BlockDocumentView
+          heading={messages.about.meta.title}
+          document={liveDocument} language={lang} />;
   }
 
   return (
