@@ -337,3 +337,24 @@ test("preview: โหมด parts=nav ต้องซ่อนทั้งหั
     "โหมด footer ต้องซ่อนท้ายเว็บของ layout (มีอยู่เดิม — กันถอยหลัง)",
   );
 });
+
+/* ── รอบที่ 159: แต่ละแท็บของ "ส่วนกลางของเว็บ" ต้องมีพรีวิวของตัวเอง ───────────── */
+
+test("chrome: แท็บ navbar/ป้ายประกาศ/ท้ายเว็บ ต้องสลับพรีวิวตามแท็บ", () => {
+  const ws = readFileSync("features/admin/ui/chrome-workspace.tsx", "utf8");
+  const page = readFileSync("app/admin/builder/chrome/page.tsx", "utf8");
+  const preview = readFileSync("app/[lang]/preview/[page]/page.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+
+  assert.ok(ws.includes("noticePreviewSrcCurrent") && ws.includes("noticePreviewSrcDraft"), "แถบขวาต้องรับพรีวิวของป้ายประกาศ");
+  assert.ok(/part === "notice"[\s\S]{0,80}noticePreviewSrc/.test(ws), "เลือก src ตามแท็บ (ป้ายประกาศต้องไม่ใช้ src ของ navbar)");
+  assert.ok(page.includes("parts=notice"), "หน้า chrome ต้องส่งพรีวิวเฉพาะป้ายประกาศ");
+  assert.ok(preview.includes('query.parts === "notice"'), "หน้าพรีวิวต้องรองรับ parts=notice");
+  assert.ok(css.includes('[data-preview-parts="notice"]'), "ต้องมีกฎซ่อนหัวเว็บ/ท้ายเว็บ/เนื้อหาในโหมดป้ายประกาศ");
+  /* โหมดป้ายประกาศต้องไม่ซ่อนตัวป้ายประกาศเอง (ตรวจแบบสตริงล้วน — เลี่ยง regex flag /s ที่ TS target ไม่รับ) */
+  const noticeBlock = css.slice(css.indexOf('[data-preview-parts="notice"]'));
+  assert.ok(
+    !noticeBlock.slice(0, noticeBlock.indexOf("}")).includes("data-mourning-notice"),
+    "โหมดป้ายประกาศต้องไม่ซ่อนตัวป้ายประกาศเอง",
+  );
+});

@@ -570,3 +570,14 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
 [data-preview-parts="nav"] footer[data-layout-footer] {
   display: none;
 }
+
+/*
+  โหมดพรีวิว "เฉพาะป้ายประกาศ" (รอบที่ 159 · ฟีดแบ็กเจ้าของ)
+  "คลิกป้ายประกาศ มุมมองที่พรีวิวขึ้นมาเป็น Navbar ต้องเปลี่ยนเป็นส่วนของพรีวิวป้ายประกาศ"
+  ⇒ เห็นเฉพาะป้ายประกาศ (ซึ่ง layout เรนเดอร์ให้อยู่แล้ว) โดยซ่อนหัวเว็บ/ท้ายเว็บ/เนื้อหาในหน้า
+  ⚠️ ห้ามซ่อน `[data-mourning-notice]` ในโหมดนี้ (ตรงข้ามกับโหมด nav ที่ต้องซ่อน)
+*/
+[data-preview-parts="notice"] footer[data-layout-footer],
+[data-preview-parts="notice"] [data-preview-content] {
+  display: none;
+}

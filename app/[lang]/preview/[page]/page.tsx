@@ -59,7 +59,9 @@ export default async function PreviewPage({
     ⇒ ติดธงให้ CSS ซ่อนป้ายประกาศ (ซึ่งเป็นโอเวอร์เลย์เต็มจอ) และซ่อนเนื้อหาหน้า ⇒ เห็นหัวเว็บชัด ๆ
     ⚠️ มีผลเฉพาะในพรีวิวนี้ — ไม่แตะโค้ดที่ออกใช้งานจริง (หน้าเว็บสาธารณะ)
   */
-  const requestedParts = query.parts === "footer" ? "footer" : query.parts === "nav" ? "nav" : null;
+  /* parts: nav = เฉพาะแถบเมนู · footer = เฉพาะท้ายเว็บ · notice = เฉพาะป้ายประกาศ (รอบที่ 159) */
+  const requestedParts =
+    query.parts === "footer" ? "footer" : query.parts === "nav" ? "nav" : query.parts === "notice" ? "notice" : null;
   /* หัวเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ด้วย postMessage) */
   const navbarConfig = await loadNavbarConfig(lang);
   /* ท้ายเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ผ่าน postMessage) */

@@ -47,6 +47,8 @@ export function ChromeWorkspace({
   previewSrcDraft,
   footerPreviewSrcCurrent,
   footerPreviewSrcDraft,
+  noticePreviewSrcCurrent,
+  noticePreviewSrcDraft,
   navbarEditor,
   noticeEditor,
   footerEditor,
@@ -55,6 +57,9 @@ export function ChromeWorkspace({
   readonly strings: Strings;
   readonly previewSrcCurrent: string;
   readonly previewSrcDraft: string;
+  /* ป้ายประกาศมีพรีวิวของตัวเอง (รอบที่ 159 · ฟีดแบ็กเจ้าของ: คลิกแท็บป้ายประกาศแล้วยังเห็น navbar) */
+  readonly noticePreviewSrcCurrent: string;
+  readonly noticePreviewSrcDraft: string;
   readonly navbarEditor: ReactNode;
   readonly noticeEditor: ReactNode;
   readonly footerEditor: ReactNode;
@@ -110,9 +115,13 @@ export function ChromeWorkspace({
       ? mode === "current"
         ? footerPreviewSrcCurrent
         : footerPreviewSrcDraft
-      : mode === "current"
-        ? previewSrcCurrent
-        : previewSrcDraft;
+      : part === "notice"
+        ? mode === "current"
+          ? noticePreviewSrcCurrent
+          : noticePreviewSrcDraft
+        : mode === "current"
+          ? previewSrcCurrent
+          : previewSrcDraft;
   const modeHint = mode === "current" ? strings.modeHintCurrent : mode === "draft" ? strings.modeHintDraft : strings.modeHintOverview;
 
   const partTabs: readonly { readonly key: ChromePart; readonly label: string }[] = [

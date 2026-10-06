@@ -243,6 +243,8 @@ export default async function ChromePage() {
         previewSrcDraft="/th/preview/home?mode=draft&parts=nav"
         footerPreviewSrcCurrent="/th/preview/home?mode=published&parts=footer"
         footerPreviewSrcDraft="/th/preview/home?mode=draft&parts=footer"
+        noticePreviewSrcCurrent="/th/preview/home?mode=published&parts=notice"
+        noticePreviewSrcDraft="/th/preview/home?mode=draft&parts=notice"
         navbarEditor={
           <NavbarEditor
             key={navbarDraftRow?.updatedAt ?? "fresh-navbar"}
