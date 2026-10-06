@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewFrame, SITE_PREVIEW_WIDTH } from "@/features/admin/ui/preview-frame";
 import Image from "next/image";
 import { useActionState, useState } from "react";
 
@@ -568,7 +569,10 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
               ))}
             </span>
           </div>
-          <ProductListSection products={[previewRecord]} language={previewLanguage} strings={props.publicStrings} />
+          {/* เรนเดอร์ที่ความกว้างจริงของเว็บ (รอบที่ 146) — กันข้อความถูกบีบในคอลัมน์แคบ */}
+          <PreviewFrame label={fillTemplate(m.adminProductsPreviewSiteWidth, { width: String(SITE_PREVIEW_WIDTH) })}>
+            <ProductListSection products={[previewRecord]} language={previewLanguage} strings={props.publicStrings} />
+          </PreviewFrame>
           <p className="text-fg-muted mt-2 text-xs">{m.adminProductsPreviewHint}</p>
         </div>
       </aside>

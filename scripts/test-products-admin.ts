@@ -298,3 +298,19 @@ test("products admin: พรีวิวสลับ ไทย/EN ได้ (ก
   assert.ok(editorForm.includes("language={previewLanguage}"), "ต้องส่งภาษาที่เลือกเข้า ProductListSection");
   assert.ok(editorForm.includes("aria-pressed={previewLanguage === item}"), "ปุ่มสลับต้องบอกสถานะให้ screen reader");
 });
+
+test("products admin: พรีวิวต้องเรนเดอร์ที่ความกว้างเท่าหน้าเว็บจริง (กันข้อความถูกบีบ — รอบที่ 146)", () => {
+  /* ฟีดแบ็กเจ้าของ: การ์ดในพรีวิวถูกบีบ เพราะเรนเดอร์ในคอลัมน์แคบแต่ breakpoint อิง viewport */
+  assert.ok(editorForm.includes("PreviewFrame"), "พรีวิวต้องอยู่ในกรอบ PreviewFrame");
+  assert.ok(
+    /<PreviewFrame[\s\S]*?<ProductListSection/.test(editorForm),
+    "ต้องเรนเดอร์ ProductListSection (ตัวเรนเดอร์เดียวกับเว็บ) ภายในกรอบความกว้างจริง",
+  );
+  const frame = readFileSync("features/admin/ui/preview-frame.tsx", "utf8");
+  assert.ok(frame.includes("SITE_PREVIEW_WIDTH"), "ต้องมีความกว้างอ้างอิงของเว็บ");
+  assert.ok(
+    /style=\{\{ width \}\}/.test(frame) || frame.includes("width, "),
+    "กรอบต้องตั้งความกว้างจริง (ไม่ปล่อยให้บีบตามคอลัมน์)",
+  );
+  assert.ok(frame.includes("overflow-x-auto"), "จอแคบให้เลื่อนแนวนอน ไม่ใช่บีบเนื้อหา");
+});
