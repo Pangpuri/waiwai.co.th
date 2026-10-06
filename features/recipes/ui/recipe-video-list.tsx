@@ -65,7 +65,7 @@ export function RecipeVideoList({
         </h2>
         <p className="mt-2 text-sm text-fg-muted">{fillTemplate(strings.count, { count: recipes.length })}</p>
 
-        <ul className="mt-8 grid list-none gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="recipe-card-grid mt-8 grid list-none gap-6 p-0 sm:grid-cols-2 lg:grid-cols-3">
           {recipes.map((recipe) => {
             const computedTitle = recipeTitleOf(recipe.titleTh, recipe.titleEn, language);
             const title = computedTitle === "" && titlePlaceholder !== undefined ? titlePlaceholder : computedTitle;

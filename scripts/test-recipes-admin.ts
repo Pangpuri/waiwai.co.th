@@ -245,3 +245,21 @@ test("recipes admin: ลบถาวรมีเฉพาะของในถ�
   assert.ok(listPage.includes("item.trashed ? ("), "ปุ่มลบถาวรโผล่เฉพาะของที่อยู่ในถัง");
   assert.ok(listPage.includes("recipesAdminDeleteForeverWarning"), "ต้องมีคำเตือนว่ากู้คืนไม่ได้");
 });
+
+test("recipes admin: พรีวิวต้องเรนเดอร์ที่ความกว้างการ์ดจริง 1:1 (รอบที่ 151 · ฟีดแบ็กเจ้าของ)", () => {
+  const frame = readFileSync("features/admin/ui/preview-frame.tsx", "utf8");
+  const list = readFileSync("features/recipes/ui/recipe-video-list.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+
+  /* หน้า /recipes ใช้ 3 คอลัมน์ + gap-6 (24px) ⇒ (1216 − 48)/3 = 389px */
+  assert.ok(frame.includes("export const SITE_RECIPE_CARD_WIDTH"), "ต้องมีค่าความกว้างการ์ดเมนูที่คำนวณจากของจริง");
+  assert.ok(
+    editorForm.includes("width={SITE_RECIPE_CARD_WIDTH}") && editorForm.includes("singleCard"),
+    "พรีวิวเมนูต้องเรนเดอร์ที่ความกว้างการ์ดจริง + โหมดการ์ดเดียว ⇒ ตัวอักษรเท่าหน้าเว็บ",
+  );
+  assert.ok(list.includes("recipe-card-grid"), "กริดการ์ดเมนูต้องมีคลาสสำหรับกฎการ์ดเดียว");
+  assert.ok(
+    /\.preview-single-card \.recipe-card-grid\s*\{[^}]*minmax\(0,\s*1fr\)/.test(css),
+    "ต้องมีกฎ CSS บังคับกริดการ์ดเมนู 1 คอลัมน์ในพรีวิว",
+  );
+});

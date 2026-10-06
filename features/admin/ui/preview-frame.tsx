@@ -37,6 +37,13 @@ export const SITE_PREVIEW_WIDTH = 1216;
  */
 export const SITE_CARD_WIDTH = 395;
 
+/**
+ * ความกว้าง **การ์ดเมนูอาหาร 1 ใบ** เท่าหน้าเว็บจริง
+ *
+ * หน้า  ใช้ 3 คอลัมน์ +  (24px): (1216 − 2 × 24) / 3 = 389.33px ⇒ ปัดเป็น **389px**
+ */
+export const SITE_RECIPE_CARD_WIDTH = 389;
+
 export function PreviewFrame({
   label,
   width = SITE_PREVIEW_WIDTH,

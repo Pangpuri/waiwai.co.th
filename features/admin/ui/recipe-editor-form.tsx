@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewFrame, SITE_RECIPE_CARD_WIDTH } from "@/features/admin/ui/preview-frame";
 import Image from "next/image";
 import { useActionState, useState } from "react";
 
@@ -328,12 +329,17 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
               ))}
             </span>
           </div>
-          <RecipeVideoList
+
+          <PreviewFrame singleCard width={SITE_RECIPE_CARD_WIDTH} label={fillTemplate(m.adminProductsPreviewSiteWidth, { width: String(SITE_RECIPE_CARD_WIDTH) })}>
+
+            <RecipeVideoList
             recipes={[previewRecord]}
             language={previewLanguage}
             strings={props.publicStrings}
             titlePlaceholder={m.recipesAdminPreviewUntitled}
           />
+
+          </PreviewFrame>
           <p className="text-fg-muted mt-2 text-xs">
             {fillTemplate(m.recipesAdminPreviewHint, { status: fields.status === "draft" ? m.recipesAdminStatusDraft : m.recipesAdminStatusPublished })}
           </p>

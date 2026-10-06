@@ -553,3 +553,8 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
 .preview-single-card .product-card-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* พรีวิวหลังบ้าน: การ์ดเมนูอาหารใบเดียวเต็มความกว้างกรอบ (รอบที่ 151 · ฟีดแบ็กเจ้าของ) */
+.preview-single-card .recipe-card-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
