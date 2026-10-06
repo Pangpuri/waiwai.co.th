@@ -91,7 +91,7 @@ export function ProductListSection({
         </h2>
         <p className="text-fg-muted mt-1 text-sm">{fillTemplate(strings.count, { count: products.length })}</p>
 
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="product-card-grid mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => {
             const label = productNameOf(product, language);
             const group = productGroupOf(product, language);
@@ -128,7 +128,7 @@ export function ProductListSection({
                       <div>
                         <p className="text-fg-muted text-xs font-semibold">{strings.ingredients}</p>
                         <div className="mt-1 overflow-x-auto">
-                          <table className="w-full border-collapse text-left text-xs">
+                          <table className="w-full min-w-[26rem] border-collapse text-left text-xs">
                             <thead>
                               <tr className="text-fg-muted">
                                 <th scope="col" className="border-line border-b py-1 pr-2 font-semibold">

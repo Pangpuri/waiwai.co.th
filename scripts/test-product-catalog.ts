@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -223,4 +224,21 @@ test("model: ผลแกะจากหน้าหมวด → ข้อม�
     };
     assert.deepEqual([...validateProductInput(input)], [], `${item.nameTh}: ต้องผ่านตัวตรวจ`);
   }
+});
+
+/* ── รอบที่ 147: ห้าม "บีบ" รายละเอียดสินค้าในการ์ด (ฟีดแบ็กเจ้าของ) ───────────── */
+
+test("product catalog: เปิดรายละเอียดการ์ดแล้วต้องได้ความกว้างเต็ม (ไม่ถูกบีบเป็นแถวตั้ง)", () => {
+  const list = readFileSync("features/products/ui/product-list.tsx", "utf8");
+  const css = readFileSync("app/globals.css", "utf8");
+
+  assert.ok(list.includes("product-card-grid"), "กริดการ์ดต้องมีคลาสสำหรับกฎขยายการ์ดที่เปิดอยู่");
+  assert.ok(
+    /\.product-card-grid:has\(details\[open\]\)\s*\{[^}]*grid-template-columns:[\s\S]*?minmax\(0,\s*1fr\)/.test(css),
+    "ต้องมีกฎ CSS :has(details[open]) ให้การ์ดที่เปิดขยายเต็มความกว้าง (ไม่ต้องใช้ JS)",
+  );
+  assert.ok(
+    /<table className="[^"]*min-w-\[/.test(list),
+    "ตารางส่วนผสมต้องมี min-width (ให้เลื่อนแนวนอนแทนการบีบคอลัมน์)",
+  );
 });

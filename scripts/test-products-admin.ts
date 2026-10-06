@@ -312,5 +312,7 @@ test("products admin: พรีวิวต้องเรนเดอร์ท�
     /style=\{\{ width \}\}/.test(frame) || frame.includes("width, "),
     "กรอบต้องตั้งความกว้างจริง (ไม่ปล่อยให้บีบตามคอลัมน์)",
   );
-  assert.ok(frame.includes("overflow-x-auto"), "จอแคบให้เลื่อนแนวนอน ไม่ใช่บีบเนื้อหา");
+  assert.ok(frame.includes("scale("), "ต้องย่อด้วย transform scale (ไม่ปล่อยให้ล้น/ต้องเลื่อน)");
+  assert.ok(!frame.includes("overflow-x-auto"), "ห้ามใช้การเลื่อนแนวนอน (ฟีดแบ็กเจ้าของ: ต้องย่อพอดีช่อง)");
+  assert.ok(frame.includes("1216"), "ความกว้างอ้างอิงต้องมาจากของจริง (container-site 80rem − padding = 1216px)");
 });

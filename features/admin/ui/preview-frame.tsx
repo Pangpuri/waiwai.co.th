@@ -1,20 +1,29 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 /**
- * กรอบพรีวิว "ขนาดเท่าหน้าเว็บจริง" (รอบที่ 146 · ฟีดแบ็กเจ้าของ)
+ * กรอบพรีวิว "สัดส่วนเท่าหน้าเว็บจริง" + ย่อพอดีช่อง (รอบที่ 147 · ฟีดแบ็กเจ้าของ)
  *
- * ปัญหาจริง: พรีวิวการ์ดสินค้าเคยเรนเดอร์ **ในคอลัมน์แคบของหลังบ้าน** ตรง ๆ
- *   → `ProductListSection` ใช้ breakpoint ของ **viewport** (`sm:`/`lg:`) ซึ่งยังเป็น "จอใหญ่"
- *   → จัดเป็น 3 คอลัมน์ในพื้นที่ ~400px ⇒ การ์ดกว้าง ~130px ข้อความถูกบีบเป็นแถวตั้งยาว ✗
+ * ปัญหาที่แก้ต่อกัน 2 รอบ
+ *   1. พรีวิวเรนเดอร์การ์ดในคอลัมน์แคบ ⇒ การ์ด/บล็อคขาวรายละเอียดถูกบีบ
+ *      (breakpoint `sm:`/`lg:` อ้าง **viewport** ไม่ใช่กล่องแม่)
+ *   2. รอบที่ 146 แก้ด้วย "ความกว้างจริง + เลื่อนแนวนอน" ⇒ **ผู้ใช้ต้องสกอลข้าง** ✗
  *
- * ทางแก้: เรนเดอร์ที่ **ความกว้างจริงแบบเดสก์ท็อป** แล้วให้เลื่อนแนวนอนได้
- *   ⇒ เลย์เอาต์/ความกว้างการ์ด/การจัดบรรทัด **เหมือนหน้าเว็บจริง** (สิ่งที่ผู้ใช้จะเห็นตอนเผยแพร่)
+ * รอบนี้: เรนเดอร์ที่ความกว้างเนื้อหาจริงของเว็บ แล้ว **ย่อทั้งภาพด้วย `transform: scale()`**
+ *   (วิธีเดียวกับตัวสร้างหน้าเว็บ) ⇒ เห็นเลย์เอาต์/ความกว้างการ์ดเท่าหน้าเว็บจริง และ **ไม่ต้องเลื่อน**
  *
- * ⚠️ กฎโปรเจกต์ (บทเรียนรอบที่ 33): **ห้ามตั้งความกว้างของพรีวิวตามความกว้างช่องในหลังบ้าน**
- *    (ของจริงคือ iframe ที่ต้อง `scale()` — ที่นี่เป็นคอมโพเนนต์ inline จึงเลือก "ความกว้างจริง + เลื่อน" แทน)
- *    ถ้าภายหลังต้องการให้ย่อพอดีช่องโดยไม่ต้องเลื่อน ให้ทำแบบ `scale()` ของตัวสร้างหน้าเว็บ (มี ResizeObserver)
+ * 📏 ตัวเลขอ้างอิงวัดจากของจริง (`app/globals.css` · `@utility container-site`)
+ *   `max-width: 80rem` (1280px) − `padding-inline: 2rem × 2` (เดสก์ท็อป) = **1216px**
+ *   ⇒ การ์ด 3 คอลัมน์ + `gap-4` = (1216 − 32) / 3 ≈ **395px** (เท่าที่ผู้ชมเห็นบนเว็บ)
+ *
+ * ⚠️ กัน feedback loop (บทเรียนตัวสร้างหน้าเว็บ): วัด "ความกว้างกล่องแม่" ไปตั้ง `scale` และ
+ *    วัด "ความสูงของเนื้อหาข้างใน × scale" ไปตั้งความสูงกล่องนอก — เนื้อหาข้างในมีความกว้างคงที่
+ *    ความสูงจึงไม่ขึ้นกับกล่องนอก ⇒ ไม่วนกลับ
  */
 
-/** ความกว้างอ้างอิง = โซนเนื้อหาของเว็บจริงบนเดสก์ท็อป (max-width ของคอนเทนเนอร์ + padding) */
-export const SITE_PREVIEW_WIDTH = 1152;
+/** ความกว้างเนื้อหาเว็บจริงบนเดสก์ท็อป (container-site 80rem − padding 2×2rem) */
+export const SITE_PREVIEW_WIDTH = 1216;
 
 export function PreviewFrame({
   label,
@@ -25,11 +34,42 @@ export function PreviewFrame({
   readonly width?: number;
   readonly children: React.ReactNode;
 }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [innerHeight, setInnerHeight] = useState(0);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    const inner = innerRef.current;
+    if (host === null || inner === null) return;
+
+    const update = () => {
+      const available = host.clientWidth;
+      setScale(available === 0 ? 1 : Math.min(1, available / width));
+      setInnerHeight(inner.scrollHeight);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(host);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [width]);
+
   return (
     <div>
       <p className="text-fg-muted mb-1 text-xs">{label}</p>
-      <div className="border-line overflow-x-auto rounded-xl border">
-        <div style={{ width }} className="bg-bg p-4">
+      <div
+        ref={hostRef}
+        className="border-line overflow-hidden rounded-xl border"
+        style={{ height: innerHeight === 0 ? undefined : innerHeight * scale }}
+      >
+        <div
+          ref={innerRef}
+          style={{ width, transform: `scale(${scale})`, transformOrigin: "top left" }}
+          className="bg-bg p-4"
+        >
           {children}
         </div>
       </div>
