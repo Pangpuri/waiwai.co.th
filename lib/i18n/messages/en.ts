@@ -28,6 +28,7 @@ import { adminBlockTypes } from "./areas/en/adminBlockTypes.ts";
 import { adminSchedule } from "./areas/en/adminSchedule.ts";
 import { adminRbac } from "./areas/en/adminRbac.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
+import { enAdminNotice } from "./areas/en/adminNotice.ts";
 import { previewLinkPage } from "./areas/en/previewLink.ts";
 import { pendingPages } from "./areas/en/pendingPages.ts";
 
@@ -89,6 +90,7 @@ export const en: Messages = {
     ...adminTrash,
     ...adminTemplate,
     ...adminPreviewLink,
+    ...enAdminNotice,
     ...adminRbac,
     ...adminChromePreset,
     ...adminBlockTypes,

@@ -5,14 +5,19 @@ import { test } from "node:test";
 
 import { MAX_UPLOAD_BYTES, extensionFor, readImageInfo } from "@/lib/media/image-info";
 import {
+  ASPECT_TOLERANCE,
   MAX_UPLOAD_EDGE,
   SHRINK_MIN_BYTES,
   WEBP_QUALITY,
+  centerCropRect,
+  isAspectMismatch,
+  ratioLabel,
   scaleToFit,
   shouldAttemptShrink,
   shrinkSummary,
   webpFilename,
 } from "@/features/admin/ui/image-resize";
+import { MOURNING_IMAGE_ASPECT, MOURNING_IMAGE_HEIGHT, MOURNING_IMAGE_WIDTH } from "@/lib/mourning/config";
 
 /**
  * เทสต์การย่อ/แปลงภาพในเบราว์เซอร์ก่อนอัปโหลด (รอบที่ 99)
@@ -132,4 +137,66 @@ test("resize: สิ่งที่เบราว์เซอร์ส่งอ
 
   /* เพดานฝั่งเซิร์ฟเวอร์ยัง 5MB เท่าเดิม — การย่อฝั่งเบราว์เซอร์ไม่ใช่การผ่อนด่าน */
   assert.equal(MAX_UPLOAD_BYTES, 5 * 1024 * 1024, "เพดานเซิร์ฟเวอร์ต้องไม่ถูกแก้จากรอบนี้");
+});
+
+/* ── ครอปสัดส่วนก่อนอัปโหลด (รอบที่ 168) ─────────────────────────────────────── */
+
+test("crop: กรอบครอปกลางภาพคำนวณจากสัดส่วนเป้าหมาย", () => {
+  /* สัดส่วนตรงอยู่แล้ว = กรอบเต็มภาพ (ไม่ครอปอะไรทิ้ง) */
+  assert.deepEqual(centerCropRect(3000, 1000, 3), { x: 0, y: 0, width: 3000, height: 1000 });
+  /* 2999×1000 ต่างไม่ถึง 2% = ยังถือว่าตรง */
+  assert.deepEqual(centerCropRect(2999, 1000, 3), { x: 0, y: 0, width: 2999, height: 1000 });
+
+  /* กว้างเกิน: ตัดบน-ล่างออกเท่ากันสองข้าง */
+  assert.deepEqual(centerCropRect(1600, 900, 3), { x: 0, y: 184, width: 1600, height: 533 });
+  /* สูงเกิน (ภาพแนวตั้ง): ตัดซ้าย-ขวาออกเท่ากัน */
+  assert.deepEqual(centerCropRect(900, 1600, 3), { x: 0, y: 650, width: 900, height: 300 });
+
+  /* ผลลัพธ์ต้องได้สัดส่วนใกล้เป้าหมายเสมอ */
+  const rect = centerCropRect(1600, 900, 3);
+  assert.ok(rect !== null);
+  assert.ok(Math.abs(rect.width / rect.height - 3) < 0.05);
+
+  /* ค่าเข้าเพี้ยน = null (ผู้เรียกใช้ไฟล์เดิม) */
+  assert.equal(centerCropRect(0, 100, 3), null);
+  assert.equal(centerCropRect(100, 100, 0), null);
+  assert.equal(centerCropRect(Number.NaN, 100, 3), null);
+});
+
+test("crop: ตรวจสัดส่วนผิด + ป้ายสัดส่วนอ่านง่าย", () => {
+  assert.equal(isAspectMismatch(3000, 1000, 3), false);
+  assert.equal(isAspectMismatch(1600, 900, 3), true);
+  assert.equal(isAspectMismatch(900, 1600, 3), true);
+  assert.equal(isAspectMismatch(0, 100, 3), false, "ค่าเพี้ยนต้องไม่ทำให้พัง");
+  assert.ok(ASPECT_TOLERANCE > 0 && ASPECT_TOLERANCE < 0.1);
+
+  assert.equal(ratioLabel(3000, 1000), "3:1");
+  assert.equal(ratioLabel(1600, 900), "16:9");
+  assert.equal(ratioLabel(6682, 2227), "3.00:1", "สัดส่วนที่ลดทอนไม่ลงตัว = ใช้ทศนิยม");
+  assert.equal(ratioLabel(0, 100), "");
+});
+
+test("crop: ช่องภาพของป้ายประกาศต้องครอป 3:1 และไม่กระทบช่องอื่น", () => {
+  const drop = read("features", "admin", "ui", "image-drop.tsx");
+  assert.ok(drop.includes("cropAspect?: number"), "ช่องภาพต้องรับสัดส่วนเป้าหมายได้ (ไม่ใส่ = พฤติกรรมเดิม)");
+  assert.ok(drop.includes("if (cropAspect === undefined)"), "ไม่ระบุสัดส่วน = ย่ออย่างเดียวเหมือนเดิม");
+  assert.ok(drop.includes("await cropImageFile(file, cropAspect)"), "ระบุสัดส่วน = ครอปก่อนส่ง");
+  assert.ok(drop.includes("cropped.aspectMismatch"), "ภาพผิดสัดส่วนต้องมีข้อความบอกผู้ใช้");
+  assert.ok(drop.includes("imageCropApplied"), "ข้อความมาจากพจนานุกรม (ไม่มีสตริงไทยใน .tsx)");
+
+  const editor = read("features", "admin", "ui", "mourning-editor.tsx");
+  assert.ok(editor.includes("cropAspect={MOURNING_IMAGE_ASPECT}"), "ตัวแก้ป้ายประกาศต้องส่ง 3:1 ให้ช่องภาพ");
+
+  /* ค่ากลางต้องสอดคล้องกัน: ขนาดมาตรฐาน ÷ กัน = สัดส่วน (มีเทสต์กันแก้ข้างเดียว) */
+  assert.equal(MOURNING_IMAGE_ASPECT, 3);
+  assert.equal(MOURNING_IMAGE_WIDTH / MOURNING_IMAGE_HEIGHT, MOURNING_IMAGE_ASPECT);
+});
+
+test("crop: ครอปจริงต้องใช้ผลลัพธ์เสมอ แต่ยังไม่โยน error (สแกนซอร์ส)", () => {
+  const source = read("features", "admin", "ui", "image-resize.ts");
+  assert.ok(source.includes("export async function cropImageFile("), "ต้องมีตัวครอปใช้ในเบราว์เซอร์");
+  assert.ok(source.includes("if (!aspectMismatch && blob.size >= file.size)"), "สัดส่วนตรง + ไม่เล็กลง = เก็บไฟล์เดิม");
+  assert.ok(source.includes("context.drawImage(bitmap, rect.x, rect.y, rect.width, rect.height"), "ต้องวาดจากกรอบครอปจริง");
+  assert.ok(source.includes("} catch {"), "ต้องมี try/catch (ห้ามทำให้อัปโหลดพัง)");
+  assert.ok(source.includes('typeof createImageBitmap !== "function"'), "เบราว์เซอร์เก่า = ส่งไฟล์เดิม");
 });

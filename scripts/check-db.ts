@@ -156,6 +156,8 @@ import {
   trashMedia,
   trashStats,
 } from "@/lib/trash/repository";
+import { listReorderItems, parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
+import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
 type MutableText = { th: string; en: string };
 type MutableItem = { order: number; fields: Record<string, MutableText>; media: Record<string, never> };
@@ -327,6 +329,12 @@ async function main(): Promise<void> {
 
   /* 29) ประวัติรุ่นสินค้า: บันทึก/อ่าน/เทียบความต่าง (รอบที่ 145) */
   await checkRevisionHistory();
+
+  /* 30) ฉบับร่างป้ายประกาศ: บันทึกฉบับร่างได้ แต่ **ฝั่งเผยแพร่ต้องไม่ถูกแตะ** (รอบที่ 168) */
+  await checkNoticeDraft();
+
+  /* 31) จัดลำดับรายการ (reorderRows): ลากเรียงแล้วลำดับเปลี่ยนจริง · แถวที่ไม่ได้ส่งไม่ถูกแตะ (รอบที่ 168) */
+  await checkReorder();
 
   await closePool();
 
@@ -2203,6 +2211,14 @@ async function loadPageLiveFlag(page: string): Promise<boolean> {
   return rows[0]?.is_live === true;
 }
 
+/* ⚠️ ค่าคงที่ของวงจร 30–31 ต้องประกาศ **ก่อน** `await main()` (ไม่งั้น TDZ) — บทเรียนเดียวกับวงจร 24–28 */
+const NOTICE_CHECK_ACTOR = "check-db-notice@example.invalid";
+const REORDER_CHECK_CATEGORY = "check-db-reorder";
+const REORDER_CHECK_ACTOR = "check-db-reorder@example.invalid";
+const REORDER_CHECK_IDS = ["p999990", "p999991", "p999992", "p999993"] as const;
+/** แถวสุดท้ายที่ "จงใจไม่ส่ง" ให้ reorderRows ⇒ ต้องไม่ถูกแตะ */
+const REORDER_CHECK_UNTOUCHED_ID = "p999993";
+
 await main();
 
 /**
@@ -3133,6 +3149,159 @@ async function checkRevisionHistory(): Promise<void> {
       await countWhere("entity_revision where entity_id = $1", [REVISION_CHECK_ID]),
       0,
       "ต้องไม่เหลือประวัติทดสอบ",
+    );
+  }
+}
+
+/**
+ * 30) ฉบับร่างป้ายประกาศ (รอบที่ 168) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * ทำไมต้องมี: ป้ายประกาศเป็นแถว `page_document` ที่ draft/published อยู่ตารางเดียวกัน (ต่างกันที่ status)
+ *   จุดที่พลาดง่ายที่สุดคือ "บันทึกฉบับร่างแล้วเผลอเขียนทับฝั่งเผยแพร่" ⇒ เว็บจริงเปลี่ยนทันทีโดยไม่ตั้งใจ
+ * วงจรนี้พิสูจน์: บันทึกฉบับร่าง → อ่านกลับได้ → **ฝั่ง published (เนื้อหา + updated_at) ต้องไม่ขยับ**
+ *   แล้วคืนฉบับร่างเดิมให้ครบใน finally (มีอยู่ = เขียนทับด้วยของเดิม · ไม่มี = ลบแถวที่สร้างใหม่)
+ * ⚠️ `NOTICE_CHECK_ACTOR` ประกาศไว้ก่อน `await main()` (TDZ)
+ */
+
+async function checkNoticeDraft(): Promise<void> {
+  const publishedBefore = await loadDocumentRow(MOURNING_PAGE_KEY, "published");
+  const draftBefore = await loadDocumentRow(MOURNING_PAGE_KEY, "draft");
+
+  const marker = `ตรวจป้ายประกาศ ${new Date().toISOString()}`;
+  const draftConfig = {
+    ...defaultMourningConfig(th),
+    enabled: true,
+    caption: { th: marker, en: "" },
+    images: [{ path: "/media/check-db-notice", altTh: "ภาพทดสอบจากด่านตรวจ", altEn: "", width: 3000, height: 1000 }],
+  };
+
+  try {
+    await saveJsonDraft(MOURNING_PAGE_KEY, draftConfig, NOTICE_CHECK_ACTOR);
+
+    const after = await loadDocumentRow(MOURNING_PAGE_KEY, "draft");
+    assert.ok(after !== null, "บันทึกฉบับร่างแล้วต้องอ่านกลับได้");
+    const parsed = parseMourningConfig(after.raw, th);
+    assert.ok(parsed.ok, "ฉบับร่างที่บันทึกต้องผ่าน parser");
+    assert.equal(parsed.config.caption.th, marker, "ข้อความที่บันทึกต้องอ่านกลับได้");
+    assert.equal(parsed.config.images.length, 1, "จำนวนภาพในฉบับร่างต้องตรง");
+    assert.equal(parsed.config.images[0]?.path, "/media/check-db-notice");
+
+    /* ⭐ หัวใจของวงจร: ฝั่งเผยแพร่ต้องไม่ถูกแตะเลย */
+    const publishedAfter = await loadDocumentRow(MOURNING_PAGE_KEY, "published");
+    assert.equal(
+      publishedBefore?.updatedAt ?? null,
+      publishedAfter?.updatedAt ?? null,
+      "บันทึกฉบับร่างต้องไม่แตะ updated_at ของฝั่งเผยแพร่",
+    );
+    assert.deepEqual(publishedBefore?.raw ?? null, publishedAfter?.raw ?? null, "บันทึกฉบับร่างต้องไม่แตะเนื้อหาฝั่งเผยแพร่");
+
+    done("ป้ายประกาศ: บันทึกฉบับร่างได้ โดยฝั่งเผยแพร่ไม่ถูกแตะ", "page_document(draft/published)");
+  } finally {
+    if (draftBefore === null) {
+      await getPool().query("delete from page_document where page = $1 and status = 'draft'", [MOURNING_PAGE_KEY]);
+    } else {
+      await saveJsonDraft(MOURNING_PAGE_KEY, draftBefore.raw, NOTICE_CHECK_ACTOR);
+    }
+
+    const publishedFinal = await loadDocumentRow(MOURNING_PAGE_KEY, "published");
+    assert.equal(
+      publishedBefore?.updatedAt ?? null,
+      publishedFinal?.updatedAt ?? null,
+      "คืนสภาพแล้วฝั่งเผยแพร่ต้องยังไม่ถูกแตะ",
+    );
+  }
+}
+
+/**
+ * 31) จัดลำดับรายการ (รอบที่ 168 · หนี้ "reorderRows ยังไม่มีวงจร") — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ 3 ข้อ
+ * 1. อ่านรายการตาม `sort_order` จริง (ไม่ใช่ตาม id)
+ * 2. `parseOrderCsv` + `reorderRows` เขียนลำดับใหม่แล้วมีผลจริง
+ * 3. **แถวที่ไม่ได้ส่งไปต้องไม่ถูกแตะ** (ข้อนี้สำคัญ: หน้าจอกรองหมวด/คำค้น ⇒ ถ้าอัปเดตทั้งตารางจะพังเงียบ)
+ * ⚠️ สร้างหมวด+สินค้าทดสอบของตัวเอง แล้วลบทิ้งใน finally (ไม่แตะสินค้าจริง)
+ * ⚠️ ค่าคงที่ของวงจรนี้ประกาศไว้ก่อน `await main()` (TDZ)
+ */
+
+function reorderCheckProduct(id: string, sortOrder: number): ProductInput {
+  return {
+    id,
+    categoryId: REORDER_CHECK_CATEGORY,
+    sourceId: id.replace(/^p/, ""),
+    sourceUrl: `/th/pages/${id}`,
+    nameTh: `สินค้าจัดลำดับ ${id}`,
+    nameEn: "",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    detailsEn: "",
+    allergensTh: "",
+    allergensEn: "",
+    netWeightTh: "",
+    netWeightEn: "",
+    fdaNumber: "",
+    packagingTh: "",
+    packagingEn: "",
+    sortOrder,
+  };
+}
+
+async function sortOrderOf(id: string): Promise<number> {
+  const { rows } = await getPool().query<{ sort_order: number }>("select sort_order from product where id = $1", [id]);
+  return rows[0]?.sort_order ?? -1;
+}
+
+async function checkReorder(): Promise<void> {
+  try {
+    await upsertProductCategory(
+      { id: REORDER_CHECK_CATEGORY, sourceId: "999990", descriptionTh: "", descriptionEn: "" },
+      REORDER_CHECK_ACTOR,
+      null,
+    );
+    /* ตั้ง sort_order สวนทางกับ id ⇒ พิสูจน์ได้ว่าอ่านตาม sort_order จริง */
+    for (const [index, id] of REORDER_CHECK_IDS.entries()) {
+      await upsertProduct(reorderCheckProduct(id, (REORDER_CHECK_IDS.length - index) * 10), REORDER_CHECK_ACTOR, null);
+    }
+
+    const before = await listReorderItems("product", { categoryId: REORDER_CHECK_CATEGORY });
+    assert.deepEqual(
+      before.map((entry) => entry.id),
+      [...REORDER_CHECK_IDS].reverse(),
+      "ค่าเริ่มต้นต้องเรียงตาม sort_order (ไม่ใช่ตาม id)",
+    );
+
+    /* จัดใหม่เฉพาะ 3 แถวแรก ⇒ แถวสุดท้ายต้องคง sort_order เดิมไว้ */
+    const targetIds = parseOrderCsv([...REORDER_CHECK_IDS].reverse().join(","));
+    const untouchedId = REORDER_CHECK_UNTOUCHED_ID;
+    const orderedIds = targetIds.filter((id) => id !== untouchedId);
+    const untouchedBefore = await sortOrderOf(untouchedId);
+
+    const changed = await reorderRows("product", orderedIds, REORDER_CHECK_ACTOR);
+    assert.equal(changed, orderedIds.length, "ต้องบันทึกลำดับครบทุกรายการที่ส่งมา");
+
+    const after = await listReorderItems("product", { categoryId: REORDER_CHECK_CATEGORY });
+    assert.deepEqual(after.map((entry) => entry.id), [...orderedIds, untouchedId], "ลำดับใหม่ต้องมีผลจริงกับหน้าเว็บ");
+    assert.equal(await sortOrderOf(untouchedId), untouchedBefore, "แถวที่ไม่ได้ส่งไปต้องไม่ถูกแตะ");
+
+    assert.equal(await sortOrderOf(orderedIds[0] ?? ""), 1, "แถวแรกที่ส่งไปต้องได้ลำดับ 1");
+    assert.equal(await sortOrderOf(orderedIds[1] ?? ""), 2);
+
+    done("จัดลำดับรายการ: อ่านตาม sort_order → ลากเรียง → บันทึกจริง · แถวที่ไม่ส่งไม่ถูกแตะ", "reorderRows · parseOrderCsv");
+  } finally {
+    for (const id of REORDER_CHECK_IDS) await deleteProduct(id);
+    await deleteProductCategory(REORDER_CHECK_CATEGORY);
+
+    assert.equal(
+      await countWhere("product where category_id = $1", [REORDER_CHECK_CATEGORY]),
+      0,
+      "ต้องไม่เหลือสินค้าจัดลำดับทดสอบ",
+    );
+    assert.equal(
+      await countWhere("product_category where id = $1", [REORDER_CHECK_CATEGORY]),
+      0,
+      "ต้องไม่เหลือหมวดทดสอบ",
     );
   }
 }

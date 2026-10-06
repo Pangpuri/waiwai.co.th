@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { shrinkImageFile, shrinkSummary } from "@/features/admin/ui/image-resize";
+import { cropImageFile, shrinkImageFile, shrinkSummary, type ShrinkOutcome } from "@/features/admin/ui/image-resize";
+import { fillTemplate } from "@/lib/i18n/template";
 import { useFormStatus } from "react-dom";
 
 import { uploadImageAction } from "@/app/admin/media/actions";
@@ -46,6 +47,11 @@ type Props = {
   readonly frameHint?: string;
   /** ข้อความชวนวางภาพ (ค่าเริ่มต้น = imageDropHint) */
   readonly dropPrompt?: string;
+  /**
+   * สัดส่วนเป้าหมายของ "ไฟล์ที่เก็บ" (กว้าง ÷ สูง) — ใส่แล้วระบบจะ **ครอปกลางภาพให้อัตโนมัติ**
+   * ก่อนอัปโหลด (รอบที่ 168 · ใช้กับป้ายประกาศ = 3) · ไม่ใส่ = พฤติกรรมเดิมเป๊ะ (ย่ออย่างเดียว)
+   */
+  readonly cropAspect?: number;
 };
 
 function failureMessage(strings: Messages["admin"], reason: UploadFailure): string {
@@ -87,6 +93,7 @@ export function ImageDrop({
   frameAspect,
   frameHint,
   dropPrompt,
+  cropAspect,
 }: Props) {
   const [state, action] = useActionState<UploadState, FormData>(uploadImageAction, INITIAL_UPLOAD_STATE);
   /* คลังภาพในบริบทนี้ (ว่าง = ไม่มีคลัง ⇒ ซ่อนปุ่ม "เลือกจากคลัง" ไม่ทำให้ช่องภาพพัง) */
@@ -96,6 +103,8 @@ export function ImageDrop({
   const [localError, setLocalError] = useState<UploadFailure | null>(null);
   /* สรุปการย่อภาพอัตโนมัติ (รอบที่ 99) — ตัวเลข KB → KB ล้วน */
   const [shrinkNote, setShrinkNote] = useState<string | null>(null);
+  /* หมายเหตุการครอปสัดส่วน (รอบที่ 168) — ข้อความจากพจนานุกรม */
+  const [cropNote, setCropNote] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const appliedPath = useRef<string | null>(null);
@@ -126,7 +135,25 @@ export function ImageDrop({
     if (input === null || form === null) return;
 
     setShrinkNote(null);
-    const outcome = await shrinkImageFile(file);
+    setCropNote(null);
+
+    /*
+      รอบที่ 168: ถ้าช่องนี้กำหนดสัดส่วนเป้าหมาย (ป้ายประกาศ = 3:1) ให้ **ครอปกลางภาพ** ก่อนส่ง
+      ⇒ ไฟล์ที่เก็บ = สิ่งที่เห็นบนจอ (CSS ล็อกกรอบ 3:1 อยู่แล้ว) · ไม่กำหนด = ย่ออย่างเดียวเหมือนเดิม
+    */
+    let outcome: ShrinkOutcome;
+    if (cropAspect === undefined) {
+      outcome = await shrinkImageFile(file);
+    } else {
+      const cropped = await cropImageFile(file, cropAspect);
+      outcome = cropped;
+      const aspect = String(cropAspect);
+      if (cropped.cropped) {
+        setCropNote(fillTemplate(strings.imageCropApplied, { aspect, ratio: cropped.sourceAspectLabel }));
+      } else if (cropped.aspectMismatch) {
+        setCropNote(fillTemplate(strings.imageCropWarn, { aspect }));
+      }
+    }
     setShrinkNote(shrinkSummary(outcome));
 
     try {
@@ -277,6 +304,9 @@ export function ImageDrop({
       )}
 
       {reason !== null ? <p className="text-fg text-xs font-semibold">{failureMessage(strings, reason)}</p> : null}
+
+      {/* บอกผลการครอปสัดส่วน (ข้อความจากพจนานุกรม + ตัวเลขสัดส่วน) */}
+      {cropNote === null ? null : <p className="text-fg text-[11px] font-semibold">{cropNote}</p>}
 
       {/* บอกผลการย่ออัตโนมัติ (ตัวเลข KB → KB ล้วน — ไม่ต้องใช้พจนานุกรม) */}
       {shrinkNote === null ? null : (

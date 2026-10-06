@@ -22,6 +22,18 @@ export const MOURNING_PAGE_KEY = "mourning";
  */
 export const MAX_MOURNING_IMAGES = 12;
 
+/**
+ * สัดส่วนมาตรฐานของภาพป้ายประกาศ (3000×1000 = 3:1)
+ *
+ * ใช้ 2 ที่ (แหล่งความจริงเดียว):
+ * 1. **ครอปตอนอัปโหลด** (รอบที่ 168) — ภาพที่ไม่ใช่ 3:1 ถูกครอปกลางให้อัตโนมัติ
+ * 2. **ขนาดสำรอง** ตอนภาพที่อัปโหลดใหม่ไม่รู้ขนาดจริง (ดู lib/mourning/loader.ts)
+ *    ⇒ กรอบป้ายไม่กระตุก (CSS ล็อกกล่องไว้ 3:1 แล้วตั้งแต่รอบที่ 166)
+ */
+export const MOURNING_IMAGE_ASPECT = 3;
+export const MOURNING_IMAGE_WIDTH = 3000;
+export const MOURNING_IMAGE_HEIGHT = 1000;
+
 export type MourningImageConfig = {
   /** พาธในโปรเจกต์ (`/rip/...` ของเดิม) หรือ `/media/<id>` ของที่อัปโหลดใหม่ (มติ D9) */
   readonly path: string;

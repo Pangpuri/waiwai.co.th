@@ -1,6 +1,8 @@
 import { cache } from "react";
 
 import {
+  MOURNING_IMAGE_HEIGHT,
+  MOURNING_IMAGE_WIDTH,
   MOURNING_PAGE_KEY,
   defaultMourningConfig,
   mourningErrorsOf,
@@ -41,9 +43,9 @@ function toNoticeImages(config: MourningConfig, locale: Locale): readonly Mourni
     id: `mourning-${index + 1}`,
     src: image.path,
     alt: locale === "en" && image.altEn.trim() !== "" ? image.altEn : image.altTh,
-    /* ไม่รู้ขนาดจริง (ภาพที่อัปโหลดใหม่) → ใช้ 3:1 เท่าภาพชุดเดิม เพื่อไม่ให้กรอบกระตุก */
-    width: image.width ?? 3000,
-    height: image.height ?? 1000,
+    /* ไม่รู้ขนาดจริง (ภาพที่อัปโหลดใหม่) → ใช้ 3:1 มาตรฐาน ตามค่ากลางใน lib/mourning/config.ts */
+    width: image.width ?? MOURNING_IMAGE_WIDTH,
+    height: image.height ?? MOURNING_IMAGE_HEIGHT,
   }));
 }
 

@@ -14,6 +14,8 @@ import {
 import { advanceIndex, hasSlideControls, isLastSlide } from "@/lib/slideshow";
 
 import { MOURNING_MESSAGE } from "@/features/blocks/ui/preview-frame";
+import type { Locale } from "@/lib/i18n/config";
+import { parseMourningLiveConfig, type MourningLiveNotice } from "@/lib/mourning/live-config";
 import { MOURNING_CLOSE_MS, type MourningNoticeImage } from "../mourning";
 
 /**
@@ -50,90 +52,63 @@ type MourningNoticeProps = {
   /** ภาพที่ใช้จริง — มาจากค่าเริ่มต้นในโค้ด หรือจากหลังบ้าน (คลังภาพ) */
   readonly images: readonly MourningNoticeImage[];
   readonly labels: MourningNoticeLabels;
+  /** ภาษาที่ใช้เลือกข้อความ "สด" จากพรีวิว (th/en) — หน้าเว็บจริงใช้ `labels` จากเซิร์ฟเวอร์อยู่แล้ว */
+  readonly locale: Locale;
 };
 
 /* ── แหล่งความจริงเดียวของ "หน้าต่างเปิดอยู่ไหม" คือ attribute บน <html> ─────────── */
 
 const store = createAttributeStore(MOURNING_ATTRIBUTE, MOURNING_STATE_SHOWN);
 
-/**
- * แปลงภาพที่รับ "สด ๆ" จากแถบแก้ (รอบที่ 165) ให้เป็นรูปทรงที่ตัวแสดงผลใช้
- *
- * ⚠️ ค่าที่ส่งมาจากตัวแก้ยังไม่ผ่านการบันทึก ⇒ รูปร่างไม่เหมือนของที่เรนเดอร์จากเซิร์ฟเวอร์
- *    (เคยทำให้เกิด "empty string passed to src" + "Received NaN for width/height" ในคอนโซล)
- *  ⇒ รับได้ทั้ง src / path / mediaId · เดา alt จาก altTh · ขนาดไม่รู้ใช้ 3:1 มาตรฐาน
- *  ⇒ ภาพที่ยังไม่มีแหล่งที่มา = **ข้าม** (ไม่เรนเดอร์เลย ดีกว่าส่ง src ว่างให้เบราว์เซอร์)
- */
-function toLiveImage(raw: unknown): MourningNoticeImage | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const item = raw as {
-    readonly id?: unknown;
-    readonly src?: unknown;
-    readonly path?: unknown;
-    readonly mediaId?: unknown;
-    readonly alt?: unknown;
-    readonly altTh?: unknown;
-    readonly width?: unknown;
-    readonly height?: unknown;
-  };
-  const src =
-    typeof item.src === "string" && item.src !== ""
-      ? item.src
-      : typeof item.path === "string" && item.path !== ""
-        ? item.path
-        : typeof item.mediaId === "string" && item.mediaId !== ""
-          ? `/media/${item.mediaId}`
-          : "";
-  if (src === "") return null;
-  const width = typeof item.width === "number" && Number.isFinite(item.width) ? item.width : 1200;
-  const height = typeof item.height === "number" && Number.isFinite(item.height) ? item.height : 400;
-  const alt =
-    typeof item.alt === "string" && item.alt !== ""
-      ? item.alt
-      : typeof item.altTh === "string"
-        ? item.altTh
-        : "";
-  return {
-    id: typeof item.id === "string" && item.id !== "" ? item.id : src,
-    src,
-    alt,
-    width,
-    height,
-  };
-}
+/*
+  ⚠️ รอบที่ 168: ตัวแปลงค่าสด (ภาพ + ข้อความ + สถานะเปิด-ปิด) ย้ายไปเป็น pure module
+  `lib/mourning/live-config.ts` ⇒ เทสต์ด้วย `node --test` ได้ตรง ๆ (ไม่มี DOM/React)
+  และกันไม่ให้ตรรกะการแปลงหลุดไปอยู่หลายที่
+*/
 
-export function MourningNotice({ images, labels }: MourningNoticeProps) {
-  const total = images.length;
+export function MourningNotice({ images, labels: serverLabels, locale }: MourningNoticeProps) {
   const isShown = useSyncExternalStore(store.subscribe, store.read, store.readOnServer);
   const [isClosing, setIsClosing] = useState(false);
   const [muteToday, setMuteToday] = useState(false);
   const [index, setIndex] = useState(0);
 
   /*
-    พรีวิวสด (รอบที่ 161): ในหน้าพรีวิว (data-preview-parts="notice") รับภาพล่าสุดจากแถบแก้
-    ⇒ เพิ่ม/ลบภาพแล้วเห็นทันทีโดยไม่ต้องบันทึก — นอกพรีวิวไม่มีผล (ค่าเริ่มต้นยังมาจากเซิร์ฟเวอร์)
+    พรีวิวสด (รอบที่ 161 · ขยายรอบที่ 168): ในหน้าพรีวิว (data-preview-parts="notice")
+    รับค่าล่าสุดจากแถบแก้ ทั้ง **ภาพ + ข้อความ (แคปชัน/ปุ่ม) + สถานะเปิด-ปิด**
+    ⇒ เห็นทันทีโดยไม่ต้องบันทึก — นอกพรีวิวผู้ฟังไม่ทำงาน ค่ามาจากเซิร์ฟเวอร์เท่านั้น
   */
-  const [liveImages, setLiveImages] = useState<readonly MourningNoticeImage[] | null>(null);
+  const [liveNotice, setLiveNotice] = useState<MourningLiveNotice | null>(null);
 
   useEffect(() => {
     if (document.documentElement.getAttribute("data-preview-parts") !== "notice") return;
     const handler = (event: MessageEvent): void => {
       if (event.origin !== window.location.origin) return;
-      const data = event.data as { readonly type?: string; readonly config?: { readonly images?: readonly MourningNoticeImage[] } } | null;
-      if (data?.type !== MOURNING_MESSAGE) return;
-      /* แปลง + กรองภาพที่ยังไม่มีแหล่งที่มา (กัน "empty src"/"NaN" ในคอนโซล) */
-      const raw = Array.isArray(data.config?.images) ? data.config.images : [];
-      const parsed = raw
-        .map((item) => toLiveImage(item))
-        .filter((item): item is MourningNoticeImage => item !== null);
-      setLiveImages(parsed);
+      const data = event.data as { readonly type?: unknown; readonly config?: unknown } | null;
+      if (data === null || data.type !== MOURNING_MESSAGE) return;
+      /* แปลง + กรองก่อน set state เสมอ (กัน "empty src"/"NaN" ในคอนโซล) */
+      const parsed = parseMourningLiveConfig(data.config, locale);
+      if (parsed !== null) setLiveNotice(parsed);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [locale]);
 
-  /* ใช้ภาพสดถ้ามี (พรีวิว) ไม่มี = ภาพจากเซิร์ฟเวอร์ (หน้าเว็บจริง) */
-  const shownImages = liveImages ?? images;
+  /* ใช้ค่าสดถ้ามี (พรีวิว) · ไม่มี = ค่าจากเซิร์ฟเวอร์ (หน้าเว็บจริง) */
+  const shownImages = liveNotice?.images ?? images;
+  const total = shownImages.length;
+  const activeLabels: MourningNoticeLabels =
+    liveNotice === null
+      ? serverLabels
+      : {
+          dialogLabel: serverLabels.dialogLabel,
+          caption: liveNotice.caption,
+          close: liveNotice.closeLabel,
+          muteToday: liveNotice.muteTodayLabel,
+          seeNext: liveNotice.seeNextLabel,
+          prev: serverLabels.prev,
+          next: serverLabels.next,
+          gotoSlide: serverLabels.gotoSlide,
+        };
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -250,6 +225,12 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
     };
   }, [isOpen, total, close]);
 
+  /*
+    พรีวิวสด: ปิดสวิตช์ "เปิด/ปิดป้ายประกาศ" ในหลังบ้าน = ต้องหายจากพรีวิวทันที
+    (หน้าเว็บจริง `liveNotice` เป็น null เสมอ ⇒ บรรทัดนี้ไม่มีผล)
+  */
+  if (liveNotice !== null && !liveNotice.enabled) return null;
+
   const active = total > 0 ? (shownImages[advanceIndex(index, total)] ?? null) : null;
   if (!active) return null;
 
@@ -270,7 +251,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
       data-closing={isClosing ? "" : undefined}
       role="dialog"
       aria-modal="true"
-      aria-label={labels.dialogLabel}
+      aria-label={activeLabels.dialogLabel}
       /*
         ผู้ใช้รายงาน รอบที่ 39: "เป็นหน้าต่างด้านบน แต่ความสูงน้อยไป เอาให้เห็นภาพเต็ม"
         ⇒ เดิมใช้ grid + place-items-center ในกล่องที่เลื่อนไม่ได้ ⇒ พอเนื้อหาสูงกว่าจอ ส่วนบนจะถูกตัดและเลื่อนตามไม่ได้
@@ -336,7 +317,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
                 <button
                   type="button"
                   onClick={() => setIndex((current) => advanceIndex(current, total, -1))}
-                  aria-label={labels.prev}
+                  aria-label={activeLabels.prev}
                   className="absolute top-1/2 left-3 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-overlay/70 text-lg font-bold text-on-brand transition-colors hover:bg-overlay"
                 >
                   <span aria-hidden="true">‹</span>
@@ -344,7 +325,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
                 <button
                   type="button"
                   onClick={() => setIndex((current) => advanceIndex(current, total))}
-                  aria-label={labels.next}
+                  aria-label={activeLabels.next}
                   className="absolute top-1/2 right-3 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-overlay/70 text-lg font-bold text-on-brand transition-colors hover:bg-overlay"
                 >
                   <span aria-hidden="true">›</span>
@@ -354,9 +335,9 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
           </div>
 
           {/* คำบรรยาย: แสดงเฉพาะเมื่อมีข้อความ — รอบที่ 36 ใช้ "รูป" เป็นตัวประกาศ จึงมักเว้นว่าง */}
-          {labels.caption.trim() === "" ? null : (
+          {activeLabels.caption.trim() === "" ? null : (
             <figcaption className="mt-4 max-w-3xl px-2 text-center text-sm leading-relaxed text-on-brand/85">
-              {labels.caption}
+              {activeLabels.caption}
             </figcaption>
           )}
         </figure>
@@ -364,7 +345,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
         {hasSlideControls(total) ? (
           <div
             role="group"
-            aria-label={labels.dialogLabel}
+            aria-label={activeLabels.dialogLabel}
             className="mt-5 flex items-center gap-2"
           >
             {shownImages.map((image, position) => {
@@ -375,7 +356,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
                   key={`${image.id ?? "frame"}-${String(position)}`}
                   type="button"
                   onClick={() => setIndex(position)}
-                  aria-label={`${labels.gotoSlide} ${position + 1}`}
+                  aria-label={`${activeLabels.gotoSlide} ${position + 1}`}
                   aria-current={isActive}
                   className={[
                     "h-2.5 rounded-full transition-all duration-300",
@@ -399,7 +380,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
           onClick={onPrimaryAction}
           className="mt-6 rounded-full bg-brand-red px-7 py-3.5 text-sm font-bold text-on-brand shadow-lg transition-transform hover:-translate-y-0.5"
         >
-          {atLastSlide ? labels.close : labels.seeNext}
+          {atLastSlide ? activeLabels.close : activeLabels.seeNext}
         </button>
 
         {/*
@@ -416,7 +397,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
               onChange={(event) => setMuteToday(event.currentTarget.checked)}
               className="h-4 w-4 shrink-0 accent-brand-yellow"
             />
-            {labels.muteToday}
+            {activeLabels.muteToday}
           </label>
         ) : null}
       </div>

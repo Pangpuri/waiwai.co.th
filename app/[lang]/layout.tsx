@@ -180,6 +180,7 @@ export default async function LocaleLayout({
         {mourningNotice.enabled && mourningNotice.images.length > 0 ? (
           <MourningNotice
             images={mourningNotice.images}
+            locale={chromeLocale}
             labels={{
               dialogLabel: messages.mourning.dialogLabel,
               caption: mourningNotice.caption,

@@ -320,6 +320,26 @@ test("blocks a11y: ตัวเรนเดอร์ต้องออก <h1> �
   }
 });
 
+/* ── รอบที่ 168: ไล่ <h1> หน้าที่เหลือ (ต่อจากรอบที่ 149) ─────────────────────── */
+
+test("a11y: หน้า 'กำลังจัดทำ' และ 404 ต้องมี <h1> หน้าละ 1 ตัว", () => {
+  const pending = readFileSync("features/shell/ui/pending-page.tsx", "utf8");
+  const notFound = readFileSync("features/shell/ui/not-found-content.tsx", "utf8");
+
+  assert.ok(/<h1[ >]/.test(pending), "หน้า 'กำลังจัดทำ' ต้องมี h1 (ใช้ร่วมกัน 3 หน้า: cookie-policy/terms/sustainability)");
+  assert.ok(/<h1[ >]/.test(notFound), "หน้า 404 ต้องมี h1 (ครอบ [...rest])");
+
+  /* หน้าที่ใช้คอมโพเนนต์ต้องไม่เพิ่ม h1 ซ้ำอีก (1 h1 ต่อหน้า) */
+  for (const file of ["app/[lang]/cookie-policy/page.tsx", "app/[lang]/terms/page.tsx", "app/[lang]/sustainability/page.tsx"]) {
+    const page = readFileSync(file, "utf8");
+    assert.ok(page.includes("<PendingPage"), `${file} ต้องเรนเดอร์ PendingPage (มี h1 อยู่ในนั้น)`);
+    assert.ok(!page.includes("<h1"), `${file} ห้ามมี h1 ซ้ำ`);
+  }
+
+  const rest = readFileSync("app/[lang]/[...rest]/page.tsx", "utf8");
+  assert.ok(rest.includes("notFound()"), "[...rest] ต้องเรียก notFound() → ใช้หน้า 404 ที่มี h1");
+});
+
 /* ── รอบที่ 158: พรีวิว "เฉพาะ navbar" ต้องไม่โชว์ท้ายเว็บของ layout ─────────── */
 
 test("preview: โหมด parts=nav ต้องซ่อนทั้งหัวเว็บและท้ายเว็บของ layout", () => {
@@ -386,8 +406,12 @@ test("preview: ป้ายประกาศต้องส่งค่าเ�
     "เปิดโหมดสดเฉพาะในหน้าพรีวิว (หน้าเว็บจริงไม่รับข้อความจากที่อื่น)",
   );
   assert.ok(
-    notice.includes("const shownImages = liveImages ?? images"),
+    notice.includes("const shownImages = liveNotice?.images ?? images"),
     "พรีวิวใช้ภาพสด · หน้าเว็บจริงยังใช้ภาพจากเซิร์ฟเวอร์",
+  );
+  assert.ok(
+    notice.includes("parseMourningLiveConfig") && notice.includes("activeLabels"),
+    "รอบที่ 168: ข้อความ/สถานะเปิด-ปิด ต้องมาจากค่าสดด้วย (ไม่ใช่แค่ภาพ)",
   );
 });
 
@@ -408,12 +432,19 @@ test("preview: postLiveValues ต้องไม่เรียกตัวเ�
 /* ── รอบที่ 165: พรีวิวสดต้องไม่ส่งค่าเสียรูปทรงให้ตัวแสดงผล ─────────────────── */
 
 test("preview: ภาพสดของป้ายประกาศต้องถูกแปลง + กรองก่อนเรนเดอร์", () => {
+  /* รอบที่ 168: ตัวแปลงย้ายไป pure module `lib/mourning/live-config.ts` (เทสต์ตรง ๆ ได้) */
+  const live = readFileSync("lib/mourning/live-config.ts", "utf8");
   const notice = readFileSync("features/shell/ui/mourning-notice.tsx", "utf8");
-  assert.ok(notice.includes("function toLiveImage("), "ต้องมีตัวแปลงรูปทรงของภาพที่รับสด ๆ จากแถบแก้");
-  assert.ok(notice.includes("if (src === \"\") return null;"), "ภาพที่ยังไม่มีแหล่งที่มา = ข้าม ไม่เรนเดอร์ (กัน empty src)");
-  assert.ok(notice.includes("Number.isFinite(item.width)"), "ขนาดที่ไม่ใช่ตัวเลขต้องไม่หลุดไปเป็น width/height");
-  assert.ok(notice.includes(".filter((item): item is MourningNoticeImage => item !== null)"), "ต้องกรองก่อน set state");
-  assert.ok(!notice.includes("setLiveImages(data.config?.images"), "ห้ามตั้งค่าดิบจากข้อความโดยตรง (รูปร่างไม่ตรง)");
+
+  assert.ok(live.includes("export function toLiveImage("), "ต้องมีตัวแปลงรูปทรงของภาพที่รับสด ๆ จากแถบแก้");
+  assert.ok(live.includes('if (src === "") return null;'), "ภาพที่ยังไม่มีแหล่งที่มา = ข้าม ไม่เรนเดอร์ (กัน empty src)");
+  assert.ok(live.includes("Number.isFinite(item.width)"), "ขนาดที่ไม่ใช่ตัวเลขต้องไม่หลุดไปเป็น width/height");
+  assert.ok(
+    live.includes(".filter((item): item is MourningNoticeImage => item !== null)"),
+    "ต้องกรองก่อนคืนค่า",
+  );
+  assert.ok(!notice.includes("setLiveImages("), "ห้ามตั้งค่าดิบจากข้อความโดยตรง (ใช้ตัวแปลงกลาง)");
+  assert.ok(!notice.includes("toLiveImage("), "ตรรกะแปลงต้องไม่อยู่ในคอมโพเนนต์ซ้ำอีก");
 });
 
 /* ── รอบที่ 166: กล่องป้ายประกาศต้องคงที่ 3:1 (ไม่ยืดหดตามภาพแต่ละใบ) ─────────── */

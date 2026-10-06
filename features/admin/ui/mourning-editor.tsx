@@ -11,6 +11,7 @@ import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { fillTemplate } from "@/lib/i18n/template";
 import {
   MAX_MOURNING_IMAGES,
+  MOURNING_IMAGE_ASPECT,
   diffMourningConfig,
   type MourningChange,
   type MourningConfig,
@@ -373,7 +374,9 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
               })()}
               onChange={(patch) => updateImage(Math.min(selectedImage, config.images.length - 1), patch)}
               /* ผู้ใช้สั่ง รอบที่ 46: "ไม่ต้องรักษาสเกลภาพ" ⇒ ไม่ต้องมีกรอบขาว 3:1 ในแผงแก้
-                 (ดูสัดส่วนจริงได้จากพรีวิวหน้าเว็บอยู่แล้ว) — เหลือช่องลากวางกะทัดรัด + คำอธิบายภาพ */
+                 (ดูสัดส่วนจริงได้จากพรีวิวหน้าเว็บอยู่แล้ว) — เหลือช่องลากวางกะทัดรัด + คำอธิบายภาพ
+                 รอบที่ 168: ครอปกลางภาพเป็น 3:1 ให้อัตโนมัติตอนอัปโหลด (เก็บ = สิ่งที่เห็น) */
+              cropAspect={MOURNING_IMAGE_ASPECT}
               dropPrompt={strings.mourningDropPrompt}
               compact
             />

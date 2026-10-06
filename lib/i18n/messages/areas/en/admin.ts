@@ -22,8 +22,9 @@ import type { adminRecipes as thAdminRecipes } from "@/lib/i18n/messages/areas/t
 import type { thAdminRevisions } from "@/lib/i18n/messages/areas/th/adminRevisions";
 import type { thAdminSort } from "@/lib/i18n/messages/areas/th/adminSort";
 import type { thAdminNav } from "@/lib/i18n/messages/areas/th/adminNav";
+import type { thAdminNotice } from "@/lib/i18n/messages/areas/th/adminNotice";
 
-/** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset/block-types/schedule) — ไฟล์นี้ไม่ต้องมีอีก */
+/** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset/block-types/schedule/notice) — ไฟล์นี้ไม่ต้องมีอีก */
 type MovedKeys =
   | keyof typeof thAdminProducts
   | keyof typeof thAdminNews
@@ -31,6 +32,7 @@ type MovedKeys =
   | keyof typeof thAdminRevisions
   | keyof typeof thAdminSort
   | keyof typeof thAdminNav
+  | keyof typeof thAdminNotice
   | keyof typeof thAdminMedia
   | keyof typeof thAdminSettings
   | keyof typeof thAdminDraft
