@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { legacyRedirectRules } from "@/lib/routing/redirects";
+
 const nextConfig: NextConfig = {
   /*
     เปิดให้เครื่องอื่นในวงแลนด์เข้า dev server ได้
@@ -46,6 +48,15 @@ const nextConfig: NextConfig = {
     (ธีม/สถานะป๊อปอัพ/การ์ด — ดู features/shell/ui/inline-script.tsx) CSP ที่เข้มจะบล็อกสคริปต์เหล่านั้น
     ทำให้หน้าวาบ · ถ้าจะทำ CSP ต้องใช้ nonce ซึ่งกระทบเรื่อง static rendering → เป็นงานแยกที่ต้องคุยกันก่อน
   */
+  /*
+    ── URL เก่า → 301 ──────────────────────────────────────────────────────────
+    X2.7 ส่วนที่ 2 (รอบที่ 150) · รายการอยู่ใน  (ที่เดียว พร้อมที่มาของทุกกฎ)
+    ⚠️ ต้องเป็นค่าคงที่ในโค้ด — proxy/middleware อ่านฐานข้อมูลไม่ได้ (เอกสาร Next + มีเทสต์สแกน)
+  */
+  async redirects() {
+    return [...legacyRedirectRules()];
+  },
+
   async headers() {
     return [
       {
