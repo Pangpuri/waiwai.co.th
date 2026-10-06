@@ -30,7 +30,7 @@ import {
   sessionCookieOptions,
   sessionExpiry,
 } from "@/lib/auth/session";
-import { ENV_ADMIN_ID, createEnvUserStore, createFallbackUserStore, type AdminUserStore } from "@/lib/auth/user-store";
+import { ENV_ADMIN_ID, createEnvHashOverrideStore, createEnvUserStore, createFallbackUserStore, type AdminUserStore } from "@/lib/auth/user-store";
 import type { AdminUser } from "@/lib/auth/types";
 
 /**
@@ -96,7 +96,14 @@ export function getAdminUserStore(): AdminUserStore | null {
 
   if (dbStore === null) return envStore;
   if (envStore === null) return dbStore;
-  return createFallbackUserStore(dbStore, envStore);
+  /*
+    ⚠️ รอบที่ 144 (บั๊กจริง): แถวบัญชี env ในตารางมี hash 'env-only' ที่ยืนยันไม่ได้
+    ⇒ ต้องให้ hash จาก env ชนะเสมอ ไม่งั้น "รหัสถูกแต่ล็อกอินไม่ได้" ทั้งในเครื่องและคลาวด์
+  */
+  return createEnvHashOverrideStore(createFallbackUserStore(dbStore, envStore), {
+    email: env.email ?? "",
+    passwordHash: env.passwordHash ?? null,
+  });
 }
 
 /** หลังบ้านพร้อมใช้งานหรือยัง — ถ้าไม่พร้อม หน้าล็อกอินต้องบอกวิธีตั้งค่า ไม่ใช่ฟอร์มที่กดแล้วเงียบ */

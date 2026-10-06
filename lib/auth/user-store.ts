@@ -107,3 +107,40 @@ export function createFallbackUserStore(primary: AdminUserStore, fallback: Admin
     },
   };
 }
+
+/**
+ * ให้ **บัญชีจาก env** ตรวจรหัสผ่านด้วย hash จาก env เสมอ (รอบที่ 144 · บั๊กจริง)
+ *
+ * ที่มา: รอบที่ 124 แก้บั๊ก FK (`admin_session.user_id` → `admin_user(id)`) ด้วยการ
+ * `ensureEnvAdminUser()` ⇒ เกิดแถวในตาราง `admin_user` ที่มี `password_hash = 'env-only'`
+ * (ค่าที่ตั้งใจให้ยืนยันไม่ได้)
+ *
+ * ⚠️ ผลข้างเคียงที่มองไม่เห็น: `createFallbackUserStore` เลือก **DB ก่อน** และถอยไป env
+ *    เฉพาะเมื่อ "ไม่พบอีเมล" ⇒ พอมีแถวแล้ว การล็อกอินจึงไปเทียบกับ `'env-only'`
+ *    ⇒ **รหัสถูกก็ไม่ผ่านตลอด** (ทั้งเครื่องและคลาวด์ · audit เป็น `login-failure`)
+ *
+ * ทางแก้: ครอบ store ด้วยตัวนี้ — ถ้าบัญชีที่เจอ **เป็นอีเมลของ env** ให้ใช้ `passwordHash` จาก env
+ * (ค่าในตารางยังเป็น `env-only` เหมือนเดิม ⇒ เอา hash จากฐานข้อมูลไปล็อกอินไม่ได้)
+ */
+export function createEnvHashOverrideStore(
+  store: AdminUserStore,
+  options: { readonly email: string; readonly passwordHash: string | null },
+): AdminUserStore {
+  const target = options.email.trim().toLowerCase();
+  const override = options.passwordHash;
+
+  const patch = (account: AdminAccount | null): AdminAccount | null => {
+    if (account === null || override === null) return account;
+    if (account.email.trim().toLowerCase() !== target) return account;
+    return account.passwordHash === override ? account : { ...account, passwordHash: override };
+  };
+
+  return {
+    async findByEmail(email: string): Promise<AdminAccount | null> {
+      return patch(await store.findByEmail(email));
+    },
+    async findById(id: string): Promise<AdminAccount | null> {
+      return patch(await store.findById(id));
+    },
+  };
+}
