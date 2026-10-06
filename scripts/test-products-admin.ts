@@ -226,3 +226,47 @@ test("products admin: ไม่มี 'ลบหมวด' — 6 หมวดถ
     "product_category ต้องไม่มี deleted_at (หมวดถูกล็อก 6 หมวด)",
   );
 });
+
+/* ── รอบที่ 140: นำเข้าสินค้าซ้ำต้องไม่ทับงานที่แก้จากหลังบ้าน ────────────────── */
+
+test("products admin: สคริปต์นำเข้าใช้โหมด 'protect-edited' เป็นค่าเริ่มต้น และมี --force", () => {
+  const importer = readFileSync("scripts/import-products.ts", "utf8");
+  assert.ok(importer.includes('arg === "--force"'), "ต้องมีธง --force");
+  assert.ok(
+    importer.includes('const writeMode = options.force ? "replace" : "protect-edited";'),
+    "ค่าเริ่มต้นต้องเป็น protect-edited (ไม่ทับงานคน) · --force จึงทับจริง",
+  );
+  assert.ok(importer.includes("stats.protectedEdits"), "ต้องนับและรายงานจำนวนที่คงค่าเดิมไว้");
+  assert.ok(importer.includes("if (result.protectedEdit)"), "ต้องตรวจผลจากชั้นข้อมูล (ไม่เดาเอง)");
+  assert.ok(
+    importer.includes("npm run products:import -- --force"),
+    "ต้องบอกผู้ใช้ว่าจะทับจริงต้องทำอย่างไร",
+  );
+});
+
+test("products admin: ชั้นข้อมูลมีประตูกันทับที่ SQL + คง updated_at/by (ไม่งั้นรอบ 2 ทับ)", () => {
+  assert.ok(repository.includes('export type ProductWriteMode'), "ต้องมีชนิดโหมดการเขียนให้ชัดเจน");
+  assert.ok(
+    repository.includes('"replace" | "protect-edited"'),
+    "ต้องมีสองโหมด: replace (หลังบ้าน) · protect-edited (นำเข้า)",
+  );
+  assert.ok(
+    repository.includes('const PROTECTED_EDIT_CONDITION = "product.updated_by is distinct from excluded.updated_by"'),
+    "เงื่อนไขต้องเทียบ updated_by ของแถวเดิมกับผู้ที่กำลังเขียน",
+  );
+  assert.ok(
+    repository.includes("function guardedNow(") && repository.includes("then product.updated_at else now() end"),
+    "⚠️ โหมดป้องกันต้องคง updated_at เดิม ⇒ ถ้าไม่คง การนำเข้าครั้งที่สองจะทับงานคน",
+  );
+  assert.ok(
+    repository.includes('guardedColumn(options.writeMode, "updated_by")'),
+    "⚠️ ต้องคง updated_by เดิมด้วยเหตุผลเดียวกัน",
+  );
+  assert.ok(repository.includes("protectedEdit"), "ต้องคืนผลว่าป้องกันไว้ไหม (ให้สคริปต์รายงาน)");
+});
+
+test("products admin: หลังบ้านต้องยังเขียนทับได้ (โหมด replace เป็นค่าเริ่มต้น)", () => {
+  /* ถ้าหลังบ้านเผลอส่ง protect-edited: กดบันทึกจากหลังบ้านจะไม่ทับค่าที่นำเข้ามา = ผู้ดูแลแก้ไม่ได้ */
+  assert.ok(!/writeMode:\s*"protect-edited"/.test(actions), "action ของหลังบ้านห้ามใช้โหมดป้องกัน");
+  assert.ok(actions.includes('imageMode: "set"'), "หลังบ้านต้องใช้โหมดภาพ set (ค่าเริ่มต้นของ writeMode = replace)");
+});

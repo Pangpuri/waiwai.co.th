@@ -22,6 +22,7 @@ import {
  *   npm run products:import                    → ดึงจากเว็บจริง (ต้องมี DATABASE_URL)
  *   npm run products:import -- --dry-run       → แกะ + รายงานผล ไม่เขียนอะไร
  *   npm run products:import -- --dir=<โฟลเดอร์> → อ่าน HTML ที่บันทึกไว้ (ไม่ต้องต่อเน็ต)
+ *   npm run products:import -- --force         → ⚠️ เขียนทับแม้สินค้านั้นถูกแก้จากหลังบ้าน (ค่าเริ่มต้น = ไม่ทับ)
  *
  * กติกา
  * - **idempotent**: id ของสินค้า = `p<source_id>` · หมวด = slug จากโค้ด ⇒ รันซ้ำได้ ไม่สร้างซ้ำ
@@ -67,16 +68,19 @@ const SOURCES = [
 type Options = {
   readonly dryRun: boolean;
   readonly dir: string | null;
+  readonly force: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Options {
   let dryRun = false;
   let dir: string | null = null;
+  let force = false;
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--force") force = true;
     else if (arg.startsWith("--dir=")) dir = arg.slice("--dir=".length);
   }
-  return { dryRun, dir };
+  return { dryRun, dir, force };
 }
 
 function log(message: string): void {
@@ -132,7 +136,7 @@ async function main(): Promise<void> {
   }
 
   const mediaCache: ImportMediaCache = new Map();
-  const stats = { newImages: 0, reusedImages: 0, products: 0, ingredients: 0, skippedDuplicates: 0, skippedInvalid: 0 };
+  const stats = { newImages: 0, reusedImages: 0, products: 0, ingredients: 0, skippedDuplicates: 0, skippedInvalid: 0, protectedEdits: 0 };
   const issues: string[] = [];
 
   for (const source of SOURCES) {
@@ -230,7 +234,21 @@ async function main(): Promise<void> {
         options.dryRun ? null : await ensureMedia(card.imageUrl, imageAltTh, imageAltEn, mediaCache, stats);
 
       if (!options.dryRun) {
-        await upsertProduct(productInput, ACTOR, imageId);
+        /*
+          รอบที่ 140: ค่าเริ่มต้น **ไม่ทับงานที่แก้จากหลังบ้าน**
+          - ถ้าแถวเดิมถูกแก้โดยผู้ใช้อื่น (updated_by ≠ import) ชั้นข้อมูลจะคงค่าเดิมไว้ แล้วคืน protectedEdit = true
+          - รายการนั้น = **ข้ามส่วนผสมด้วย** เพราะส่วนผสมที่คนแก้มักแก้พร้อมกับตัวสินค้า (ทับไปก็เสียของ)
+          - ต้องทับจริง (เช่น ต้นฉบับแก้ไขเยอะ) ⇒ ใส่ `--force`
+        */
+        const writeMode = options.force ? "replace" : "protect-edited";
+        const result = await upsertProduct(productInput, ACTOR, imageId, { writeMode });
+        if (result.protectedEdit) {
+          stats.protectedEdits += 1;
+          /* นับเป็น "พบ" ใน log ต่อหมวด แต่ไม่นับเป็นรายการที่เขียนทับ */
+          order += 1;
+          log(`   ⓘ คงค่าเดิมไว้ (แก้จากหลังบ้าน): ${card.nameTh}`);
+          continue;
+        }
         await replaceProductIngredients(productInput.id, ingredients);
       }
 
@@ -246,7 +264,13 @@ async function main(): Promise<void> {
   log(`สรุป: หมวด ${SOURCES.length} · สินค้า ${stats.products} · ส่วนผสม ${stats.ingredients}`);
   log(`      ภาพใหม่ ${stats.newImages} · ใช้ภาพเดิม (sha256 ซ้ำ) ${stats.reusedImages}`);
   log(`      ข้ามสินค้าซ้ำ ${stats.skippedDuplicates} · ข้ามเพราะข้อมูลไม่ผ่าน ${stats.skippedInvalid}`);
+  log(`      คงค่าเดิมไว้ (แก้จากหลังบ้าน) ${stats.protectedEdits}`);
   if (options.dryRun) log("      (โหมด --dry-run: ไม่ได้เขียนลงฐานข้อมูล)");
+  if (stats.protectedEdits > 0 && !options.force) {
+    log("");
+    log("ℹ️ สินค้าที่ถูกแก้จากหลังบ้านถูก “คงค่าเดิม” ไว้ (ไม่ทับ)");
+    log("   ถ้าต้องการให้ค่าจากเว็บเดิมทับจริง ใช้: npm run products:import -- --force");
+  }
 
   if (issues.length > 0) {
     log(`\n⚠️ ข้อที่ต้องดู (${issues.length}):`);

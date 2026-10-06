@@ -317,6 +317,9 @@ async function main(): Promise<void> {
   /* 26) ถังขยะ + ลบถาวร: ประตู "ต้องอยู่ในถังก่อน" อยู่ที่ SQL ทั้งสินค้าและเมนู (รอบที่ 139) */
   await checkTrashForever();
 
+  /* 27) นำเข้าสินค้าซ้ำ: ต้องไม่ทับงานที่แก้จากหลังบ้าน (รอบที่ 140) */
+  await checkProductImportGuard();
+
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
@@ -1982,6 +1985,11 @@ const RECIPE_CHECK_ACTOR = "check-db-recipes@example.invalid";
 const TRASH_CHECK_ACTOR = "check-db-trash-forever@example.invalid";
 const TRASH_CHECK_PRODUCT_ID = "p999997";
 
+/* 27) นำเข้าสินค้าซ้ำต้องไม่ทับงานคน (รอบที่ 140) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
+const IMPORT_GUARD_CHECK_ID = "p999996";
+const IMPORT_GUARD_IMPORT_ACTOR = "import:waiwai.co.th";
+const IMPORT_GUARD_HUMAN_ACTOR = "check-db-human-editor@example.invalid";
+
 async function checkRecipeVideos(): Promise<void> {
   const mediaId = newMediaId();
   const png = Buffer.from(
@@ -2769,5 +2777,107 @@ async function checkTrashForever(): Promise<void> {
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
     assert.equal(await countOfCategory(), beforeCount, "ตัวนับต่อหมวดต้องกลับมาเท่าเดิม");
     assert.deepEqual(await adminRecipeCounts(), beforeRecipeCounts, "ตัวนับเมนูต้องกลับมาเท่าเดิม");
+  }
+}
+
+/**
+ * 27) นำเข้าสินค้าซ้ำต้อง **ไม่ทับงานที่แก้จากหลังบ้าน** (รอบที่ 140)
+ *
+ * ที่มา: เจ้าของถามว่า "ส่วนสินค้าปิดเซสชันหรือยัง" ⇒ ตรวจแล้วเจอกับดักจริง
+ *   `products:import` (idempotent) เขียนทับ **ทุกช่อง** บน `on conflict` ⇒ ใครรันนำเข้าซ้ำ
+ *   งานที่แก้จากหลังบ้าน (ชื่อ/คำโปรย/รายละเอียด/ส่วนผสม/ลำดับ) หายเงียบ ๆ
+ * ⇒ รอบที่ 140 เพิ่มโหมด `protect-edited` (สคริปต์นำเข้าใช้เป็นค่าเริ่มต้น):
+ *   ถ้าแถวเดิมถูกแก้โดย **ผู้ใช้อื่น** (`updated_by` ไม่ใช่ตัวนำเข้า) ให้คงค่าเดิมไว้
+ *
+ * วงจรนี้พิสูจน์ 6 ข้อ (ข้อ 4 คือกับดักที่เกือบพลาด — ถ้าเขียน `updated_by` ทับในโหมดป้องกัน
+ * การนำเข้า "ครั้งที่สอง" จะเห็นว่าตนเองเป็นคนแก้ล่าสุด แล้วทับงานคนทันที)
+ */
+async function checkProductImportGuard(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดในฐานข้อมูลก่อนรันวงจรนี้");
+
+  const fromSource: ProductInput = {
+    id: IMPORT_GUARD_CHECK_ID,
+    categoryId,
+    sourceId: "999996",
+    sourceUrl: "",
+    nameTh: "ชื่อจากเว็บเดิม",
+    nameEn: "From source",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "รายละเอียดจากเว็บเดิม",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    sortOrder: 3,
+  };
+  const humanEdit: ProductInput = {
+    ...fromSource,
+    nameTh: "ชื่อที่คนแก้จากหลังบ้าน",
+    detailsTh: "รายละเอียดที่คนแก้",
+    sortOrder: 77,
+  };
+  const actorOf = async (): Promise<string | null> => {
+    const row = await getPool().query<{ updated_by: string | null }>(
+      "select updated_by from product where id = $1",
+      [IMPORT_GUARD_CHECK_ID],
+    );
+    return row.rows[0]?.updated_by ?? null;
+  };
+
+  try {
+    /* 1) นำเข้าครั้งแรก = สร้างใหม่ (ยังไม่มีอะไรให้ป้องกัน) */
+    const created = await upsertProduct(fromSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(created.created, true, "ครั้งแรกต้องเป็นการสร้างแถวใหม่");
+    assert.equal(created.protectedEdit, false, "ครั้งแรกยังไม่มีของเดิมให้ป้องกัน");
+
+    /* 2) คนแก้จากหลังบ้าน (โหมดปกติ = ค่าที่กรอกชนะ) */
+    const edited = await upsertProduct(humanEdit, IMPORT_GUARD_HUMAN_ACTOR, null, { writeMode: "replace" });
+    assert.equal(edited.created, false, "ครั้งที่สองต้องไม่ใช่การสร้างใหม่");
+    assert.equal(edited.protectedEdit, false, "โหมด replace ต้องไม่รายงานว่าป้องกัน");
+    assert.equal((await loadProductForAdmin(IMPORT_GUARD_CHECK_ID))?.nameTh, "ชื่อที่คนแก้จากหลังบ้าน");
+
+    /* 3) รันนำเข้าซ้ำ (โหมดป้องกัน) → ต้องคงค่าที่คนแก้ + รายงานว่าป้องกันไว้ */
+    const reimported = await upsertProduct(fromSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(reimported.protectedEdit, true, "ต้องรายงานว่าป้องกันงานที่คนแก้ไว้");
+    const kept = await loadProductForAdmin(IMPORT_GUARD_CHECK_ID);
+    assert.equal(kept?.nameTh, "ชื่อที่คนแก้จากหลังบ้าน", "นำเข้าซ้ำต้องไม่ทับชื่อที่คนแก้");
+    assert.equal(kept?.detailsTh, "รายละเอียดที่คนแก้", "นำเข้าซ้ำต้องไม่ทับรายละเอียดที่คนแก้");
+    assert.equal(kept?.sortOrder, 77, "ลำดับที่คนตั้งไว้ต้องไม่ถูกทับ");
+    assert.equal(await actorOf(), IMPORT_GUARD_HUMAN_ACTOR, "ต้องคง updated_by ของคนไว้");
+
+    /* 4) ⭐ นำเข้าซ้ำ "ครั้งที่สอง" ติดกัน → ต้องยังคงค่าคน (กับดักที่จับได้ตอนเขียนเทสต์) */
+    const reimportedAgain = await upsertProduct(fromSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(reimportedAgain.protectedEdit, true, "ครั้งที่สองต้องยังป้องกันอยู่ (ไม่ใช่ป้องกันได้ครั้งเดียว)");
+    assert.equal(
+      (await loadProductForAdmin(IMPORT_GUARD_CHECK_ID))?.nameTh,
+      "ชื่อที่คนแก้จากหลังบ้าน",
+      "⚠️ งานคนต้องรอดแม้รันนำเข้าซ้ำหลายรอบ",
+    );
+
+    /* 5) --force = เขียนทับจริงตามที่ผู้ใช้สั่ง */
+    const forced = await upsertProduct(fromSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "replace" });
+    assert.equal(forced.protectedEdit, false, "โหมด replace ต้องไม่รายงานว่าป้องกัน");
+    assert.equal(
+      (await loadProductForAdmin(IMPORT_GUARD_CHECK_ID))?.nameTh,
+      "ชื่อจากเว็บเดิม",
+      "--force ต้องเขียนทับจริง",
+    );
+
+    /* 6) หลัง force ค่าล่าสุดเป็นของตัวนำเข้า ⇒ รันซ้ำโหมดป้องกันได้ตามปกติ (idempotent) */
+    const afterForce = await upsertProduct(fromSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(afterForce.protectedEdit, false, "ไม่มีงานคนค้างอยู่ ⇒ ไม่ต้องรายงานว่าป้องกันไว้");
+
+    done(
+      "นำเข้าสินค้าซ้ำ: ไม่ทับงานที่แก้จากหลังบ้าน · --force ทับจริง · งานคนรอดแม้รันซ้ำหลายรอบ",
+      "เทียบ updated_by · ลำดับ · 2 รอบติดกัน · โหมด replace",
+    );
+  } finally {
+    await deleteProduct(IMPORT_GUARD_CHECK_ID);
+    assert.equal(await countWhere("product where id = $1", [IMPORT_GUARD_CHECK_ID]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
   }
 }

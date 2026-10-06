@@ -343,37 +343,86 @@ export async function upsertProductCategory(
   );
 }
 
+/**
+ * โหมดเขียนทับเมื่อ "มีแถวเดิมอยู่แล้ว" (รอบที่ 140)
+ * - `replace` (ค่าเริ่มต้น) — เขียนทับทุกช่อง · **หลังบ้านใช้โหมดนี้** (ผู้ดูแลกดบันทึก = ค่าที่กรอกต้องชนะ)
+ * - `protect-edited` — **สคริปต์นำเข้าใช้**: ถ้าแถวเดิมถูกแก้โดย **ผู้ใช้อื่น** (คนละคนกับที่กำลังเขียน)
+ *   ให้คงค่าเดิมไว้ ⇒ "รันนำเข้าซ้ำไม่ทับงานที่แก้จากหลังบ้าน"
+ *
+ * ⚠️ ตรวจด้วย `updated_by` ไม่ใช่ "ค่าเปลี่ยนไปจากต้นฉบับไหม" — เพราะเราเทียบได้แค่ "ใครเขียนล่าสุด"
+ *    (ถ้าคนแก้กลับไปเป็นค่าเดิมเป๊ะ ก็ยังนับว่าคนแก้ — ปลอดภัยกว่า)
+ */
+export type ProductWriteMode = "replace" | "protect-edited";
+
+export type ProductUpsertResult = {
+  /** true = เพิ่งสร้างแถวใหม่ (ไม่มีของเดิม) */
+  readonly created: boolean;
+  /** true = เจอของเดิมที่ "คนอื่นแก้" และโหมด protect-edited จึงคงค่าเดิมไว้จริง */
+  readonly protectedEdit: boolean;
+};
+
+/** เงื่อนไข "แถวเดิมถูกแก้โดยคนอื่น" — ใช้ทั้งการคงค่าและตัดสินว่าเขียน updated_at/by ไหม */
+const PROTECTED_EDIT_CONDITION = "product.updated_by is distinct from excluded.updated_by";
+
+/** ค่าที่จะเขียนลงคอลัมน์: โหมดปกติ = ค่าที่ส่งมา · โหมดป้องกัน = คงค่าเดิมเมื่อคนอื่นเป็นคนแก้ล่าสุด */
+function guardedColumn(mode: ProductWriteMode | undefined, column: string): string {
+  if ((mode ?? "replace") !== "protect-edited") return `excluded.${column}`;
+  return `case when ${PROTECTED_EDIT_CONDITION} then product.${column} else excluded.${column} end`;
+}
+
+/**
+ * โหมดป้องกันต้อง **คง `updated_at`/`updated_by` เดิมไว้ด้วย** เมื่อกันไว้
+ * ⚠️ ถ้าไม่คง: การนำเข้าครั้งที่ 2 จะเห็นว่า "คนแก้ล่าสุดคือตัวนำเข้าเอง" ⇒ ทับงานคนในรอบถัดไปทันที
+ *    (กับดักนี้จับได้ด้วยเทสต์ "นำเข้าซ้ำ 2 ครั้ง" ใน `check:db` วงจรที่ 27)
+ */
+function guardedNow(mode: ProductWriteMode | undefined): string {
+  if ((mode ?? "replace") !== "protect-edited") return "now()";
+  return `case when ${PROTECTED_EDIT_CONDITION} then product.updated_at else now() end`;
+}
+
 export async function upsertProduct(
   input: ProductInput,
   actor: string,
   imageMediaId: string | null,
-  options: { readonly imageMode?: ImageWriteMode } = {},
-): Promise<void> {
-  await getPool().query(
-    `insert into product (
-        id, category_id, source_id, source_url, name_th, name_en, group_th, group_en,
-        tagline_th, tagline_en, details_th, allergens_th, net_weight_th, fda_number, packaging_th,
-        image_media_id, sort_order, updated_at, updated_by
-      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18)
-     on conflict (id) do update set
-        category_id    = excluded.category_id,
-        source_id      = excluded.source_id,
-        source_url     = excluded.source_url,
-        name_th        = excluded.name_th,
-        name_en        = excluded.name_en,
-        group_th       = excluded.group_th,
-        group_en       = excluded.group_en,
-        tagline_th     = excluded.tagline_th,
-        tagline_en     = excluded.tagline_en,
-        details_th     = excluded.details_th,
-        allergens_th   = excluded.allergens_th,
-        net_weight_th  = excluded.net_weight_th,
-        fda_number     = excluded.fda_number,
-        packaging_th   = excluded.packaging_th,
-        image_media_id = ${imageWriteExpression(options.imageMode, "product")},
-        sort_order     = excluded.sort_order,
-        updated_at     = now(),
-        updated_by     = excluded.updated_by`,
+  options: { readonly imageMode?: ImageWriteMode; readonly writeMode?: ProductWriteMode } = {},
+): Promise<ProductUpsertResult> {
+  /*
+    `previous` อ่านค่าก่อนคำสั่ง (CTE เห็น snapshot ของ statement) ⇒ รู้ว่าแถวเดิมมีไหม/ใครแก้ล่าสุด
+    แล้วคืนกลับให้ผู้เรียกนับว่า "ป้องกันไว้กี่รายการ" ได้ (สคริปต์นำเข้าใช้รายงานผล)
+  */
+  const result = await getPool().query<{ previous_total: number; previous_actor: string | null }>(
+    `with previous as (
+        select count(*)::int as total, max(updated_by) as actor from product where id = $1
+      ),
+      upserted as (
+        insert into product (
+          id, category_id, source_id, source_url, name_th, name_en, group_th, group_en,
+          tagline_th, tagline_en, details_th, allergens_th, net_weight_th, fda_number, packaging_th,
+          image_media_id, sort_order, updated_at, updated_by
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18)
+        on conflict (id) do update set
+          category_id    = ${guardedColumn(options.writeMode, "category_id")},
+          source_id      = excluded.source_id,
+          source_url     = excluded.source_url,
+          name_th        = ${guardedColumn(options.writeMode, "name_th")},
+          name_en        = ${guardedColumn(options.writeMode, "name_en")},
+          group_th       = ${guardedColumn(options.writeMode, "group_th")},
+          group_en       = ${guardedColumn(options.writeMode, "group_en")},
+          tagline_th     = ${guardedColumn(options.writeMode, "tagline_th")},
+          tagline_en     = ${guardedColumn(options.writeMode, "tagline_en")},
+          details_th     = ${guardedColumn(options.writeMode, "details_th")},
+          allergens_th   = ${guardedColumn(options.writeMode, "allergens_th")},
+          net_weight_th  = ${guardedColumn(options.writeMode, "net_weight_th")},
+          fda_number     = ${guardedColumn(options.writeMode, "fda_number")},
+          packaging_th   = ${guardedColumn(options.writeMode, "packaging_th")},
+          image_media_id = ${imageWriteExpression(options.imageMode, "product")},
+          sort_order     = ${guardedColumn(options.writeMode, "sort_order")},
+          updated_at     = ${guardedNow(options.writeMode)},
+          updated_by     = ${guardedColumn(options.writeMode, "updated_by")}
+        returning id
+      )
+     select (select total from previous) as previous_total,
+            (select actor from previous) as previous_actor`,
     [
       input.id,
       input.categoryId,
@@ -395,6 +444,15 @@ export async function upsertProduct(
       actor,
     ],
   );
+
+  const total = result.rows[0]?.previous_total ?? 0;
+  const previousActor = result.rows[0]?.previous_actor ?? null;
+  const created = total === 0;
+  return {
+    created,
+    protectedEdit:
+      !created && (options.writeMode ?? "replace") === "protect-edited" && previousActor !== actor,
+  };
 }
 
 /** แทนที่ส่วนผสมทั้งชุดของสินค้า (ใน transaction เดียว — นำเข้าซ้ำแล้วได้ผลเท่าเดิม) */
