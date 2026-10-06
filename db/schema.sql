@@ -379,12 +379,16 @@ create table if not exists recipe (
   video_id       text        not null,
   published_on   date,
   sort_order     integer     not null default 0,
+  /* หลังบ้านเมนูอาหาร (migration 0021 · รอบที่ 135) — ร่าง/เผยแพร่ + ถังขยะ */
+  status         text        not null default 'published' check (status in ('draft', 'published')),
+  deleted_at     timestamptz,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );
 
 create index if not exists recipe_order_idx on recipe (sort_order, id);
 create index if not exists recipe_source_idx on recipe (source_id);
+create index if not exists recipe_admin_idx on recipe (deleted_at, status, sort_order, id);
 
 -- ── ข่าวสาร & กิจกรรม ที่นำเข้าจากเว็บเดิม (S5 · migration 0018) ────────────────
 -- 151 ข่าว (2018–2026) · เนื้อหาเก็บเป็น **บล็อกเรียงลำดับ** (ย่อหน้า/หัวข้อ/รูป) ไม่เก็บ HTML ดิบ

@@ -18,11 +18,13 @@ import type { adminBlockTypes as thAdminBlockTypes } from "@/lib/i18n/messages/a
 import type { adminSchedule as thAdminSchedule } from "@/lib/i18n/messages/areas/th/adminSchedule";
 import type { adminProducts as thAdminProducts } from "@/lib/i18n/messages/areas/th/adminProducts";
 import type { adminNews as thAdminNews } from "@/lib/i18n/messages/areas/th/adminNews";
+import type { adminRecipes as thAdminRecipes } from "@/lib/i18n/messages/areas/th/adminRecipes";
 
 /** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset/block-types/schedule) — ไฟล์นี้ไม่ต้องมีอีก */
 type MovedKeys =
   | keyof typeof thAdminProducts
   | keyof typeof thAdminNews
+  | keyof typeof thAdminRecipes
   | keyof typeof thAdminMedia
   | keyof typeof thAdminSettings
   | keyof typeof thAdminDraft

@@ -70,7 +70,18 @@ import {
   upsertNews,
 } from "@/lib/news/repository";
 import { recipeIdOfSourceId } from "@/lib/recipes/model";
-import { deleteRecipe, listRecipes, upsertRecipe } from "@/lib/recipes/repository";
+import {
+  adminRecipeCounts,
+  createRecipeForAdmin,
+  deleteRecipe,
+  listRecipes,
+  listRecipesForAdmin,
+  loadRecipeForAdmin,
+  setRecipeTrashed,
+  updateRecipeForAdmin,
+  upsertRecipe,
+  type AdminRecipeInput,
+} from "@/lib/recipes/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
@@ -296,6 +307,9 @@ async function main(): Promise<void> {
 
   /* 24) หลังบ้านสินค้า: ตัวอ่านของจอ (การ์ด/แก้ไข/หมวด) + โหมดเขียนภาพ keep/set (รอบที่ 134) */
   await checkProductAdmin();
+
+  /* 25) หลังบ้านเมนูอาหาร: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บจริง (รอบที่ 135) */
+  await checkRecipeAdmin();
 
   await closePool();
 
@@ -1954,6 +1968,8 @@ async function checkProductCatalog(): Promise<void> {
  */
 const RECIPE_CHECK_ID = "r999999";
 const RECIPE_CHECK_SOURCE_ID = "999999";
+/* 25) หลังบ้านเมนูอาหาร (รอบที่ 135) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
+const RECIPE_ADMIN_CHECK_ACTOR = "check-db-recipes-admin@example.invalid";
 const RECIPE_CHECK_ACTOR = "check-db-recipes@example.invalid";
 
 async function checkRecipeVideos(): Promise<void> {
@@ -2449,5 +2465,125 @@ async function checkProductAdmin(): Promise<void> {
       "ต้องไม่เหลือหมวดทดสอบ",
     );
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
+  }
+}
+
+/**
+ * 25) หลังบ้านเมนูอาหาร (รอบที่ 135) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์ว่า "ร่าง/เผยแพร่/ถังขยะ" คุมการมองเห็นบนเว็บจริง (ตรรกะอยู่ที่ SQL ⇒ ถ้าลืมกรองที่ใด ร่างหลุดขึ้นเว็บทันที)
+ *   · สร้างเป็น "เผยแพร่" → หน้าเว็บ (listRecipes) เห็น
+ *   · เปลี่ยนเป็น "ร่าง" → หน้าเว็บไม่เห็น · ตัวนับแท็บขยับถูก
+ *   · ย้ายเข้าถังขยะ → ไม่เห็น · แท็บถังขยะเห็น · กู้คืนได้
+ *   · ค้นหาด้วยชื่อ/รหัสวิดีโอ · `loadRecipeForAdmin` คืนฟิลด์ครบ (พาธภาพ/วันเผยแพร่)
+ *   · ตัวเลขในตัวนับใช้ค่าสัมพัทธ์ (ไม่ assume ว่าฐานข้อมูลว่าง — บทเรียนรอบที่ 124/127)
+ */
+async function checkRecipeAdmin(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const marker = `เมนูหลังบ้าน ${String(Date.now())}`;
+
+  const baseInput: AdminRecipeInput = {
+    titleTh: marker,
+    titleEn: "Admin check recipe",
+    videoId: "dQw4w9WgXcQ",
+    publishedOn: "2018-10-09",
+    sortOrder: 7,
+    coverPath: `/media/${mediaId}`,
+    status: "published",
+  };
+
+  let createdId = "";
+  const before = await adminRecipeCounts();
+
+  try {
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-recipe-admin.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "เมนูหลังบ้าน",
+      altEn: "Admin recipe",
+      createdBy: RECIPE_ADMIN_CHECK_ACTOR,
+    });
+
+    /* 1) สร้างเป็น "เผยแพร่" → หน้าเว็บต้องเห็น */
+    createdId = await createRecipeForAdmin(baseInput, RECIPE_ADMIN_CHECK_ACTOR);
+    assert.ok(createdId.startsWith("r"), `id ต้องขึ้นต้นด้วย r (ได้ "${createdId}")`);
+
+    const publicAfterCreate = await listRecipes();
+    const visible = publicAfterCreate.find((entry) => entry.id === createdId);
+    assert.ok(visible !== undefined, "เมนูที่เผยแพร่ต้องขึ้นหน้าเว็บ");
+    assert.equal(visible.coverPath, `/media/${mediaId}`, "ภาพปกต้องเป็นพาธ /media/<id> (มติ D9)");
+    assert.equal(visible.publishedOn, "2018-10-09", "วันเผยแพร่ต้องอ่านกลับเป็น ISO");
+
+    const afterCreate = await adminRecipeCounts();
+    assert.equal(afterCreate.published, before.published + 1, "ตัวนับ 'เผยแพร่' ต้อง +1");
+    assert.equal(afterCreate.draft, before.draft, "ตัวนับ 'ฉบับร่าง' ต้องไม่ขยับ");
+    assert.equal(afterCreate.trashed, before.trashed, "ตัวนับ 'ถังขยะ' ต้องไม่ขยับ");
+
+    /* 2) จอแก้ต้องอ่านได้ครบ */
+    const detail = await loadRecipeForAdmin(createdId);
+    assert.ok(detail !== null, "ต้องโหลดเมนูสำหรับจอแก้ได้");
+    assert.equal(detail.titleTh, marker);
+    assert.equal(detail.videoId, "dQw4w9WgXcQ");
+    assert.equal(detail.sortOrder, 7);
+    assert.equal(detail.status, "published");
+    assert.equal(detail.trashed, false);
+
+    /* 3) เปลี่ยนเป็น "ร่าง" → หน้าเว็บต้องไม่เห็น */
+    await updateRecipeForAdmin(createdId, { ...baseInput, titleTh: `${marker} (ร่าง)`, status: "draft" }, RECIPE_ADMIN_CHECK_ACTOR);
+    assert.equal(
+      (await listRecipes()).some((entry) => entry.id === createdId),
+      false,
+      "ฉบับร่างต้องไม่ขึ้นหน้าเว็บ",
+    );
+    const afterDraft = await adminRecipeCounts();
+    assert.equal(afterDraft.draft, before.draft + 1, "ตัวนับ 'ฉบับร่าง' ต้อง +1");
+    assert.equal(afterDraft.published, before.published, "ตัวนับ 'เผยแพร่' ต้องกลับมาเท่าเดิม");
+
+    /* 4) กลับไปเผยแพร่ แล้วย้ายเข้าถังขยะ → หน้าเว็บไม่เห็น แต่ยังกู้คืนได้ */
+    await updateRecipeForAdmin(createdId, baseInput, RECIPE_ADMIN_CHECK_ACTOR);
+    await setRecipeTrashed(createdId, true, RECIPE_ADMIN_CHECK_ACTOR);
+    assert.equal(
+      (await listRecipes()).some((entry) => entry.id === createdId),
+      false,
+      "ของในถังขยะต้องไม่ขึ้นหน้าเว็บ",
+    );
+    const trashList = await listRecipesForAdmin({ tab: "trash", search: marker });
+    assert.ok(
+      trashList.items.some((entry) => entry.id === createdId),
+      "แท็บถังขยะต้องเห็นเมนูที่เพิ่งย้ายเข้า",
+    );
+    const afterTrash = await adminRecipeCounts();
+    assert.equal(afterTrash.trashed, before.trashed + 1, "ตัวนับ 'ถังขยะ' ต้อง +1");
+    assert.equal(afterTrash.all, before.all, "'ทั้งหมด' นับเฉพาะของที่ไม่อยู่ในถังขยะ");
+
+    await setRecipeTrashed(createdId, false, RECIPE_ADMIN_CHECK_ACTOR);
+    assert.ok(
+      (await listRecipes()).some((entry) => entry.id === createdId),
+      "กู้คืนแล้วต้องกลับขึ้นหน้าเว็บ",
+    );
+
+    /* 5) ค้นหาได้ทั้งชื่อและรหัสวิดีโอ */
+    const byTitle = await listRecipesForAdmin({ tab: "published", search: marker });
+    assert.ok(byTitle.items.some((entry) => entry.id === createdId), "ค้นหาด้วยชื่อไทยต้องเจอ");
+    const byVideo = await listRecipesForAdmin({ tab: "all", search: "dQw4w9WgXcQ" });
+    assert.ok(byVideo.items.some((entry) => entry.id === createdId), "ค้นหาด้วยรหัสวิดีโอต้องเจอ");
+
+    done("หลังบ้านเมนูอาหาร: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บได้จริง", "ตัวนับแท็บ · ค้นหา · พาธภาพ · กู้คืน");
+  } finally {
+    if (createdId !== "") await deleteRecipe(createdId);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(createdId === "" ? 0 : await countWhere("recipe where id = $1", [createdId]), 0, "ต้องไม่เหลือเมนูทดสอบ");
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
+    assert.deepEqual(await adminRecipeCounts(), before, "ตัวนับต้องกลับมาเท่าเดิมหลังลบรอยทดสอบ");
   }
 }

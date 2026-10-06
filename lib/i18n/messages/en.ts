@@ -12,6 +12,7 @@ import { adminSettings } from "./areas/en/adminSettings.ts";
 import { adminDraft } from "./areas/en/adminDraft.ts";
 import { adminNews } from "./areas/en/adminNews.ts";
 import { adminProducts } from "./areas/en/adminProducts.ts";
+import { adminRecipes } from "./areas/en/adminRecipes.ts";
 import { adminRetention } from "./areas/en/adminRetention.ts";
 import { privacyPage } from "./areas/en/privacy.ts";
 import { maintenancePage } from "./areas/en/maintenance.ts";
@@ -76,6 +77,7 @@ export const en: Messages = {
     ...adminRetention,
     ...adminNews,
     ...adminProducts,
+    ...adminRecipes,
     ...adminMaintenance,
     ...adminErasure,
     ...adminTrash,

@@ -26,6 +26,10 @@ export type AuditAction =
   | "news-save"
   | "news-trash"
   | "news-restore"
+  /* เมนูอาหาร (รอบที่ 135) */
+  | "recipe-save"
+  | "recipe-trash"
+  | "recipe-restore"
   /** ย้ายรุ่นรูปทรงบล็อกของข้อมูลที่เก็บไว้ (X1.1) */
   | "migrate-blocks"
   /** ลบข้อมูลที่หมดอายุตามนโยบายระยะเก็บ (X2b) — ร่องรอยว่าลบอะไรไปเท่าไร */
