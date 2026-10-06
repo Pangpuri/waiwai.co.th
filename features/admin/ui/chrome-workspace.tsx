@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { FOOTER_MESSAGE, MOURNING_LIVE_EVENT, MOURNING_MESSAGE, NAVBAR_MESSAGE } from "@/features/blocks/ui/preview-frame";
 
@@ -80,6 +80,18 @@ export function ChromeWorkspace({
   const [liveNotice, setLiveNotice] = useState<{ readonly sent: boolean; readonly value: unknown }>({ sent: false, value: null });
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
+  /**
+   * ส่งค่าที่กำลังแก้ (navbar/ท้ายเว็บ/ป้ายประกาศ) เข้า iframe พรีวิว
+   *
+   * ⚠️ บทเรียนรอบที่ 162 (ฟีดแบ็กเจ้าของ: "พรีวิวสดไม่ทำงาน"):
+   *   iframe มี `key` ผูกกับ `mode`/`reloadKey` เท่านั้น ⇒ **สลับแท็บ (part) แล้วไม่ remount**
+   *   มีแค่ `src` เปลี่ยน ⇒ ข้อความที่ส่งตอนนั้นไปถึงเอกสารเก่า (หรือก่อน listener ใหม่พร้อม) แล้วหาย
+   *   ⇒ ต้องส่ง **ซ้ำตอน `onLoad`** และส่งซ้ำอีกครั้งหลัง hydration ของเอกสารใหม่
+   */
+  const postLiveValues = useCallback((): void => {
+    postLiveValues();
+  }, [liveNavbar, liveFooter, liveNotice]);
+
   /* รับค่าที่กำลังแก้จากตัวแก้แถบเมนู → ส่งต่อเข้า iframe (พรีวิวเปลี่ยนทันที) */
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -122,7 +134,7 @@ export function ChromeWorkspace({
       target.postMessage({ type: MOURNING_MESSAGE, config: liveNotice.value }, window.location.origin);
     }
     }
-  }, [liveNavbar, liveFooter, liveNotice, mode, reloadKey, part]);
+  }, [postLiveValues, mode, reloadKey, part]);
 
   /* ท้ายเว็บใช้พรีวิวคนละโหมด (โชว์ท้ายเว็บอย่างเดียว) — แถบเมนู/ป้ายประกาศใช้โหมด nav */
   const src =
@@ -194,6 +206,11 @@ export function ChromeWorkspace({
               <iframe
                 key={`${mode}-${reloadKey}`}
                 ref={frameRef}
+                onLoad={() => {
+                  postLiveValues();
+                  /* เอกสารใหม่เพิ่งโหลด — ส่งซ้ำอีกครั้งหลัง hydration จะได้ไม่พลาด */
+                  window.setTimeout(postLiveValues, 300);
+                }}
                 src={src}
                 title={strings.previewTitle}
                 className="bg-bg h-[74vh] w-full rounded-lg border-0"
