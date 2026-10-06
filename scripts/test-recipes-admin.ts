@@ -291,3 +291,25 @@ test("reorder: whitelist ชนิด + parse ค่าลำดับ + มี 
 function isReorderKindSafe(lib: string): boolean {
   return lib.includes("isReorderKind(");
 }
+
+/* ── รอบที่ 157: Sidebar พับเก็บแล้วยังมีไอคอน + ลื่น (ไม่ unmount) ─────────── */
+
+test("admin sidebar: มีไอคอนทุกเมนู · พับแล้วยังเห็นไอคอน · ใช้ transition ไม่ unmount", () => {
+  const ui = readFileSync("features/admin/ui/admin-sidebar.tsx", "utf8");
+  const layout = readFileSync("app/admin/layout.tsx", "utf8");
+
+  assert.ok(ui.includes("ICONS") && ui.includes("<svg"), "เมนูต้องมีไอคอน (svg · currentColor)");
+  assert.ok(ui.includes("iconFor("), "ต้องเลือกไอคอนตามเส้นทางเมนู");
+  assert.ok(ui.includes("aria-hidden"), "ไอคอนตกแต่งต้อง aria-hidden (มีชื่อเมนูเป็นข้อความจริง)");
+  assert.ok(ui.includes("transition-[width]"), "เปิด/ปิดต้อง animate ความกว้าง (ไม่กระด้าง)");
+  assert.ok(ui.includes("transition-transform") && ui.includes("rotate-180"), "ลูกศรต้องหมุนตามสถานะ");
+  assert.ok(ui.includes("aria-expanded"), "ปุ่มเปิด/ปิดต้องบอกสถานะให้ assistive tech");
+  assert.ok(ui.includes("title={item.label}"), "พับเก็บแล้วต้อง hover ดูชื่อเมนูได้");
+  /* ⚠️ บทเรียนรอบ 157: ของเดิมพับแล้ว unmount เมนูทั้งก้อน ⇒ กระพริบ/กระโดด */
+  /* ของเดิมพับแล้วไม่ render เมนูทั้งก้อน ⇒ กระพริบ/กระโดด · ตอนนี้ต้อง "ซ่อนด้วย CSS" เท่านั้น */
+  assert.ok(
+    ui.includes("<nav className={open ?"),
+    "เมนูต้อง render ตลอดเวลา แล้วสลับคลาสตามสถานะ (ห้าม unmount ตอนพับ)",
+  );
+  assert.ok(layout.includes("AdminSidebar"), "layout ต้องใช้ Sidebar");
+});
