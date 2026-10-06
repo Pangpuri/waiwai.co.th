@@ -14,7 +14,7 @@ import { getFormPool, getReadPool } from "@/db/pool";
  *
  * กติกา
  * 1. ฟังก์ชันที่ใช้ `readQuery()` ต้องเป็น **SELECT ล้วน** — ห้าม insert/update/delete ในฟังก์ชันเดียวกัน
- *    (มีเทสต์สแกนกันถอยหลังที่ `scripts/test-db-readonly.ts`)
+ *    (มีเทสต์สแกนกันถอยหลังที่ `scripts/test-db-roles.ts`)
  * 2. งานเขียน + transaction ใช้ `getPool()` (หลังบ้าน) เท่านั้น
  * 3. ไม่ตั้ง `PUBLIC_DATABASE_URL`/`FORM_DATABASE_URL` = ถอยไปใช้ pool หลังบ้าน (พฤติกรรมเดิม)
  *    ⇒ ยังไม่มี isolation จนกว่าจะตั้ง; ดู `isReadOnlyConfigured()` + `npm run db:roles`
