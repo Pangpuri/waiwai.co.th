@@ -76,3 +76,70 @@ export function planVercelEnv(env: Readonly<Record<string, string | undefined>>)
     excluded: VERCEL_EXCLUDED_KEYS,
   };
 }
+
+/* ── หนี้ A3 (รอบที่ 142): แผน env ของ "หลังบ้าน" สำหรับ Vercel ──────────────── */
+
+/**
+ * คีย์ที่จำเป็นสำหรับให้ **หลังบ้าน** ทำงานบน Vercel
+ * (ไม่รวม `ADMIN_NAME`/`ADMIN_ROLE` — มีค่าเริ่มต้นในโค้ด)
+ */
+export const VERCEL_ADMIN_KEYS = ["ADMIN_EMAIL", "ADMIN_PASSWORD_HASH", "SESSION_SECRET"] as const;
+
+/** ความยาวขั้นต่ำของ `SESSION_SECRET` (ตรงกับที่แอปบังคับตอนล็อกอิน) */
+export const SESSION_SECRET_MIN_LENGTH = 32;
+
+export type VercelAdminEnvPlan = {
+  /** บรรทัดที่วางใน Vercel (เรียงตาม `VERCEL_ADMIN_KEYS`) */
+  readonly lines: readonly string[];
+  /** คำเตือนที่ต้องอ่านก่อนวาง (มติ D4 + บทเรียนจริง) */
+  readonly warnings: readonly string[];
+};
+
+/**
+ * วางแผน env ของหลังบ้านสำหรับ Vercel (รอบที่ 142 · หนี้ A3)
+ *
+ * บริบทจริง: เจ้าของล็อกอินหลังบ้านบนเดโมไม่ได้ ⇒ ตรวจแล้วพบว่า **ค่า env บน Vercel กับในเครื่องไม่ตรงกัน**
+ * (ระบบล็อกอินไม่ได้พัง — ยิงฟอร์มจริงแล้ว action ทำงาน + เขียน audit ปกติ แต่ hash ไม่ตรงกับรหัสที่ใช้)
+ *
+ * ⇒ ตัวนี้ช่วย **สร้างบล็อกที่ถูกต้อง** จากค่าจริงใน `.env.local` พร้อม **ด่านกันพลาด 2 ข้อที่เคยเกิดจริง**
+ *   1. **ค่าห้ามมี `$`** — `@next/env` (dotenv-expand) จะตีความเป็นชื่อตัวแปรแล้ว **ตัดค่าทิ้ง**
+ *      (เคสจริงรอบที่ 27: hash แบบเดิมทำให้ "รหัสถูกแต่ล็อกอินไม่ได้")
+ *   2. **`SESSION_SECRET` ต้องยาว ≥ 32** ไม่งั้นแอปจะปฏิเสธการล็อกอิน
+ *
+ * ⚠️ **มติ D4:** การใส่คีย์ชุดนี้ = เปิด `/admin` สู่อินเทอร์เน็ต (ยังไม่มี 2FA/ทบทวนความปลอดภัยรอบสุดท้าย)
+ *    ⇒ ใช้เมื่อต้องสาธิตหลังบ้านเท่านั้น และควรหมุนรหัสก่อนเปิดใช้จริง
+ */
+export function planVercelAdminEnv(env: Readonly<Record<string, string | undefined>>): VercelAdminEnvPlan {
+  const email = (env["ADMIN_EMAIL"] ?? "").trim();
+  const hash = (env["ADMIN_PASSWORD_HASH"] ?? "").trim();
+  const secret = (env["SESSION_SECRET"] ?? "").trim();
+
+  if (email === "") {
+    throw new Error("ไม่พบ ADMIN_EMAIL — ตั้งอีเมลผู้ดูแลใน .env.local ก่อน (npm run admin:create --write-env)");
+  }
+  if (hash === "") {
+    throw new Error("ไม่พบ ADMIN_PASSWORD_HASH — สร้างด้วย npm run admin:create -- --email=… --password=… --write-env");
+  }
+  if (!hash.startsWith("scrypt:")) {
+    throw new Error("ADMIN_PASSWORD_HASH ต้องอยู่ในรูปแบบ scrypt:N:r:p:<salt>:<hash> (รูปแบบอื่นแอปจะปฏิเสธ)");
+  }
+  if (hash.includes("$")) {
+    throw new Error("ADMIN_PASSWORD_HASH มีอักขระ $ — Vercel/dotenv-expand จะตัดค่าทิ้ง ⇒ ล็อกอินไม่ได้ (เคสจริงรอบที่ 27)");
+  }
+  if (secret.length < SESSION_SECRET_MIN_LENGTH) {
+    throw new Error(`SESSION_SECRET สั้นเกินไป (${String(secret.length)} ตัวอักษร — ต้อง ≥ ${String(SESSION_SECRET_MIN_LENGTH)})`);
+  }
+  if (secret.includes("$")) {
+    throw new Error("SESSION_SECRET มีอักขระ $ — dotenv-expand จะตัดค่าทิ้ง (เคสจริงรอบที่ 27)");
+  }
+
+  return {
+    lines: [`ADMIN_EMAIL=${email}`, `ADMIN_PASSWORD_HASH=${hash}`, `SESSION_SECRET=${secret}`],
+    warnings: [
+      "⚠️ มติ D4: คีย์ชุดนี้ = เปิดหลังบ้านสู่อินเทอร์เน็ต — ใส่เมื่อต้องสาธิตเท่านั้น (ยังไม่มี 2FA)",
+      "หลังแก้ env ต้อง Redeploy ใหม่เสมอ (env ใหม่ไม่มีผลกับ deployment เดิม)",
+      "อย่าใช้รหัสผ่านที่เคยหลุด/ส่งในแชท — หมุนใหม่ก่อนเปิดใช้จริง",
+      "ADMIN_NAME/ADMIN_ROLE ไม่จำเป็น (มีค่าเริ่มต้นในโค้ด)",
+    ],
+  };
+}

@@ -9,8 +9,11 @@ import {
   validateProductInput,
   type ProductIngredientInput,
 } from "@/lib/products/model";
+import { prunePlan } from "@/lib/import/prune";
 import {
+  listProductIds,
   replaceProductIngredients,
+  setProductTrashed,
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
@@ -69,18 +72,29 @@ type Options = {
   readonly dryRun: boolean;
   readonly dir: string | null;
   readonly force: boolean;
+  /** รายงานของที่หายไปจากเว็บเดิม (หนี้ A2) */
+  readonly prune: boolean;
+  /** ย้ายของที่หายไปเข้าถังขยะจริง (ไม่ลบถาวร) */
+  readonly pruneApply: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Options {
   let dryRun = false;
   let dir: string | null = null;
   let force = false;
+  let prune = false;
+  let pruneApply = false;
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
     else if (arg === "--force") force = true;
+    else if (arg === "--prune") prune = true;
+    else if (arg === "--prune-apply") {
+      prune = true;
+      pruneApply = true;
+    }
     else if (arg.startsWith("--dir=")) dir = arg.slice("--dir=".length);
   }
-  return { dryRun, dir, force };
+  return { dryRun, dir, force, prune, pruneApply };
 }
 
 function log(message: string): void {
@@ -137,6 +151,8 @@ async function main(): Promise<void> {
 
   const mediaCache: ImportMediaCache = new Map();
   const stats = { newImages: 0, reusedImages: 0, products: 0, ingredients: 0, skippedDuplicates: 0, skippedInvalid: 0, protectedEdits: 0 };
+  /* id ที่เจอในรอบนี้ — ใช้คำนวณ --prune (ของที่หายจากต้นทาง) */
+  const importedIds: string[] = [];
   const issues: string[] = [];
 
   for (const source of SOURCES) {
@@ -251,11 +267,13 @@ async function main(): Promise<void> {
           stats.protectedEdits += 1;
           /* นับเป็น "พบ" ใน log ต่อหมวด แต่ไม่นับเป็นรายการที่เขียนทับ */
           order += 1;
+          importedIds.push(productInput.id);
           log(`   ⓘ คงค่าเดิมไว้ (แก้จากหลังบ้าน): ${card.nameTh}`);
           continue;
         }
         await replaceProductIngredients(productInput.id, ingredients);
       }
+      importedIds.push(productInput.id);
 
       stats.products += 1;
       stats.ingredients += ingredients.length;
@@ -271,6 +289,7 @@ async function main(): Promise<void> {
   log(`      ข้ามสินค้าซ้ำ ${stats.skippedDuplicates} · ข้ามเพราะข้อมูลไม่ผ่าน ${stats.skippedInvalid}`);
   log(`      คงค่าเดิมไว้ (แก้จากหลังบ้าน) ${stats.protectedEdits}`);
   if (options.dryRun) log("      (โหมด --dry-run: ไม่ได้เขียนลงฐานข้อมูล)");
+  await pruneMissingProducts(options, importedIds);
   if (stats.protectedEdits > 0 && !options.force) {
     log("");
     log("ℹ️ สินค้าที่ถูกแก้จากหลังบ้านถูก “คงค่าเดิม” ไว้ (ไม่ทับ)");
@@ -281,6 +300,24 @@ async function main(): Promise<void> {
     log(`\n⚠️ ข้อที่ต้องดู (${issues.length}):`);
     for (const issue of issues.slice(0, 20)) log(`   · ${issue}`);
   }
+}
+
+/** ย้ายสินค้าที่หายไปจากต้นทางเข้าถังขยะ (ไม่ลบถาวร) — หนี้ A2 รอบที่ 142 */
+async function pruneMissingProducts(options: Options, importedIds: readonly string[]): Promise<void> {
+  /* รายงานได้แม้เป็น --dry-run (การอ่านไม่ใช่การเขียน) — เฉพาะลงมือเท่านั้นที่ข้าม */
+  if (!options.prune) return;
+  const missing = prunePlan(await listProductIds(), importedIds);
+  if (missing.length === 0) {
+    log("🧹 --prune: ไม่มีสินค้าค้างที่หายจากเว็บเดิม");
+    return;
+  }
+  log(`🧹 --prune: พบสินค้าที่หายจากเว็บเดิม ${missing.length} รายการ → ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? " …" : ""}`);
+  if (!options.pruneApply || options.dryRun) {
+    log("   (ยังไม่ทำอะไร — ใส่ --prune-apply เพื่อย้ายเข้าถังขยะ · กู้คืนได้เสมอ)");
+    return;
+  }
+  for (const id of missing) await setProductTrashed(id, true, ACTOR);
+  log(`   ✓ ย้ายเข้าถังขยะแล้ว ${missing.length} รายการ (กู้คืนได้จาก /admin/products → แท็บถังขยะ)`);
 }
 
 async function readLocal(dir: string, filename: string): Promise<string> {

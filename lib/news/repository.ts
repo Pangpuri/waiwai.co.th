@@ -156,29 +156,63 @@ export async function listNewsSourceIds(): Promise<readonly string[]> {
 
 /* ── ฝั่งเขียน (ใช้โดยสคริปต์นำเข้า) — โยน error ออกไปถ้าล้มเหลว (ห้ามกลืน) ────── */
 
+/**
+ * โหมดเขียนทับของข่าว (รอบที่ 142 · หนี้ A1) — แบบเดียวกับสินค้า/เมนู
+ * - `replace` (ค่าเริ่มต้น) — เขียนทับทุกช่อง (หลังบ้านใช้)
+ * - `protect-edited` — **สคริปต์นำเข้าใช้**: ถ้าแถวเดิมถูกแก้โดยผู้ใช้อื่น ให้คงค่าเดิม
+ */
+export type NewsWriteMode = "replace" | "protect-edited";
+
+export type NewsUpsertResult = {
+  readonly created: boolean;
+  readonly protectedEdit: boolean;
+};
+
+const NEWS_PROTECTED_EDIT = "news.updated_by is distinct from excluded.updated_by";
+
+function newsColumn(mode: NewsWriteMode | undefined, column: string, fallback: string): string {
+  if ((mode ?? "replace") !== "protect-edited") return fallback;
+  return `case when ${NEWS_PROTECTED_EDIT} then news.${column} else ${fallback} end`;
+}
+
 export async function upsertNews(
   input: NewsInput,
   actor: string,
   coverMediaId: string | null,
   body: readonly NewsBlock[],
-): Promise<void> {
-  await getPool().query(
-    `insert into news (id, source_id, source_url, title_th, title_en, excerpt_th, excerpt_en,
-                       cover_media_id, body, published_at, published_label, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::timestamptz, $11, now(), $12)
-     on conflict (id) do update set
-       source_id       = excluded.source_id,
-       source_url      = excluded.source_url,
-       title_th        = excluded.title_th,
-       title_en        = excluded.title_en,
-       excerpt_th      = excluded.excerpt_th,
-       excerpt_en      = excluded.excerpt_en,
-       cover_media_id  = coalesce(excluded.cover_media_id, news.cover_media_id),
-       body            = excluded.body,
-       published_at    = coalesce(excluded.published_at, news.published_at),
-       published_label = excluded.published_label,
-       updated_at      = now(),
-       updated_by      = excluded.updated_by`,
+  options: { readonly writeMode?: NewsWriteMode } = {},
+): Promise<NewsUpsertResult> {
+  /*
+    ⚠️ โหมด protect-edited ต้องคง updated_at/updated_by เดิมด้วย
+    ไม่งั้นการนำเข้าครั้งที่ 2 จะทับงานคนทันที (บทเรียนรอบที่ 140)
+    ⚠️ "เนื้อหาข่าว" คือ `body` ⇒ ต้องถูกป้องกันด้วย ไม่งั้นแก้ข่าวจากหลังบ้านแล้วนำเข้าซ้ำ = เนื้อหาหาย
+  */
+  const mode = options.writeMode;
+  const result = await getPool().query<{ previous_total: number; previous_actor: string | null }>(
+    `with previous as (
+        select count(*)::int as total, max(updated_by) as actor from news where id = $1
+      ),
+      upserted as (
+        insert into news (id, source_id, source_url, title_th, title_en, excerpt_th, excerpt_en,
+                          cover_media_id, body, published_at, published_label, updated_at, updated_by)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::timestamptz, $11, now(), $12)
+        on conflict (id) do update set
+          source_id       = excluded.source_id,
+          source_url      = excluded.source_url,
+          title_th        = ${newsColumn(mode, "title_th", "excluded.title_th")},
+          title_en        = ${newsColumn(mode, "title_en", "excluded.title_en")},
+          excerpt_th      = ${newsColumn(mode, "excerpt_th", "excluded.excerpt_th")},
+          excerpt_en      = ${newsColumn(mode, "excerpt_en", "excluded.excerpt_en")},
+          cover_media_id  = ${newsColumn(mode, "cover_media_id", "coalesce(excluded.cover_media_id, news.cover_media_id)")},
+          body            = ${newsColumn(mode, "body", "excluded.body")},
+          published_at    = ${newsColumn(mode, "published_at", "coalesce(excluded.published_at, news.published_at)")},
+          published_label = ${newsColumn(mode, "published_label", "excluded.published_label")},
+          updated_at      = ${newsColumn(mode, "updated_at", "now()")},
+          updated_by      = ${newsColumn(mode, "updated_by", "excluded.updated_by")}
+        returning id
+      )
+     select (select total from previous) as previous_total,
+            (select actor from previous) as previous_actor`,
     [
       input.id,
       input.sourceId,
@@ -195,6 +229,25 @@ export async function upsertNews(
       actor,
     ],
   );
+
+  const total = result.rows[0]?.previous_total ?? 0;
+  const previousActor = result.rows[0]?.previous_actor ?? null;
+  const created = total === 0;
+  return {
+    created,
+    protectedEdit: !created && (mode ?? "replace") === "protect-edited" && previousActor !== actor,
+  };
+}
+
+/** id ข่าวที่ยังใช้งาน (ไม่รวมของในถัง) — ใช้คำนวณ `--prune` (รอบที่ 142) */
+export async function listNewsIds(): Promise<readonly string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{ id: string }>("select id from news where deleted_at is null order by id");
+    return result.rows.map((row) => row.id);
+  } catch {
+    return [];
+  }
 }
 
 /** ลบข่าว 1 ชิ้นถาวร (ใช้ในด่านตรวจ/ล้างข้อมูลทดสอบ) */

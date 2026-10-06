@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { VERCEL_EXCLUDED_KEYS, planVercelEnv } from "@/lib/db/vercel-env";
+import { VERCEL_EXCLUDED_KEYS, planVercelAdminEnv, planVercelEnv } from "@/lib/db/vercel-env";
 
 /**
  * เทสต์ "env ที่จะตั้งบน Vercel" (รอบที่ 116)
@@ -60,4 +60,48 @@ test("vercel-env: ไม่มีค่าเป้าหมาย = แจ้�
   assert.throws(() => planVercelEnv({}), /TARGET_DATABASE_URL/);
   assert.throws(() => planVercelEnv({ TARGET_DATABASE_URL: "   " }), /TARGET_DATABASE_URL/);
   assert.throws(() => planVercelEnv({ TARGET_DATABASE_URL: "ไม่ใช่-url" }), /อ่านโฮสต์/);
+});
+
+/* ── หนี้ A3 (รอบที่ 142): แผน env ของ "หลังบ้าน" ──────────────────────────── */
+
+const HASH = "scrypt:32768:8:1:abcdef0123456789:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd";
+const SECRET = "J7not-a-real-secret-but-long-enough-0123456789";
+
+test("vercel-env: แผนคีย์หลังบ้านต้องได้ 3 คีย์ครบและมีคำเตือนมติ D4", () => {
+  const plan = planVercelAdminEnv({ ADMIN_EMAIL: "admin@waiwai.co.th", ADMIN_PASSWORD_HASH: HASH, SESSION_SECRET: SECRET });
+  assert.deepEqual(
+    plan.lines.map((line) => line.split("=")[0]),
+    ["ADMIN_EMAIL", "ADMIN_PASSWORD_HASH", "SESSION_SECRET"],
+    "ต้องได้คีย์ตามลำดับที่กำหนด",
+  );
+  assert.ok(plan.warnings.some((w) => w.includes("D4")), "ต้องเตือนเรื่องมติ D4 (เปิดหลังบ้านสู่อินเทอร์เน็ต)");
+  assert.ok(plan.warnings.some((w) => w.includes("Redeploy")), "ต้องเตือนว่าต้อง Redeploy หลังแก้ env");
+});
+
+test("vercel-env: กันค่าที่มี $ (กับดัก dotenv-expand เคสจริงรอบที่ 27)", () => {
+  assert.throws(
+    () => planVercelAdminEnv({ ADMIN_EMAIL: "a@b.co", ADMIN_PASSWORD_HASH: "scrypt:1:2:3:sa$lt:hash", SESSION_SECRET: SECRET }),
+    /\$/,
+    "hash ที่มี $ ต้องถูกปฏิเสธ (Vercel จะตัดค่าทิ้ง ⇒ ล็อกอินไม่ได้)",
+  );
+  assert.throws(
+    () => planVercelAdminEnv({ ADMIN_EMAIL: "a@b.co", ADMIN_PASSWORD_HASH: HASH, SESSION_SECRET: "x".repeat(40) + "$y" }),
+    /\$/,
+    "SESSION_SECRET ที่มี $ ก็ต้องถูกปฏิเสธ",
+  );
+});
+
+test("vercel-env: ด่านรูปแบบรหัสผ่าน/ความยาว SESSION_SECRET", () => {
+  assert.throws(() => planVercelAdminEnv({ ADMIN_PASSWORD_HASH: HASH, SESSION_SECRET: SECRET }), /ADMIN_EMAIL/);
+  assert.throws(() => planVercelAdminEnv({ ADMIN_EMAIL: "a@b.co", SESSION_SECRET: SECRET }), /ADMIN_PASSWORD_HASH/);
+  assert.throws(
+    () => planVercelAdminEnv({ ADMIN_EMAIL: "a@b.co", ADMIN_PASSWORD_HASH: "$2b$10$abc", SESSION_SECRET: SECRET }),
+    /scrypt/,
+    "รูปแบบอื่นที่ไม่ใช่ scrypt:… ต้องถูกปฏิเสธ (แอปจะล็อกอินไม่ได้)",
+  );
+  assert.throws(
+    () => planVercelAdminEnv({ ADMIN_EMAIL: "a@b.co", ADMIN_PASSWORD_HASH: HASH, SESSION_SECRET: "short" }),
+    /32/,
+    "SESSION_SECRET สั้นกว่า 32 ต้องถูกปฏิเสธ",
+  );
 });

@@ -320,6 +320,9 @@ async function main(): Promise<void> {
   /* 27) นำเข้าสินค้าซ้ำ: ต้องไม่ทับงานที่แก้จากหลังบ้าน (รอบที่ 140) */
   await checkProductImportGuard();
 
+  /* 28) นำเข้าเมนู/ข่าวซ้ำ: ต้องไม่ทับงานที่แก้จากหลังบ้าน (รอบที่ 142) */
+  await checkContentImportGuard();
+
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
@@ -1991,6 +1994,10 @@ const TRASH_CHECK_PRODUCT_ID = "p999997";
 
 /* 27) นำเข้าสินค้าซ้ำต้องไม่ทับงานคน (รอบที่ 140) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
 const IMPORT_GUARD_CHECK_ID = "p999996";
+
+/* 28) นำเข้าเมนู/ข่าวซ้ำต้องไม่ทับงานคน (รอบที่ 142) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
+const IMPORT_GUARD_RECIPE_ID = "r999995";
+const IMPORT_GUARD_NEWS_ID = "n999994";
 const IMPORT_GUARD_IMPORT_ACTOR = "import:waiwai.co.th";
 const IMPORT_GUARD_HUMAN_ACTOR = "check-db-human-editor@example.invalid";
 
@@ -2907,5 +2914,117 @@ async function checkProductImportGuard(): Promise<void> {
   } finally {
     await deleteProduct(IMPORT_GUARD_CHECK_ID);
     assert.equal(await countWhere("product where id = $1", [IMPORT_GUARD_CHECK_ID]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+  }
+}
+/**
+ * 28) นำเข้าเมนู/ข่าวซ้ำต้องไม่ทับงานที่แก้จากหลังบ้าน (รอบที่ 142 · หนี้ A1)
+ *
+ * ที่มา: รอบที่ 140 แก้เฉพาะสินค้า ⇒ หนี้ที่เหลือคือ `recipes:import`/`news:import`
+ *   ยังเขียนทับงานคน (รวม "เนื้อหาข่าว" ทั้งก้อน) ⇒ รอบที่ 142 ใช้โหมด `protect-edited` แบบเดียวกัน
+ *
+ * วงจรนี้พิสูจน์กับ DB จริงทั้งเมนูและข่าว (ข้อ 3 คือกับดักเดิม: คง `updated_at/by` ไม่งั้นรอบ 2 ทับ)
+ */
+async function checkContentImportGuard(): Promise<void> {
+  const recipeSource = {
+    id: IMPORT_GUARD_RECIPE_ID,
+    sourceId: "999995",
+    sourceUrl: "",
+    titleTh: "เมนูจากเว็บเดิม",
+    titleEn: "",
+    videoId: "abcdefghijk",
+    publishedOn: "2025-01-02",
+    sortOrder: 7,
+  };
+  const newsSource = {
+    id: IMPORT_GUARD_NEWS_ID,
+    sourceId: "999994",
+    sourceUrl: "",
+    titleTh: "ข่าวจากเว็บเดิม",
+    titleEn: "",
+    excerptTh: "คำโปรยเดิม",
+    excerptEn: "",
+    publishedLocal: "2025-03-04T10:00",
+    publishedLabel: "4 มีนาคม 2568",
+  };
+  const bodySource = [{ type: "paragraph" as const, text: "เนื้อหาจากเว็บเดิม" }];
+
+  try {
+    /* ── เมนูอาหาร ─────────────────────────────────────────────────────────── */
+    const created = await upsertRecipe(recipeSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(created.created, true, "เมนู: ครั้งแรกต้องเป็นการสร้างใหม่");
+
+    await upsertRecipe(
+      { ...recipeSource, titleTh: "เมนูที่คนแก้จากหลังบ้าน", sortOrder: 99 },
+      IMPORT_GUARD_HUMAN_ACTOR,
+      null,
+      { writeMode: "replace" },
+    );
+
+    const reimported = await upsertRecipe(recipeSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(reimported.protectedEdit, true, "เมนู: ต้องรายงานว่าป้องกันไว้");
+    const recipeKept = await loadRecipeForAdmin(IMPORT_GUARD_RECIPE_ID);
+    assert.equal(recipeKept?.titleTh, "เมนูที่คนแก้จากหลังบ้าน", "เมนู: นำเข้าซ้ำต้องไม่ทับชื่อที่คนแก้");
+    assert.equal(recipeKept?.sortOrder, 99, "เมนู: ลำดับที่คนตั้งต้องไม่ถูกทับ");
+
+    /* ⭐ รอบที่ 2 ติดกัน (กับดัก: ถ้าเขียน updated_by ทับ จะทับงานคนในรอบนี้) */
+    const reimportedAgain = await upsertRecipe(recipeSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "protect-edited" });
+    assert.equal(reimportedAgain.protectedEdit, true, "เมนู: ต้องยังป้องกันอยู่ในการนำเข้าครั้งที่ 2");
+    assert.equal(
+      (await loadRecipeForAdmin(IMPORT_GUARD_RECIPE_ID))?.titleTh,
+      "เมนูที่คนแก้จากหลังบ้าน",
+      "⚠️ เมนู: งานคนต้องรอดแม้รันซ้ำหลายรอบ",
+    );
+
+    const forced = await upsertRecipe(recipeSource, IMPORT_GUARD_IMPORT_ACTOR, null, { writeMode: "replace" });
+    assert.equal(forced.protectedEdit, false, "เมนู: โหมด replace ต้องไม่รายงานว่าป้องกัน");
+    assert.equal(
+      (await loadRecipeForAdmin(IMPORT_GUARD_RECIPE_ID))?.titleTh,
+      "เมนูจากเว็บเดิม",
+      "เมนู: --force ต้องทับจริง",
+    );
+
+    /* ── ข่าว (สำคัญที่สุด: "เนื้อหา" อยู่ในคอลัมน์ body) ─────────────────────── */
+    const newsCreated = await upsertNews(newsSource, IMPORT_GUARD_IMPORT_ACTOR, null, bodySource, {
+      writeMode: "protect-edited",
+    });
+    assert.equal(newsCreated.created, true, "ข่าว: ครั้งแรกต้องเป็นการสร้างใหม่");
+
+    const humanBody = [
+      { type: "paragraph" as const, text: "เนื้อหาที่คนแก้จากหลังบ้าน" },
+      { type: "heading" as const, text: "หัวข้อที่คนเพิ่ม" },
+    ];
+    await upsertNews(
+      { ...newsSource, titleTh: "ข่าวที่คนแก้จากหลังบ้าน", excerptTh: "คำโปรยที่คนแก้" },
+      IMPORT_GUARD_HUMAN_ACTOR,
+      null,
+      humanBody,
+      { writeMode: "replace" },
+    );
+
+    const newsReimported = await upsertNews(newsSource, IMPORT_GUARD_IMPORT_ACTOR, null, bodySource, {
+      writeMode: "protect-edited",
+    });
+    assert.equal(newsReimported.protectedEdit, true, "ข่าว: ต้องรายงานว่าป้องกันไว้");
+    const newsKept = await loadNewsForAdmin(IMPORT_GUARD_NEWS_ID);
+    assert.equal(newsKept?.titleTh, "ข่าวที่คนแก้จากหลังบ้าน", "ข่าว: นำเข้าซ้ำต้องไม่ทับหัวข้อที่คนแก้");
+    assert.equal(newsKept?.excerptTh, "คำโปรยที่คนแก้", "ข่าว: นำเข้าซ้ำต้องไม่ทับคำโปรยที่คนแก้");
+    assert.equal(newsKept?.body.length, 2, "⚠️ ข่าว: เนื้อหาที่คนแก้ (body) ต้องไม่ถูกทับด้วยของจากเว็บเดิม");
+    assert.equal(newsKept?.body[0]?.type === "paragraph" ? newsKept.body[0].text : "", "เนื้อหาที่คนแก้จากหลังบ้าน");
+
+    const newsForced = await upsertNews(newsSource, IMPORT_GUARD_IMPORT_ACTOR, null, bodySource, { writeMode: "replace" });
+    assert.equal(newsForced.protectedEdit, false, "ข่าว: โหมด replace ต้องไม่รายงานว่าป้องกัน");
+    const newsAfterForce = await loadNewsForAdmin(IMPORT_GUARD_NEWS_ID);
+    assert.equal(newsAfterForce?.titleTh, "ข่าวจากเว็บเดิม", "ข่าว: --force ต้องทับจริง");
+    assert.equal(newsAfterForce?.body.length, 1, "ข่าว: --force ต้องทับเนื้อหาจริง");
+
+    done(
+      "นำเข้าเมนู/ข่าวซ้ำ: ไม่ทับงานที่แก้จากหลังบ้าน (รวมเนื้อหาข่าว) · --force ทับจริง · งานคนรอดแม้รันซ้ำ",
+      "เทียบ updated_by · รอบติดกัน · body JSONB · ลำดับ",
+    );
+  } finally {
+    await deleteRecipe(IMPORT_GUARD_RECIPE_ID);
+    await deleteNews(IMPORT_GUARD_NEWS_ID);
+    assert.equal(await countWhere("recipe where id = $1", [IMPORT_GUARD_RECIPE_ID]), 0, "ต้องไม่เหลือเมนูทดสอบ");
+    assert.equal(await countWhere("news where id = $1", [IMPORT_GUARD_NEWS_ID]), 0, "ต้องไม่เหลือข่าวทดสอบ");
   }
 }

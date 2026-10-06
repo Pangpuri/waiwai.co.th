@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 
-import { planVercelEnv } from "@/lib/db/vercel-env";
+import { planVercelEnv, planVercelAdminEnv } from "@/lib/db/vercel-env";
 
 /**
  * `npm run env:vercel` (รอบที่ 116) — พิมพ์ **บล็อก env สำหรับวางบน Vercel**
@@ -15,10 +15,13 @@ import { planVercelEnv } from "@/lib/db/vercel-env";
  *    (ช่อง "Import .env" วางได้เลย) แล้วเลือก Environments: Production/Preview/Development
  *
  * ตัวเลือก: `--reveal` พิมพ์ค่าจริง (ค่าเริ่มต้นจะปิดรหัสผ่านไว้ให้ตรวจได้ก่อน)
+ *          `--with-admin` เพิ่มคีย์หลังบ้าน (ADMIN_EMAIL/ADMIN_PASSWORD_HASH/SESSION_SECRET) — หนี้ A3 รอบที่ 142
+ *                       ⚠️ = เปิด /admin สู่อินเทอร์เน็ต (มติ D4) · มีด่านกันค่าที่มี `$` (เคสจริงรอบที่ 27)
  *          `--clipboard` คัดลอกเฉพาะบรรทัด DATABASE_URL ลงคลิปบอร์ด (Windows)
  */
 
 const shouldReveal = process.argv.includes("--reveal");
+const withAdmin = process.argv.includes("--with-admin");
 const toClipboard = process.argv.includes("--clipboard");
 
 function redacted(line: string): string {
@@ -88,9 +91,40 @@ async function main(): Promise<void> {
       `   (โหมดตรวจสอบ: ${shown === plan.line ? "แสดงค่าจริง" : "ปิดรหัสผ่าน"} · ใส่ --reveal เพื่อดูค่าจริง)\n`,
   );
 
-  if (toClipboard) {
-    await copyToClipboard(plan.line);
-    process.stdout.write("✓ คัดลอกบรรทัด DATABASE_URL ลงคลิปบอร์ดแล้ว (วางใน Vercel ได้เลย)\n");
+  /* ── หนี้ A3 (รอบที่ 142): คีย์หลังบ้าน — ใส่เมื่อต้องสาธิตหลังบ้านบนเดโม ───── */
+  if (withAdmin) {
+    let admin: ReturnType<typeof planVercelAdminEnv>;
+    try {
+      admin = planVercelAdminEnv(env);
+    } catch (error) {
+      process.stderr.write(`✗ ${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(1);
+    }
+
+    const maskValue = (line: string): string => {
+      const [key, ...rest] = line.split("=");
+      const value = rest.join("=");
+      if ((key ?? "").includes("HASH")) return `${key ?? ""}=scrypt:…(ซ่อนไว้ ${String(value.length)} ตัวอักษร)`;
+      return `${key ?? ""}=${value.slice(0, 2)}…(ซ่อนไว้ ${String(value.length)} ตัวอักษร)`;
+    };
+
+    process.stdout.write("\n── คีย์หลังบ้าน (วางต่อในบล็อกเดียวกัน) ──\n");
+    for (const line of admin.lines) process.stdout.write(`${shouldReveal ? line : maskValue(line)}\n`);
+    process.stdout.write("────────────────────────────────────────\n");
+    for (const warning of admin.warnings) process.stdout.write(`${warning}\n`);
+
+    if (toClipboard) {
+      await copyToClipboard([plan.line, ...admin.lines].join("\n"));
+      process.stdout.write("✓ คัดลอก DATABASE_URL + คีย์หลังบ้านลงคลิปบอร์ดแล้ว\n");
+    }
+  } else {
+    process.stdout.write(
+      "\nℹ️ หลังบ้านยังไม่ถูกใส่ (ปลอดภัยตามมติ D4) — ถ้าต้องสาธิตหลังบ้านบนเดโม ใช้ --with-admin\n",
+    );
+    if (toClipboard) {
+      await copyToClipboard(plan.line);
+      process.stdout.write("✓ คัดลอกบรรทัด DATABASE_URL ลงคลิปบอร์ดแล้ว (วางใน Vercel ได้เลย)\n");
+    }
   }
 }
 

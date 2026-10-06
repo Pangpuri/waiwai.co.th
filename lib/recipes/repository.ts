@@ -101,22 +101,60 @@ export async function listRecipes(): Promise<readonly RecipeRecord[]> {
 
 /* ── ฝั่งเขียน (ใช้โดยสคริปต์นำเข้า) — โยน error ออกไปถ้าล้มเหลว (ห้ามกลืน) ────── */
 
-export async function upsertRecipe(input: RecipeInput, actor: string, coverMediaId: string | null): Promise<void> {
-  await getPool().query(
-    `insert into recipe (id, source_id, source_url, title_th, title_en, cover_media_id, video_provider, video_id, published_on, sort_order, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, $6, 'youtube', $7, $8::date, $9, now(), $10)
-     on conflict (id) do update set
-       source_id      = excluded.source_id,
-       source_url     = excluded.source_url,
-       title_th       = excluded.title_th,
-       title_en       = excluded.title_en,
-       cover_media_id = coalesce(excluded.cover_media_id, recipe.cover_media_id),
-       video_provider = excluded.video_provider,
-       video_id       = excluded.video_id,
-       published_on   = coalesce(excluded.published_on, recipe.published_on),
-       sort_order     = excluded.sort_order,
-       updated_at     = now(),
-       updated_by     = excluded.updated_by`,
+/**
+ * โหมดเขียนทับของเมนูอาหาร (รอบที่ 142 · หนี้ A1) — แบบเดียวกับสินค้า (รอบที่ 140)
+ * - `replace` (ค่าเริ่มต้น) — เขียนทับทุกช่อง (หลังบ้านใช้: ผู้ดูแลกดบันทึกต้องชนะ)
+ * - `protect-edited` — **สคริปต์นำเข้าใช้**: ถ้าแถวเดิมถูกแก้โดยผู้ใช้อื่น ให้คงค่าเดิม
+ */
+export type RecipeWriteMode = "replace" | "protect-edited";
+
+export type RecipeUpsertResult = {
+  readonly created: boolean;
+  readonly protectedEdit: boolean;
+};
+
+/** เงื่อนไข "แถวเดิมถูกแก้โดยคนอื่น" — ใช้ทั้งการคงค่าและตัดสินว่าเขียน updated_at/by ไหม */
+const RECIPE_PROTECTED_EDIT = "recipe.updated_by is distinct from excluded.updated_by";
+
+function recipeColumn(mode: RecipeWriteMode | undefined, column: string, fallback: string): string {
+  if ((mode ?? "replace") !== "protect-edited") return fallback;
+  return `case when ${RECIPE_PROTECTED_EDIT} then recipe.${column} else ${fallback} end`;
+}
+
+export async function upsertRecipe(
+  input: RecipeInput,
+  actor: string,
+  coverMediaId: string | null,
+  options: { readonly writeMode?: RecipeWriteMode } = {},
+): Promise<RecipeUpsertResult> {
+  /*
+    ⚠️ โหมด protect-edited ต้องคง updated_at/updated_by เดิมด้วย
+    ไม่งั้นการนำเข้าครั้งที่ 2 จะเห็นว่าตนเองเป็นคนแก้ล่าสุด แล้วทับงานคนทันที (บทเรียนรอบที่ 140)
+  */
+  const mode = options.writeMode;
+  const result = await getPool().query<{ previous_total: number; previous_actor: string | null }>(
+    `with previous as (
+        select count(*)::int as total, max(updated_by) as actor from recipe where id = $1
+      ),
+      upserted as (
+        insert into recipe (id, source_id, source_url, title_th, title_en, cover_media_id, video_provider, video_id, published_on, sort_order, updated_at, updated_by)
+          values ($1, $2, $3, $4, $5, $6, 'youtube', $7, $8::date, $9, now(), $10)
+        on conflict (id) do update set
+          source_id      = excluded.source_id,
+          source_url     = excluded.source_url,
+          title_th       = ${recipeColumn(mode, "title_th", "excluded.title_th")},
+          title_en       = ${recipeColumn(mode, "title_en", "excluded.title_en")},
+          cover_media_id = ${recipeColumn(mode, "cover_media_id", "coalesce(excluded.cover_media_id, recipe.cover_media_id)")},
+          video_provider = ${recipeColumn(mode, "video_provider", "excluded.video_provider")},
+          video_id       = ${recipeColumn(mode, "video_id", "excluded.video_id")},
+          published_on   = ${recipeColumn(mode, "published_on", "coalesce(excluded.published_on, recipe.published_on)")},
+          sort_order     = ${recipeColumn(mode, "sort_order", "excluded.sort_order")},
+          updated_at     = ${recipeColumn(mode, "updated_at", "now()")},
+          updated_by     = ${recipeColumn(mode, "updated_by", "excluded.updated_by")}
+        returning id
+      )
+     select (select total from previous) as previous_total,
+            (select actor from previous) as previous_actor`,
     [
       input.id,
       input.sourceId,
@@ -130,6 +168,25 @@ export async function upsertRecipe(input: RecipeInput, actor: string, coverMedia
       actor,
     ],
   );
+
+  const total = result.rows[0]?.previous_total ?? 0;
+  const previousActor = result.rows[0]?.previous_actor ?? null;
+  const created = total === 0;
+  return {
+    created,
+    protectedEdit: !created && (mode ?? "replace") === "protect-edited" && previousActor !== actor,
+  };
+}
+
+/** id เมนูที่ยังใช้งาน (ไม่รวมของในถัง) — ใช้คำนวณ `--prune` (รอบที่ 142) */
+export async function listRecipeIds(): Promise<readonly string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{ id: string }>("select id from recipe where deleted_at is null order by id");
+    return result.rows.map((row) => row.id);
+  } catch {
+    return [];
+  }
 }
 
 /** ลบเมนู 1 รายการ **ถาวร** (ใช้ในด่านตรวจ/สคริปต์นำเข้า/ล้างข้อมูลทดสอบ)

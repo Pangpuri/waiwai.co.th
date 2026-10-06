@@ -4,7 +4,8 @@ import { newsImageVariantUrl, parseNewsArticlePage, parseNewsListingPage } from 
 import { validateNewsBody, type NewsBlock } from "@/lib/news/body";
 import { newsIdOfSourceId, isFutureNewsDate, validateNewsInput, type NewsInput } from "@/lib/news/model";
 import { applyNewsDateOverride } from "@/lib/news/date-overrides";
-import { upsertNews } from "@/lib/news/repository";
+import { prunePlan } from "@/lib/import/prune";
+import { listNewsIds, setNewsTrashed, upsertNews } from "@/lib/news/repository";
 
 /**
  * นำเข้าข่าวสาร & กิจกรรม จากเว็บเดิม (waiwai.co.th · `/th/news/`) — หน้า /news · รอบที่ 105
@@ -43,6 +44,12 @@ type Options = {
   readonly dir: string | null;
   readonly pages: readonly number[];
   readonly limit: number | null;
+  /** ทับงานที่แก้จากหลังบ้านจริง (ค่าเริ่มต้น = ไม่ทับ · หนี้ A1 รอบที่ 142) */
+  readonly force: boolean;
+  /** รายงานของที่หายไปจากเว็บเดิม (หนี้ A2) */
+  readonly prune: boolean;
+  /** ย้ายของที่หายไปเข้าถังขยะจริง (ไม่ลบถาวร) */
+  readonly pruneApply: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Options {
@@ -50,9 +57,18 @@ function parseArgs(argv: readonly string[]): Options {
   let dir: string | null = null;
   let pages: number[] = [];
   let limit: number | null = null;
+  let force = false;
+  let prune = false;
+  let pruneApply = false;
 
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--force") force = true;
+    else if (arg === "--prune") prune = true;
+    else if (arg === "--prune-apply") {
+      prune = true;
+      pruneApply = true;
+    }
     else if (arg.startsWith("--dir=")) dir = arg.slice("--dir=".length);
     else if (arg.startsWith("--pages=")) {
       pages = arg
@@ -66,7 +82,7 @@ function parseArgs(argv: readonly string[]): Options {
     }
   }
 
-  return { dryRun, dir, pages, limit };
+  return { dryRun, dir, pages, limit, force, prune, pruneApply };
 }
 
 function log(message: string): void {
@@ -115,6 +131,29 @@ async function fetchBinaryOnce(url: string): Promise<Buffer> {
 /** เงียบ — ใช้กับความพยายามที่ "ล้มเหลวได้ตามปกติ" (การไล่หารุ่นย่อ) */
 function quiet(): void {}
 
+/** ย้ายข่าวที่หายไปจากต้นทางเข้าถังขยะ (ไม่ลบถาวร) — หนี้ A2 รอบที่ 142 */
+async function pruneMissingNews(options: Options, importedIds: readonly string[]): Promise<void> {
+  /* รายงานได้แม้เป็น --dry-run (การอ่านไม่ใช่การเขียน) — เฉพาะ "ลงมือ" เท่านั้นที่ข้าม */
+  if (!options.prune) return;
+  /* ⚠️ รอบบางส่วน (--limit/--pages) ห้าม prune เด็ดขาด — ที่ไม่ถูกดึงไม่ได้แปลว่า Missing จากต้นทาง */
+  if (options.limit !== null || options.pages.length > 0) {
+    log("⚠️ ข้าม --prune เพราะรอบนี้เป็นบางส่วน (--limit/--pages) — ถ้าจะใช้ --prune ต้องดึงทั้งชุด");
+    return;
+  }
+  const missing = prunePlan(await listNewsIds(), importedIds);
+  if (missing.length === 0) {
+    log("🧹 --prune: ไม่มีข่าวค้างที่หายจากเว็บเดิม");
+    return;
+  }
+  log(`🧹 --prune: พบข่าวที่หายจากเว็บเดิม ${missing.length} รายการ → ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? " …" : ""}`);
+  if (!options.pruneApply || options.dryRun) {
+    log("   (ยังไม่ทำอะไร — ใส่ --prune-apply เพื่อย้ายเข้าถังขยะ · กู้คืนได้เสมอ)");
+    return;
+  }
+  for (const id of missing) await setNewsTrashed(id, true, ACTOR);
+  log(`   ✓ ย้ายเข้าถังขยะแล้ว ${missing.length} รายการ (กู้คืนได้จาก /admin/news → แท็บถังขยะ)`);
+}
+
 async function readLocal(dir: string, filename: string): Promise<string> {
   const { readFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
@@ -131,7 +170,9 @@ async function main(): Promise<void> {
   }
 
   const mediaCache: ImportMediaCache = new Map();
-  const stats = { newImages: 0, reusedImages: 0, news: 0, skippedInvalid: 0, skippedImages: 0, futureDates: 0 };
+  const stats = { newImages: 0, reusedImages: 0, news: 0, skippedInvalid: 0, skippedImages: 0, futureDates: 0, protectedEdits: 0 };
+  /* id ที่เจอในรอบนี้ — ใช้คำนวณ --prune (ของที่หายจากต้นทาง) */
+  const importedIds: string[] = [];
   const issues: string[] = [];
 
   /* 1) เก็บการ์ดข่าวจากทุกหน้า (เว็บเดิมแบ่ง 15 ข่าว/หน้า · หน้าสุดท้าย 1) */
@@ -297,7 +338,16 @@ async function main(): Promise<void> {
       continue;
     }
 
-    if (!options.dryRun) await upsertNews(input, ACTOR, coverId, blocks);
+    if (!options.dryRun) {
+      /* หนี้ A1 (รอบที่ 142): ค่าเริ่มต้น = ไม่ทับงานที่แก้จากหลังบ้าน · ต้องทับจริงใช้ --force */
+      const writeMode = options.force ? "replace" : "protect-edited";
+      const result = await upsertNews(input, ACTOR, coverId, blocks, { writeMode });
+      if (result.protectedEdit) {
+        stats.protectedEdits += 1;
+        log(`   ⓘ คงค่าเดิมไว้ (แก้จากหลังบ้าน): ${titleTh.slice(0, 50)}`);
+      }
+    }
+    importedIds.push(input.id);
 
     stats.news += 1;
     if (order % 10 === 0 || order === selected.length) {
@@ -314,7 +364,13 @@ async function main(): Promise<void> {
   );
   if (stats.skippedInvalid > 0) log(`      ข้ามข่าวเพราะข้อมูลไม่ผ่าน ${stats.skippedInvalid}`);
   if (stats.futureDates > 0) log(`      ⚠️ ข่าวที่วันที่เป็นอนาคต ${stats.futureDates} รายการ (ดูรายการด้านล่าง — ต้องให้เจ้าของยืนยัน)`);
+  log(`      คงค่าเดิมไว้ (แก้จากหลังบ้าน) ${stats.protectedEdits}`);
   if (options.dryRun) log("      (โหมด --dry-run: ไม่ได้เขียนลงฐานข้อมูล/ไม่ได้โหลดรูป)");
+  await pruneMissingNews(options, importedIds);
+  if (stats.protectedEdits > 0 && !options.force) {
+    log("");
+    log("ℹ️ ข่าวที่ถูกแก้จากหลังบ้านถูก “คงค่าเดิม” ไว้ — ถ้าต้องให้ค่าจากเว็บเดิมทับจริง ใช้ --force");
+  }
 
   if (issues.length > 0) {
     log(`\n⚠️ ข้อที่ต้องดู (${issues.length}):`);

@@ -2,7 +2,8 @@ import { closePool, isDatabaseConfigured } from "@/db/pool";
 import { ensureImportedMedia, type ImportMediaCache } from "@/lib/import/media";
 import { parseRecipeArticlePage, parseRecipeCategoryPage } from "@/lib/recipes/import-parse";
 import { recipeIdOfSourceId, recipeTitleOf, validateRecipeInput } from "@/lib/recipes/model";
-import { upsertRecipe } from "@/lib/recipes/repository";
+import { prunePlan } from "@/lib/import/prune";
+import { listRecipeIds, setRecipeTrashed, upsertRecipe } from "@/lib/recipes/repository";
 
 /**
  * นำเข้าเมนูอาหาร (วิดีโอ) จากเว็บเดิม (waiwai.co.th · หมวดบทความ 12586) — S3 ส่วนที่ 4 · รอบที่ 104
@@ -26,16 +27,34 @@ const CATEGORY_PATH = "/th/articles/category/12586";
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36";
 const ACTOR = "import:waiwai.co.th";
 
-type Options = { readonly dryRun: boolean; readonly dir: string | null };
+type Options = {
+  readonly dryRun: boolean;
+  readonly dir: string | null;
+  /** ทับงานที่แก้จากหลังบ้านจริง (ค่าเริ่มต้น = ไม่ทับ · หนี้ A1 รอบที่ 142) */
+  readonly force: boolean;
+  /** รายงานของที่หายไปจากเว็บเดิม (หนี้ A2) */
+  readonly prune: boolean;
+  /** ย้ายของที่หายไปเข้าถังขยะจริง (ไม่ลบถาวร) */
+  readonly pruneApply: boolean;
+};
 
 function parseArgs(argv: readonly string[]): Options {
   let dryRun = false;
   let dir: string | null = null;
+  let force = false;
+  let prune = false;
+  let pruneApply = false;
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--force") force = true;
+    else if (arg === "--prune") prune = true;
+    else if (arg === "--prune-apply") {
+      prune = true;
+      pruneApply = true;
+    }
     else if (arg.startsWith("--dir=")) dir = arg.slice("--dir=".length);
   }
-  return { dryRun, dir };
+  return { dryRun, dir, force, prune, pruneApply };
 }
 
 function log(message: string): void {
@@ -68,6 +87,24 @@ async function fetchBinary(url: string): Promise<Buffer> {
   return Buffer.from(await (await fetchWithRetry(url)).arrayBuffer());
 }
 
+/** ย้ายเมนูที่หายไปจากต้นทางเข้าถังขยะ (ไม่ลบถาวร) — หนี้ A2 รอบที่ 142 */
+async function pruneMissingRecipes(options: Options, importedIds: readonly string[]): Promise<void> {
+  /* รายงานได้แม้เป็น --dry-run (การอ่านไม่ใช่การเขียน) — เฉพาะลงมือเท่านั้นที่ข้าม */
+  if (!options.prune) return;
+  const missing = prunePlan(await listRecipeIds(), importedIds);
+  if (missing.length === 0) {
+    log("🧹 --prune: ไม่มีเมนูค้างที่หายจากเว็บเดิม");
+    return;
+  }
+  log(`🧹 --prune: พบเมนูที่หายจากเว็บเดิม ${missing.length} รายการ → ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? " …" : ""}`);
+  if (!options.pruneApply || options.dryRun) {
+    log("   (ยังไม่ทำอะไร — ใส่ --prune-apply เพื่อย้ายเข้าถังขยะ · กู้คืนได้เสมอ)");
+    return;
+  }
+  for (const id of missing) await setRecipeTrashed(id, true, ACTOR);
+  log(`   ✓ ย้ายเข้าถังขยะแล้ว ${missing.length} รายการ (กู้คืนได้จาก /admin/recipes → แท็บถังขยะ)`);
+}
+
 async function readLocal(dir: string, filename: string): Promise<string> {
   const { readFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
@@ -84,7 +121,9 @@ async function main(): Promise<void> {
   }
 
   const mediaCache: ImportMediaCache = new Map();
-  const stats = { newImages: 0, reusedImages: 0, recipes: 0, skippedInvalid: 0 };
+  const stats = { newImages: 0, reusedImages: 0, recipes: 0, skippedInvalid: 0, protectedEdits: 0 };
+  /* id ที่เจอในรอบนี้ — ใช้คำนวณ --prune (ของที่หายจากต้นทาง) */
+  const importedIds: string[] = [];
   const issues: string[] = [];
 
   const categoryHtml =
@@ -145,7 +184,16 @@ async function main(): Promise<void> {
             log,
           });
 
-    if (!options.dryRun) await upsertRecipe(input, ACTOR, coverId);
+    if (!options.dryRun) {
+      /* หนี้ A1 (รอบที่ 142): ค่าเริ่มต้น = ไม่ทับงานที่แก้จากหลังบ้าน · ต้องทับจริงใช้ --force */
+      const writeMode = options.force ? "replace" : "protect-edited";
+      const result = await upsertRecipe(input, ACTOR, coverId, { writeMode });
+      if (result.protectedEdit) {
+        stats.protectedEdits += 1;
+        log(`   ⓘ คงค่าเดิมไว้ (แก้จากหลังบ้าน): ${titleTh.slice(0, 50)}`);
+      }
+    }
+    importedIds.push(input.id);
 
     stats.recipes += 1;
     order += 1;
@@ -156,7 +204,13 @@ async function main(): Promise<void> {
   log("");
   log(`สรุป: เมนู ${stats.recipes} รายการ · ภาพใหม่ ${stats.newImages} · ใช้ภาพเดิม (sha256 ซ้ำ) ${stats.reusedImages}`);
   if (stats.skippedInvalid > 0) log(`      ข้ามเพราะข้อมูลไม่ผ่าน ${stats.skippedInvalid}`);
+  log(`      คงค่าเดิมไว้ (แก้จากหลังบ้าน) ${stats.protectedEdits}`);
   if (options.dryRun) log("      (โหมด --dry-run: ไม่ได้เขียนลงฐานข้อมูล)");
+  await pruneMissingRecipes(options, importedIds);
+  if (stats.protectedEdits > 0 && !options.force) {
+    log("");
+    log("ℹ️ เมนูที่ถูกแก้จากหลังบ้านถูก “คงค่าเดิม” ไว้ — ถ้าต้องให้ค่าจากเว็บเดิมทับจริง ใช้ --force");
+  }
 
   if (issues.length > 0) {
     log(`\n⚠️ ข้อที่ต้องดู (${issues.length}):`);

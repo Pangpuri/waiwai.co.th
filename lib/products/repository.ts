@@ -487,6 +487,17 @@ export async function replaceProductIngredients(productId: string, items: readon
   });
 }
 
+/** id สินค้าที่ยังใช้งาน (ไม่รวมของในถัง) — ใช้คำนวณ `--prune` ของสคริปต์นำเข้า (รอบที่ 142) */
+export async function listProductIds(): Promise<readonly string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{ id: string }>("select id from product where deleted_at is null order by id");
+    return result.rows.map((row) => row.id);
+  } catch {
+    return [];
+  }
+}
+
 /** ลบสินค้า 1 รายการ **ถาวร** (ใช้ในด่านตรวจ/สคริปต์นำเข้า/ล้างข้อมูลทดสอบ) — ส่วนผสมถูกลบตาม (on delete cascade)
  *  ⚠️ หลังบ้านต้องใช้ `deleteProductForever()` (มีประตูถังขยะ) ไม่ใช่ตัวนี้ */
 export async function deleteProduct(id: string): Promise<void> {
