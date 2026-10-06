@@ -597,3 +597,30 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
   height: auto;
   object-fit: cover;
 }
+
+/*
+  ป้ายประกาศ: กล่องต้อง "คงที่ 3:1" ไม่ยืดหดตามภาพแต่ละใบ (รอบที่ 166 · คำถามเจ้าของ)
+  "ภาพแรกเต็มจอ ภาพ 2 หดเล็กลง ภาพ 3 ขยายขึ้นมานิด ภาพ 4 เต็มจอ เกิดจากอะไร ขนาดภาพเหรอ"
+
+  ต้นเหตุ: ในคอมโพเนนต์มี <img> ซ่อนไว้เพื่อ "วัดขนาดจากภาพจริง" (h-auto w-auto + max-h/max-w)
+  ⇒ กล่องจึงได้ขนาดตามภาพของสไลด์ที่กำลังแสดง ⇒ ภาพคนละขนาด/คนละสัดส่วน = กล่องยืดหด
+  และภาพที่ไม่ใช่ 3:1 จะเหลือกรอบโล่ง
+
+  แก้: ล็อกกล่องเป็น 3:1 เสมอ (อ้างจาก *กล่องแม่ของภาพสไลด์* ผ่าน `:has()` ไม่ต้องใช้ JS)
+  · `img[data-mourning-frame]` = ภาพสไลด์จริง (มี attribute นี้อยู่แล้ว)
+  · `object-fit: cover` ⇒ ภาพเต็มกรอบ ครอปกลาง ไม่มีกรอบโล่ง
+  · `max-height` เท่าเดิม ⇒ จอมือถือสูงไม่เกินจอ (คำนวณจาก dvh)
+  ⚠️ กฎเดิม `[data-mourning-notice] img` (รอบ 162) อ้าง attribute ที่ **ไม่ได้ตั้งไว้บนตัวป้ายเสมอ**
+     ⇒ ไม่มีผลจริง · เก็บไว้ไม่เสียหาย แต่ของจริงคือกฎข้างล่างนี้
+*/
+img[data-mourning-frame] {
+  object-fit: cover;
+}
+
+div:has(> img[data-mourning-frame]) {
+  aspect-ratio: 3 / 1;
+  width: 100%;
+  height: auto;
+  max-height: min(78dvh, calc(100dvh - 13rem));
+  overflow: hidden;
+}

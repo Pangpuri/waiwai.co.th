@@ -415,3 +415,18 @@ test("preview: ภาพสดของป้ายประกาศต้อ�
   assert.ok(notice.includes(".filter((item): item is MourningNoticeImage => item !== null)"), "ต้องกรองก่อน set state");
   assert.ok(!notice.includes("setLiveImages(data.config?.images"), "ห้ามตั้งค่าดิบจากข้อความโดยตรง (รูปร่างไม่ตรง)");
 });
+
+/* ── รอบที่ 166: กล่องป้ายประกาศต้องคงที่ 3:1 (ไม่ยืดหดตามภาพแต่ละใบ) ─────────── */
+
+test("notice: กล่องป้ายประกาศล็อกสัดส่วน 3:1 ไม่ยืดหดตามขนาดภาพ", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+  assert.ok(css.includes("img[data-mourning-frame]"), "ต้องจับภาพสไลด์ด้วย attribute ที่มีจริง (data-mourning-frame)");
+  assert.ok(
+    css.includes("div:has(> img[data-mourning-frame])"),
+    "ต้องล็อกกล่องแม่ของภาพสไลด์ (ขนาดคงที่ทุกสไลด์) ด้วย :has()",
+  );
+  const block = css.slice(css.indexOf("div:has(> img[data-mourning-frame])"));
+  assert.ok(block.includes("aspect-ratio: 3 / 1"), "กล่องต้องเป็น 3:1 เสมอ");
+  assert.ok(block.includes("overflow: hidden"), "ต้องตัดส่วนเกิน (กันกรอบโล่ง)");
+  assert.ok(block.includes("dvh"), "ยังต้องจำกัดความสูงบนจอมือถือ");
+});
