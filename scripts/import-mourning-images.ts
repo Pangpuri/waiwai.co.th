@@ -23,11 +23,6 @@ import { storeImageFile } from "@/lib/media/upload";
 const FILES = ["mourning-banner.jpg", "mourning-banner-02.jpg"] as const;
 const ACTOR = "import:public/rip";
 
-async function sha256Of(buffer: Buffer): Promise<string> {
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(buffer).digest("hex");
-}
-
 async function main(): Promise<void> {
   const pool = getPool();
   for (const name of FILES) {
@@ -40,9 +35,15 @@ async function main(): Promise<void> {
       continue;
     }
 
-    /* มีอยู่แล้วหรือยัง (เทียบเนื้อหา ไม่ใช่ชื่อไฟล์) */
-    const digest = await sha256Of(buffer);
-    const existing = await pool.query<{ id: string }>("select id from media where sha256 = $1 limit 1", [digest]);
+    /*
+      มีอยู่แล้วหรือยัง — ⚠️ บทเรียนรอบที่ 167: **ห้ามเทียบด้วย sha256 ของไฟล์ต้นทาง**
+      เพราะท่อเก็บภาพจะ "เข้ารหัสใหม่" (WebP) ⇒ hash ของไบต์ที่เก็บ ≠ hash ของไฟล์ต้นทาง
+      (รอบแรกทำแบบนั้น ⇒ รันซ้ำแล้วได้ภาพซ้ำอีกชุด) ⇒ เทียบด้วย "ชื่อไฟล์ + ผู้สร้าง" แทน
+    */
+    const existing = await pool.query<{ id: string }>(
+      "select id from media where filename = $1 and created_by = $2 order by id desc limit 1",
+      [name, ACTOR],
+    );
     if ((existing.rowCount ?? 0) > 0) {
       console.log(`= ${name} มีอยู่ในฐานข้อมูลแล้ว → /media/${String(existing.rows[0]?.id)}`);
       continue;
