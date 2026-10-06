@@ -265,7 +265,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
 
               return (
                 <Image
-                  key={image.id}
+                  key={`${image.id ?? "frame"}-${String(position)}`}
                   src={image.src}
                   alt={isActiveFrame ? image.alt : ""}
                   aria-hidden={!isActiveFrame}
@@ -321,7 +321,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
 
               return (
                 <button
-                  key={image.id}
+                  key={`${image.id ?? "frame"}-${String(position)}`}
                   type="button"
                   onClick={() => setIndex(position)}
                   aria-label={`${labels.gotoSlide} ${position + 1}`}
