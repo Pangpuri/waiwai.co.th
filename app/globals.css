@@ -558,3 +558,15 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
 .preview-single-card .recipe-card-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/*
+  โหมดพรีวิว "เฉพาะ navbar" (รอบที่ 158 · ฟีดแบ็กเจ้าของ)
+  "ตอนนี้ไม่ได้โชว์แค่ Navbar หลังจากเข้าโหมด Navbar ดันมี footer โผล่มา"
+
+  ต้นเหตุ: กฎเดิมของ `parts=nav` ซ่อนแค่ `header[data-layout-header]` + เนื้อหาในหน้า
+  แต่ **ท้ายเว็บของ layout** (`footer[data-layout-footer]`) ไม่ถูกซ่อน ⇒ เห็น navbar แล้วเจอ footer ต่อท้าย
+  ⚠️ ห้ามใช้ selector กว้างอย่าง `footer` เฉย ๆ — พรีวิว自己有ส่วนของตัวเอง ต้องเจาะจงที่ท้ายเว็บของ layout
+*/
+[data-preview-parts="nav"] footer[data-layout-footer] {
+  display: none;
+}
