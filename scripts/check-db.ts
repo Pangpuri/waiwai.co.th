@@ -2155,9 +2155,15 @@ async function checkNews(): Promise<void> {
 
     assert.ok((await countNews()) >= 1, "นับจำนวนข่าวได้");
 
-    /* ข่าวใหม่สุดต้องอยู่บนสุดของหน้าแรก (published_at desc) */
+    /* ลำดับบนหน้าข่าว (รอบที่ 155): `sort_order` ที่จัดจากหลังบ้านมาก่อน แล้วค่อยถอยไปใช้วันที่
+       ⇒ ข่าวทดสอบต้องถูกจัดให้อยู่หัวแถวอย่างชัดเจน (ตั้ง sort_order = ค่าต่ำสุด - 1)
+          เพื่อไม่ให้ผลขึ้นกับว่ามีคนจัดลำดับข่าวไว้ก่อนหรือไม่ */
+    const minOrder = await getPool().query<{ min: number | null }>("select min(sort_order) as min from news");
+    const headOrder = (minOrder.rows[0]?.min ?? 0) - 1;
+    await getPool().query("update news set sort_order = $2 where id = $1", [NEWS_CHECK_ID, headOrder]);
+
     const firstPage = await listNews(3, 0);
-    assert.equal(firstPage[0]?.id, NEWS_CHECK_ID, "ข่าวที่ใหม่สุดต้องมาก่อน");
+    assert.equal(firstPage[0]?.id, NEWS_CHECK_ID, "ข่าวที่ถูกจัดลำดับไว้หัวแถวต้องมาก่อน");
 
     const coverUsage = await findMediaUsage(coverId);
     assert.ok(

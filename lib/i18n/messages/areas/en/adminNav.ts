@@ -1,0 +1,20 @@
+/** Dictionary area: admin sidebar (round 156) */
+export const enAdminNav = {
+  navGroupContent: "Website content",
+  navGroupData: "Data",
+  navGroupSystem: "System",
+  navChrome: "Site-wide (menu / footer / notice)",
+  navHome: "Edit home page",
+  navAbout: "Edit company page",
+  navExecutives: "Edit executives page",
+  navProducts: "Edit products page",
+  navRecipes: "Edit recipes",
+  navNews: "Edit news & activities",
+  navCareers: "Edit careers page",
+  navContact: "Edit contact page",
+  navStructured: "Home page (field editor)",
+  navToggleOpen: "Open sidebar",
+  navToggleClose: "Close sidebar",
+  navLabel: "Admin menu",
+  navRoleHint: "Menu items depend on your permissions",
+};
