@@ -88,8 +88,18 @@ export function ChromeWorkspace({
    *   มีแค่ `src` เปลี่ยน ⇒ ข้อความที่ส่งตอนนั้นไปถึงเอกสารเก่า (หรือก่อน listener ใหม่พร้อม) แล้วหาย
    *   ⇒ ต้องส่ง **ซ้ำตอน `onLoad`** และส่งซ้ำอีกครั้งหลัง hydration ของเอกสารใหม่
    */
-  const postLiveValues = useCallback((): void => {
-    postLiveValues();
+    const postLiveValues = useCallback((): void => {
+    const target = frameRef.current?.contentWindow;
+    if (target === null || target === undefined) return;
+    if (liveNavbar.sent) {
+      target.postMessage({ type: NAVBAR_MESSAGE, config: liveNavbar.value }, window.location.origin);
+    }
+    if (liveFooter.sent) {
+      target.postMessage({ type: FOOTER_MESSAGE, config: liveFooter.value }, window.location.origin);
+    }
+    if (liveNotice.sent) {
+      target.postMessage({ type: MOURNING_MESSAGE, config: liveNotice.value }, window.location.origin);
+    }
   }, [liveNavbar, liveFooter, liveNotice]);
 
   /* รับค่าที่กำลังแก้จากตัวแก้แถบเมนู → ส่งต่อเข้า iframe (พรีวิวเปลี่ยนทันที) */

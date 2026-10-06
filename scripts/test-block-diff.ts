@@ -390,3 +390,17 @@ test("preview: ป้ายประกาศต้องส่งค่าเ�
     "พรีวิวใช้ภาพสด · หน้าเว็บจริงยังใช้ภาพจากเซิร์ฟเวอร์",
   );
 });
+
+/* ── รอบที่ 163: กันพัง "Maximum call stack size exceeded" ในพรีวิวสด ─────────── */
+
+test("preview: postLiveValues ต้องไม่เรียกตัวเอง (กัน recursion) และต้องส่งซ้ำตอน iframe โหลดเสร็จ", () => {
+  const ws = readFileSync("features/admin/ui/chrome-workspace.tsx", "utf8");
+  const def = /const postLiveValues = useCallback\([\s\S]*?\}, \[liveNavbar, liveFooter, liveNotice\]\);/.exec(ws);
+  assert.ok(def !== null, "ต้องมีนิยาม postLiveValues");
+  assert.ok(
+    !def[0].includes("postLiveValues()"),
+    "ในนิยามห้ามเรียกตัวเอง — เคสจริงรอบ 163 ทำเบราว์เซอร์ขึ้น Maximum call stack size exceeded",
+  );
+  assert.ok(ws.includes("onLoad={() => {"), "ต้องส่งค่าสดซ้ำตอน iframe โหลดเสร็จ");
+  assert.ok(ws.includes("window.setTimeout(postLiveValues, 300)"), "ส่งซ้ำหลังเอกสารใหม่ hydrate");
+});
