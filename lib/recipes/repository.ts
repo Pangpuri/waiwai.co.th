@@ -132,7 +132,8 @@ export async function upsertRecipe(input: RecipeInput, actor: string, coverMedia
   );
 }
 
-/** ลบเมนู 1 รายการ (ใช้ในด่านตรวจ/ล้างข้อมูลทดสอบ) */
+/** ลบเมนู 1 รายการ **ถาวร** (ใช้ในด่านตรวจ/สคริปต์นำเข้า/ล้างข้อมูลทดสอบ)
+ *  ⚠️ หลังบ้านต้องใช้ `deleteRecipeForever()` (มีประตูถังขยะ) ไม่ใช่ตัวนี้ */
 export async function deleteRecipe(id: string): Promise<void> {
   await getPool().query("delete from recipe where id = $1", [id]);
 }
@@ -375,4 +376,16 @@ export async function setRecipeTrashed(id: string, trashed: boolean, actor: stri
     "update recipe set deleted_at = case when $2 then now() else null end, updated_at = now(), updated_by = $3 where id = $1",
     [id, trashed, actor],
   );
+}
+
+/**
+ * ลบเมนู **ถาวรจากถังขยะ** (รอบที่ 139) — ใช้เฉพาะหลังบ้าน
+ *
+ * ⚠️ **ประตูอยู่ที่ SQL เอง**: `and deleted_at is not null` ⇒ เมนูที่ยังใช้งานอยู่ลบไม่ได้
+ *    แม้ action จะถูกเรียกตรง ๆ (fail-closed · เทสต์ได้ที่ `check:db` วงจรที่ 26)
+ * คืน `true` = ลบจริง 1 แถว · `false` = ไม่เข้าเงื่อนไข
+ */
+export async function deleteRecipeForever(id: string): Promise<boolean> {
+  const result = await getPool().query("delete from recipe where id = $1 and deleted_at is not null", [id]);
+  return (result.rowCount ?? 0) > 0;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { trashRecipeAction } from "@/app/admin/recipes/actions";
+import { deleteRecipeForeverAction, trashRecipeAction } from "@/app/admin/recipes/actions";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
@@ -190,6 +190,19 @@ export default async function AdminRecipesPage({
                           {item.trashed ? m.recipesAdminRestore : m.recipesAdminMoveToTrash}
                         </button>
                       </form>
+                      {/* ลบถาวร — มีเฉพาะของที่อยู่ในถังแล้ว (รอบที่ 139) · ประตูจริงอยู่ที่ SQL */}
+                      {item.trashed ? (
+                        <form action={deleteRecipeForeverAction} className="flex flex-col gap-0.5">
+                          <input type="hidden" name="id" value={item.id} />
+                          <button
+                            type="submit"
+                            className="border-brand-red text-brand-red hover:bg-surface-raised focus-visible:ring-ring self-start rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                          >
+                            {m.recipesAdminDeleteForever}
+                          </button>
+                          <span className="text-fg-muted text-[11px]">{m.recipesAdminDeleteForeverWarning}</span>
+                        </form>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

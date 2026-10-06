@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -68,6 +68,20 @@ const DATABASE_MARKERS = [
 
 function sourceOf(relativePath: string): string {
   return readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
+/** ไล่หาไฟล์ทั้งหมดใต้โฟลเดอร์ (ใช้กับกฎที่ต้องครอบ "ทุกหน้า" ไม่ใช่รายการที่พิมพ์เอง) */
+function walk(relativeDir: string): readonly string[] {
+  const found: string[] = [];
+  const visit = (current: string): void => {
+    for (const entry of readdirSync(path.join(ROOT, current), { withFileTypes: true })) {
+      const next = `${current}/${entry.name}`;
+      if (entry.isDirectory()) visit(next);
+      else found.push(next);
+    }
+  };
+  visit(relativeDir);
+  return found;
 }
 
 test("isr: ทุกหน้า/เลย์เอาต์สาธารณะที่อ่านฐานข้อมูลประกาศ `export const revalidate`", () => {
@@ -172,5 +186,27 @@ test("isr: หน้าจอออกรายงาน (rebuild) ต้อง�
   for (const locale of ["th", "en"]) {
     const source = sourceOf(`lib/i18n/messages/areas/${locale}/admin.ts`);
     assert.ok(source.includes("rebuildIsr:"), `${locale}: ต้องมีคีย์ rebuildIsr`);
+  }
+});
+
+test("isr: ห้ามปิด dynamicParams ของหน้าใน [lang] (ไม่งั้นกดบันทึกแล้วหน้า 404)", () => {
+  /*
+    บทเรียนจริงรอบที่ 139 (จับได้ด้วยการยิง HTTP จริง):
+    `/products/<slug>` เคยมี `export const dynamicParams = false` ⇒ พอหลังบ้านกดบันทึก/เผยแพร่/ลบ
+    (ซึ่งเรียก `revalidatePath("/", "layout")`) รายการ prerender ถูกทำให้เก่าทั้งหมด
+    ⇒ คำขอถัดไปเข้าเส้นทาง fallback ที่ถูกปิด → `NoFallbackError` → **หน้าหมวดทั้ง 6 ตอบ 404**
+    ⇒ ห้ามมี `dynamicParams = false` ในทุกไฟล์ใต้ `app/[lang]/` (ให้พึ่ง notFound() ในหน้าแทน)
+  */
+  const files = walk("app/[lang]").filter((file) => file.endsWith("page.tsx"));
+  assert.ok(files.length >= 10, `ต้องเจอหน้าอย่างน้อย 10 ไฟล์ (พบ ${String(files.length)})`);
+  for (const file of files) {
+    /* ⚠️ ตัดคอมเมนต์ก่อนตรวจ — ไฟล์จริงอธิบายบทเรียนไว้โดยยกโค้ดเดิมมาเป็นตัวอย่างในคอมเมนต์ */
+    const code = sourceOf(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    assert.ok(
+      !/export const dynamicParams\s*=\s*false/.test(code),
+      `${file}: ห้ามปิด dynamicParams — revalidatePath("/", "layout") จะทำให้หน้านี้ 404 จนกว่าจะ build ใหม่`,
+    );
   }
 });

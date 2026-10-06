@@ -2,13 +2,20 @@ import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
 
 /**
- * อ่าน/เขียน "สินค้า" ในฐานข้อมูล (S3 ส่วนที่ 3 · รอบที่ 103) — ฝั่งเซิร์ฟเวอร์เท่านั้น
+ * อ่าน/เขียน "สินค้า" ในฐานข้อมูล (S3 ส่วนที่ 3 · รอบที่ 103 · ถังขยะ รอบที่ 139) — ฝั่งเซิร์ฟเวอร์เท่านั้น
  *
  * หลักการเดียวกับส่วนอื่นของโปรเจกต์: **ห้ามทำให้เว็บพังเพราะฐานข้อมูล**
  * - ยังไม่ตั้ง `DATABASE_URL` / ตารางว่าง / อ่านไม่สำเร็จ → คืน `[]` หรือ `null` (หน้าเว็บถอยไปใช้เลย์เอาต์เดิม)
  * - ข้อมูลจาก DB ต้องผ่าน mapper (ไม่เชื่อค่าดิบ) · แถวที่ไม่ผ่านตัวตรวจถูก **ข้าม** ไม่ทำให้ทั้งหน้าล่ม
  * - รูปเก็บเป็น id ของ `media` ⇒ ที่นี่คืนพาธ `/media/<id>` (มติ D9: ห้ามเก็บ/ส่ง URL เต็ม)
+ *
+ * รอบที่ 139 เพิ่ม **ถังขยะของสินค้า** (`deleted_at`)
+ * ⚠️ ฝั่งเว็บสาธารณะต้องเห็นเฉพาะ `deleted_at is null` **เสมอ** (การ์ดหมวด · สินค้าในหมวด · สินค้าเด่น)
+ * ⚠️ `product_category` **ไม่มี** deleted_at — หมวดถูกล็อก 6 หมวดตามมติ Q-D (ไม่มี "ลบหมวด")
  */
+
+/** เงื่อนไข "สินค้าที่เว็บสาธารณะเห็นได้" — ใช้ร่วมทุกคำสั่งอ่านฝั่งเว็บ (ห้ามลืม) */
+const PUBLIC_PRODUCT_CONDITION = "p.deleted_at is null";
 
 export type ProductIngredientRecord = {
   readonly nameTh: string;
@@ -142,6 +149,7 @@ export async function listProductsByCategory(categoryId: string): Promise<readon
          left join product_ingredient i on i.product_id = p.id
          left join media m on m.id = p.image_media_id
         where p.category_id = $1
+          and ${PUBLIC_PRODUCT_CONDITION}
         group by p.id
         order by p.sort_order, p.id`,
       [categoryId],
@@ -163,7 +171,10 @@ export async function countProductsByCategory(): Promise<Readonly<Record<string,
   if (!isDatabaseConfigured()) return {};
   try {
     const result = await getPool().query<{ category_id: string; total: string }>(
-      "select category_id, count(*)::text as total from product group by category_id",
+      `select p.category_id, count(*)::text as total
+         from product p
+        where ${PUBLIC_PRODUCT_CONDITION}
+        group by p.category_id`,
     );
     const counts: Record<string, number> = {};
     for (const row of result.rows) {
@@ -216,7 +227,8 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
               count(p.id)::text as "productCount"
          from product_category c
          left join media m on m.id = c.image_media_id
-         left join product p on p.category_id = c.id
+         /* ⚠️ รอบที่ 139: ใส่เงื่อนไขถังขยะใน join (ไม่ใช่ where) เพื่อให้หมวดที่ไม่มีสินค้าเหลือยังได้การ์ดอยู่ */
+         left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION}
         group by c.id, m.id, m.width, m.height`,
     );
 
@@ -276,6 +288,7 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
               m.height      as "imageHeight"
          from product p
          join media m on m.id = p.image_media_id
+        where ${PUBLIC_PRODUCT_CONDITION}
         order by p.category_id, p.sort_order, p.id`,
     );
 
@@ -397,9 +410,22 @@ export async function replaceProductIngredients(productId: string, items: readon
   });
 }
 
-/** ลบสินค้า 1 รายการ (ใช้ในด่านตรวจ/ล้างข้อมูลทดสอบ) — ส่วนผสมถูกลบตาม (on delete cascade) */
+/** ลบสินค้า 1 รายการ **ถาวร** (ใช้ในด่านตรวจ/สคริปต์นำเข้า/ล้างข้อมูลทดสอบ) — ส่วนผสมถูกลบตาม (on delete cascade)
+ *  ⚠️ หลังบ้านต้องใช้ `deleteProductForever()` (มีประตูถังขยะ) ไม่ใช่ตัวนี้ */
 export async function deleteProduct(id: string): Promise<void> {
   await getPool().query("delete from product where id = $1", [id]);
+}
+
+/**
+ * ลบสินค้า **ถาวรจากถังขยะ** (รอบที่ 139) — ใช้เฉพาะหลังบ้าน
+ *
+ * ⚠️ **ประตูอยู่ที่ SQL เอง**: `and deleted_at is not null` ⇒ สินค้าที่ไม่เคยเข้าถังขยะ
+ *    ถูกลบไม่ได้แม้ action จะถูกเรียกตรง ๆ (fail-closed · เทสต์ได้ที่ `check:db` วงจรที่ 26)
+ * คืน `true` = ลบจริง 1 แถว · `false` = ไม่เข้าเงื่อนไข (ยังไม่เข้า ถังขยะ/ไม่มีแถว)
+ */
+export async function deleteProductForever(id: string): Promise<boolean> {
+  const result = await getPool().query("delete from product where id = $1 and deleted_at is not null", [id]);
+  return (result.rowCount ?? 0) > 0;
 }
 
 /** ลบหมวด (ใช้ในด่านตรวจ/ล้างข้อมูลทดสอบ) */
@@ -407,7 +433,7 @@ export async function deleteProductCategory(id: string): Promise<void> {
   await getPool().query("delete from product_category where id = $1", [id]);
 }
 
-/* ── หลังบ้าน (รอบที่ 131) — แก้สินค้า/ส่วนผสม/หมวด แบบ WordPress ───────────── */
+/* ── หลังบ้าน (รอบที่ 131 · ถังขยะ รอบที่ 139) — แก้สินค้า/ส่วนผสม/หมวด ───────── */
 
 export type AdminProductListItem = {
   readonly id: string;
@@ -422,6 +448,8 @@ export type AdminProductListItem = {
   readonly ingredientCount: number;
   /** ลำดับการแสดงในหมวด — ต้องส่งกลับตอนบันทึก ไม่งั้นแก้สินค้าแล้วลำดับเพี้ยน (เคสจริงรอบที่ 134) */
   readonly sortOrder: number;
+  /** `true` = อยู่ในถังขยะ (ไม่ขึ้นเว็บ) — รอบที่ 139 */
+  readonly trashed: boolean;
   /** `YYYY-MM-DDTHH:MM` (เวลาไทย) หรือ null */
   readonly updatedLocal: string | null;
 };
@@ -440,6 +468,7 @@ export type AdminProductDetail = AdminProductListItem & {
 
 const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en,
        p.tagline_th, p.tagline_en, p.details_th, p.allergens_th, p.net_weight_th, p.fda_number, p.packaging_th, p.sort_order,
+       (p.deleted_at is not null) as trashed,
        m.id as image_id, m.width as image_width, m.height as image_height,
        (select count(*)::int from product_ingredient i where i.product_id = p.id) as ingredient_count,
        to_char(p.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local`;
@@ -464,19 +493,63 @@ function toAdminProduct(row: Record<string, unknown>): AdminProductListItem | nu
     imageHeight: num(row.image_height),
     ingredientCount: typeof row.ingredient_count === "number" ? row.ingredient_count : 0,
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
+    trashed: row.trashed === true,
     updatedLocal: updatedLocal === "" ? null : updatedLocal,
   };
 }
 
-/** รายการสินค้าสำหรับหลังบ้าน (กรองตามหมวด + ค้นหา) */
+/** แท็บของหน้ารายการสินค้าหลังบ้าน (รอบที่ 139) */
+export type AdminProductTab = "all" | "trash";
+
+/** ตัวนับของแต่ละแท็บ — ใช้โชว์บนหัวแท็บ */
+export async function adminProductCounts(): Promise<{ readonly all: number; readonly trash: number }> {
+  if (!isDatabaseConfigured()) return { all: 0, trash: 0 };
+  try {
+    const result = await getPool().query<{ all: string; trash: string }>(
+      `select count(*) filter (where deleted_at is null)::text as "all",
+              count(*) filter (where deleted_at is not null)::text as trash
+         from product`,
+    );
+    const row = result.rows[0];
+    return {
+      all: Number.parseInt(row?.all ?? "0", 10) || 0,
+      trash: Number.parseInt(row?.trash ?? "0", 10) || 0,
+    };
+  } catch {
+    return { all: 0, trash: 0 };
+  }
+}
+
+/**
+ * ย้ายสินค้าเข้าถังขยะ / กู้คืน (รอบที่ 139)
+ * - ตั้ง `updated_by` ด้วย ⇒ รู้ว่าใครทำ (audit log มีรายละเอียดอีกชั้น)
+ * - **ไม่แตะเนื้อหา/ส่วนผสม/ภาพ** ⇒ กู้คืนได้ครบเหมือนเดิม
+ */
+export async function setProductTrashed(id: string, trashed: boolean, actor: string): Promise<boolean> {
+  const result = await getPool().query(
+    `update product
+        set deleted_at = case when $2 then now() else null end,
+            updated_at = now(),
+            updated_by = $3
+      where id = $1`,
+    [id, trashed, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** รายการสินค้าสำหรับหลังบ้าน (กรองตามหมวด + ค้นหา + แท็บ) */
 export async function listProductsForAdmin(input: {
   readonly categoryId?: string;
   readonly search?: string;
+  readonly tab?: AdminProductTab;
 }): Promise<{ readonly items: readonly AdminProductListItem[]; readonly total: number }> {
   if (!isDatabaseConfigured()) return { items: [], total: 0 };
 
   const params: unknown[] = [];
   const where: string[] = [];
+
+  /* แท็บเป็นตัวกำหนดว่าจะเห็นของในถังหรือของใช้งาน (ไม่ระบุ = ของใช้งาน ปลอดภัยกว่า) */
+  where.push((input.tab ?? "all") === "trash" ? "p.deleted_at is not null" : "p.deleted_at is null");
 
   const category = (input.categoryId ?? "").trim();
   if (category !== "") {

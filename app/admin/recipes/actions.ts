@@ -10,6 +10,7 @@ import { isDatabaseConfigured } from "@/db/pool";
 import { storeImageFile } from "@/lib/media/upload";
 import {
   createRecipeForAdmin,
+  deleteRecipeForever,
   loadRecipeForAdmin,
   setRecipeTrashed,
   updateRecipeForAdmin,
@@ -140,6 +141,34 @@ export async function trashRecipeAction(formData: FormData): Promise<void> {
     actorEmail: user.email,
     target: `recipe:${id}`,
     detail: trashed ? "moved-to-trash" : "restored",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+}
+
+/**
+ * ลบเมนู **ถาวร** (รอบที่ 139) — ใช้ได้เฉพาะของที่อยู่ในถังขยะแล้ว
+ *
+ * ⚠️ ประตูไม่ได้อยู่ที่ UI: `deleteRecipeForever()` บังคับ `deleted_at is not null` ที่ SQL
+ *    ⇒ แม้มีคนยิง action นี้กับเมนูที่ยังใช้งานอยู่ ก็จะไม่ลบ (fail-closed)
+ * ⚠️ ลบแล้วกู้คืนไม่ได้ (ต่างจาก "ย้ายเข้าถังขยะ") — ปุ่มอยู่ในแท็บถังขยะเท่านั้น
+ */
+export async function deleteRecipeForeverAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id").trim();
+  if (id === "" || !isDatabaseConfigured()) return;
+
+  const deleted = await deleteRecipeForever(id);
+  if (!deleted) {
+    /* ไม่ได้ลบ (ยังไม่อยู่ในถังขยะ/ไม่มีแถว) ⇒ **ไม่บันทึก audit ว่าลบ** เพื่อไม่ให้ log โกหก */
+    return;
+  }
+
+  await recordAudit({
+    action: "recipe-delete",
+    actorEmail: user.email,
+    target: `recipe:${id}`,
+    detail: "deleted-forever",
   });
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");

@@ -67,5 +67,8 @@ export const adminRecipes = {
   recipesAdminPreviewHint: "แบบที่ผู้อ่านจะเห็น (สถานะ: {status}) — ร่างจะยังไม่ขึ้นเว็บ",
   auditRecipeSave: "บันทึกเมนูอาหาร",
   auditRecipeTrash: "ย้ายเมนูเข้าถังขยะ",
+  recipesAdminDeleteForever: "ลบถาวร",
+  recipesAdminDeleteForeverWarning: "ลบถาวรแล้วกู้คืนไม่ได้",
+  auditRecipeDelete: "ลบเมนูอาหารถาวร",
   auditRecipeRestore: "กู้คืนเมนูอาหาร",
 };

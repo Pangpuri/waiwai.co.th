@@ -69,5 +69,8 @@ export const adminRecipes: Pick<Messages["admin"], keyof typeof thAdminRecipes> 
   recipesAdminPreviewHint: "How readers will see it (status: {status}) - drafts never show on the site",
   auditRecipeSave: "Recipe saved",
   auditRecipeTrash: "Recipe moved to trash",
+  recipesAdminDeleteForever: "Delete forever",
+  recipesAdminDeleteForeverWarning: "Deleting forever cannot be undone",
+  auditRecipeDelete: "Recipe deleted forever",
   auditRecipeRestore: "Recipe restored",
 };

@@ -41,6 +41,7 @@ import {
   countProductsByCategory,
   deleteProduct,
   deleteProductCategory,
+  deleteProductForever,
   listProductCategoriesForAdmin,
   listProductCategoryCards,
   listProductHighlights,
@@ -48,6 +49,7 @@ import {
   listProductsForAdmin,
   loadProductForAdmin,
   replaceProductIngredients,
+  setProductTrashed,
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
@@ -74,6 +76,7 @@ import {
   adminRecipeCounts,
   createRecipeForAdmin,
   deleteRecipe,
+  deleteRecipeForever,
   listRecipes,
   listRecipesForAdmin,
   loadRecipeForAdmin,
@@ -310,6 +313,9 @@ async function main(): Promise<void> {
 
   /* 25) หลังบ้านเมนูอาหาร: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บจริง (รอบที่ 135) */
   await checkRecipeAdmin();
+
+  /* 26) ถังขยะ + ลบถาวร: ประตู "ต้องอยู่ในถังก่อน" อยู่ที่ SQL ทั้งสินค้าและเมนู (รอบที่ 139) */
+  await checkTrashForever();
 
   await closePool();
 
@@ -1972,6 +1978,10 @@ const RECIPE_CHECK_SOURCE_ID = "999999";
 const RECIPE_ADMIN_CHECK_ACTOR = "check-db-recipes-admin@example.invalid";
 const RECIPE_CHECK_ACTOR = "check-db-recipes@example.invalid";
 
+/* 26) ถังขยะ + ลบถาวร (รอบที่ 139) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
+const TRASH_CHECK_ACTOR = "check-db-trash-forever@example.invalid";
+const TRASH_CHECK_PRODUCT_ID = "p999997";
+
 async function checkRecipeVideos(): Promise<void> {
   const mediaId = newMediaId();
   const png = Buffer.from(
@@ -2585,5 +2595,179 @@ async function checkRecipeAdmin(): Promise<void> {
     assert.equal(createdId === "" ? 0 : await countWhere("recipe where id = $1", [createdId]), 0, "ต้องไม่เหลือเมนูทดสอบ");
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
     assert.deepEqual(await adminRecipeCounts(), before, "ตัวนับต้องกลับมาเท่าเดิมหลังลบรอยทดสอบ");
+  }
+}
+
+/**
+ * 26) ถังขยะ + ลบถาวร (รอบที่ 139) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * เจ้าของสั่ง "ลุยที่ยังเหลือ" = ปิดหนี้ "ลบให้ครบวงจร" ⇒ วงจรนี้พิสูจน์ 4 อย่าง
+ *   1. **ของในถังหายจากเว็บจริงทุกเส้นทาง** (การ์ดหมวด · สินค้าในหมวด · สินค้าเด่น · ตัวนับ)
+ *   2. **ประตูลบถาวรอยู่ที่ SQL** — ของที่ยังใช้งานอยู่ `deleteProductForever()` ต้องคืน `false` และไม่ลบจริง
+ *   3. **ภาพของในถังยังนับเป็น "ถูกใช้"** (`findMediaUsage`) ⇒ ผู้ดูแลลบภาพไม่ได้ระหว่างที่ยังกู้คืนได้
+ *   4. เมนูอาหารมีประตูเดียวกัน (`deleteRecipeForever`)
+ *
+ * ⚠️ ตัวเลขทุกตัวใช้ **ค่าสัมพัทธ์** (เทียบก่อน/หลัง) ไม่ assume ว่าฐานข้อมูลว่าง — บทเรียนรอบที่ 124/127
+ */
+async function checkTrashForever(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดในฐานข้อมูลก่อนรันวงจรนี้");
+
+  const beforeCounts = await countProductsByCategory();
+  const beforeCount = beforeCounts[categoryId] ?? 0;
+  const beforeRecipeCounts = await adminRecipeCounts();
+  let recipeId = "";
+
+  /* sort_order ติดลบมาก = การ์ด "สินค้าเด่น" ของหมวดนี้ต้องเป็นของทดสอบ (พิสูจน์เส้นทาง highlights ได้จริง) */
+  const productInput: ProductInput = {
+    id: TRASH_CHECK_PRODUCT_ID,
+    categoryId,
+    sourceId: "999997",
+    sourceUrl: "",
+    nameTh: "สินค้าด่านถังขยะ",
+    nameEn: "Trash check product",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    sortOrder: -99999,
+  };
+
+  const inCategoryList = async (): Promise<boolean> =>
+    (await listProductsByCategory(categoryId)).some((item) => item.id === TRASH_CHECK_PRODUCT_ID);
+  const inHighlights = async (): Promise<boolean> =>
+    (await listProductHighlights()).some((item) => item.id === TRASH_CHECK_PRODUCT_ID);
+  const cardCount = async (): Promise<number> =>
+    (await listProductCategoryCards()).find((card) => card.id === categoryId)?.productCount ?? -1;
+  const countOfCategory = async (): Promise<number> => (await countProductsByCategory())[categoryId] ?? 0;
+  const inAdminTab = async (tab: "all" | "trash"): Promise<boolean> =>
+    (await listProductsForAdmin({ tab })).items.some((item) => item.id === TRASH_CHECK_PRODUCT_ID);
+  const mediaUsageTargets = async (): Promise<readonly string[]> =>
+    (await findMediaUsage(mediaId)).map((usage) => usage.target);
+
+  try {
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-trash-forever.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "สินค้าด่านถังขยะ",
+      altEn: "Trash check product",
+      createdBy: TRASH_CHECK_ACTOR,
+    });
+    await upsertProduct(productInput, TRASH_CHECK_ACTOR, mediaId, { imageMode: "set" });
+
+    /* 1) ตอนใช้งาน: ต้องเห็นครบทุกเส้นทางของเว็บ */
+    assert.equal(await inCategoryList(), true, "สินค้าที่ใช้งานต้องอยู่ในรายการหมวด");
+    assert.equal(await inHighlights(), true, "สินค้าที่ใช้งานต้องเป็นสินค้าเด่นของหมวด (sort_order ต่ำสุด)");
+    assert.equal(await countOfCategory(), beforeCount + 1, "ตัวนับต่อหมวดต้อง +1");
+    assert.equal(await cardCount(), beforeCount + 1, "จำนวนบนการ์ดหมวดต้อง +1");
+    assert.equal(await inAdminTab("all"), true, "แท็บ 'ใช้งาน' ต้องเห็นสินค้านี้");
+    assert.equal(await inAdminTab("trash"), false, "แท็บ 'ถังขยะ' ต้องไม่เห็นสินค้าที่ใช้งานอยู่");
+    assert.ok(
+      (await mediaUsageTargets()).includes(`product:${TRASH_CHECK_PRODUCT_ID}`),
+      "ภาพของสินค้าต้องถูกนับเป็น 'ใช้งาน' (กันผู้ดูแลกดลบภาพที่สินค้ายังใช้)",
+    );
+
+    /* 2) ⭐ ประตูจริง: ลบถาวรของที่ยังใช้งานอยู่ ต้องไม่สำเร็จ */
+    assert.equal(
+      await deleteProductForever(TRASH_CHECK_PRODUCT_ID),
+      false,
+      "deleteProductForever ต้องปฏิเสธสินค้าที่ไม่ได้อยู่ในถังขยะ",
+    );
+    assert.ok((await loadProductForAdmin(TRASH_CHECK_PRODUCT_ID)) !== null, "สินค้าต้องยังอยู่หลังลบถาวรไม่สำเร็จ");
+    assert.equal(await inCategoryList(), true, "สินค้าต้องยังขึ้นเว็บอยู่");
+
+    /* 3) ย้ายเข้าถังขยะ → หายจากเว็บทุกเส้นทาง + แท็บถังขยะเห็น */
+    assert.equal(
+      await setProductTrashed(TRASH_CHECK_PRODUCT_ID, true, TRASH_CHECK_ACTOR),
+      true,
+      "ย้ายเข้าถังขยะต้องสำเร็จ",
+    );
+    assert.equal(await inCategoryList(), false, "ของในถังต้องหายจากรายการหมวด");
+    assert.equal(await inHighlights(), false, "ของในถังต้องหายจากสินค้าเด่น");
+    assert.equal(await countOfCategory(), beforeCount, "ตัวนับต่อหมวดต้องกลับมาเท่าเดิม");
+    assert.equal(await cardCount(), beforeCount, "จำนวนบนการ์ดหมวดต้องกลับมาเท่าเดิม");
+    assert.equal(await inAdminTab("all"), false, "ของในถังต้องไม่อยู่ในแท็บ 'ใช้งาน'");
+    assert.equal(await inAdminTab("trash"), true, "ของในถังต้องอยู่ในแท็บ 'ถังขยะ'");
+    const trashedDetail = await loadProductForAdmin(TRASH_CHECK_PRODUCT_ID);
+    assert.equal(trashedDetail?.trashed, true, "จอแก้ต้องรู้ว่าของอยู่ในถัง");
+    assert.ok(
+      (await mediaUsageTargets()).includes(`product:${TRASH_CHECK_PRODUCT_ID}`),
+      "⚠️ ของในถังต้องยังนับว่าภาพ 'ถูกใช้' (กู้คืนได้ ⇒ ลบภาพไม่ได้)",
+    );
+
+    /* 4) กู้คืน → กลับขึ้นเว็บ */
+    assert.equal(
+      await setProductTrashed(TRASH_CHECK_PRODUCT_ID, false, TRASH_CHECK_ACTOR),
+      true,
+      "กู้คืนต้องสำเร็จ",
+    );
+    assert.equal(await inCategoryList(), true, "กู้คืนแล้วต้องกลับขึ้นเว็บ");
+    assert.equal(await countOfCategory(), beforeCount + 1, "ตัวนับต้องกลับมา +1");
+
+    /* 5) ย้ายเข้าถังอีกรอบ → ลบถาวรสำเร็จ + ไม่เหลือรอย + ตัวนับกลับมาเท่าเดิม */
+    await setProductTrashed(TRASH_CHECK_PRODUCT_ID, true, TRASH_CHECK_ACTOR);
+    assert.equal(await deleteProductForever(TRASH_CHECK_PRODUCT_ID), true, "ลบถาวรของในถังต้องสำเร็จ");
+    assert.equal(await loadProductForAdmin(TRASH_CHECK_PRODUCT_ID), null, "ลบถาวรแล้วต้องไม่เหลือแถว");
+    assert.equal(await countOfCategory(), beforeCount, "ตัวนับต้องกลับมาเท่าเดิมหลังลบถาวร");
+    assert.equal(
+      await deleteProductForever(TRASH_CHECK_PRODUCT_ID),
+      false,
+      "ลบถาวรซ้ำต้องไม่สำเร็จ (idempotent · ไม่มีแถวให้ลบ)",
+    );
+    assert.ok(
+      !(await mediaUsageTargets()).includes(`product:${TRASH_CHECK_PRODUCT_ID}`),
+      "ลบถาวรแล้วภาพต้องไม่ถูกนับว่าใช้งานอีก",
+    );
+
+    /* 6) เมนูอาหาร: ประตูเดียวกัน */
+    recipeId = await createRecipeForAdmin(
+      {
+        titleTh: `เมนูด่านลบถาวร ${String(Date.now())}`,
+        titleEn: "Trash check recipe",
+        videoId: "dQw4w9WgXcQ",
+        publishedOn: "2018-10-09",
+        sortOrder: 7,
+        coverPath: null,
+        status: "published",
+      },
+      TRASH_CHECK_ACTOR,
+    );
+    assert.equal(await deleteRecipeForever(recipeId), false, "ลบถาวรเมนูที่ยังเผยแพร่อยู่ต้องไม่สำเร็จ");
+    assert.ok((await loadRecipeForAdmin(recipeId)) !== null, "เมนูต้องยังอยู่หลังลบถาวรไม่สำเร็จ");
+    await setRecipeTrashed(recipeId, true, TRASH_CHECK_ACTOR);
+    assert.equal(await deleteRecipeForever(recipeId), true, "ลบถาวรเมนูในถังต้องสำเร็จ");
+    assert.equal(await loadRecipeForAdmin(recipeId), null, "ลบถาวรแล้วเมนูต้องไม่เหลือแถว");
+    recipeId = "";
+
+    done(
+      "ถังขยะ + ลบถาวร: ของในถังหายจากเว็บทุกเส้นทาง · ประตู 'ต้องอยู่ในถัง' อยู่ที่ SQL",
+      "การ์ดหมวด · สินค้าเด่น · ตัวนับ · ภาพของในถัง · เมนูอาหาร",
+    );
+  } finally {
+    await deleteProduct(TRASH_CHECK_PRODUCT_ID);
+    if (recipeId !== "") await deleteRecipe(recipeId);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(await countWhere("product where id = $1", [TRASH_CHECK_PRODUCT_ID]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+    assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
+    assert.equal(await countOfCategory(), beforeCount, "ตัวนับต่อหมวดต้องกลับมาเท่าเดิม");
+    assert.deepEqual(await adminRecipeCounts(), beforeRecipeCounts, "ตัวนับเมนูต้องกลับมาเท่าเดิม");
   }
 }

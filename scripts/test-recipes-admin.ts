@@ -90,8 +90,12 @@ test("recipes admin: ฝั่งเว็บสาธารณะต้อง�
 
 test("recipes admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 3, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
-  assert.equal((actions.match(/^export async function/gm) ?? []).length, 3, "ไฟล์นี้มี 3 action (บันทึก · ถังขยะ · อัปโหลดภาพ)");
+  assert.ok(permissionChecks >= 4, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.equal(
+    (actions.match(/^export async function/gm) ?? []).length,
+    4,
+    "ไฟล์นี้มี 4 action (บันทึก · ย้าย/กู้คืนถังขยะ · ลบถาวร · อัปโหลดภาพ)",
+  );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
   assert.ok(actions.includes("validateRecipeInput("), "ต้องตรวจค่าที่รับจากเบราว์เซอร์ด้วย validator กลาง");
@@ -129,10 +133,14 @@ test("recipes admin: ห้ามมี <form> ซ้อน <form> (บทเร
   assert.equal(formTags(editorForm), 1, "จอแก้เมนูมีแท็ก <form> ได้เพียงตัวเดียว (ฟอร์มบันทึก)");
   assert.ok(editorForm.includes("uploadRecipeImageAction("), "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>)");
   /* หน้ารายการมี 2 ฟอร์ม: ค้นหา (GET) + ย้ายเข้าถังขยะ (action) — ต้องเป็นพี่น้องกัน ไม่ซ้อนกัน */
-  assert.equal(formTags(listPage), 2, "หน้ารายการมี <form> 2 ตัว (ค้นหา + ถังขยะ)");
+  assert.equal(formTags(listPage), 3, "หน้ารายการมี <form> 3 ตัว (ค้นหา + ย้าย/กู้คืน + ลบถาวร) เป็นพี่น้องกัน");
   const searchFormEnd = listPage.indexOf("</form>");
   const trashFormStart = listPage.indexOf("action={trashRecipeAction}");
   assert.ok(searchFormEnd >= 0 && trashFormStart > searchFormEnd, "ฟอร์มถังขยะต้องอยู่นอกฟอร์มค้นหา");
+  assert.ok(
+    listPage.indexOf("action={deleteRecipeForeverAction}") > searchFormEnd,
+    "ฟอร์มลบถาวรต้องอยู่นอกฟอร์มค้นหา",
+  );
 });
 
 test("recipes admin: กันสร้างเมนูซ้ำ — หลังสร้างสำเร็จต้องใช้ id ที่เซิร์ฟเวอร์คืนมา", () => {
@@ -142,7 +150,7 @@ test("recipes admin: กันสร้างเมนูซ้ำ — หลั
 });
 
 test("recipes admin: audit ใหม่ต้องมีป้ายข้อความครบ", () => {
-  for (const action of ["recipe-save", "recipe-trash", "recipe-restore"]) {
+  for (const action of ["recipe-save", "recipe-trash", "recipe-restore", "recipe-delete"]) {
     assert.ok(auditLabels.includes(`"${action}"`), `audit-labels ต้องมีป้ายของ ${action}`);
   }
 });
@@ -217,4 +225,23 @@ test("recipes admin: placeholder มีผลเฉพาะหลังบ้�
   const publicPage = readFileSync("app/[lang]/recipes/page.tsx", "utf8");
   assert.ok(!publicPage.includes("titlePlaceholder"), "หน้าเว็บจริงห้ามส่ง placeholder (ชื่อว่าง = ชื่อว่าง)");
   assert.equal((publicPage.match(/<RecipeVideoList/g) ?? []).length, 2, "หน้าเว็บจริงเรียกตัวเรนเดอร์ 2 ที่ตามเดิม");
+});
+
+/* ── รอบที่ 139: ลบถาวรจากถังขยะ (ประตูอยู่ที่ SQL ไม่ใช่ที่ปุ่ม) ─────────────── */
+
+test("recipes admin: ลบถาวรมีเฉพาะของในถัง + ประตูอยู่ที่ SQL (fail-closed)", () => {
+  assert.ok(repository.includes("export async function deleteRecipeForever"), "ต้องมีตัวลบถาวร");
+  assert.ok(
+    repository.includes("delete from recipe where id = $1 and deleted_at is not null"),
+    "ประตูต้องอยู่ใน SQL ⇒ เมนูที่ยังใช้งานอยู่ลบไม่ได้แม้ยิง action ตรง ๆ",
+  );
+  assert.ok(actions.includes("deleteRecipeForever("), "action ต้องเรียกผ่านตัวที่มีประตู");
+  assert.ok(actions.includes('action: "recipe-delete"'), "ลบถาวรต้องมี audit");
+  assert.ok(
+    !/\bdeleteRecipe\(/.test(actions),
+    "action ห้ามเรียก `deleteRecipe()` (ตัวที่ข้ามประตูถังขยะ) — ใช้ได้แค่ในสคริปต์/ด่านตรวจ",
+  );
+  assert.ok(listPage.includes("deleteRecipeForeverAction"), "ปุ่มลบถาวรอยู่ในหน้ารายการ");
+  assert.ok(listPage.includes("item.trashed ? ("), "ปุ่มลบถาวรโผล่เฉพาะของที่อยู่ในถัง");
+  assert.ok(listPage.includes("recipesAdminDeleteForeverWarning"), "ต้องมีคำเตือนว่ากู้คืนไม่ได้");
 });

@@ -347,12 +347,15 @@ create table if not exists product (
   packaging_th   text        not null default '',
   image_media_id text        references media (id) on delete set null,
   sort_order     integer     not null default 0,
+  /* ถังขยะของสินค้า (migration 0022 · รอบที่ 139) — null = ใช้งาน · มีค่า = อยู่ในถัง (กู้คืนได้) */
+  deleted_at     timestamptz,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );
 
 create index if not exists product_category_order_idx on product (category_id, sort_order, id);
 create index if not exists product_source_idx on product (source_id);
+create index if not exists product_admin_idx on product (deleted_at, category_id, sort_order, id);
 
 create table if not exists product_ingredient (
   product_id   text    not null references product (id) on delete cascade,

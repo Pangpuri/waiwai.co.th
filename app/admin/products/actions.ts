@@ -14,7 +14,13 @@ import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { storeImageFile } from "@/lib/media/upload";
-import { replaceProductIngredients, upsertProduct, upsertProductCategory } from "@/lib/products/repository";
+import {
+  deleteProductForever,
+  replaceProductIngredients,
+  setProductTrashed,
+  upsertProduct,
+  upsertProductCategory,
+} from "@/lib/products/repository";
 import {
   isCatalogCategoryId,
   productIdOfSourceId,
@@ -164,6 +170,57 @@ export async function saveProductCategoryAction(
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");
   return { status: "saved", reason: null };
+}
+
+/**
+ * ย้ายสินค้าเข้าถังขยะ / กู้คืน (รอบที่ 139)
+ *
+ * ⚠️ ห้ามลบถาวรตรงนี้ — ต้องผ่านถังขยะก่อน (กดพลาดแล้วกู้คืนได้ เสมอ)
+ * ⚠️ ใช้ `intent` ช่องเดียว (trash/restore) ⇒ ฟอร์มเดียวจบ ไม่ต้องมี JS
+ */
+export async function trashProductAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id").trim();
+  const trashed = field(formData, "intent") === "trash";
+  if (id === "" || !isDatabaseConfigured()) return;
+
+  const changed = await setProductTrashed(id, trashed, user.email);
+  if (!changed) return;
+
+  await recordAudit({
+    action: trashed ? "product-trash" : "product-restore",
+    actorEmail: user.email,
+    target: `product:${id}`,
+    detail: trashed ? "moved-to-trash" : "restored",
+  });
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${id}`);
+  await refreshPublicSite("page");
+}
+
+/**
+ * ลบสินค้า **ถาวร** (รอบที่ 139) — เฉพาะของที่อยู่ในถังขยะแล้ว
+ *
+ * ⚠️ ประตูอยู่ที่ SQL ของ `deleteProductForever()` (`deleted_at is not null`) ⇒ fail-closed
+ * ⚠️ ลบถาวร ⇒ ส่วนผสมถูกลบตาม (on delete cascade) และ **กู้คืนไม่ได้**
+ */
+export async function deleteProductForeverAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id").trim();
+  if (id === "" || !isDatabaseConfigured()) return;
+
+  const deleted = await deleteProductForever(id);
+  if (!deleted) return;
+
+  await recordAudit({
+    action: "product-delete",
+    actorEmail: user.email,
+    target: `product:${id}`,
+    detail: "deleted-forever",
+  });
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${id}`);
+  await refreshPublicSite("page");
 }
 
 /** อัปโหลดภาพจากเครื่อง (ใช้ท่อกลาง storeImageFile — ย่อภาพ/ตรวจหัวไฟล์/เพดาน 5MB) */

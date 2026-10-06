@@ -76,8 +76,12 @@ const formTags = (value: string): number => (value.match(/<form[ \n]/g) ?? []).l
 
 test("products admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 3, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
-  assert.equal((actions.match(/^export async function/gm) ?? []).length, 3, "ไฟล์นี้มี 3 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ)");
+  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.equal(
+    (actions.match(/^export async function/gm) ?? []).length,
+    5,
+    "ไฟล์นี้มี 5 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ · ย้าย/กู้คืนถังขยะ · ลบถาวร)",
+  );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
 });
@@ -123,7 +127,16 @@ test("products admin: ห้ามมี <form> ซ้อน <form> (บทเ�
   assert.equal(formTags(categoryForm), 1, "ฟอร์มหมวดมีแท็ก <form> ได้เพียงตัวเดียว");
   assert.ok(editorForm.includes("uploadProductImageAction("), "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>)");
   assert.ok(categoryForm.includes("uploadProductImageAction("), "ปุ่มอัปโหลดภาพหมวดต้องเรียก Server Action เอง");
-  assert.equal(formTags(listPage), 1, "หน้าจอ /admin/products มี <form> GET (ค้นหา) ได้เพียงตัวเดียว — ฟอร์มหมวดอยู่ใน client component");
+  assert.equal(formTags(listPage), 3, "หน้ารายการมี <form> 3 ตัว (ค้นหา + ย้าย/กู้คืนถังขยะ + ลบถาวร) เป็นพี่น้องกัน");
+  const searchFormEnd = listPage.indexOf("</form>");
+  assert.ok(
+    searchFormEnd >= 0 && listPage.indexOf("action={trashProductAction}") > searchFormEnd,
+    "ฟอร์มถังขยะต้องอยู่นอกฟอร์มค้นหา",
+  );
+  assert.ok(
+    listPage.indexOf("action={deleteProductForeverAction}") > searchFormEnd,
+    "ฟอร์มลบถาวรต้องอยู่นอกฟอร์มค้นหา",
+  );
 });
 
 test("products admin: จอหมวดต้องมีฟอร์มของตัวเองต่อหมวด (6 ใบ จากทะเบียนเดียวกับหน้าเว็บ)", () => {
@@ -160,4 +173,56 @@ test("products admin: จอแก้สินค้าต้องส่ง '�
   assert.ok(editorPage.includes("existing?.sortOrder"), "ต้องเติม sortOrder จากข้อมูลเดิม ไม่ใช่ 0 คงที่");
   assert.ok(repository.includes("p.sort_order"), "ตัวอ่านหลังบ้านต้องดึง sort_order มาด้วย");
   assert.ok(!/sortOrder: 0,/.test(editorPage), "ห้ามฮาร์ดโค้ด sortOrder = 0 ในหน้าจอแก้");
+});
+
+/* ── รอบที่ 139: ถังขยะสินค้า + ลบถาวร (ประตูอยู่ที่ SQL ไม่ใช่ที่ปุ่ม) ─────────── */
+
+test("products admin: ถังขยะสินค้า — ย้าย/กู้คืน/ลบถาวร ครบ และลบถาวรมีประตูที่ SQL", () => {
+  assert.ok(repository.includes("export async function setProductTrashed"), "ต้องมีตัวย้าย/กู้คืน");
+  assert.ok(repository.includes("export async function deleteProductForever"), "ต้องมีตัวลบถาวร");
+  assert.ok(
+    repository.includes("delete from product where id = $1 and deleted_at is not null"),
+    "ประตูลบถาวรต้องอยู่ใน SQL (fail-closed) ⇒ ของที่ยังใช้งานอยู่ลบไม่ได้แม้ยิง action ตรง ๆ",
+  );
+  assert.ok(actions.includes("deleteProductForever("), "action ต้องเรียกผ่านตัวที่มีประตู");
+  assert.ok(actions.includes('action: "product-delete"'), "ลบถาวรต้องมี audit");
+  assert.ok(
+    !/\bdeleteProduct\(/.test(actions),
+    "action ห้ามเรียก `deleteProduct()` (ตัวที่ข้ามประตูถังขยะ) — ใช้ได้แค่ในสคริปต์/ด่านตรวจ",
+  );
+});
+
+test("products admin: หน้าเว็บสาธารณะต้องกรองสินค้าในถังออกทุกเส้นทาง (การ์ดหมวด/สินค้า/สินค้าเด่น/ตัวนับ)", () => {
+  const uses = (repository.match(/PUBLIC_PRODUCT_CONDITION/g) ?? []).length;
+  assert.ok(
+    uses >= 5,
+    `ต้องใช้เงื่อนไขกลางในทุกคำสั่งอ่านฝั่งเว็บ (1 ประกาศ + 4 คำสั่งอ่าน — พบ ${String(uses)})`,
+  );
+  assert.ok(repository.includes('const PUBLIC_PRODUCT_CONDITION = "p.deleted_at is null"'), "นิยามเงื่อนไขต้องชัด");
+  assert.ok(
+    repository.includes("left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION}"),
+    "การ์ดหมวดต้องใส่เงื่อนไขใน join (ไม่ใช่ where) เพื่อไม่ให้หมวดที่ไม่มีสินค้าเหลือหายไปทั้งใบ",
+  );
+});
+
+test("products admin: ปุ่มลบถาวร/กู้คืนโผล่เฉพาะที่ที่ควร + บอกผู้ใช้ว่าของอยู่ในถัง", () => {
+  assert.ok(listPage.includes("deleteProductForeverAction"), "แท็บถังขยะต้องมีปุ่มลบถาวร");
+  assert.ok(
+    listPage.includes("item.trashed ? m.adminProductsRestore : m.adminProductsTrash"),
+    "ปุ่มเดียวสลับ ย้าย/กู้คืน ตามสถานะ",
+  );
+  assert.ok(listPage.includes("adminProductCounts"), "หัวแท็บต้องมีตัวนับจากฐานข้อมูล");
+  assert.ok(listPage.includes('query.tab === "trash"'), "ต้องอ่านแท็บจาก query (ไม่เชื่อค่าดิบ)");
+  assert.ok(editorPage.includes("trashProductAction"), "จอแก้ต้องกู้คืนของที่อยู่ในถังได้");
+  assert.ok(editorPage.includes("adminProductsTrashedNotice"), "ต้องบอกว่าอยู่ในถังและหน้าเว็บไม่แสดง");
+  assert.ok(listPage.includes("adminProductsDeleteForeverWarning"), "ปุ่มลบถาวรต้องมีคำเตือนกำกับ");
+});
+
+test("products admin: ไม่มี 'ลบหมวด' — 6 หมวดถูกล็อกตามมติ Q-D (กันเผลอทำหน้าสินค้าพัง)", () => {
+  assert.ok(!/deleteProductCategoryAction/.test(actions), "ห้ามมี action ลบหมวด");
+  assert.ok(!/deleteProductCategory/.test(listPage), "หน้ารายการห้ามมีปุ่มลบหมวด");
+  assert.ok(
+    !repository.includes("deleted_at") || !/product_category\s+set\s+deleted_at/.test(repository),
+    "product_category ต้องไม่มี deleted_at (หมวดถูกล็อก 6 หมวด)",
+  );
 });

@@ -8,6 +8,7 @@ import { productListStringsOf } from "@/features/products/ui/product-list";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
 import { loadProductForAdmin } from "@/lib/products/repository";
+import { trashProductAction } from "../actions";
 
 /**
  * หลังบ้าน — หน้าจอแก้ "สินค้า" (รอบที่ 133)
@@ -56,6 +57,23 @@ export default async function AdminProductEditorPage({
       <h1 className="font-display mt-4 text-2xl font-semibold tracking-tight">
         {isNew ? m.adminProductsHeadingNew : m.adminProductsHeadingEdit}
       </h1>
+
+      {/* สถานะถังขยะ (รอบที่ 139) — บอกให้ชัดว่าของชิ้นนี้ไม่ขึ้นเว็บ + กู้คืนได้จากตรงนี้ */}
+      {existing?.trashed === true ? (
+        <div className="border-line bg-bg-subtle mt-4 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3">
+          <p className="text-fg-muted text-sm">{m.adminProductsTrashedNotice}</p>
+          <form action={trashProductAction}>
+            <input type="hidden" name="id" value={existing.id} />
+            <input type="hidden" name="intent" value="restore" />
+            <button
+              type="submit"
+              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {m.adminProductsRestore}
+            </button>
+          </form>
+        </div>
+      ) : null}
 
       <div className="mt-8">
         <ProductEditorForm
