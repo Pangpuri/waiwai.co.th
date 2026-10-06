@@ -80,11 +80,11 @@ const formTags = (value: string): number => (value.match(/<form[ \n]/g) ?? []).l
 
 test("products admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 6, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    5,
-    "ไฟล์นี้มี 5 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ · ย้าย/กู้คืนถังขยะ · ลบถาวร)",
+    6,
+    "ไฟล์นี้มี 6 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ · ย้าย/กู้คืนถังขยะ · ลบถาวร · กู้คืนประวัติ)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");

@@ -1,5 +1,7 @@
 "use server";
 
+import { loadEntityRevision, recordEntityRevision } from "@/lib/revisions/repository";
+import { recipeRestoreOf, recipeSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import { INITIAL_RECIPE_UPLOAD_STATE, type RecipeSaveState, type RecipeUploadState } from "@/features/admin/recipe-state";
@@ -111,6 +113,8 @@ export async function saveRecipeAction(_previous: RecipeSaveState, formData: For
     });
     revalidateAdminPath(LIST_PATH);
     await refreshPublicSite("page");
+  /* B1 (รอบที่ 145): เก็บรุ่นหลังบันทึกสำเร็จ — อ่านค่าจริงจากฐานข้อมูล จึงตรงกับของจริงเสมอ */
+  await recordRecipeRevision(createdId, user.email);
     return { status: input.status === "draft" ? "draft" : "saved", reason: null, createdId };
   }
 
@@ -191,4 +195,44 @@ export async function uploadRecipeImageAction(
 
   revalidateAdminPath(LIST_PATH);
   return { status: "ok", path: stored.path, reason: "" };
+}
+
+/* ── ประวัติรุ่น (B1 ส่วนที่ 2 · รอบที่ 145) ─────────────────────────────── */
+
+async function recordRecipeRevision(id: string, actor: string, note = ""): Promise<void> {
+  const saved = await loadRecipeForAdmin(id);
+  if (saved === null) return;
+  await recordEntityRevision({ kind: "recipe", entityId: id, snapshot: recipeSnapshotOf(saved), actor, note });
+}
+
+/**
+ * กู้คืนจากรุ่นในประวัติ
+ * - ตรวจสิทธิ์ `content` · ตรวจว่ารุ่นนั้นเป็นของรายการนี้จริง
+ * - **บันทึกสถานะปัจจุบันเป็นรุ่นใหม่ก่อนเขียนทับ** ⇒ กู้คืนผิดก็ย้อนกลับได้เสมอ
+ */
+export async function restoreRecipeRevisionAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id");
+  const revisionId = field(formData, "revisionId");
+  if (id === "" || revisionId === "") return;
+
+  const snapshot = await loadEntityRevision({ kind: "recipe", entityId: id, revisionId });
+  const current = await loadRecipeForAdmin(id);
+  if (snapshot === null || current === null) return;
+
+  await recordRecipeRevision(id, user.email, "ก่อนกู้คืน");
+
+  const restore = recipeRestoreOf(snapshot);
+  await updateRecipeForAdmin(id, { ...restore.values, coverPath: restore.coverPath }, user.email);
+  await recordRecipeRevision(id, user.email, `กู้คืนรุ่น #${revisionId}`);
+  await recordAudit({
+    action: "recipe-revision-restore",
+    actorEmail: user.email,
+    target: `recipe:${id}`,
+    detail: `revision=${revisionId}`,
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${id}`);
+  await refreshPublicSite("page");
 }

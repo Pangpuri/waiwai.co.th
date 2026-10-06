@@ -85,6 +85,8 @@ import {
   upsertRecipe,
   type AdminRecipeInput,
 } from "@/lib/recipes/repository";
+import { revisionDiff, productSnapshotOf } from "@/lib/revisions/model";
+import { loadEntityRevision, listEntityRevisions, recordEntityRevision } from "@/lib/revisions/repository";
 import { RETENTION_CLASSES, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, retentionOverview } from "@/lib/retention/purge";
 import { eraseSubject, erasurePreview } from "@/lib/privacy/repository";
@@ -322,6 +324,9 @@ async function main(): Promise<void> {
 
   /* 28) นำเข้าเมนู/ข่าวซ้ำ: ต้องไม่ทับงานที่แก้จากหลังบ้าน (รอบที่ 142) */
   await checkContentImportGuard();
+
+  /* 29) ประวัติรุ่นสินค้า: บันทึก/อ่าน/เทียบความต่าง (รอบที่ 145) */
+  await checkRevisionHistory();
 
   await closePool();
 
@@ -1997,6 +2002,8 @@ const IMPORT_GUARD_CHECK_ID = "p999996";
 
 /* 28) นำเข้าเมนู/ข่าวซ้ำต้องไม่ทับงานคน (รอบที่ 142) — ประกาศก่อน `await main()` (ไม่งั้น TDZ) */
 const IMPORT_GUARD_RECIPE_ID = "r999995";
+const REVISION_CHECK_ID = "p999993";
+const REVISION_CHECK_ACTOR = "check-db-revision@example.invalid";
 const IMPORT_GUARD_NEWS_ID = "n999994";
 const IMPORT_GUARD_IMPORT_ACTOR = "import:waiwai.co.th";
 const IMPORT_GUARD_HUMAN_ACTOR = "check-db-human-editor@example.invalid";
@@ -3026,5 +3033,100 @@ async function checkContentImportGuard(): Promise<void> {
     await deleteNews(IMPORT_GUARD_NEWS_ID);
     assert.equal(await countWhere("recipe where id = $1", [IMPORT_GUARD_RECIPE_ID]), 0, "ต้องไม่เหลือเมนูทดสอบ");
     assert.equal(await countWhere("news where id = $1", [IMPORT_GUARD_NEWS_ID]), 0, "ต้องไม่เหลือข่าวทดสอบ");
+  }
+}
+/**
+ * 29) ประวัติรุ่นของสินค้า (B1 ส่วนที่ 2 · รอบที่ 145) — พิสูจน์กับ DB จริง
+ * บันทึก 2 รุ่น → อ่านรายการ → เปิดรุ่นเก่า → เทียบความต่างกับค่าปัจจุบัน (ก่อนกู้คืน)
+ * ⚠️ ใช้หมวดที่มีอยู่จริง (ไม่สร้าง/ไม่ลบหมวด) — กันพังแบบวงจรก่อน ๆ
+ */
+async function checkRevisionHistory(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวด (วงจรนี้ใช้หมวดที่มีอยู่จริง)");
+
+  const base = {
+    id: REVISION_CHECK_ID,
+    categoryId,
+    sourceId: "999993",
+    sourceUrl: "",
+    nameTh: "สินค้าทดสอบประวัติ",
+    nameEn: "",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    detailsEn: "",
+    allergensTh: "",
+    allergensEn: "",
+    netWeightTh: "",
+    netWeightEn: "",
+    fdaNumber: "",
+    packagingTh: "",
+    packagingEn: "",
+    sortOrder: 0,
+  };
+
+  try {
+    await upsertProduct(base, REVISION_CHECK_ACTOR, null, { writeMode: "replace" });
+    const first = await loadProductForAdmin(REVISION_CHECK_ID);
+    assert.ok(first !== null, "ต้องโหลดสินค้าทดสอบได้");
+    const revision1 = await recordEntityRevision({
+      kind: "product",
+      entityId: REVISION_CHECK_ID,
+      snapshot: productSnapshotOf(first),
+      actor: REVISION_CHECK_ACTOR,
+    });
+    assert.equal(revision1, 1, "รุ่นแรกต้องเป็นเลข 1");
+
+    await upsertProduct(
+      { ...base, nameTh: "สินค้าทดสอบประวัติ (แก้แล้ว)", sortOrder: 5 },
+      REVISION_CHECK_ACTOR,
+      null,
+      { writeMode: "replace" },
+    );
+    const second = await loadProductForAdmin(REVISION_CHECK_ID);
+    assert.ok(second !== null);
+    await recordEntityRevision({
+      kind: "product",
+      entityId: REVISION_CHECK_ID,
+      snapshot: productSnapshotOf(second),
+      actor: REVISION_CHECK_ACTOR,
+    });
+
+    const current = productSnapshotOf(second);
+    const list = await listEntityRevisions({ kind: "product", entityId: REVISION_CHECK_ID, current });
+    assert.equal(list.length, 2, "ต้องมี 2 รุ่น");
+    assert.equal(list[0]?.revision, 2, "รายการต้องเรียงใหม่ → เก่า");
+    assert.equal(list[0]?.changeCount, 0, "รุ่นล่าสุด = ตรงกับค่าปัจจุบัน");
+    assert.equal(list[1]?.changeCount, 2, "รุ่นก่อนหน้า: ชื่อ + ลำดับ เปลี่ยน 2 ช่อง");
+
+    const older = await loadEntityRevision({
+      kind: "product",
+      entityId: REVISION_CHECK_ID,
+      revisionId: list[1]?.id ?? "",
+    });
+    assert.equal(older?.nameTh, "สินค้าทดสอบประวัติ", "เปิดรุ่นเก่าได้ค่าตอนนั้น");
+    const changes = older === null ? [] : revisionDiff(older, current);
+    assert.deepEqual(
+      changes.map((item) => item.field),
+      ["nameTh", "sortOrder"],
+      "เทียบความต่างต้องบอกช่องที่เปลี่ยน (ใช้ตอนยืนยันก่อนกู้คืน)",
+    );
+
+    done(
+      "ประวัติรุ่นสินค้า: บันทึก 2 รุ่น · อ่านรายการ · เปิดรุ่นเก่า · เทียบความต่างก่อนกู้คืน",
+      "entity_revision · changeCount · revisionDiff",
+    );
+  } finally {
+    await deleteProduct(REVISION_CHECK_ID);
+    await getPool().query("delete from entity_revision where entity_id = $1", [REVISION_CHECK_ID]);
+    assert.equal(await countWhere("product where id = $1", [REVISION_CHECK_ID]), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+    assert.equal(
+      await countWhere("entity_revision where entity_id = $1", [REVISION_CHECK_ID]),
+      0,
+      "ต้องไม่เหลือประวัติทดสอบ",
+    );
   }
 }

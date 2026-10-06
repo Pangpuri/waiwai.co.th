@@ -90,11 +90,11 @@ test("recipes admin: ฝั่งเว็บสาธารณะต้อง�
 
 test("recipes admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 4, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    4,
-    "ไฟล์นี้มี 4 action (บันทึก · ย้าย/กู้คืนถังขยะ · ลบถาวร · อัปโหลดภาพ)",
+    5,
+    "ไฟล์นี้มี 5 action (บันทึก · ย้าย/กู้คืนถังขยะ · อัปโหลดภาพ · ลบถาวร · กู้คืนประวัติ)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");

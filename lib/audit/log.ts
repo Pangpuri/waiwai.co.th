@@ -17,6 +17,9 @@ export type AuditAction =
   | "logout"
   | "publish"
   | "restore-revision"
+  | "product-revision-restore"
+  | "recipe-revision-restore"
+  | "news-revision-restore"
   | "preset-save"
   | "pages-update"
   /* ข่าว/กิจกรรม (รอบที่ 123) */

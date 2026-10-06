@@ -1,3 +1,7 @@
+import { loadEntityRevision, listEntityRevisions } from "@/lib/revisions/repository";
+import { revisionDiff, productSnapshotOf } from "@/lib/revisions/model";
+import { RevisionHistoryPanel } from "@/features/admin/ui/revision-history";
+import { restoreProductRevisionAction } from "@/app/admin/products/actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -20,14 +24,17 @@ import { trashProductAction } from "../actions";
 
 export default async function AdminProductEditorPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ readonly id: string }>;
+  readonly searchParams: Promise<{ readonly revision?: string }>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
   const { id } = await params;
+  const selectedRevisionId = (await searchParams).revision ?? '';
   const isNew = id === "new";
 
   const [existing, media] = await Promise.all([
@@ -46,6 +53,13 @@ export default async function AdminProductEditorPage({
     name: messages.productsPage.items[item.id].name,
   }));
 
+
+  /* ── ประวัติรุ่น (B1 ส่วนที่ 2 · รอบที่ 145) ─────────────────────────── */
+  const currentSnapshot = existing === null ? {} : productSnapshotOf(existing);
+  const revisions = existing === null ? [] : await listEntityRevisions({ kind: "product", entityId: id, current: currentSnapshot });
+  const selectedSnapshot = existing === null || selectedRevisionId === "" ? null : await loadEntityRevision({ kind: "product", entityId: id, revisionId: selectedRevisionId });
+  const selectedRevision = selectedSnapshot === null ? null : (revisions.find((item) => item.id === selectedRevisionId) ?? null);
+  const revisionChanges = selectedSnapshot === null ? [] : revisionDiff(selectedSnapshot, currentSnapshot);
   return (
     <main className="container-site py-10">
       <p className="text-sm">
@@ -112,6 +126,16 @@ export default async function AdminProductEditorPage({
           }}
         />
       </div>
+
+      <RevisionHistoryPanel
+        strings={m}
+        revisions={revisions.map((item) => ({ id: item.id, revision: item.revision, note: item.note, createdBy: item.createdBy, createdLocal: item.createdLocal, changeCount: item.changeCount, isCurrent: item.isCurrent }))}
+        selected={selectedRevision}
+        changes={revisionChanges}
+        restoreAction={restoreProductRevisionAction}
+        entityId={id}
+        basePath={`/admin/products/${id}`}
+      />
     </main>
   );
 }

@@ -1,3 +1,7 @@
+import { loadEntityRevision, listEntityRevisions } from "@/lib/revisions/repository";
+import { revisionDiff, newsSnapshotOf } from "@/lib/revisions/model";
+import { RevisionHistoryPanel } from "@/features/admin/ui/revision-history";
+import { restoreNewsRevisionAction } from "@/app/admin/news/actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -17,14 +21,17 @@ import { loadNewsForAdmin } from "@/lib/news/repository";
 
 export default async function AdminNewsEditorPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ readonly id: string }>;
+  readonly searchParams: Promise<{ readonly revision?: string }>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
   const { id } = await params;
+  const selectedRevisionId = (await searchParams).revision ?? '';
   const isNew = id === "new";
 
   const [existing, media] = await Promise.all([isNew ? Promise.resolve(null) : loadNewsForAdmin(id), listMedia(60)]);
@@ -39,6 +46,13 @@ export default async function AdminNewsEditorPage({
   /* ขนาดรูปสำหรับพรีวิว — ใช้ข้อมูลจากคลังที่ดึงมาแล้ว (ไม่ต้องยิง DB เพิ่ม) */
   const previewSizes = media.map((item) => ({ id: item.id, width: item.width, height: item.height }));
 
+
+  /* ── ประวัติรุ่น (B1 ส่วนที่ 2 · รอบที่ 145) ─────────────────────────── */
+  const currentSnapshot = existing === null ? {} : newsSnapshotOf(existing);
+  const revisions = existing === null ? [] : await listEntityRevisions({ kind: "news", entityId: id, current: currentSnapshot });
+  const selectedSnapshot = existing === null || selectedRevisionId === "" ? null : await loadEntityRevision({ kind: "news", entityId: id, revisionId: selectedRevisionId });
+  const selectedRevision = selectedSnapshot === null ? null : (revisions.find((item) => item.id === selectedRevisionId) ?? null);
+  const revisionChanges = selectedSnapshot === null ? [] : revisionDiff(selectedSnapshot, currentSnapshot);
   return (
     <main className="container-site py-10">
       <p className="text-sm">
@@ -68,6 +82,16 @@ export default async function AdminNewsEditorPage({
           trashed={existing?.trashed ?? false}
         />
       </div>
+
+      <RevisionHistoryPanel
+        strings={m}
+        revisions={revisions.map((item) => ({ id: item.id, revision: item.revision, note: item.note, createdBy: item.createdBy, createdLocal: item.createdLocal, changeCount: item.changeCount, isCurrent: item.isCurrent }))}
+        selected={selectedRevision}
+        changes={revisionChanges}
+        restoreAction={restoreNewsRevisionAction}
+        entityId={id}
+        basePath={`/admin/news/${id}`}
+      />
     </main>
   );
 }

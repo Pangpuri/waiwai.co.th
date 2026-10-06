@@ -1,5 +1,7 @@
 "use server";
 
+import { loadEntityRevision, recordEntityRevision } from "@/lib/revisions/repository";
+import { productRestoreOf, productSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -16,6 +18,7 @@ import { mediaIdFromPath } from "@/lib/media/usage";
 import { storeImageFile } from "@/lib/media/upload";
 import {
   deleteProductForever,
+  loadProductForAdmin,
   replaceProductIngredients,
   setProductTrashed,
   upsertProduct,
@@ -140,6 +143,8 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
   revalidateAdminPath(`${LIST_PATH}/${productId}`);
   revalidatePath(`${LIST_PATH}/${productId}`);
   await refreshPublicSite("page");
+  /* B1 (รอบที่ 145): เก็บรุ่นหลังบันทึกสำเร็จ — อ่านค่าจริงจากฐานข้อมูล จึงตรงกับของจริงเสมอ */
+  await recordProductRevision(productId, user.email);
   return { status: "saved", reason: null, createdId: productId };
 }
 
@@ -245,4 +250,53 @@ export async function uploadProductImageAction(
 
   revalidateAdminPath(LIST_PATH);
   return { status: "ok", path: stored.path, reason: "" };
+}
+
+/* ── ประวัติรุ่น (B1 ส่วนที่ 2 · รอบที่ 145) ─────────────────────────────── */
+
+async function recordProductRevision(id: string, actor: string, note = ""): Promise<void> {
+  const saved = await loadProductForAdmin(id);
+  if (saved === null) return;
+  await recordEntityRevision({ kind: "product", entityId: id, snapshot: productSnapshotOf(saved), actor, note });
+}
+
+/**
+ * กู้คืนจากรุ่นในประวัติ
+ * - ตรวจสิทธิ์ `content` · ตรวจว่ารุ่นนั้นเป็นของรายการนี้จริง
+ * - **บันทึกสถานะปัจจุบันเป็นรุ่นใหม่ก่อนเขียนทับ** ⇒ กู้คืนผิดก็ย้อนกลับได้เสมอ
+ */
+export async function restoreProductRevisionAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id");
+  const revisionId = field(formData, "revisionId");
+  if (id === "" || revisionId === "") return;
+
+  const snapshot = await loadEntityRevision({ kind: "product", entityId: id, revisionId });
+  const current = await loadProductForAdmin(id);
+  if (snapshot === null || current === null) return;
+
+  await recordProductRevision(id, user.email, "ก่อนกู้คืน");
+
+  const restore = productRestoreOf(snapshot);
+  await upsertProduct(
+    { ...restore.input, id: id, sourceId: current.sourceId, sourceUrl: "" },
+    user.email,
+    restore.imageMediaId,
+    { imageMode: "set" },
+  );
+  await replaceProductIngredients(
+    id,
+    restore.ingredients.map((item, index) => ({ ...item, sortOrder: index + 1 })),
+  );
+  await recordProductRevision(id, user.email, `กู้คืนรุ่น #${revisionId}`);
+  await recordAudit({
+    action: "product-revision-restore",
+    actorEmail: user.email,
+    target: `product:${id}`,
+    detail: `revision=${revisionId}`,
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${id}`);
+  await refreshPublicSite("page");
 }

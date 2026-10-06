@@ -1,5 +1,7 @@
 "use server";
 
+import { loadEntityRevision, recordEntityRevision } from "@/lib/revisions/repository";
+import { newsRestoreOf, newsSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import type { NewsSaveState, NewsUploadState } from "@/features/admin/news-state";
@@ -95,6 +97,8 @@ export async function saveNewsAction(_previous: NewsSaveState, formData: FormDat
     });
     revalidateAdminPath(LIST_PATH);
     await refreshPublicSite("page");
+  /* B1 (รอบที่ 145): เก็บรุ่นหลังบันทึกสำเร็จ — อ่านค่าจริงจากฐานข้อมูล จึงตรงกับของจริงเสมอ */
+  await recordNewsRevision(createdId, user.email);
     return { status: input.status === "draft" ? "draft" : "saved", reason: null, createdId };
   }
 
@@ -157,4 +161,44 @@ export async function uploadNewsImageAction(
 
   revalidateAdminPath(LIST_PATH);
   return { status: "ok", path: stored.path, reason: "" };
+}
+
+/* ── ประวัติรุ่น (B1 ส่วนที่ 2 · รอบที่ 145) ─────────────────────────────── */
+
+async function recordNewsRevision(id: string, actor: string, note = ""): Promise<void> {
+  const saved = await loadNewsForAdmin(id);
+  if (saved === null) return;
+  await recordEntityRevision({ kind: "news", entityId: id, snapshot: newsSnapshotOf(saved), actor, note });
+}
+
+/**
+ * กู้คืนจากรุ่นในประวัติ
+ * - ตรวจสิทธิ์ `content` · ตรวจว่ารุ่นนั้นเป็นของรายการนี้จริง
+ * - **บันทึกสถานะปัจจุบันเป็นรุ่นใหม่ก่อนเขียนทับ** ⇒ กู้คืนผิดก็ย้อนกลับได้เสมอ
+ */
+export async function restoreNewsRevisionAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id");
+  const revisionId = field(formData, "revisionId");
+  if (id === "" || revisionId === "") return;
+
+  const snapshot = await loadEntityRevision({ kind: "news", entityId: id, revisionId });
+  const current = await loadNewsForAdmin(id);
+  if (snapshot === null || current === null) return;
+
+  await recordNewsRevision(id, user.email, "ก่อนกู้คืน");
+
+  const restore = newsRestoreOf(snapshot);
+  await updateNewsForAdmin(id, { ...restore.values, coverPath: restore.coverPath, body: restore.body }, user.email);
+  await recordNewsRevision(id, user.email, `กู้คืนรุ่น #${revisionId}`);
+  await recordAudit({
+    action: "news-revision-restore",
+    actorEmail: user.email,
+    target: `news:${id}`,
+    detail: `revision=${revisionId}`,
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  revalidateAdminPath(`${LIST_PATH}/${id}`);
+  await refreshPublicSite("page");
 }
