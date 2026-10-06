@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { FOOTER_MESSAGE, NAVBAR_MESSAGE } from "@/features/blocks/ui/preview-frame";
+import { FOOTER_MESSAGE, MOURNING_LIVE_EVENT, MOURNING_MESSAGE, NAVBAR_MESSAGE } from "@/features/blocks/ui/preview-frame";
 
 /**
  * "ส่วนกลางของเว็บ" — พื้นที่ทำงานแบบแท็บ (ผู้ใช้สั่ง รอบที่ 55)
@@ -76,6 +76,8 @@ export function ChromeWorkspace({
   });
   /** ค่าตั้งท้ายเว็บที่กำลังแก้ (W3) — ส่งต่อเข้า iframe ให้พรีวิวเปลี่ยนทันที */
   const [liveFooter, setLiveFooter] = useState<{ readonly sent: boolean; readonly value: unknown }>({ sent: false, value: null });
+  /* ค่าล่าสุดของป้ายประกาศที่กำลังแก้ (ยังไม่บันทึก) — รอบที่ 161 */
+  const [liveNotice, setLiveNotice] = useState<{ readonly sent: boolean; readonly value: unknown }>({ sent: false, value: null });
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
   /* รับค่าที่กำลังแก้จากตัวแก้แถบเมนู → ส่งต่อเข้า iframe (พรีวิวเปลี่ยนทันที) */
@@ -98,6 +100,16 @@ export function ChromeWorkspace({
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  /* รับค่าสดจากตัวแก้ป้ายประกาศ (CustomEvent) แล้วเก็บไว้ส่งเข้า iframe */
+  useEffect(() => {
+    const handler = (event: Event): void => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      setLiveNotice({ sent: true, value: detail ?? null });
+    };
+    window.addEventListener(MOURNING_LIVE_EVENT, handler);
+    return () => window.removeEventListener(MOURNING_LIVE_EVENT, handler);
+  }, []);
+
   useEffect(() => {
     const target = frameRef.current?.contentWindow;
     if (target === null || target === undefined) return;
@@ -106,8 +118,11 @@ export function ChromeWorkspace({
     }
     if (liveFooter.sent) {
       target.postMessage({ type: FOOTER_MESSAGE, config: liveFooter.value }, window.location.origin);
+    if (liveNotice.sent) {
+      target.postMessage({ type: MOURNING_MESSAGE, config: liveNotice.value }, window.location.origin);
     }
-  }, [liveNavbar, liveFooter, mode, reloadKey, part]);
+    }
+  }, [liveNavbar, liveFooter, liveNotice, mode, reloadKey, part]);
 
   /* ท้ายเว็บใช้พรีวิวคนละโหมด (โชว์ท้ายเว็บอย่างเดียว) — แถบเมนู/ป้ายประกาศใช้โหมด nav */
   const src =

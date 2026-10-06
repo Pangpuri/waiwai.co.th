@@ -38,6 +38,12 @@ export const DROP_IMAGE_MESSAGE = "waiwai:drop-image";
  */
 export const NAVBAR_MESSAGE = "waiwai:navbar";
 
+/** live update ของ "ป้ายประกาศ" (รอบที่ 161) — ส่งค่าที่กำลังแก้ (ยังไม่บันทึก) เข้า iframe พรีวิว */
+export const MOURNING_MESSAGE = "waiwai:mourning";
+
+/** ชื่อ CustomEvent ภายในหน้าแอดมิน: ตัวแก้ป้ายประกาศยิง → workspace จับแล้วส่งเข้า iframe */
+export const MOURNING_LIVE_EVENT = "waiwai:mourning-live";
+
 /** ข้อความ "ค่าตั้งท้ายเว็บที่กำลังแก้" (W3) — หน้าจอแก้ → ตัวสร้าง → พรีวิว */
 export const FOOTER_MESSAGE = "waiwai:footer";
 

@@ -358,3 +358,35 @@ test("chrome: แท็บ navbar/ป้ายประกาศ/ท้ายเ
     "โหมดป้ายประกาศต้องไม่ซ่อนตัวป้ายประกาศเอง",
   );
 });
+
+/* ── รอบที่ 161: พรีวิวสดของ "ป้ายประกาศ" (เพิ่ม/ลบภาพแล้วเห็นทันที) ─────────── */
+
+test("preview: ป้ายประกาศต้องส่งค่าเข้า iframe ได้ (ไม่ต้องบันทึกก่อนเห็น)", () => {
+  const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
+  const editor = readFileSync("features/admin/ui/mourning-editor.tsx", "utf8");
+  const ws = readFileSync("features/admin/ui/chrome-workspace.tsx", "utf8");
+  const notice = readFileSync("features/shell/ui/mourning-notice.tsx", "utf8");
+
+  assert.ok(frame.includes("MOURNING_MESSAGE") && frame.includes("MOURNING_LIVE_EVENT"), "ต้องมีค่าคงที่ข้อความ live ของป้ายประกาศ");
+  assert.ok(
+    editor.includes("new CustomEvent(MOURNING_LIVE_EVENT") && editor.includes("}, [config]);"),
+    "ตัวแก้ป้ายประกาศต้องยิงค่าล่าสุดออกไปทุกครั้งที่ config เปลี่ยน",
+  );
+  assert.ok(ws.includes("MOURNING_LIVE_EVENT") && ws.includes("type: MOURNING_MESSAGE"), "workspace ต้องจับ event แล้วส่งเข้า iframe");
+  assert.ok(
+    /part === "notice"[\s\S]{0,120}noticePreviewSrc/.test(ws),
+    "ค่า live ต้องมาพร้อมพรีวิวของแท็บป้ายประกาศ",
+  );
+  assert.ok(
+    notice.includes('addEventListener("message"') && notice.includes("MOURNING_MESSAGE"),
+    "ตัวแสดงป้ายประกาศต้องฟัง message เพื่ออัปเดตภาพทันที",
+  );
+  assert.ok(
+    notice.includes('data-preview-parts") !== "notice"'),
+    "เปิดโหมดสดเฉพาะในหน้าพรีวิว (หน้าเว็บจริงไม่รับข้อความจากที่อื่น)",
+  );
+  assert.ok(
+    notice.includes("const shownImages = liveImages ?? images"),
+    "พรีวิวใช้ภาพสด · หน้าเว็บจริงยังใช้ภาพจากเซิร์ฟเวอร์",
+  );
+});

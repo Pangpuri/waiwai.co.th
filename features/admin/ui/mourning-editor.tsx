@@ -1,7 +1,8 @@
 "use client";
 
+import { MOURNING_LIVE_EVENT } from "@/features/blocks/ui/preview-frame";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { publishMourningAction, resetMourningToDefaultsAction, saveMourningDraftAction } from "@/app/admin/builder/mourning/actions";
@@ -167,6 +168,14 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
 
 export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions, strings, compact = false }: Props) {
   const [config, setConfig] = useState<MourningConfig>(initial);
+
+  /*
+    พรีวิวสด (รอบที่ 161): ส่งค่าที่กำลังแก้ (ยังไม่บันทึก) ออกไปให้ workspace ส่งเข้า iframe
+    ⇒ เพิ่ม/ลบภาพแล้วเห็นในพรีวิวทันที ไม่ต้องบันทึกก่อน
+  */
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(MOURNING_LIVE_EVENT, { detail: config }));
+  }, [config]);
   const [draftState, draftAction] = useActionState(saveMourningDraftAction, INITIAL_BUILDER_STATE);
   const [publishState, publishAction] = useActionState(publishMourningAction, INITIAL_BUILDER_STATE);
   const resetAction = resetMourningToDefaultsAction;

@@ -13,6 +13,7 @@ import {
 } from "@/lib/mourning-notice";
 import { advanceIndex, hasSlideControls, isLastSlide } from "@/lib/slideshow";
 
+import { MOURNING_MESSAGE } from "@/features/blocks/ui/preview-frame";
 import { MOURNING_CLOSE_MS, type MourningNoticeImage } from "../mourning";
 
 /**
@@ -61,6 +62,27 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [muteToday, setMuteToday] = useState(false);
   const [index, setIndex] = useState(0);
+
+  /*
+    พรีวิวสด (รอบที่ 161): ในหน้าพรีวิว (data-preview-parts="notice") รับภาพล่าสุดจากแถบแก้
+    ⇒ เพิ่ม/ลบภาพแล้วเห็นทันทีโดยไม่ต้องบันทึก — นอกพรีวิวไม่มีผล (ค่าเริ่มต้นยังมาจากเซิร์ฟเวอร์)
+  */
+  const [liveImages, setLiveImages] = useState<readonly MourningNoticeImage[] | null>(null);
+
+  useEffect(() => {
+    if (document.documentElement.getAttribute("data-preview-parts") !== "notice") return;
+    const handler = (event: MessageEvent): void => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { readonly type?: string; readonly config?: { readonly images?: readonly MourningNoticeImage[] } } | null;
+      if (data?.type !== MOURNING_MESSAGE) return;
+      setLiveImages(data.config?.images ?? []);
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  /* ใช้ภาพสดถ้ามี (พรีวิว) ไม่มี = ภาพจากเซิร์ฟเวอร์ (หน้าเว็บจริง) */
+  const shownImages = liveImages ?? images;
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -177,7 +199,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
     };
   }, [isOpen, total, close]);
 
-  const active = total > 0 ? (images[advanceIndex(index, total)] ?? null) : null;
+  const active = total > 0 ? (shownImages[advanceIndex(index, total)] ?? null) : null;
   if (!active) return null;
 
   const atLastSlide = isLastSlide(index, total);
@@ -238,7 +260,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
               className="invisible block h-auto max-h-[min(78dvh,calc(100dvh-13rem))] w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-[calc(100vw-2.5rem)]"
             />
 
-            {images.map((image, position) => {
+            {shownImages.map((image, position) => {
               const isActiveFrame = position === index;
 
               return (
@@ -294,7 +316,7 @@ export function MourningNotice({ images, labels }: MourningNoticeProps) {
             aria-label={labels.dialogLabel}
             className="mt-5 flex items-center gap-2"
           >
-            {images.map((image, position) => {
+            {shownImages.map((image, position) => {
               const isActive = position === index;
 
               return (
