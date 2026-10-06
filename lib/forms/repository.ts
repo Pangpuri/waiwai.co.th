@@ -1,4 +1,5 @@
 import { getPool } from "@/db/pool";
+import { formQuery } from "@/lib/db/read";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { SUBMISSION_WINDOW_MS, type FormKind, type SubmissionDraft } from "@/lib/forms/model";
 
@@ -68,7 +69,7 @@ function toRow(row: RawRow): SubmissionRow {
 
 /** บันทึกผู้ติดต่อใหม่ (คืน id) — เรียกจาก action ที่ตรวจ/จำกัดความถี่แล้ว */
 export async function insertSubmission(draft: SubmissionDraft, spam: boolean): Promise<number> {
-  const { rows } = await getPool().query<{ id: string }>(
+  const { rows } = await formQuery<{ id: string }>(
     `insert into form_submission (form, email, name, phone, topic, subject, message, payload, consent, status)
      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
      returning id`,
@@ -91,7 +92,7 @@ export async function insertSubmission(draft: SubmissionDraft, spam: boolean): P
 /** เวลาที่อีเมลนี้ส่งล่าสุด (ใช้จำกัดความถี่) */
 export async function recentSubmissionTimes(email: string): Promise<readonly number[]> {
   if (!isDatabaseConfigured()) return [];
-  const { rows } = await getPool().query<{ created_at: Date }>(
+  const { rows } = await formQuery<{ created_at: Date }>(
     `select created_at from form_submission
       where lower(email) = lower($1) and created_at > now() - ($2 || ' milliseconds')::interval
       order by created_at desc
@@ -187,7 +188,7 @@ export async function insertAttachment(
   submissionId: number,
   file: { readonly filename: string; readonly mime: string; readonly sizeBytes: number; readonly data: Uint8Array },
 ): Promise<number> {
-  const { rows } = await getPool().query<{ id: string }>(
+  const { rows } = await formQuery<{ id: string }>(
     `insert into form_attachment (submission_id, filename, mime, size_bytes, data)
      values ($1, $2, $3, $4, $5)
      returning id`,

@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { getPool, withTransaction } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import { recordAudit } from "@/lib/audit/log";
 import { countRawBlocks, migrateDocumentValue, storedVersionSummary } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
@@ -44,7 +45,7 @@ type RawDocumentRow = {
 
 /** อ่านเอกสารตามสถานะ — คืน null เมื่อยังไม่มีแถว */
 export async function loadDocumentRow(page: string, status: DocumentStatus): Promise<LoadedDocumentRow | null> {
-  const result = await getPool().query<RawDocumentRow>(
+  const result = await readQuery<RawDocumentRow>(
     `select document, updated_at, updated_by, published_at from page_document where page = $1 and status = $2`,
     [page, status],
   );
@@ -235,7 +236,7 @@ export async function restoreRevisionToDraft(page: string, revision: number, act
  * เก็บที่แถว `published` เท่านั้น · ค่าเริ่มต้น false = หน้าเว็บใช้ของเดิม (ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ)
  */
 export async function isPageLive(page: string): Promise<boolean> {
-  const { rows } = await getPool().query<{ readonly is_live: boolean }>(
+  const { rows } = await readQuery<{ readonly is_live: boolean }>(
     'select is_live from page_document where page = $1 and status = $2',
     [page, 'published'],
   );

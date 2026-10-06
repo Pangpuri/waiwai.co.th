@@ -1,4 +1,5 @@
 import { getPool, isDatabaseConfigured } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { isYouTubeVideoId, type RecipeInput } from "@/lib/recipes/model";
 
@@ -78,7 +79,7 @@ function toRecipeRecord(row: Record<string, unknown>): RecipeRecord | null {
 export async function listRecipes(): Promise<readonly RecipeRecord[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<Record<string, unknown>>(
+    const result = await readQuery<Record<string, unknown>>(
       `select r.id, r.source_id, r.source_url, r.title_th, r.title_en, r.cover_media_id,
               r.video_provider, r.video_id, r.published_on::text as published_on, r.sort_order,
               m.width as cover_width, m.height as cover_height

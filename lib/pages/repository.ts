@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import { getPool } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { defaultPages, isPageEditor, sortPages, type PageEditor, type PageRecord, type PageSeo } from "@/lib/pages/model";
 
@@ -62,7 +63,7 @@ export async function listPages(fallback: readonly PageRecord[]): Promise<readon
   if (!isDatabaseConfigured()) return fallback;
 
   try {
-    const { rows } = await getPool().query<PageRow>(`select ${SELECT_COLUMNS} from page`);
+    const { rows } = await readQuery<PageRow>(`select ${SELECT_COLUMNS} from page`);
     const pages = rows.map((row) => toPage(row)).filter((page): page is PageRecord => page !== null);
     if (pages.length === 0) return fallback;
     return sortPages(pages);
@@ -76,7 +77,7 @@ export async function findPage(id: string): Promise<PageRecord | null> {
   if (!isDatabaseConfigured()) return null;
 
   try {
-    const { rows } = await getPool().query<PageRow>(`select ${SELECT_COLUMNS} from page where id = $1`, [id]);
+    const { rows } = await readQuery<PageRow>(`select ${SELECT_COLUMNS} from page where id = $1`, [id]);
     const row = rows[0];
     return row === undefined ? null : toPage(row);
   } catch {

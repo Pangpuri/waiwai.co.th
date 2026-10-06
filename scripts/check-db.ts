@@ -19,7 +19,7 @@ import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { listBlockPresets, saveBlockPreset } from "@/lib/blocks/presets";
 import { ENV_ADMIN_ID } from "@/lib/auth/user-store";
 import { ensureEnvAdminUser } from "@/lib/auth/users-repository";
-import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
+import { closePool, getFormPool, getPool, getReadPool, isDatabaseConfigured, isFormRoleConfigured, isReadOnlyConfigured } from "@/db/pool";
 import { HOME_SEED } from "@/lib/content/home-seed";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { countPageRows, importPageSeed, loadPageContent, savePageContent } from "@/lib/content/repository";
@@ -335,6 +335,9 @@ async function main(): Promise<void> {
 
   /* 31) จัดลำดับรายการ (reorderRows): ลากเรียงแล้วลำดับเปลี่ยนจริง · แถวที่ไม่ได้ส่งไม่ถูกแตะ (รอบที่ 168) */
   await checkReorder();
+
+  /* 32) Least privilege: role อ่านอย่างเดียวเขียนไม่ได้ · role ฟอร์มแตะเฉพาะตารางฟอร์ม (รอบที่ 169) */
+  await checkLeastPrivilege();
 
   await closePool();
 
@@ -3303,5 +3306,90 @@ async function checkReorder(): Promise<void> {
       0,
       "ต้องไม่เหลือหมวดทดสอบ",
     );
+  }
+}
+
+/**
+ * 32) Least privilege ของ connection (รอบที่ 169) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * พิสูจน์เฉพาะเมื่อตั้ง env ของ role (ไม่ตั้ง = รายงานว่าข้าม — ไม่เงียบ)
+ * 1. `PUBLIC_DATABASE_URL` อ่านตารางสาธารณะได้
+ * 2. เขียนผ่าน role อ่าน = **ต้องได้ `insufficient_privilege` (42501)** — เขียนได้ = isolation ไม่จริง (แดง)
+ * 3. role อ่านต้องอ่านตารางอ่อนไหว (`form_submission`/`admin_session`) ไม่ได้
+ * 4. role ฟอร์ม: INSERT ได้ (แถวจริงแล้วลบ) · UPDATE ตารางฟอร์มไม่ได้ · อ่าน `admin_user` ไม่ได้
+ * ⚠️ ใช้ `update … where false` เป็นตัวยิง (ไม่มี side effect) ⇒ DB ไม่สกปรกแม้สิทธิ์หลุด
+ */
+function isInsufficientPrivilege(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { readonly code?: unknown }).code === "42501";
+}
+
+async function checkLeastPrivilege(): Promise<void> {
+  if (!isReadOnlyConfigured()) {
+    done("least privilege: ข้ามการพิสูจน์ role อ่านอย่างเดียว", "ไม่ได้ตั้ง PUBLIC_DATABASE_URL (ดู `npm run db:roles`)");
+  } else {
+    const readPool = getReadPool();
+    const readable = await readPool.query<{ total: string }>("select count(*)::text as total from news");
+    assert.ok(Number.parseInt(readable.rows[0]?.total ?? "0", 10) >= 0, "role อ่านอย่างเดียวต้องอ่านตารางสาธารณะได้");
+
+    let writeDenied = false;
+    try {
+      await readPool.query("update page_document set updated_at = updated_at where false");
+    } catch (error) {
+      writeDenied = isInsufficientPrivilege(error);
+    }
+    assert.equal(writeDenied, true, "role อ่านอย่างเดียวต้องเขียนไม่ได้ (คาด insufficient_privilege 42501)");
+
+    for (const table of ["form_submission", "admin_session"]) {
+      let denied = false;
+      try {
+        await readPool.query(`select count(*) from ${table}`);
+      } catch (error) {
+        denied = isInsufficientPrivilege(error);
+      }
+      assert.equal(denied, true, `role อ่านต้องเข้าถึงตารางอ่อนไหวไม่ได้: ${table}`);
+    }
+
+    done("least privilege: role อ่านอย่างเดียวอ่านได้/เขียนไม่ได้ · ไม่เห็นตารางอ่อนไหว", "42501 · page_document/form_submission/admin_session");
+  }
+
+  if (!isFormRoleConfigured()) {
+    done("least privilege: ข้ามการพิสูจน์ role ฟอร์ม", "ไม่ได้ตั้ง FORM_DATABASE_URL");
+    return;
+  }
+
+  const formPool = getFormPool();
+  const probeEmail = "check-db-form-role@example.invalid";
+  let probeId: number | null = null;
+  try {
+    const inserted = await formPool.query<{ id: string }>(
+      `insert into form_submission (form, email, name, phone, topic, subject, message, payload, consent, status)
+       values ('contact', $1, 'probe', '', '', '', '', '{}'::jsonb, true, 'spam')
+       returning id`,
+      [probeEmail],
+    );
+    const id = Number.parseInt(inserted.rows[0]?.id ?? "0", 10);
+    assert.ok(Number.isFinite(id) && id > 0, "role ฟอร์มต้อง INSERT ได้ (ทางเขียนเดียวของคนนอก)");
+    probeId = id;
+
+    let updateDenied = false;
+    try {
+      await formPool.query("update form_submission set handled_by = handled_by where false");
+    } catch (error) {
+      updateDenied = isInsufficientPrivilege(error);
+    }
+    assert.equal(updateDenied, true, "role ฟอร์มต้องแก้ข้อมูลเดิมไม่ได้ (มีแค่ select/insert)");
+
+    let adminDenied = false;
+    try {
+      await formPool.query("select count(*) from admin_user");
+    } catch (error) {
+      adminDenied = isInsufficientPrivilege(error);
+    }
+    assert.equal(adminDenied, true, "role ฟอร์มต้องอ่านตารางผู้ดูแลไม่ได้");
+
+    done("least privilege: role ฟอร์ม INSERT ได้ · แก้/อ่านตารางอ่อนไหวไม่ได้", "form_submission");
+  } finally {
+    if (probeId !== null) await getPool().query("delete from form_submission where id = $1", [probeId]);
+    assert.equal(await countWhere("form_submission where email = $1", [probeEmail]), 0, "ต้องไม่เหลือแถวทดสอบของ role ฟอร์ม");
   }
 }

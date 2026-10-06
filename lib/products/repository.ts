@@ -1,4 +1,5 @@
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
 
 /**
@@ -125,7 +126,7 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
 export async function loadProductCategory(categoryId: string): Promise<ProductCategoryRecord | null> {
   if (!isDatabaseConfigured()) return null;
   try {
-    const result = await getPool().query<Record<string, unknown>>(
+    const result = await readQuery<Record<string, unknown>>(
       "select id, description_th, description_en, image_media_id from product_category where id = $1 limit 1",
       [categoryId],
     );
@@ -143,7 +144,7 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
 export async function listProductsByCategory(categoryId: string): Promise<readonly ProductRecord[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<Record<string, unknown>>(
+    const result = await readQuery<Record<string, unknown>>(
       `select ${PRODUCT_COLUMNS},
               min(m.width)  as image_width,
               min(m.height) as image_height,
@@ -179,7 +180,7 @@ export async function listProductsByCategory(categoryId: string): Promise<readon
 export async function countProductsByCategory(): Promise<Readonly<Record<string, number>>> {
   if (!isDatabaseConfigured()) return {};
   try {
-    const result = await getPool().query<{ category_id: string; total: string }>(
+    const result = await readQuery<{ category_id: string; total: string }>(
       `select p.category_id, count(*)::text as total
          from product p
         where ${PUBLIC_PRODUCT_CONDITION}
@@ -218,7 +219,7 @@ export type ProductCategoryCardRecord = {
 export async function listProductCategoryCards(): Promise<readonly ProductCategoryCardRecord[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<{
+    const result = await readQuery<{
       id: string;
       descriptionTh: string;
       descriptionEn: string;
@@ -277,7 +278,7 @@ export type ProductHighlightRecord = {
 export async function listProductHighlights(): Promise<readonly ProductHighlightRecord[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<{
+    const result = await readQuery<{
       id: string;
       categoryId: string;
       nameTh: string;

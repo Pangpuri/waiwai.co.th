@@ -17,6 +17,7 @@
     "admin:create": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/admin-create.ts",
     "check:db": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/check-db.ts",
     "db:migrate": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/migrate.ts",
+    "db:roles": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-roles.ts",
     "db:status": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/migrate.ts --status",
     "check:migrations": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/check-migrations.ts",
     "db:purge": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/purge.ts",

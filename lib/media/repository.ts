@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { getPool, isDatabaseConfigured } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import type { AllowedImageMime } from "@/lib/media/image-info";
 
 /**
@@ -52,7 +53,7 @@ export async function loadMediaSizes(ids: readonly string[]): Promise<ReadonlyMa
   if (unique.length === 0 || !isDatabaseConfigured()) return sizes;
 
   try {
-    const result = await getPool().query<{ id: string; width: number | null; height: number | null }>(
+    const result = await readQuery<{ id: string; width: number | null; height: number | null }>(
       "select id, width, height from media where id = any($1::text[])",
       [unique],
     );
@@ -116,7 +117,7 @@ export async function findMediaIdBySha256(sha256: string): Promise<string | null
 }
 
 export async function getMediaBinary(id: string): Promise<MediaBinary | null> {
-  const result = await getPool().query<{
+  const result = await readQuery<{
     mime: AllowedImageMime;
     data: Buffer;
     size_bytes: number;

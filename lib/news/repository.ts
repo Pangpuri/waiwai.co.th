@@ -1,4 +1,5 @@
 import { getPool, isDatabaseConfigured } from "@/db/pool";
+import { readQuery } from "@/lib/db/read";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { parseNewsBody, type NewsBlock } from "@/lib/news/body";
 import type { NewsInput } from "@/lib/news/model";
@@ -86,7 +87,7 @@ function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
 export async function countNews(): Promise<number> {
   if (!isDatabaseConfigured()) return 0;
   try {
-    const result = await getPool().query<{ count: string }>(
+    const result = await readQuery<{ count: string }>(
       `select count(*)::text as count from news n where ${PUBLIC_NEWS_CONDITION}`,
     );
     const value = Number.parseInt(result.rows[0]?.count ?? "0", 10);
@@ -100,7 +101,7 @@ export async function countNews(): Promise<number> {
 export async function listNews(limit = NEWS_PER_PAGE, offset = 0): Promise<readonly NewsRecord[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<Record<string, unknown>>(
+    const result = await readQuery<Record<string, unknown>>(
       `select ${NEWS_COLUMNS}
          from news n
          left join media m on m.id = n.cover_media_id
@@ -127,7 +128,7 @@ export async function loadNewsBySourceId(sourceId: string): Promise<NewsRecord |
   if (!isDatabaseConfigured()) return null;
   if (!/^\d{3,}$/.test(sourceId.trim())) return null;
   try {
-    const result = await getPool().query<Record<string, unknown>>(
+    const result = await readQuery<Record<string, unknown>>(
       `select ${NEWS_COLUMNS}
          from news n
          left join media m on m.id = n.cover_media_id
@@ -146,7 +147,7 @@ export async function loadNewsBySourceId(sourceId: string): Promise<NewsRecord |
 export async function listNewsSourceIds(): Promise<readonly string[]> {
   if (!isDatabaseConfigured()) return [];
   try {
-    const result = await getPool().query<{ source_id: string }>(
+    const result = await readQuery<{ source_id: string }>(
       `select n.source_id from news n where ${PUBLIC_NEWS_CONDITION} ${PUBLIC_NEWS_ORDER}`,
     );
     return result.rows.map((row) => row.source_id).filter((value) => /^\d{3,}$/.test(value));

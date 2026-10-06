@@ -140,7 +140,16 @@ jobs:
       - name: check:migrations (ด่าน 12)
         run: npm run check:migrations
 
+      # ── Least privilege (รอบที่ 169): สร้าง role อ่าน/ฟอร์ม แล้วพิสูจน์ผ่าน check:db วงจร 32 ──
+      # รหัสผ่านเป็นค่าเฉพาะ CI (ฐานข้อมูลชั่วคราว) — ไม่ใช่ความลับของโปรเจกต์
+      # ⚠️ ตั้ง PUBLIC/FORM_DATABASE_URL เฉพาะขั้นนี้ (หลังสร้าง role) เพื่อไม่ให้ขั้นก่อนหน้าไปเชื่อมก่อน role มี
+      - name: สร้าง DB role แบบ least privilege
+        run: npm run db:roles -- --ro-password=waiwai_ci_ro --form-password=waiwai_ci_form
+
       - name: check:db (ด่าน 11)
+        env:
+          PUBLIC_DATABASE_URL: postgres://waiwai_public_ro:waiwai_ci_ro@127.0.0.1:5432/waiwai
+          FORM_DATABASE_URL: postgres://waiwai_public_form:waiwai_ci_form@127.0.0.1:5432/waiwai
         run: npm run check:db
 
       - name: สำรองฐานข้อมูล
