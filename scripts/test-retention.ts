@@ -144,6 +144,7 @@ test("retention: สรุปผลลบสำหรับ audit log มีท�
     careers: 3,
     blockRevision: 6,
     contentRevision: 7,
+    entityRevision: 8,
     loginAttempt: 4,
     adminSession: 5,
     auditLog: 5,
@@ -151,7 +152,7 @@ test("retention: สรุปผลลบสำหรับ audit log มีท�
   /* ลำดับในสรุป = ลำดับของ RETENTION_CLASSES (ชั้นข้อมูลใหม่ต้องต่อท้าย ไม่แทรกกลาง) */
   assert.equal(
     summary,
-    "contact=1 newsletter=2 careers=3 blockRevision=6 contentRevision=7 loginAttempt=4 auditLog=5 adminSession=5",
+    "contact=1 newsletter=2 careers=3 blockRevision=6 contentRevision=7 entityRevision=8 loginAttempt=4 auditLog=5 adminSession=5",
   );
   assert.ok(PURGE_AUDIT_ACTION.length > 0, "ต้องมีชื่อ action สำหรับบันทึก");
 });

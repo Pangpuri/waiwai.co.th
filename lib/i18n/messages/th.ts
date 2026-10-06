@@ -12,6 +12,7 @@ import { adminSettings } from "./areas/th/adminSettings.ts";
 import { adminDraft } from "./areas/th/adminDraft.ts";
 import { adminNews } from "./areas/th/adminNews.ts";
 import { adminProducts } from "./areas/th/adminProducts.ts";
+import { thAdminRevisions } from "./areas/th/adminRevisions.ts";
 import { adminRecipes } from "./areas/th/adminRecipes.ts";
 import { adminRetention } from "./areas/th/adminRetention.ts";
 import { privacyPage } from "./areas/th/privacy.ts";
@@ -76,6 +77,7 @@ export const th = {
     ...adminRetention,
     ...adminNews,
     ...adminProducts,
+    ...thAdminRevisions,
     ...adminRecipes,
     ...adminMaintenance,
     ...adminErasure,

@@ -66,6 +66,7 @@ export default async function AdminHomePage() {
     careers: strings.retentionLabelCareers,
     blockRevision: strings.retentionLabelBlockRevision,
     contentRevision: strings.retentionLabelContentRevision,
+    entityRevision: strings.retentionLabelEntityRevision,
     loginAttempt: strings.retentionLabelLoginAttempt,
     auditLog: strings.retentionLabelAuditLog,
     adminSession: strings.retentionLabelAdminSession,

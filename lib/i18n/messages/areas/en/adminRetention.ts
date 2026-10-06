@@ -25,6 +25,7 @@ export const adminRetention = {
   retentionLabelCareers: "Job applications + résumés",
   retentionLabelBlockRevision: "Page revision history (latest block kept)",
   retentionLabelContentRevision: "Field revision history (latest kept)",
+  retentionLabelEntityRevision: "Product/recipe/news revision history",
   retentionLabelLoginAttempt: "Sign-in attempts",
   retentionLabelAuditLog: "Content change log",
   retentionLabelAdminSession: "Back-office sessions",

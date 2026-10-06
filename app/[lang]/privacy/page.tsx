@@ -41,6 +41,7 @@ function retentionLabels(m: Messages["privacyPage"]): Readonly<Record<RetentionC
     careers: m.retentionLabelCareers,
     blockRevision: m.retentionLabelBlockRevision,
     contentRevision: m.retentionLabelContentRevision,
+    entityRevision: m.retentionLabelEntityRevision,
     loginAttempt: m.retentionLabelLoginAttempt,
     auditLog: m.retentionLabelAuditLog,
     adminSession: m.retentionLabelAdminSession,

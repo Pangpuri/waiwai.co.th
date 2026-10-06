@@ -52,6 +52,7 @@ export const privacyPage = {
   retentionLabelCareers: "ใบสมัครงานและไฟล์เรซูเม่",
   retentionLabelBlockRevision: "ประวัติการแก้เนื้อหาหน้าเว็บ (เก็บรุ่นล่าสุดไว้เสมอ)",
   retentionLabelContentRevision: "ประวัติการแก้เนื้อหาแบบฟิลด์ (เก็บรุ่นล่าสุดไว้เสมอ)",
+  retentionLabelEntityRevision: "ประวัติรุ่นของสินค้า/เมนูอาหาร/ข่าว",
   retentionLabelLoginAttempt: "ร่องรอยการพยายามเข้าสู่ระบบหลังบ้าน (เฉพาะเจ้าหน้าที่)",
   retentionLabelAuditLog: "บันทึกการแก้ไขเนื้อหา (เฉพาะเจ้าหน้าที่)",
   /* เซสชันหลังบ้าน (รอบที่ 95) */

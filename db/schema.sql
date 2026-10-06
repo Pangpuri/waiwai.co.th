@@ -431,3 +431,19 @@ create index if not exists news_source_idx on news (source_id);
 
 -- รอบที่ 123: ดัชนีหน้ารายการหลังบ้าน (กรองถังขยะ/สถานะ แล้วเรียงใหม่สุดก่อน)
 create index if not exists news_admin_idx on news (deleted_at, status, published_at desc nulls last, id desc);
+
+/* ประวัติรุ่นของสินค้า/เมนูอาหาร/ข่าว (migration 0024 · B1 รอบที่ 143)
+   — เก็บทุกครั้งที่บันทึก · ระยะเก็บ 1 ปี (lib/retention/plan.ts) · กู้คืนก็เป็นรุ่นหนึ่ง */
+create table if not exists entity_revision (
+  id         bigint      generated always as identity primary key,
+  kind       text        not null check (kind in ('product', 'recipe', 'news')),
+  entity_id  text        not null,
+  revision   integer     not null,
+  snapshot   jsonb       not null,
+  note       text,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (kind, entity_id, revision)
+);
+
+create index if not exists entity_revision_lookup_idx on entity_revision (kind, entity_id, revision desc);

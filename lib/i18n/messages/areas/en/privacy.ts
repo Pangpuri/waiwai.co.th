@@ -53,6 +53,7 @@ export const privacyPage = {
   retentionLabelCareers: "Job applications and résumé files",
   retentionLabelBlockRevision: "Page content edit history (latest revision always kept)",
   retentionLabelContentRevision: "Field content edit history (latest revision always kept)",
+  retentionLabelEntityRevision: "Product/recipe/news revision history",
   retentionLabelLoginAttempt: "Back-office sign-in attempts (staff only)",
   retentionLabelAuditLog: "Content change log (staff only)",
   /* Back-office sessions (round 95) */

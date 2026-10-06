@@ -58,6 +58,7 @@ const ZERO: PurgeCounts = {
   careers: 0,
   blockRevision: 0,
   contentRevision: 0,
+  entityRevision: 0,
   loginAttempt: 0,
   auditLog: 0,
   adminSession: 0,
@@ -80,17 +81,24 @@ function totalOf(counts: PurgeCounts): number {
  * ⚠️ ชื่อตารางมาจากค่าคงที่ในโค้ดเท่านั้น (ไม่รับจากผู้ใช้) — ไม่มีทางกลายเป็น SQL injection
  */
 async function purgeRevisions(options: {
-  readonly table: "page_document_revision" | "content_revision";
+  readonly table: "page_document_revision" | "content_revision" | "entity_revision";
   readonly cutoffIso: string;
   readonly dryRun: boolean;
   readonly client: PoolClient;
 }): Promise<number> {
   const { table, cutoffIso, dryRun, client } = options;
 
-  /* เก็บรุ่นล่าสุดของ "หน้าเดียวกัน" ไว้เสมอ (เทียบด้วยคอลัมน์ page) */
+  /*
+    เก็บรุ่นล่าสุดไว้เสมอ — `page_document_revision`/`content_revision` ใช้คอลัมน์ `page`
+    · `entity_revision` ใช้คู่ (kind, entity_id) เพราะเก็บหลายชนิดในตารางเดียว
+  */
+  const groupBy =
+    table === "entity_revision"
+      ? `keep.kind = ${table}.kind and keep.entity_id = ${table}.entity_id`
+      : `keep.page = ${table}.page`;
   const predicate = `created_at < $1 and id not in (
       select keep.id from ${table} keep
-       where keep.page = ${table}.page
+       where ${groupBy}
        order by keep.revision desc, keep.id desc
        limit $2
     )`;
@@ -169,9 +177,14 @@ export async function purgeExpired(options: { readonly now?: Date; readonly dryR
         continue;
       }
 
-      /* ประวัติเนื้อหา — เก็บรุ่นล่าสุดของแต่ละหน้าไว้เสมอ (มติรอบที่ 77) */
-      if (step.cls === "blockRevision" || step.cls === "contentRevision") {
-        const table = step.cls === "blockRevision" ? "page_document_revision" : "content_revision";
+      /* ประวัติเนื้อหา/ประวัติรุ่น — เก็บรุ่นล่าสุดของแต่ละรายการไว้เสมอ (มติรอบ 77 · 143) */
+      if (step.cls === "blockRevision" || step.cls === "contentRevision" || step.cls === "entityRevision") {
+        const table =
+          step.cls === "blockRevision"
+            ? "page_document_revision"
+            : step.cls === "contentRevision"
+              ? "content_revision"
+              : "entity_revision";
         result[step.cls] = await purgeRevisions({ table, cutoffIso: step.cutoffIso, dryRun, client });
         continue;
       }

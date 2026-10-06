@@ -25,6 +25,7 @@ export const adminRetention = {
   retentionLabelCareers: "ใบสมัครงาน + เรซูเม่",
   retentionLabelBlockRevision: "ประวัติเนื้อหาหน้าเว็บ (เก็บบล็อกรุ่นล่าสุด)",
   retentionLabelContentRevision: "ประวัติเนื้อหาแบบฟิลด์ (เก็บรุ่นล่าสุด)",
+  retentionLabelEntityRevision: "ประวัติรุ่นของสินค้า/เมนูอาหาร/ข่าว",
   retentionLabelLoginAttempt: "ร่องรอยการพยายามล็อกอิน",
   retentionLabelAuditLog: "บันทึกการแก้ไขเนื้อหา",
   retentionLabelAdminSession: "เซสชันการเข้าใช้หลังบ้าน",

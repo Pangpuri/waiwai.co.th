@@ -41,6 +41,11 @@ export const RETENTION_DAYS = {
   blockRevision: 365,
   /** ประวัติเนื้อหาแบบฟิลด์ (`content_revision`) — เก็บ 1 ปี ตามมติรอบที่ 77 */
   contentRevision: 365,
+  /**
+   * ประวัติรุ่นของ สินค้า/เมนูอาหาร/ข่าว (`entity_revision`) — เก็บ 1 ปี (มติเจ้าของ รอบที่ 143)
+   * ⚠️ ตอนลบ **เก็บรุ่นล่าสุดของแต่ละรายการไว้เสมอ** (หลักเดียวกับประวัติเนื้อหา)
+   */
+  entityRevision: 365,
 } as const;
 
 export type RetentionClass = keyof typeof RETENTION_DAYS;
@@ -52,6 +57,7 @@ export const RETENTION_CLASSES: readonly RetentionClass[] = [
   "careers",
   "blockRevision",
   "contentRevision",
+  "entityRevision",
   "loginAttempt",
   "auditLog",
   "adminSession",
