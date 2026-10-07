@@ -116,12 +116,12 @@ export function ProductListSection({
                 <h3 className="text-fg mt-3 text-base leading-snug font-semibold">{label}</h3>
                 {group === "" ? null : <p className="text-fg-muted mt-0.5 text-xs">{group}</p>}
 
-                <details className="border-line mt-3 rounded-xl border px-3 py-2">
-                  <summary className="text-fg focus-visible:ring-ring cursor-pointer text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
+                <details className="product-card-details border-line mt-3 rounded-xl border px-3 py-2">
+                  <summary className="product-card-details-summary text-fg focus-visible:ring-ring flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
                     {strings.details}
                   </summary>
 
-                  <div className="mt-3 flex flex-col gap-4">
+                  <div className="product-card-details-body mt-3 flex flex-col gap-4">
                     {tagline === "" ? null : <p className="text-fg text-sm">{tagline}</p>}
 
                     {product.ingredients.length === 0 ? null : (

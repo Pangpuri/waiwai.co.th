@@ -252,3 +252,30 @@ test("product catalog: เปิดรายละเอียดการ์ด
     "ตารางส่วนผสมต้องมี min-width (ให้เลื่อนแนวนอนแทนการบีบคอลัมน์)",
   );
 });
+
+/* ── รอบที่ 172: โมชั่นเปิดรายละเอียด (ไม่เพิ่ม JS · เคารพ prefers-reduced-motion) ──── */
+
+test("product catalog: เปิดรายละเอียดมีโมชั่นนุ่มนวล โดยยังเป็น <details> ล้วน (ไม่มี JS)", async () => {
+  const list = readFileSync("features/products/ui/product-list.tsx", "utf8");
+  const css = await readStrippedCss();
+
+  /* ยังเป็น HTML disclosure เดิม — ไม่เพิ่ม JS ให้หน้าเว็บ */
+  assert.ok(list.includes("<details"), "ต้องใช้ <details> ของ HTML");
+  assert.ok(!list.includes('"use client"'), "ต้องเป็น Server Component (ไม่เพิ่ม JS)");
+  assert.ok(!list.includes("onToggle"), "ห้ามใช้ JS จัดการการเปิด/ปิด");
+  assert.ok(list.includes("product-card-details-body"), "เนื้อหาต้องมีคลาสสำหรับอนิเมชัน");
+
+  /* โมชั่นต้องอยู่ใน media query ของ reduced motion เท่านั้น */
+  assert.ok(css.includes("prefers-reduced-motion: no-preference"), "โมชั่นต้องเคารพ prefers-reduced-motion");
+  assert.ok(
+    /\.product-card-details\[open\] > \.product-card-details-body/.test(css),
+    "ต้องมีอนิเมชันเนื้อหาตอนเปิด (ทางถอยที่ได้ผลทุกเบราว์เซอร์)",
+  );
+  assert.ok(css.includes("::details-content"), "ต้องใช้ ::details-content ให้ความสูงกางนุ่มนวล (progressive enhancement)");
+  assert.ok(css.includes("interpolate-size: allow-keywords"), "ต้องเปิด interpolate-size ให้ height:auto อนิเมชันได้");
+  assert.ok(
+    !/:root\s*\{[^}]*interpolate-size/.test(css),
+    "ห้ามตั้ง interpolate-size ที่ :root (จะไปมีผลกับ height:auto ของทั้งเว็บ)",
+  );
+  assert.ok(css.includes("product-card-details-summary::after"), "ต้องมีลูกศรที่หมุนตามสถานะเปิด/ปิด");
+});
