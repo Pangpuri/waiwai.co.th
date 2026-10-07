@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { readStrippedCss } from "./css-source.ts";
+
 import {
   decodeEntities,
   normalizeText,
@@ -226,17 +228,25 @@ test("model: ผลแกะจากหน้าหมวด → ข้อม�
   }
 });
 
-/* ── รอบที่ 147: ห้าม "บีบ" รายละเอียดสินค้าในการ์ด (ฟีดแบ็กเจ้าของ) ───────────── */
+/* ── รอบที่ 171: คงสัดส่วนคอลัมน์บนหน้าบ้านแม้เปิดรายละเอียด (กลับทิศจากรอบที่ 147) ──── */
 
-test("product catalog: เปิดรายละเอียดการ์ดแล้วต้องได้ความกว้างเต็ม (ไม่ถูกบีบเป็นแถวตั้ง)", () => {
+test("product catalog: เปิดรายละเอียดการ์ดแล้วต้องคงคอลัมน์เดิม (ไม่ขยายเต็มแถว)", async () => {
   const list = readFileSync("features/products/ui/product-list.tsx", "utf8");
-  const css = readFileSync("app/globals.css", "utf8");
+  /* ⚠️ ต้องใช้ CSS ที่ตัดคอมเมนต์แล้ว — คอมเมนต์อธิบายในไฟล์มี selector เดิมอยู่ในข้อความ */
+  const css = await readStrippedCss();
 
-  assert.ok(list.includes("product-card-grid"), "กริดการ์ดต้องมีคลาสสำหรับกฎขยายการ์ดที่เปิดอยู่");
+  assert.ok(list.includes("lg:grid-cols-3"), "หน้าบ้านต้องเป็น 3 คอลัมน์บนจอใหญ่");
+  assert.ok(list.includes("product-card-grid"), "กริดการ์ดต้องมีคลาสกลาง");
+
+  /* รอบที่ 171 (ฟีดแบ็กเจ้าของ): กฎเดิมทำให้การ์ดที่เปิดเต็มความกว้าง ดูไม่เป็นระเบียบ ⇒ ห้ามมีกลับ */
   assert.ok(
-    /\.product-card-grid:has\(details\[open\]\)\s*\{[^}]*grid-template-columns:[\s\S]*?minmax\(0,\s*1fr\)/.test(css),
-    "ต้องมีกฎ CSS :has(details[open]) ให้การ์ดที่เปิดขยายเต็มความกว้าง (ไม่ต้องใช้ JS)",
+    !/\.product-card-grid:has\(details\[open\]\)/.test(css),
+    "ห้ามมีกฎ :has(details[open]) ที่ขยายการ์ดเต็มแถว (มีผลกับหน้าบ้านทั้งเว็บ)",
   );
+
+  /* พรีวิวหลังบ้านเป็นการ์ดเดียวเต็มกรอบ — คนละกลไก ไม่ถูกถอด */
+  assert.ok(css.includes(".preview-single-card .product-card-grid"), "พรีวิวการ์ดเดียวต้องยังบังคับ 1 คอลัมน์");
+
   assert.ok(
     /<table className="[^"]*min-w-\[/.test(list),
     "ตารางส่วนผสมต้องมี min-width (ให้เลื่อนแนวนอนแทนการบีบคอลัมน์)",
