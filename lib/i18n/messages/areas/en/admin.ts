@@ -4,6 +4,7 @@
  */
 import type { Messages } from "@/lib/i18n/messages/th";
 import type { adminHero as thAdminHero } from "@/lib/i18n/messages/areas/th/adminHero";
+import type { adminHeroCards as thAdminHeroCards } from "@/lib/i18n/messages/areas/th/adminHeroCards";
 import type { adminMedia as thAdminMedia } from "@/lib/i18n/messages/areas/th/adminMedia";
 import type { adminSettings as thAdminSettings } from "@/lib/i18n/messages/areas/th/adminSettings";
 import type { adminDraft as thAdminDraft } from "@/lib/i18n/messages/areas/th/adminDraft";
@@ -47,7 +48,8 @@ type MovedKeys =
   | keyof typeof thAdminRbac
   | keyof typeof thAdminBlockTypes
   | keyof typeof thAdminSchedule
-  | keyof typeof thAdminHero;
+  | keyof typeof thAdminHero
+  | keyof typeof thAdminHeroCards;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",
