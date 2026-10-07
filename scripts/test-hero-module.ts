@@ -247,3 +247,18 @@ test("hero module (ถังขยะ): ประตูอยู่ใน SQL + 
     }
   }
 });
+
+test("hero module (เฟส 3): ช่องเลือกภาพต้องอยู่ **นอก** ฟอร์มบันทึก (กัน <form> ซ้อน <form>)", () => {
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  const imgAt = manager.indexOf("<ImageDrop");
+  const formAt = manager.indexOf("<form action={saveHeroSlideAction}");
+  assert.ok(imgAt > 0, "ต้องมีช่องเลือกภาพในตัวจัดการ");
+  assert.ok(formAt > 0, "ต้องมีฟอร์มบันทึกของสไลด์");
+  /*
+    บทเรียนรอบ 129 + 188: `ImageDrop` เรนเดอร์ `<form>` ของตัวเอง
+    ⇒ ถ้าวางในฟอร์มบันทึก เบราว์เซอร์จะตัดฟอร์มชั้นในทิ้งและ React ขึ้น hydration error
+    ⇒ ต้องเป็น "พี่น้อง" กัน (ช่องภาพอยู่นอกฟอร์ม · ค่าที่เลือกส่งผ่านช่องซ่อน `mediaPath`)
+  */
+  assert.ok(imgAt < formAt, "ช่องเลือกภาพต้องอยู่ก่อนฟอร์มบันทึก (ไม่ซ้อนกัน)");
+  assert.ok(manager.includes('name="mediaPath" value={draft.path}'), "ค่าภาพต้องส่งผ่านช่องซ่อนในฟอร์มบันทึก");
+});

@@ -147,10 +147,6 @@ export function HeroSlideManager({
               </div>
 
               {/* รายละเอียด */}
-              <form action={saveHeroSlideAction} className="flex flex-col gap-2">
-                <input type="hidden" name="id" value={slide.id} />
-                <input type="hidden" name="mediaPath" value={draft.path} />
-
                 {/* ช่องภาพกลาง — เลือกจากคลัง · อัปโหลดจากเครื่อง · ลากวาง (ย่อภาพให้เอง) */}
                 <ImageDrop
                   strings={strings}
@@ -169,6 +165,11 @@ export function HeroSlideManager({
                     })
                   }
                 />
+
+              <form action={saveHeroSlideAction} className="flex flex-col gap-2">
+                <input type="hidden" name="id" value={slide.id} />
+                <input type="hidden" name="mediaPath" value={draft.path} />
+
 
                 <label className="text-fg-muted flex flex-col gap-1 text-xs">
                   {strings.heroAdminAltTh}
