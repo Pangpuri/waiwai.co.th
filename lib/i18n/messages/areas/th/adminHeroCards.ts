@@ -48,4 +48,5 @@ export const adminHeroCards = {
   campaignReady: "พร้อมขึ้นเว็บ",
   campaignNotReady: "ยังไม่พร้อม",
   campaignSlideCount: "ผูกกับ {n} สไลด์",
+  campaignDragHint: "ลากการ์ดเพื่อกำหนดตำแหน่ง (หรือใช้ลูกศรบนคีย์บอร์ด)",
 };

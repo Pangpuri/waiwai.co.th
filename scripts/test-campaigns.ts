@@ -115,3 +115,22 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   assert.ok(!/<form[^>]*>[\s\S]{0,400}<form/.test(manager.replace(/\/\*[\s\S]*?\*\//g, "")), "ห้าม <form> ซ้อน <form>");
   assert.ok(MAX_CAMPAIGNS >= 1 && Object.keys(CAMPAIGN_ANCHOR_PRESETS).length === 3);
 });
+
+test("campaigns: พรีวิวลากกำหนดจุดยึด — สูตรเดียวกับหน้าเว็บ + เมาส์/สัมผัส/คีย์บอร์ด + ไม่มี <form> ซ้อน", () => {
+  const preview = readFileSync("features/admin/ui/campaign-anchor-preview.tsx", "utf8");
+  assert.ok(preview.includes("onPointerDown") && preview.includes("setPointerCapture"), "ต้องลากด้วยเมาส์/สัมผัสได้");
+  assert.ok(preview.includes("touch-none"), "ต้องกันการเลื่อนหน้าจอตอนลากบนมือถือ");
+  assert.ok(preview.includes("ArrowLeft") && preview.includes("ArrowRight"), "ต้องขยับด้วยคีย์บอร์ดได้ (a11y)");
+  assert.ok(preview.includes("left: anchorX +") && preview.includes("translate(-"), "ตำแหน่งต้องใช้สูตรเดียวกับหน้าเว็บ (left/top % + translate กลับครึ่งตัวเอง)");
+  assert.ok(preview.includes("aspect-[16/9]"), "กรอบพรีวิวต้องเป็นสัดส่วนเดียวกับฮีโร่");
+  assert.ok(preview.includes("heroAdminNoImage"), "ไม่มีภาพสไลด์ = ต้องบอก (ไม่เรนเดอร์ <img> เปล่า)");
+  assert.ok(!preview.includes("<form"), "พรีวิวต้องไม่มี <form> (กันซ้อนกับฟอร์มบันทึก)");
+
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("CampaignAnchorPreview"), "หน้าจอต้องใช้พรีวิวที่ลากได้");
+  assert.ok(manager.includes("value={anchorOf(") && manager.includes("setAnchor("), "ช่องตัวเลขต้องผูกกับค่าที่ลาก (controlled)");
+  assert.ok(manager.includes('name="anchorX"') && manager.includes('name="anchorY"'), "ค่าที่ลากต้องถูกส่งไปกับฟอร์มบันทึก");
+
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("mediaPath: slide.mediaPath"), "หน้าจอต้องส่งภาพของสไลด์มาให้พรีวิว");
+});

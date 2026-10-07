@@ -16,9 +16,12 @@ import {
   type Campaign,
   type CampaignAnchorPreset,
 } from "@/lib/campaigns/model";
+import { useState } from "react";
+
+import { CampaignAnchorPreview } from "@/features/admin/ui/campaign-anchor-preview";
 import type { Messages } from "@/lib/i18n/messages/th";
 
-export type CampaignSlideOption = { readonly id: string; readonly label: string };
+export type CampaignSlideOption = { readonly id: string; readonly label: string; readonly mediaPath: string };
 
 /**
  * หน้า "แคมเปญ" (แท็บใน `/admin/hero` · รอบที่ 190)
@@ -43,6 +46,14 @@ export function CampaignManager({
   readonly nowIso: string;
 }) {
   const now = Date.parse(nowIso);
+  /* จุดยึดฉบับร่างต่อแคมเปญ: ลากในพรีวิว/แก้ตัวเลข แล้วกด "บันทึก" จึงเขียนฐานข้อมูล */
+  const [anchors, setAnchors] = useState<Record<string, { x: number; y: number }>>(() =>
+    Object.fromEntries(campaigns.map((campaign) => [campaign.id, { x: campaign.anchorX, y: campaign.anchorY }])),
+  );
+  const anchorOf = (id: string, fallbackX: number, fallbackY: number) => anchors[id] ?? { x: fallbackX, y: fallbackY };
+  function setAnchor(id: string, x: number, y: number): void {
+    setAnchors((prev) => ({ ...prev, [id]: { x: Math.min(100, Math.max(0, Math.round(x))), y: Math.min(100, Math.max(0, Math.round(y))) } }));
+  }
   const stateLabel: Readonly<Record<string, string>> = {
     always: strings.heroCardStateAlways,
     scheduled: strings.heroCardStateScheduled,
@@ -151,14 +162,25 @@ export function CampaignManager({
                     <legend className="text-fg-muted px-1 text-[11px]">
                       {strings.campaignPosition} {preset === null ? `(${strings.campaignAnchorCustom})` : ""}
                     </legend>
+                    <CampaignAnchorPreview
+                      imagePath={(slideOptions.find((option) => campaign.slideIds.includes(option.id)) ?? slideOptions[0])?.mediaPath ?? ""}
+                      imageAltFallback={campaign.title.th}
+                      title={campaign.title.th}
+                      body={campaign.body.th}
+                      ctaLabel={campaign.ctaLabel.th}
+                      anchorX={anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).x}
+                      anchorY={anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).y}
+                      onAnchorChange={(x, y) => setAnchor(campaign.id, x, y)}
+                      strings={strings}
+                    />
                     <div className="flex flex-wrap gap-2">
                       <label className="text-fg-muted flex items-center gap-1 text-[11px]">
                         X%
-                        <input type="number" name="anchorX" min={0} max={100} defaultValue={campaign.anchorX} className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs" />
+                        <input type="number" name="anchorX" min={0} max={100} value={anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).x} onChange={(event) => setAnchor(campaign.id, Number(event.target.value), anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).y)} className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs" />
                       </label>
                       <label className="text-fg-muted flex items-center gap-1 text-[11px]">
                         Y%
-                        <input type="number" name="anchorY" min={0} max={100} defaultValue={campaign.anchorY} className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs" />
+                        <input type="number" name="anchorY" min={0} max={100} value={anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).y} onChange={(event) => setAnchor(campaign.id, anchorOf(campaign.id, campaign.anchorX, campaign.anchorY).x, Number(event.target.value))} className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs" />
                       </label>
                       <button type="submit" name="preset" value="left" className="border-line text-fg rounded-md border px-2 py-1 text-[11px]">
                         {presetLabel.left}

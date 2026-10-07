@@ -48,4 +48,5 @@ export const adminHeroCards = {
   campaignReady: "Ready to go live",
   campaignNotReady: "Not ready",
   campaignSlideCount: "Linked to {n} slides",
+  campaignDragHint: "Drag the card to set its position (or use the arrow keys)",
 };

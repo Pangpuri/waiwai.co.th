@@ -57,7 +57,7 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
   for (const card of await listHeroCardsForAdmin()) (cardsBySlide[card.slideId] ??= []).push(card);
   const nowIso = new Date().toISOString();
   const campaigns = await listCampaignsForAdmin();
-  const slideOptions: readonly CampaignSlideOption[] = slides.map((slide) => ({ id: slide.id, label: slide.id }));
+  const slideOptions: readonly CampaignSlideOption[] = slides.map((slide) => ({ id: slide.id, label: slide.id, mediaPath: slide.mediaPath }));
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
   return (
