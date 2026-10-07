@@ -18,6 +18,7 @@ import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/mo
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { listMedia } from "@/lib/media/repository";
 import { fillTemplate } from "@/lib/i18n/template";
+import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
 
 /**
  * หลังบ้าน "สไลด์ & แคมเปญ" (รอบที่ 184 · เฟส 3 ส่วนแรก)
@@ -133,7 +134,7 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
         <div className="flex flex-col gap-1">
           <h2 className="text-fg text-lg font-semibold">{s.heroTrashTitle}</h2>
           <p className="text-fg-muted text-xs">{s.heroTrashHint}</p>
-          <p className="text-fg-muted text-xs">{s.heroTrashNote}</p>
+          <p className="text-fg-muted text-xs">{fillTemplate(s.heroTrashNote, { days: TRASH_RETENTION_DAYS })}</p>
         </div>
         {trashed.length === 0 ? (
           <p className="text-fg-muted text-sm">{s.heroTrashEmpty}</p>

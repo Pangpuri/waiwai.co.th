@@ -49,7 +49,7 @@ export const adminHero = {
   heroRestore: "กู้คืน",
   heroPurge: "ลบถาวร",
   heroPurgeConfirm: "ยืนยันลบถาวร (ย้อนกลับไม่ได้)",
-  heroTrashNote: "⚠️ ยังไม่มีตัวลบอัตโนมัติของสไลด์ — ต้องกดลบถาวรเอง (ตั้งเป็นหนี้ไว้)",
+  heroTrashNote: "สไลด์ในถังเกิน {days} วันจะถูกลบถาวรอัตโนมัติ (หรือกดลบถาวรเองได้เลย)",
   heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
   heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
 };

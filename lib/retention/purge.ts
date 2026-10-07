@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/audit/log";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { purgeExpiredTrash } from "@/lib/trash/repository";
 import { purgeExpiredContentTrash } from "@/lib/trash/content";
+import { purgeExpiredHeroTrash } from "@/lib/trash/hero";
 import { purgeExpiredPreviewLinks } from "@/lib/preview-link/repository";
 import {
   PURGE_AUDIT_ACTION,
@@ -54,6 +55,8 @@ export type RetentionOverview = {
    * ⚠️ ไม่ใช่ข้อมูลส่วนบุคคล ⇒ ไม่รวมใน `due`/`dueTotal` (คนละนโยบายกับตารางด้านบน)
    */
   readonly contentTrashDue: number;
+  /** จำนวนสไลด์ในถังขยะที่พ้นกำหนด (รอบที่ 191) */
+  readonly heroTrashDue: number;
   /** ตารางระยะเก็บทั้งหมด — ใช้ทั้งบนหน้าจอหลังบ้านและหน้า `/privacy` */
   readonly steps: readonly PurgeStep[];
 };
@@ -238,9 +241,11 @@ export async function retentionOverview(options: { readonly now?: Date } = {}): 
 
   const now = options.now ?? new Date();
   const last = await lastPurgeAt();
-  const [due, contentTrash] = await Promise.all([
+  const [due, contentTrash, heroTrash] = await Promise.all([
     purgeExpired({ now, dryRun: true }),
     purgeExpiredContentTrash({ now, dryRun: true }),
+    /* ถังขยะสไลด์หน้าแรก (รอบที่ 191) */
+    purgeExpiredHeroTrash({ now, dryRun: true }),
   ]);
   const counts = due?.counts ?? emptyCounts();
 
@@ -251,6 +256,8 @@ export async function retentionOverview(options: { readonly now?: Date } = {}): 
     dueTotal: totalOf(counts),
     /* ถังขยะเนื้อหา (รอบที่ 174) — ลบในรอบเดียวกัน แต่ไม่ใช่ข้อมูลส่วนบุคคล */
     contentTrashDue: contentTrash?.total ?? 0,
+    /* ถังขยะสไลด์ (รอบที่ 191) — ลบในรอบเดียวกัน ไม่ใช่ข้อมูลส่วนบุคคล */
+    heroTrashDue: heroTrash ?? 0,
     steps: planPurge(now),
   };
 }
@@ -272,6 +279,12 @@ async function purgeAndRecord(options: { readonly now: Date; readonly actorEmail
        ที่นี่มีหน้าที่แค่ "เก็บกวาดตามกำหนด" · บันทึก audit ของตัวเอง (`trash-purge` · target `trash-content`)
   */
   await purgeExpiredContentTrash({ now: options.now });
+
+  /*
+    ถังขยะ "สไลด์หน้าแรก" (รอบที่ 191) — ต่อเข้าตัวลบกลางเพื่อไม่ให้ของค้างในถังตลอดไป
+    ⚠️ ลบสไลด์แล้วลิงก์แคมเปญของสไลด์นั้นหายตาม (cascade) · audit ของตัวเองบันทึกในชั้นข้อมูล
+  */
+  await purgeExpiredHeroTrash({ now: options.now });
 
   /*
     ลิงก์พรีวิวชั่วคราว (X2.6) — เก็บกวาดลิงก์ที่ปิดแล้วและพ้นอายุเก็บ

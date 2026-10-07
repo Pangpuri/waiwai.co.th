@@ -161,3 +161,24 @@ test("campaigns: หน้าเว็บจับคู่แคมเปญก
   const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
   assert.ok(!manager.includes("HeroCardEditor"), "พาเนลการ์ดเดิมต้องถูกถอดออกจากหน้าสไลด์");
 });
+
+test("hero trash: ตัวลบอัตโนมัติต่อเข้าตัวลบกลาง (ประตูใน SQL · dry-run เส้นทางเดียวกัน · ใช้ระยะเก็บกลาง)", () => {
+  const hero = readFileSync("lib/trash/hero.ts", "utf8");
+  assert.ok(hero.includes("TRASH_RETENTION_DAYS"), "ต้องใช้ระยะเก็บจากค่ากลาง (ห้ามพิมพ์ตัวเลขซ้ำ)");
+  assert.ok(
+    /delete from hero_slide where deleted_at is not null and deleted_at <= \$1/.test(hero),
+    "ประตูต้องอยู่ใน SQL: ลบเฉพาะแถวที่อยู่ในถังและพ้นกำหนด",
+  );
+  assert.ok(/dryRun === true[\s\S]{0,400}select count\(\*\)/.test(hero), "dry-run ต้องนับจากเงื่อนไขเดียวกัน (ไม่ลบ)");
+  assert.ok(/catch \{[\s\S]{0,120}return 0;/.test(hero), "ตัวลบกลางต้องไม่ล้มเพราะถังขยะสไลด์");
+
+  const purge = readFileSync("lib/retention/purge.ts", "utf8");
+  assert.ok(purge.includes("purgeExpiredHeroTrash({ now, dryRun: true })"), "รายงาน dry-run ต้องรวมถังขยะสไลด์");
+  assert.ok(purge.includes("await purgeExpiredHeroTrash({ now: options.now })"), "การลบจริงต้องเรียกถังขยะสไลด์");
+  assert.ok(purge.includes("heroTrashDue"), "ภาพรวมระยะเก็บต้องรายงานยอดของถังขยะสไลด์");
+
+  const note = readFileSync("lib/i18n/messages/areas/th/adminHero.ts", "utf8");
+  assert.ok(/\{days\}/.test(note), "ข้อความบนหน้าจอต้องใช้ {days} (ไม่พิมพ์ตัวเลขเอง)");
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("TRASH_RETENTION_DAYS"), "หน้าจอต้องเติมจำนวนวันจากค่ากลาง");
+});

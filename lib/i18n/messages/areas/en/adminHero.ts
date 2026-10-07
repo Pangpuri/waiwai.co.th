@@ -49,7 +49,7 @@ export const adminHero = {
   heroRestore: "Restore",
   heroPurge: "Delete forever",
   heroPurgeConfirm: "Confirm permanent delete (cannot be undone)",
-  heroTrashNote: "⚠️ Slides are not auto-purged yet — delete forever manually (recorded as debt)",
+  heroTrashNote: "Slides in the trash are permanently removed after {days} days (or delete forever yourself)",
   heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",
 };
