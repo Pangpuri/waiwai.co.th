@@ -5,7 +5,8 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import { HERO_CARD_HREF } from "../hero-card";
-import type { HeroCard as HeroCardData } from "@/lib/hero/cards";
+import { anchorPresetOf } from "@/lib/campaigns/model";
+import type { Campaign as CampaignData } from "@/lib/campaigns/model";
 import type { HeroCardView } from "./hero-slider";
 import { DEFAULT_HERO_SETTING, type HeroSetting } from "@/lib/hero/model";
 import { HERO_SLIDES, type HeroSlideView } from "../slides";
@@ -23,7 +24,8 @@ type HeroProps = {
   /** เอฟเฟค + ความเร็วจากหลังบ้าน (รอบที่ 185) — ไม่ส่ง = ค่าเริ่มต้น (จาง 5 วิ) */
   readonly heroSetting?: HeroSetting;
   /** การ์ดแคมเปญจากหลังบ้าน (คีย์ = id สไลด์) — รอบที่ 188 */
-  readonly heroCards?: Readonly<Record<string, readonly HeroCardData[]>>;
+  /** แคมเปญจากหลังบ้าน (รอบที่ 190) — เลือกสไลด์ที่แสดงได้ · ไม่เลือก = ทุกสไลด์ */
+  readonly campaigns?: readonly CampaignData[];
 };
 
 /**
@@ -41,7 +43,7 @@ type HeroProps = {
  *
  * เป็น Server Component: ประกอบข้อความ alt จากพจนานุกรมแล้วส่งข้อมูลธรรมดาเข้า Client Component
  */
-export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING, heroCards = {} }: HeroProps) {
+export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING, campaigns = [] }: HeroProps) {
   const m = messages.hero;
 
   const templateSlides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
@@ -52,16 +54,21 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
   /* หลังบ้านมีสไลด์ ⇒ ใช้ของหลังบ้าน · ไม่มี/อ่านไม่ได้ ⇒ เทมเพลตเดิม (พฤติกรรมเดิมเป๊ะ) */
   const slides: readonly HeroSlideView[] = dbSlides.length > 0 ? dbSlides : templateSlides;
 
-  /* แปลงการ์ดเป็นข้อความตามภาษา (ไทยเป็นหลัก · อังกฤษว่าง = ถอยไปใช้ไทย) */
+  /* จับคู่แคมเปญกับสไลด์ + แปลงข้อความตามภาษา (ไทยหลัก · อังกฤษว่าง = ถอยไปใช้ไทย) */
   const cardViews: Record<string, readonly HeroCardView[]> = {};
-  for (const [slideId, cards] of Object.entries(heroCards)) {
-    cardViews[slideId] = cards.map((card) => ({
+  for (const slide of slides) {
+    const matching = campaigns.filter((campaign) => campaign.slideIds.length === 0 || campaign.slideIds.includes(slide.id));
+    if (matching.length === 0) continue;
+    cardViews[slide.id] = matching.map((card) => ({
       id: card.id,
       title: locale === "en" && card.title.en.trim() !== "" ? card.title.en : card.title.th,
       body: locale === "en" && card.body.en.trim() !== "" ? card.body.en : card.body.th,
       ctaLabel: locale === "en" && card.ctaLabel.en.trim() !== "" ? card.ctaLabel.en : card.ctaLabel.th,
       ctaHref: card.ctaHref,
-      position: card.position,
+      /* ตำแหน่งสำเร็จรูป (สำหรับสไตล์สำรอง) — จุดยึดจริงส่งแยกไปแล้ว */
+      position: anchorPresetOf(card.anchorX, card.anchorY) ?? "center",
+      anchorX: card.anchorX,
+      anchorY: card.anchorY,
     }));
   }
 

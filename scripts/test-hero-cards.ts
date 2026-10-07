@@ -82,9 +82,9 @@ test("hero cards: ต่อสายจริง — เงื่อนไขเ
   assert.ok(/catch \{[\s\S]{0,120}return \{\};/.test(repo), "อ่านพังต้องคืนค่าว่าง ไม่ทำให้หน้าเว็บพัง");
 
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(page.includes("listHeroCardsForAdmin()") && page.includes("cardsBySlide"), "หน้าจอต้องโหลดการ์ดและจัดกลุ่มตามสไลด์");
+  assert.ok(!page.includes("listHeroCardsForAdmin()"), "มติเจ้าของ 2026-10-07: ถอดการ์ดผูกสไลด์ 1:1 — หน้าจอต้องไม่โหลดการ์ดแบบเดิมแล้ว");
   const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
-  assert.ok(manager.includes("HeroCardEditor"), "การ์ดสไลด์ต้องมีพาเนลจัดการการ์ดแคมเปญ");
+  assert.ok(!manager.includes("HeroCardEditor"), "พาเนลการ์ดในหน้าสไลด์ต้องถูกถอดออก (แคมเปญย้ายไปแท็บของตัวเอง)");
   const editor = readFileSync("features/admin/ui/hero-card-editor.tsx", "utf8");
   assert.ok(editor.includes("datetime-local") && editor.includes("heroCardWindowState"), "พาเนลต้องมีช่องช่วงเวลาและแสดงสถานะ");
   assert.ok(!/[\u0E00-\u0E7F]/.test(editor.split("return (")[1] ?? ""), "โค้ดพาเนลต้องไม่มีข้อความไทย (ใช้พจนานุกรม)");

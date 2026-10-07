@@ -48,6 +48,9 @@ export type HeroCardView = {
   readonly ctaLabel: string;
   readonly ctaHref: string;
   readonly position: "left" | "center" | "right";
+  /** จุดยึดเป็นเปอร์เซ็นต์ของพื้นที่สไลด์ (รอบที่ 190) — ตรงกับที่ลากในหลังบ้าน */
+  readonly anchorX?: number;
+  readonly anchorY?: number;
 };
 
 type HeroSliderProps = {
@@ -132,17 +135,16 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
 
         {/* การ์ดแคมเปญของสไลด์ที่กำลังแสดง (รอบที่ 188) — ตำแหน่งตามที่ตั้งในหลังบ้าน */}
         {activeCards.length > 0 ? (
-          <div
-            className={[
-              "pointer-events-none absolute inset-0 z-10 flex p-4 sm:p-6",
-              activeCards[0]?.position === "center"
-                ? "items-start justify-center"
-                : activeCards[0]?.position === "right"
-                  ? "items-start justify-end"
-                  : "items-start justify-start",
-            ].join(" ")}
-          >
-            <div className="flex w-full max-w-sm flex-col gap-2 rounded-2xl bg-surface/95 p-4 text-fg shadow-lg sm:max-w-md">
+                    <div className="pointer-events-none absolute inset-0 z-10">
+            <div
+              /* ตำแหน่งการ์ด: left/top เป็นเปอร์เซ็นต์ + เลื่อนกลับครึ่งหนึ่งของตัวเอง (สูตรเดียวกับพรีวิวหลังบ้าน) */
+              style={{
+                left: (activeCards[0]?.anchorX ?? 8) + "%",
+                top: (activeCards[0]?.anchorY ?? 50) + "%",
+                transform: "translate(-" + (activeCards[0]?.anchorX ?? 8) + "%, -" + (activeCards[0]?.anchorY ?? 50) + "%)",
+              }}
+              className="pointer-events-auto absolute flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 rounded-2xl bg-surface/95 p-4 text-fg shadow-lg sm:max-w-md"
+            >
               {activeCards.map((card) => (
                 <div key={card.id} className="flex flex-col gap-1">
                   <p className="text-fg text-base font-bold sm:text-lg">{card.title}</p>
