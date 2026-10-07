@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { managedHeroSlideViews } from "@/features/home/slides";
 import {
   MAX_HERO_PAGE_SLIDES,
   clampFocus,
@@ -129,4 +130,34 @@ test("hero module: ชั้นอ่านฝั่งเว็บต้อง 
   assert.ok(repository.includes("await readQuery<"), "ฝั่งเว็บต้องอ่านผ่านประตูอ่านอย่างเดียว (readQuery)");
   assert.ok(/catch \{[\s\S]{0,120}return \[\];/.test(repository), "อ่านพังต้องกลืนแล้วคืนรายการว่าง (หน้าเว็บห้ามพังเพราะ DB)");
   assert.ok(repository.includes("listHeroPageSlidesForAdmin"), "หลังบ้านใช้ getPool (สิทธิ์เต็ม) แยกจากฝั่งเว็บ");
+});
+
+test("hero module: ต่อสายหน้าแรก — สไลด์จากฐานข้อมูล + ถอยไปเทมเพลตเมื่อว่าง", () => {
+  /* ตัวแปลง (ตรรกะล้วน) */
+  const rows = [
+    { id: "flavours", sortOrder: 10, mediaPath: "/slide/a.jpg", altTh: "ไทย ก", altEn: "EN A", focusX: 50, focusY: 50, zoom: 1, isActive: true },
+    { id: "event", sortOrder: 20, mediaPath: "/slide/b.jpg", altTh: "ไทย ข", altEn: "", focusX: 0, focusY: 100, zoom: 1.5, isActive: true },
+  ];
+  const th = managedHeroSlideViews(rows, "th");
+  assert.equal(th.length, 2);
+  assert.deepEqual(th[0], { id: "flavours", src: "/slide/a.jpg", alt: "ไทย ก", objectPosition: "50% 50%" });
+  assert.equal(managedHeroSlideViews(rows, "en")[0]?.alt, "EN A", "อังกฤษมีค่า = ใช้ค่าอังกฤษ");
+  assert.equal(managedHeroSlideViews(rows, "en")[1]?.alt, "ไทย ข", "อังกฤษว่าง = ถอยไปใช้ไทย");
+  assert.equal(th[1]?.objectPosition, "0% 100%", "จุดโฟกัสกลายเป็น object-position");
+  assert.equal(th[0]?.reviewStatus, undefined, "สไลด์จากหลังบ้านต้องไม่มีป้าย 'รออนุมัติ'");
+  assert.deepEqual(managedHeroSlideViews([], "th"), [], "ไม่มีข้อมูล = รายการว่าง (หน้าแรกถอยไปเทมเพลต)");
+
+  /* หน้าแรกต้องถอยไปเทมเพลตเสมอเมื่อไม่มีสไลด์จากหลังบ้าน */
+  const hero = readFileSync("features/home/ui/hero.tsx", "utf8");
+  assert.ok(hero.includes("dbSlides = []"), "ต้องมีค่าเริ่มต้นเป็นรายการว่าง");
+  assert.ok(
+    /dbSlides\.length > 0 \? dbSlides : templateSlides/.test(hero),
+    "มีสไลด์จากหลังบ้าน = ใช้ของหลังบ้าน · ไม่มี = เทมเพลตเดิม",
+  );
+  assert.ok(hero.includes("HERO_SLIDES.map"), "เทมเพลตเดิมต้องยังอยู่ (ไม่ลบของเดิม)");
+
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("listHeroPageSlides()"), "หน้าแรกต้องอ่านสไลด์จากชั้นข้อมูลของโมดูล");
+  assert.ok(page.includes("managedHeroSlideViews("), "ต้องแปลงวิวผ่านตัวช่วยกลาง (ไม่ประกอบเองในหน้า)");
+  assert.ok(page.includes("revalidate = 300"), "หน้าแรกยังต้องเป็น ISR 300 วิเหมือนเดิม");
 });

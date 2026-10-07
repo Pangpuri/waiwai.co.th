@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { Hero } from "@/features/home/ui/hero";
+import { managedHeroSlideViews } from "@/features/home/slides";
 import { NewsList } from "@/features/home/ui/news-list";
 import { Newsletter } from "@/features/home/ui/newsletter";
 import { ProductsShowcase } from "@/features/home/ui/products-showcase";
@@ -15,6 +16,7 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
+import { listHeroPageSlides } from "@/lib/hero/repository";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { countNews, listNews } from "@/lib/news/repository";
@@ -101,7 +103,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
     <>
       {/* JSON-LD (X1.4): องค์กร + เว็บไซต์ — ค่ามาจาก "ตั้งค่าส่วนกลาง" ในหลังบ้าน */}
       <JsonLd kind="organization" locale={lang} settings={await loadSiteSettings(lang)} />
-      <Hero locale={lang} messages={messages} />
+      <Hero locale={lang} messages={messages} dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)} />
       <ProductsShowcase
         locale={lang}
         messages={messages}

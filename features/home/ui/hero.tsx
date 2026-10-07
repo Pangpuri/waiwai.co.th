@@ -12,6 +12,11 @@ import { HeroSlider } from "./hero-slider";
 type HeroProps = {
   readonly locale: Locale;
   readonly messages: Messages;
+  /**
+   * สไลด์จากหลังบ้าน (โมดูล "สไลด์ & แคมเปญ") — **ว่าง = ใช้สไลด์ในเทมเพลตเหมือนเดิมเป๊ะ**
+   * หน้าแรกต้องไม่พังเพราะฐานข้อมูล: ตัวอ่านคืน `[]` เมื่อไม่มี DB/ตารางหาย/อ่านไม่สำเร็จ
+   */
+  readonly dbSlides?: readonly HeroSlideView[];
 };
 
 /**
@@ -29,13 +34,16 @@ type HeroProps = {
  *
  * เป็น Server Component: ประกอบข้อความ alt จากพจนานุกรมแล้วส่งข้อมูลธรรมดาเข้า Client Component
  */
-export function Hero({ locale, messages }: HeroProps) {
+export function Hero({ locale, messages, dbSlides = [] }: HeroProps) {
   const m = messages.hero;
 
-  const slides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
+  const templateSlides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
     ...slide,
     alt: m.slides[slide.id].alt,
   }));
+
+  /* หลังบ้านมีสไลด์ ⇒ ใช้ของหลังบ้าน · ไม่มี/อ่านไม่ได้ ⇒ เทมเพลตเดิม (พฤติกรรมเดิมเป๊ะ) */
+  const slides: readonly HeroSlideView[] = dbSlides.length > 0 ? dbSlides : templateSlides;
 
   return (
     <section className="relative isolate bg-bg">
