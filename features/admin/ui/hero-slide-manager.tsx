@@ -79,8 +79,15 @@ export function HeroSlideManager({
             >
               {/* ภาพตัวอย่าง + ลำดับ */}
               <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slide.mediaPath} alt={slide.altTh} className="bg-bg-subtle h-32 w-full rounded-lg object-cover" />
+                {/* ⚠️ ไม่มีพาธ = ไม่เรนเดอร์ <img> เลย (ไม่งั้นเบราว์เซอร์เตือน src="" และยิงคำขอเปล่า) */}
+                {slide.mediaPath.trim() === "" ? (
+                  <div className="bg-bg-subtle text-fg-muted flex h-32 w-full items-center justify-center rounded-lg text-xs">
+                    {strings.heroAdminNoImage}
+                  </div>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={slide.mediaPath} alt={slide.altTh} className="bg-bg-subtle h-32 w-full rounded-lg object-cover" />
+                )}
                 <span className="bg-surface/90 text-fg absolute top-1 left-1 rounded px-1.5 py-0.5 text-xs font-semibold">
                   {strings.heroAdminOrder} {index + 1}
                 </span>

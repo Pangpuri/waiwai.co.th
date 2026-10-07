@@ -42,5 +42,6 @@ export const adminHero = {
   blockSlidesAdd: "Add slide image",
   blockSlidesFocus: "Image position (point kept in the frame)",
   blockSlidesZoom: "Image zoom",
+  heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",
 };

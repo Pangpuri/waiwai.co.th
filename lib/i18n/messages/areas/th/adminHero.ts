@@ -42,5 +42,6 @@ export const adminHero = {
   blockSlidesAdd: "เพิ่มภาพสไลด์",
   blockSlidesFocus: "จัดตำแหน่งภาพ (จุดที่อยู่กลางกรอบ)",
   blockSlidesZoom: "ซูมภาพ",
+  heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
   heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
 };

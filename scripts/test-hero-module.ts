@@ -222,3 +222,17 @@ test("hero module (เอฟเฟค): อ่านค่าตั้งค่�
   const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
   assert.ok(actions.includes("saveHeroSettingAction") && actions.includes("parseHeroSetting"), "action ต้องตรวจค่าด้วยตัวช่วยกลาง");
 });
+
+test("hero module (เฟส 3): ภาพที่ยังไม่มีพาธต้องไม่ถูกเรนเดอร์เป็น <img src=\"\"> (กันคำเตือนเบราว์เซอร์)", () => {
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  assert.ok(
+    /slide\.mediaPath\.trim\(\) === ""/.test(manager),
+    "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ",
+  );
+  assert.ok(manager.includes("heroAdminNoImage"), "พาธว่างต้องแสดงข้อความจากพจนานุกรมแทนภาพ");
+  /* <img> ต้องอยู่ในสาขา else เท่านั้น (คือไม่มีทางถูกเรนเดอร์เมื่อพาธว่าง) */
+  const imgIndex = manager.indexOf("<img src={slide.mediaPath}");
+  const guardIndex = manager.indexOf('slide.mediaPath.trim() === ""');
+  assert.ok(imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
+  assert.ok(!/<img src=\{[^}]*\} alt/.test(manager.slice(0, guardIndex)), "ห้ามมี <img> ก่อนจุดตรวจ");
+});
