@@ -187,8 +187,8 @@ test("hero module: หลังบ้าน — เมนูในไซด์�
   assert.ok(page.includes("heroAdminNextStep"), "ต้องบอกผู้ใช้ว่าเฟสถัดไปทำอะไร (ไม่ให้เข้าใจว่าจบแล้ว)");
 
   /* คีย์พจนานุกรมครบสองภาษา */
-  const th = readFileSync("lib/i18n/messages/areas/th/admin.ts", "utf8");
-  const en = readFileSync("lib/i18n/messages/areas/en/admin.ts", "utf8");
+  const th = readFileSync("lib/i18n/messages/areas/th/adminHero.ts", "utf8");
+  const en = readFileSync("lib/i18n/messages/areas/en/adminHero.ts", "utf8");
   for (const key of ["navHero", "heroAdminTitle", "heroAdminIntro", "heroAdminCount", "heroAdminEmpty", "heroAdminActive", "heroAdminInactive", "heroAdminFocus", "heroAdminZoom", "heroAdminSeeSite", "heroAdminNextStep"]) {
     assert.ok(th.includes(`${key}:`), `พจนานุกรมไทยต้องมี ${key}`);
     assert.ok(en.includes(`${key}:`), `พจนานุกรมอังกฤษต้องมี ${key}`);

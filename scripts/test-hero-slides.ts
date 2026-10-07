@@ -367,8 +367,8 @@ test("hero slides (ค): แผงตัวแก้ในกรณี hero ใ�
 });
 
 test("hero slides (ค): คีย์พจนานุกรมของแผงสไลด์มีครบทั้งไทย/อังกฤษ", () => {
-  const th = readFileSync("lib/i18n/messages/areas/th/admin.ts", "utf8");
-  const en = readFileSync("lib/i18n/messages/areas/en/admin.ts", "utf8");
+  const th = readFileSync("lib/i18n/messages/areas/th/adminHero.ts", "utf8");
+  const en = readFileSync("lib/i18n/messages/areas/en/adminHero.ts", "utf8");
   for (const key of ["blockSlidesTitle", "blockSlidesCount", "blockSlidesHint", "blockSlidesAdd", "blockSlidesFocus", "blockSlidesZoom"]) {
     assert.ok(th.includes(`${key}:`), `พจนานุกรมไทยต้องมี ${key}`);
     assert.ok(en.includes(`${key}:`), `พจนานุกรมอังกฤษต้องมี ${key}`);
