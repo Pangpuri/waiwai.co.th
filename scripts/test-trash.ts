@@ -586,3 +586,84 @@ test("trash-view: ตารางรวม + ป้ายชนิดครบ 6
   assert.ok(checkDb.includes("restoreContentTrashItem("), "ต้องพิสูจน์กู้คืนจากตารางรวมกับ DB จริง");
   assert.ok(checkDb.includes("deleteContentTrashItemPermanently("), "ต้องพิสูจน์ลบถาวรจากตารางรวมกับ DB จริง");
 });
+
+/* ── 6) ปิดหนี้รอบ 176: ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177) ──────
+ *
+ * เดิม `setProductTrashed/setRecipeTrashed/setNewsTrashed` เป็น `update ... where id = $1`
+ * ⇒ "กู้คืน" ของที่ยังใช้งานอยู่ก็เข้าเงื่อนไข (ไม่มีอะไรเสียหาย แต่ประตูไม่ได้อยู่ที่ SQL ตามหลักโปรเจกต์)
+ * และตารางเนื้อหาไม่มี `deleted_by` ⇒ หน้าถังขยะโชว์ "ทำโดย" จาก `updated_by` (เปลี่ยนได้ถ้ามีคนแก้ของในถัง)
+ */
+
+const CONTENT_TRASH_WRITERS: readonly { readonly file: string; readonly fn: string; readonly table: string }[] = [
+  { file: "lib/products/repository.ts", fn: "setProductTrashed", table: "product" },
+  { file: "lib/recipes/repository.ts", fn: "setRecipeTrashed", table: "recipe" },
+  { file: "lib/news/repository.ts", fn: "setNewsTrashed", table: "news" },
+];
+
+test("trash-guard: ทั้ง 3 ตารางมีประตูสองทางที่ SQL + บันทึก deleted_by เป็นคู่กัน", () => {
+  for (const { file, fn, table } of CONTENT_TRASH_WRITERS) {
+    const source = sourceOf(file);
+
+    assert.ok(source.includes(`export async function ${fn}`), `${file}: ต้องมี ${fn}()`);
+    assert.ok(
+      source.includes(`export async function ${fn}(id: string, trashed: boolean, actor: string): Promise<boolean>`),
+      `${file}: ${fn}() ต้องคืน boolean (ผู้เรียกต้องรู้ว่าสำเร็จไหม)`,
+    );
+
+    /* ประตูเลือกจากสองสตริงคงที่ ⇒ ไม่มีค่าจากผู้ใช้ใน SQL */
+    assert.ok(
+      source.includes('const guard = trashed ? "deleted_at is null" : "deleted_at is not null";'),
+      `${file}: ต้องมี guard สองทางแบบสตริงคงที่`,
+    );
+    assert.ok(source.includes("where id = $1 and ${guard}"), `${file}: SQL ต้องใช้ ${'${guard}'} ในเงื่อนไข`);
+
+    /* deleted_at กับ deleted_by ต้องถูกตั้ง/ล้างพร้อมกัน */
+    assert.ok(source.includes("deleted_at = case when $2 then now() else null end"), `${file}: ต้องตั้ง deleted_at ตามทิศทาง`);
+    assert.ok(
+      source.includes("deleted_by = case when $2 then $3 else null end"),
+      `${file}: ต้องตั้ง/ล้าง deleted_by พร้อมกับ deleted_at`,
+    );
+    assert.ok(source.includes(`update ${table}`), `${file}: ต้องอัปเดตตาราง ${table} ของตัวเอง`);
+  }
+
+  /* listContentTrash: อ่าน deleted_by เป็นหลัก — ถอยไป updated_by เฉพาะแถวที่ลบก่อน migration */
+  const content = sourceOf("lib/trash/content.ts");
+  assert.ok(
+    content.includes("coalesce(deleted_by, updated_by) as deleted_by"),
+    "ตารางรวมต้องอ่าน deleted_by เป็นหลัก (ถอยไป updated_by เฉพาะของเก่า)",
+  );
+  assert.ok(
+    !/deletedBy: row\.updated_by/.test(content),
+    "ห้ามใช้ updated_by ตรง ๆ (จะโชว์ชื่อคนแก้แทนคนลบ — เคสจริงที่ทำให้ต้องเพิ่มคอลัมน์)",
+  );
+});
+
+test("trash-guard: migration 0026 เพิ่ม deleted_by ให้ 3 ตาราง + backfill ที่รันซ้ำได้", () => {
+  const migration = sourceOf("db/migrations/0026-content-deleted-by.sql");
+
+  for (const table of ["product", "recipe", "news"]) {
+    assert.ok(
+      migration.includes(`alter table ${table} add column if not exists deleted_by text;`),
+      `migration ต้องเพิ่ม ${table}.deleted_by แบบ idempotent`,
+    );
+    assert.ok(
+      migration.includes(`update ${table} set deleted_by = updated_by where deleted_at is not null and deleted_by is null;`),
+      `migration ต้องเติมค่าย้อนหลังของ ${table} แบบมีเงื่อนไข (รันซ้ำไม่มีผล)`,
+    );
+  }
+  assert.ok(migration.includes("idempotent: conditional-update"), "ต้องประกาศกลไกกันรันซ้ำตามกติกาด่าน migration");
+
+  /* เอกสารอ้างอิง (schema.sql) ต้องตรงกับของจริง — ไม่ปล่อยให้เอกสารหลุด */
+  const schema = sourceOf("db/schema.sql");
+  const columns = schema.match(/deleted_by +text/g) ?? [];
+  assert.ok(columns.length >= 6, `schema.sql ต้องมี deleted_by ครบทุกตารางที่มีถังขยะ (พบ ${columns.length} ที่)`);
+  assert.ok(schema.includes("0026"), "schema.sql ต้องอ้างเลข migration ที่เพิ่มคอลัมน์นี้");
+
+  /* ด่าน DB ต้องพิสูจน์วงจรจริงของประตูสองทาง */
+  const checkDb = sourceOf("scripts/check-db.ts");
+  assert.ok(checkDb.includes("checkContentTrashGuard"), "check:db ต้องมีวงจรประตูสองทาง");
+  assert.ok(
+    checkDb.includes("ย้ายเข้าถังซ้ำต้องไม่สำเร็จ"),
+    "ต้องพิสูจน์ว่าย้ายเข้าซ้ำไม่ทับเวลาที่ลบเดิม/ชื่อคนเดิม",
+  );
+});

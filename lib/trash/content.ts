@@ -143,9 +143,11 @@ export type ContentTrashEntry = {
   readonly sizeBytes: null;
   readonly deletedAt: string;
   /**
-   * ⚠️ ตารางเนื้อหา **ไม่มีคอลัมน์ `deleted_by`** (ต่างจาก media/block_preset/chrome_preset)
-   * ⇒ ใช้ `updated_by` ซึ่งถูกเขียนตอนย้ายเข้าถัง · ถ้ามีคนแก้ของที่อยู่ในถังภายหลัง ค่านี้อาจเป็นคนนั้น
-   *    (ข้อจำกัดของสคีมาเดิม — บันทึกใน § 10 รอบที่ 176)
+   * ⚠️ **รอบที่ 177:** ตารางเนื้อหามี `deleted_by` ของตัวเองแล้ว (migration 0026)
+   * ⇒ อ่าน `deleted_by` เป็นหลัก และ **ถอยไปใช้ `updated_by`** เฉพาะแถวที่ถูกลบก่อน migration
+   *    (ตอนนั้นไม่มีคอลัมน์นี้ — ค่าที่บันทึกไว้ตอนย้ายเข้าถังคือผู้ทำ)
+   * ⚠️ ห้ามกลับไปใช้ `updated_by` อย่างเดียว: มันถูกเขียนใหม่ทุกครั้งที่มีคนแก้ของที่อยู่ในถัง
+   *    ⇒ หน้าถังขยะจะโชว์ชื่อ "คนแก้" แทน "คนลบ" (เคสจริงที่ทำให้ต้องเพิ่มคอลัมน์นี้)
    */
   readonly deletedBy: string | null;
 };
@@ -163,9 +165,9 @@ export async function listContentTrash(limit = 200): Promise<readonly ContentTra
       id: string;
       label: string;
       deleted_at: Date;
-      updated_by: string | null;
+      deleted_by: string | null;
     }>(
-      `select id, ${CONTENT_LABEL_SQL[kind]} as label, deleted_at, updated_by
+      `select id, ${CONTENT_LABEL_SQL[kind]} as label, deleted_at, coalesce(deleted_by, updated_by) as deleted_by
          from ${CONTENT_TABLES[kind]}
         where deleted_at is not null
         order by deleted_at desc
@@ -181,7 +183,7 @@ export async function listContentTrash(limit = 200): Promise<readonly ContentTra
         detail: row.id,
         sizeBytes: null,
         deletedAt: new Date(row.deleted_at).toISOString(),
-        deletedBy: row.updated_by,
+        deletedBy: row.deleted_by,
       });
     }
   }

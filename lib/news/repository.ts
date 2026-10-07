@@ -532,13 +532,26 @@ export async function updateNewsForAdmin(id: string, input: AdminNewsInput, acto
   );
 }
 
-/** ย้ายเข้าถังขยะ / กู้คืน */
-export async function setNewsTrashed(id: string, trashed: boolean, actor: string): Promise<void> {
-  await getPool().query("update news set deleted_at = case when $2 then now() else null end, updated_at = now(), updated_by = $3 where id = $1", [
-    id,
-    trashed,
-    actor,
-  ]);
+/**
+ * ย้ายข่าวเข้าถังขยะ / กู้คืน (รอบที่ 123 · **ประตูสองทาง รอบที่ 177**)
+ *
+ * ⚠️ ประตูอยู่ที่ SQL: `trashed=true` ต้องเป็นของที่ยังใช้งานอยู่ · `trashed=false` ต้องเป็นของในถัง
+ *    ⇒ เรียกซ้ำ/ยิงฟอร์มปลอมหาของผิดสถานะ = ไม่มีแถวถูกแก้ (คืน `false`)
+ * ⚠️ `deleted_at` กับ `deleted_by` เป็นคู่กันเสมอ (กู้คืน = ล้างทั้งสอง)
+ */
+export async function setNewsTrashed(id: string, trashed: boolean, actor: string): Promise<boolean> {
+  /* สองสตริงคงที่เท่านั้น (ไม่มีค่าจากผู้ใช้) */
+  const guard = trashed ? "deleted_at is null" : "deleted_at is not null";
+  const result = await getPool().query(
+    `update news
+        set deleted_at = case when $2 then now() else null end,
+            deleted_by = case when $2 then $3 else null end,
+            updated_at = now(),
+            updated_by = $3
+      where id = $1 and ${guard}`,
+    [id, trashed, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**

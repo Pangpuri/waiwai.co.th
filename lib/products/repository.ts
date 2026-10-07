@@ -615,17 +615,26 @@ export async function adminProductCounts(): Promise<{ readonly all: number; read
 }
 
 /**
- * ย้ายสินค้าเข้าถังขยะ / กู้คืน (รอบที่ 139)
- * - ตั้ง `updated_by` ด้วย ⇒ รู้ว่าใครทำ (audit log มีรายละเอียดอีกชั้น)
+ * ย้ายสินค้าเข้าถังขยะ / กู้คืน (รอบที่ 139 · **ประตูสองทาง รอบที่ 177**)
+ * - ตั้ง `updated_by` + `deleted_by` ⇒ รู้ว่าใครทำ (audit log มีรายละเอียดอีกชั้น)
  * - **ไม่แตะเนื้อหา/ส่วนผสม/ภาพ** ⇒ กู้คืนได้ครบเหมือนเดิม
+ *
+ * ⚠️ **รอบที่ 177: ประตูอยู่ที่ SQL ทั้งสองทาง** (เดิมกู้คืนได้แม้แถวยังใช้งานอยู่)
+ *    `trashed=true` → ต้องเป็นของที่ **ยังใช้งานอยู่** · `trashed=false` → ต้องเป็นของที่ **อยู่ในถัง**
+ *    ⇒ เรียกซ้ำ/ยิงฟอร์มปลอมหาของผิดสถานะ = ไม่มีแถวถูกแก้ (คืน `false`)
+ *    หลักเดียวกับ `restoreContentTrashItem()` ใน `lib/trash/content.ts` (ตารางรวมใช้ตัวนั้น)
+ * ⚠️ `deleted_at` กับ `deleted_by` ต้องเป็นคู่กันเสมอ: กู้คืน = ล้างทั้งสอง
  */
 export async function setProductTrashed(id: string, trashed: boolean, actor: string): Promise<boolean> {
+  /* เลือกจากสองสตริงคงที่เท่านั้น (ไม่มีค่าจากผู้ใช้) ⇒ ไม่มีทางกลายเป็น SQL injection */
+  const guard = trashed ? "deleted_at is null" : "deleted_at is not null";
   const result = await getPool().query(
     `update product
         set deleted_at = case when $2 then now() else null end,
+            deleted_by = case when $2 then $3 else null end,
             updated_at = now(),
             updated_by = $3
-      where id = $1`,
+      where id = $1 and ${guard}`,
     [id, trashed, actor],
   );
   return (result.rowCount ?? 0) > 0;

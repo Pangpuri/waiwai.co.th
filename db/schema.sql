@@ -354,6 +354,8 @@ create table if not exists product (
   sort_order     integer     not null default 0,
   /* ถังขยะของสินค้า (migration 0022 · รอบที่ 139) — null = ใช้งาน · มีค่า = อยู่ในถัง (กู้คืนได้) */
   deleted_at     timestamptz,
+  /* ใครลบ (migration 0026 · รอบที่ 177) — คู่กับ deleted_at เสมอ: กู้คืนแล้วล้างทั้งคู่ */
+  deleted_by     text,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );
@@ -390,6 +392,8 @@ create table if not exists recipe (
   /* หลังบ้านเมนูอาหาร (migration 0021 · รอบที่ 135) — ร่าง/เผยแพร่ + ถังขยะ */
   status         text        not null default 'published' check (status in ('draft', 'published')),
   deleted_at     timestamptz,
+  /* ใครลบ (migration 0026 · รอบที่ 177) — คู่กับ deleted_at เสมอ */
+  deleted_by     text,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );
@@ -420,7 +424,9 @@ create table if not exists news (
   updated_by      text,
   -- รอบที่ 123: หลังบ้านข่าว (แบบ WP Posts)
   status text not null default 'published',   -- draft | published
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  -- รอบที่ 177 (migration 0026): ใครลบ — คู่กับ deleted_at เสมอ
+  deleted_by text
 );
 
 create index if not exists news_published_idx on news (published_at desc nulls last, id desc);

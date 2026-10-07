@@ -350,6 +350,9 @@ async function main(): Promise<void> {
   /* 35) ตารางรวมที่ `/admin/trash`: อ่าน/กู้คืน/ลบถาวรของเนื้อหาจากที่เดียว (รอบที่ 176) */
   await checkContentTrashTable();
 
+  /* 36) ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177 — ปิดหนี้รอบ 176) */
+  await checkContentTrashGuard();
+
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
@@ -3801,5 +3804,154 @@ async function checkLeastPrivilege(): Promise<void> {
   } finally {
     if (probeId !== null) await getPool().query("delete from form_submission where id = $1", [probeId]);
     assert.equal(await countWhere("form_submission where email = $1", [probeEmail]), 0, "ต้องไม่เหลือแถวทดสอบของ role ฟอร์ม");
+  }
+}
+
+/**
+ * 36) ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177 — ปิดหนี้รอบ 176)
+ *
+ * ที่มา: `setProductTrashed()` / `setRecipeTrashed()` / `setNewsTrashed()` เดิมเป็น
+ * `update ... where id = $1` **ไม่มีเงื่อนไขสถานะ** ⇒ "กู้คืน" ของที่ยังใช้งานอยู่ก็เข้าเงื่อนไข
+ * (ไม่มีอะไรเสียหายเพราะค่าเท่าเดิม แต่หลักการโปรเจกต์คือ **ประตูต้องอยู่ที่ SQL** ไม่ใช่ที่ UI)
+ * และตารางเนื้อหาไม่มี `deleted_by` ⇒ หน้าถังขยะโชว์ "ทำโดย" จาก `updated_by` (เปลี่ยนได้ถ้ามีคนแก้ของในถัง)
+ *
+ * วงจรนี้พิสูจน์ 5 ข้อกับ DB จริง
+ *   1. กู้คืนของที่ **ยังใช้งานอยู่** = `false` และไม่ถูกแตะ
+ *   2. ย้ายเข้าถัง = `true` + `deleted_by` = ผู้ทำ
+ *   3. ย้ายเข้าซ้ำ = `false` + **เวลาที่ลบเดิมและชื่อคนที่ลบไม่ถูกทับ**
+ *   4. กู้คืน = `true` + **ล้างทั้ง `deleted_at` และ `deleted_by`** (เป็นคู่กันเสมอ)
+ *   5. หน้าถังขยะอ่าน `deleted_by` ของแถวนั้นได้ (ไม่ใช่ `updated_by` ของคนที่มาแก้ทีหลัง)
+ */
+async function checkContentTrashGuard(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+
+  const actor = "check-db-trash-guard@example.invalid";
+  const secondActor = "check-db-trash-guard-2@example.invalid";
+  const productId = "p999992";
+  let newsId = "";
+  let recipeId = "";
+
+  const trashedByOf = async (table: "product" | "recipe" | "news", id: string): Promise<{ at: Date | null; by: string | null }> => {
+    const { rows } = await getPool().query<{ deleted_at: Date | null; deleted_by: string | null }>(
+      `select deleted_at, deleted_by from ${table} where id = $1`,
+      [id],
+    );
+    const row = rows[0];
+    return { at: row?.deleted_at ?? null, by: row?.deleted_by ?? null };
+  };
+
+  try {
+    await upsertProduct(
+      {
+        id: productId,
+        categoryId,
+        sourceId: "",
+        sourceUrl: "",
+        nameTh: "ทดสอบประตูสองทางถังขยะ",
+        nameEn: "",
+        groupTh: "",
+        groupEn: "",
+        taglineTh: "",
+        taglineEn: "",
+        detailsTh: "",
+        allergensTh: "",
+        netWeightTh: "",
+        fdaNumber: "",
+        packagingTh: "",
+        detailsEn: "",
+        allergensEn: "",
+        netWeightEn: "",
+        packagingEn: "",
+        sortOrder: -99992,
+      },
+      actor,
+      null,
+      { imageMode: "keep" },
+    );
+    newsId = await createNewsForAdmin(
+      {
+        titleTh: "ข่าวทดสอบประตูสองทาง",
+        titleEn: "",
+        excerptTh: "",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-04T10:30",
+        status: "published",
+        body: [{ type: "paragraph", text: "ทดสอบประตูสองทางถังขยะ" }],
+      },
+      actor,
+    );
+    recipeId = await createRecipeForAdmin(
+      {
+        titleTh: "เมนูทดสอบประตูสองทาง",
+        titleEn: "",
+        videoId: "dQw4w9WgXcQ",
+        publishedOn: "2018-10-09",
+        sortOrder: 996,
+        coverPath: null,
+        status: "published",
+      },
+      actor,
+    );
+
+    /* 1) กู้คืนของที่ยังใช้งานอยู่ = false และต้องไม่ถูกแตะ (เดิมจะ update ทับเงียบ ๆ) */
+    assert.equal(await setProductTrashed(productId, false, actor), false, "กู้คืนสินค้าที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await setRecipeTrashed(recipeId, false, actor), false, "กู้คืนเมนูที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await setNewsTrashed(newsId, false, actor), false, "กู้คืนข่าวที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    for (const [table, id] of [["product", productId], ["recipe", recipeId], ["news", newsId]] as const) {
+      const state = await trashedByOf(table, id);
+      assert.equal(state.at, null, `${table}: ยังต้องใช้งานอยู่ (ไม่ถูกแตะ)`);
+      assert.equal(state.by, null, `${table}: deleted_by ต้องยังเป็น null`);
+    }
+
+    /* 2) ย้ายเข้าถัง = true + บันทึกชื่อผู้ทำ */
+    assert.equal(await setProductTrashed(productId, true, actor), true, "ย้ายสินค้าเข้าถังต้องสำเร็จ");
+    assert.equal(await setRecipeTrashed(recipeId, true, actor), true, "ย้ายเมนูเข้าถังต้องสำเร็จ");
+    assert.equal(await setNewsTrashed(newsId, true, actor), true, "ย้ายข่าวเข้าถังต้องสำเร็จ");
+    for (const [table, id] of [["product", productId], ["recipe", recipeId], ["news", newsId]] as const) {
+      const state = await trashedByOf(table, id);
+      assert.ok(state.at !== null, `${table}: ต้องมี deleted_at`);
+      assert.equal(state.by, actor, `${table}: ต้องบันทึก deleted_by = ผู้ทำ`);
+    }
+
+    /* 3) ย้ายเข้าซ้ำ = false + ไม่ทับเวลาที่ลบเดิม/ชื่อคนเดิม */
+    const beforeRetrash = await trashedByOf("product", productId);
+    assert.equal(await setProductTrashed(productId, true, secondActor), false, "ย้ายเข้าถังซ้ำต้องไม่สำเร็จ");
+    const afterRetrash = await trashedByOf("product", productId);
+    assert.equal(afterRetrash.by, actor, "ชื่อคนลบเดิมต้องไม่ถูกทับ");
+    assert.equal(afterRetrash.at?.getTime(), beforeRetrash.at?.getTime(), "เวลาที่ลบเดิมต้องไม่ถูกทับ");
+
+    /* 4) กู้คืน = true + ล้างทั้งคู่ (deleted_at/deleted_by เป็นคู่กันเสมอ) */
+    assert.equal(await setProductTrashed(productId, false, secondActor), true, "กู้คืนสินค้าในถังต้องสำเร็จ");
+    assert.equal(await setRecipeTrashed(recipeId, false, secondActor), true, "กู้คืนเมนูในถังต้องสำเร็จ");
+    assert.equal(await setNewsTrashed(newsId, false, secondActor), true, "กู้คืนข่าวในถังต้องสำเร็จ");
+    for (const [table, id] of [["product", productId], ["recipe", recipeId], ["news", newsId]] as const) {
+      const state = await trashedByOf(table, id);
+      assert.equal(state.at, null, `${table}: กู้คืนแล้วต้องไม่มี deleted_at`);
+      assert.equal(state.by, null, `${table}: กู้คืนแล้วต้องล้าง deleted_by ด้วย (เป็นคู่กัน)`);
+    }
+
+    /* 5) หน้าถังขยะอ่าน deleted_by ของแถวได้ — และ "ไม่ใช่" updated_by ของคนที่มาแก้ทีหลัง */
+    await setNewsTrashed(newsId, true, actor);
+    /* จำลอง "มีคนแก้ของที่อยู่ในถัง" (สิ่งที่ทำให้ updated_by เพี้ยนจากคนลบ) */
+    await getPool().query("update news set updated_by = $2 where id = $1", [newsId, secondActor]);
+
+    const rows = await listContentTrash();
+    const row = rows.find((item) => item.id === newsId);
+    assert.ok(row !== undefined, "ข่าวในถังต้องโผล่ในรายการของตารางรวม");
+    assert.equal(row.deletedBy, actor, "ตารางรวมต้องโชว์ 'คนลบ' (deleted_by) ไม่ใช่ 'คนแก้ทีหลัง' (updated_by)");
+
+    done(
+      "ประตูสองทาง + deleted_by ของเนื้อหา",
+      "กู้คืนของที่ใช้งานอยู่ = false · ย้ายเข้าซ้ำไม่ทับค่าเดิม · กู้คืนล้าง deleted_at+deleted_by · ตารางรวมโชว์คนลบจริง",
+    );
+  } finally {
+    await getPool().query("delete from product where id = $1", [productId]);
+    if (newsId !== "") await deleteNews(newsId);
+    if (recipeId !== "") await deleteRecipe(recipeId);
+
+    assert.equal(await countWhere("product where id like 'p99999%'", []), 0, "ต้องไม่เหลือสินค้าทดสอบ");
   }
 }
