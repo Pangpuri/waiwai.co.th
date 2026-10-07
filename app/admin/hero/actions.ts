@@ -10,7 +10,9 @@ import { clampFocus, clampZoom, isLocalMediaPath, parseHeroSetting } from "@/lib
 import {
   createHeroPageSlide,
   listHeroPageSlidesForAdmin,
+  deleteHeroPageSlideForever,
   reorderHeroPageSlides,
+  restoreHeroPageSlide,
   saveHeroSetting,
   trashHeroPageSlide,
   updateHeroPageSlide,
@@ -153,6 +155,34 @@ export async function saveHeroSettingAction(formData: FormData): Promise<void> {
       target: "hero:setting",
       detail: `${setting.effect}:${setting.intervalMs}`,
     });
+    await refreshAfterChange();
+  }
+}
+
+/** กู้คืนสไลด์จากถังขยะ (รอบที่ 186) */
+export async function restoreHeroSlideAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
+  if (id === "") return;
+  const ok = await restoreHeroPageSlide(id, user.email);
+  if (ok) {
+    await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "restore" });
+    await refreshAfterChange();
+  }
+}
+
+/**
+ * ลบถาวรจากถังขยะ (รอบที่ 186) — **ย้อนกลับไม่ได้**
+ * ⚠️ ต้องยืนยันในฟอร์ม (`confirm=yes`) ไม่งั้นไม่ทำอะไร — กันการกดพลาด
+ * ⚠️ ชั้นข้อมูลยังบังคับว่า "ต้องเป็นของในถัง" อีกชั้น (ประตูใน SQL)
+ */
+export async function deleteHeroSlideForeverAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
+  if (id === "" || formData.get("confirm") !== "yes") return;
+  const ok = await deleteHeroPageSlideForever(id);
+  if (ok) {
+    await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "purge" });
     await refreshAfterChange();
   }
 }

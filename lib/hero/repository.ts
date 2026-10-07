@@ -209,3 +209,45 @@ export async function saveHeroSetting(setting: HeroSetting, actor: string): Prom
   );
   return (result.rowCount ?? 0) > 0;
 }
+
+/* ── ถังขยะของสไลด์ (รอบที่ 186) ────────────────────────────────────────────────
+   กติกา: **ประตูอยู่ที่ SQL เสมอ** — กู้คืน/ลบถาวรทำได้เฉพาะแถวที่ `deleted_at is not null`
+   ⇒ ยิงคำสั่งผิดพลาดใส่ของที่ยังใช้งานอยู่ = ไม่มีผล (fail-closed · พิสูจน์ได้ในเทสต์/check:db)
+*/
+
+type TrashedHeroSlideRow = HeroSlideRow & { readonly deleted_at: string | null };
+
+/** สไลด์ที่อยู่ในถัง (ใหม่สุดก่อน) — สำหรับหน้าจอหลังบ้านเท่านั้น */
+export async function listTrashedHeroPageSlides(): Promise<readonly { slide: HeroPageSlide; deletedAt: string }[]> {
+  if (!isDatabaseConfigured()) return [];
+  const result = await getPool().query<TrashedHeroSlideRow>(
+    `select id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, deleted_at
+       from hero_slide
+      where deleted_at is not null
+      order by deleted_at desc, id asc`,
+  );
+  return result.rows.map((row) => ({
+    slide: toSlide(row),
+    deletedAt: row.deleted_at ?? "",
+  }));
+}
+
+/** กู้คืนจากถังขยะ — ต้องเป็นของในถังเท่านั้น (ประตูใน SQL) */
+export async function restoreHeroPageSlide(id: string, actor: string): Promise<boolean> {
+  const result = await getPool().query(
+    `update hero_slide
+        set deleted_at = null, deleted_by = null, updated_at = now(), updated_by = $2
+      where id = $1 and deleted_at is not null`,
+    [id, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** ลบถาวร — ต้องเป็นของในถังเท่านั้น (fail-closed) */
+export async function deleteHeroPageSlideForever(id: string): Promise<boolean> {
+  const result = await getPool().query(
+    `delete from hero_slide where id = $1 and deleted_at is not null`,
+    [id],
+  );
+  return (result.rowCount ?? 0) > 0;
+}

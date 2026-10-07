@@ -3,9 +3,15 @@ import Link from "next/link";
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
-import { addHeroSlideAction, saveHeroSettingAction } from "@/app/admin/hero/actions";
+import {
+  addHeroSlideAction,
+  deleteHeroSlideForeverAction,
+  restoreHeroSlideAction,
+  saveHeroSettingAction,
+} from "@/app/admin/hero/actions";
+import { auditStamp } from "@/features/admin/audit-labels";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
-import { listHeroPageSlidesForAdmin, loadHeroSetting } from "@/lib/hero/repository";
+import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { fillTemplate } from "@/lib/i18n/template";
 
 /**
@@ -32,6 +38,7 @@ export default async function AdminHeroPage() {
     none: s.heroAdminEffectNone,
   };
   const slides = await listHeroPageSlidesForAdmin();
+  const trashed = await listTrashedHeroPageSlides();
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
   return (
@@ -86,6 +93,55 @@ export default async function AdminHeroPage() {
       ) : (
         <HeroSlideManager slides={slides} strings={s} />
       )}
+
+      {/* ── ถังขยะสไลด์ (รอบที่ 186) — กู้คืนได้ · ลบถาวรต้องยืนยัน ───────────────── */}
+      <section className="border-line flex flex-col gap-3 rounded-xl border p-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-fg text-lg font-semibold">{s.heroTrashTitle}</h2>
+          <p className="text-fg-muted text-xs">{s.heroTrashHint}</p>
+          <p className="text-fg-muted text-xs">{s.heroTrashNote}</p>
+        </div>
+        {trashed.length === 0 ? (
+          <p className="text-fg-muted text-sm">{s.heroTrashEmpty}</p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {trashed.map((entry) => (
+              <li key={entry.slide.id} className="border-line flex flex-col gap-2 rounded-lg border p-2">
+                {entry.slide.mediaPath.trim() === "" ? (
+                  <div className="bg-bg-subtle text-fg-muted flex h-20 w-full items-center justify-center rounded-md text-xs">
+                    {s.heroAdminNoImage}
+                  </div>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={entry.slide.mediaPath} alt={entry.slide.altTh} className="bg-bg-subtle h-20 w-full rounded-md object-cover" />
+                )}
+                <p className="text-fg text-xs font-semibold">{entry.slide.id}</p>
+                <p className="text-fg-muted text-[11px]">
+                  {s.heroTrashDeletedAt}: {auditStamp(entry.deletedAt)}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={restoreHeroSlideAction}>
+                    <input type="hidden" name="id" value={entry.slide.id} />
+                    <button type="submit" className="border-line text-fg rounded-md border px-2 py-1 text-xs font-semibold">
+                      {s.heroRestore}
+                    </button>
+                  </form>
+                  <form action={deleteHeroSlideForeverAction} className="flex items-center gap-2">
+                    <input type="hidden" name="id" value={entry.slide.id} />
+                    <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+                      <input type="checkbox" name="confirm" value="yes" />
+                      {s.heroPurgeConfirm}
+                    </label>
+                    <button type="submit" className="border-line text-fg-muted rounded-md border px-2 py-1 text-xs">
+                      {s.heroPurge}
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

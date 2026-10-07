@@ -236,3 +236,27 @@ test("hero module (เฟส 3): ภาพที่ยังไม่มีพ�
   assert.ok(imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
   assert.ok(!/<img src=\{[^}]*\} alt/.test(manager.slice(0, guardIndex)), "ห้ามมี <img> ก่อนจุดตรวจ");
 });
+
+test("hero module (ถังขยะ): ประตูอยู่ใน SQL + ลบถาวรต้องยืนยัน + จอมีปุ่มกู้คืน/ลบถาวร", () => {
+  const repo = readFileSync("lib/hero/repository.ts", "utf8");
+  assert.ok(/restoreHeroPageSlide[\s\S]{0,400}deleted_at is not null/.test(repo), "กู้คืนต้องทำได้เฉพาะของในถัง");
+  assert.ok(/deleteHeroPageSlideForever[\s\S]{0,200}delete from hero_slide where id = \$1 and deleted_at is not null/.test(repo), "ลบถาวรต้องมีประตูใน SQL");
+  assert.ok(repo.includes("listTrashedHeroPageSlides"), "ต้องมีตัวอ่านถังขยะสำหรับหลังบ้าน");
+
+  const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
+  assert.ok(actions.includes("restoreHeroSlideAction") && actions.includes("deleteHeroSlideForeverAction"), "ต้องมี action กู้คืน/ลบถาวร");
+  assert.ok(/deleteHeroSlideForeverAction[\s\S]{0,600}formData\.get\("confirm"\) !== "yes"/.test(actions), "ลบถาวรต้องบังคับยืนยันที่ฝั่งเซิร์ฟเวอร์");
+  assert.ok(actions.includes('detail: "restore"') && actions.includes('detail: "purge"'), "ต้องมี audit ทั้งกู้คืนและลบถาวร");
+
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("listTrashedHeroPageSlides()"), "จอหลังบ้านต้องอ่านถังขยะ");
+  assert.ok(page.includes("heroTrashTitle") && page.includes("heroRestore") && page.includes("heroPurge"), "ต้องมีหัวข้อ/ปุ่มกู้คืน/ลบถาวร");
+  assert.ok(page.includes('name="confirm" value="yes"'), "ปุ่มลบถาวรต้องมีช่องยืนยัน");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
+    for (const key of ["heroTrashTitle", "heroTrashHint", "heroTrashEmpty", "heroTrashDeletedAt", "heroRestore", "heroPurge", "heroPurgeConfirm", "heroTrashNote"]) {
+      assert.ok(area.includes(`${key}:`), `พื้นที่ ${locale} ต้องมี ${key}`);
+    }
+  }
+});
