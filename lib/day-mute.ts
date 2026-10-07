@@ -32,25 +32,37 @@ type InitScriptOptions = {
   readonly storageKey: string;
   readonly attribute: string;
   readonly shownValue: string;
+  /**
+   * (ไม่บังคับ) **นิพจน์ JS เพิ่มเติม** — ถ้าคืน `true` = รอบนี้ **ไม่แสดง**
+   *
+   * ใช้กับประกาศที่ **บังทั้งจอ** ซึ่งไม่ควรเด้งในบริบทที่กำลังมีคนทำงานอยู่ (เช่น iframe พรีวิวของหลังบ้าน)
+   * ⚠️ ต้องเป็นนิพจน์ที่ **เขียนไว้ในโค้ดเราเท่านั้น** — ห้ามประกอบจากค่าที่ผู้ใช้ส่งมา
+   *    (ค่าที่รับจากภายนอกใช้ได้แค่ผ่าน `JSON.stringify` ของ storageKey/attribute/shownValue)
+   */
+  readonly skipWhen?: string;
 };
 
 /**
  * สร้างสคริปต์ก่อน paint สำหรับประกาศหนึ่งชิ้น
  *
- * กติกา: **แสดงเป็นค่าเริ่มต้น** เว้นแต่ผู้ใช้เคยกดปิดไว้ "ในวันเดียวกัน"
+ * กติกา: **แสดงเป็นค่าเริ่มต้น** เว้นแต่ผู้ใช้เคยกดปิดไว้ "ในวันเดียวกัน" (หรือ `skipWhen` เป็นจริง)
  * - เทียบวันที่แบบเวลาท้องถิ่น (สร้างสตริงเองให้ตรงกับ `dayStamp`)
  * - ถ้าอ่าน storage ไม่ได้ (โหมดส่วนตัว/ถูกบล็อก) → **ยังคงแสดง** เพราะยังรัน JS อยู่
  *   จึงกดปิดได้ปกติ และการ "พลาดประกาศ" เสียหายกว่าการเห็นซ้ำหนึ่งครั้ง
  *   (ต่างจากกรณีไม่มี JavaScript เลย ซึ่งสคริปต์ไม่ทำงานและประกาศไม่ขึ้น — เลี่ยง modal ที่ปิดไม่ได้)
+ * - `skipWhen` ตรวจ **หลัง** การเช็ก storage (กดปิดไว้แล้วก็ไม่แสดงอยู่ดี) และ **ก่อน** ติด attribute
+ *   ⇒ ไม่มีอาการวาบ เพราะทั้ง CSS และ React (อ่าน attribute ผ่าน `useSyncExternalStore`) เห็นตรงกันตั้งแต่รอบแรก
  */
 export function buildDayMuteInitScript({
   storageKey,
   attribute,
   shownValue,
+  skipWhen,
 }: InitScriptOptions): string {
+  const skip = skipWhen === undefined || skipWhen.trim() === "" ? "" : `if(${skipWhen})return;`;
   return `(function(){try{var d=new Date(),today=d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);if(localStorage.getItem(${JSON.stringify(
     storageKey,
-  )})===today)return;}catch(_){}document.documentElement.setAttribute(${JSON.stringify(
+  )})===today)return;}catch(_){}${skip}document.documentElement.setAttribute(${JSON.stringify(
     attribute,
   )},${JSON.stringify(shownValue)});})();`;
 }

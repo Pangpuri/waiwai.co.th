@@ -131,11 +131,26 @@ type SandboxOptions = {
   readonly now: Date;
   /** จำลอง localStorage ที่ถูกบล็อก (โหมดส่วนตัว) */
   readonly storageThrows?: boolean;
+  /** จำลองว่าหน้านี้ถูกฝังใน <iframe> (พรีวิวของหลังบ้าน) — ค่าเริ่มต้น false = แท็บปกติ */
+  readonly framed?: boolean;
+  /** query string ของ URL (ใช้ตรวจข้อยกเว้นของโหมดพรีวิวป้ายประกาศ) */
+  readonly search?: string;
 };
 
-function runInitScript({ stored = null, now, storageThrows = false }: SandboxOptions): string | null {
+function runInitScript({
+  stored = null,
+  now,
+  storageThrows = false,
+  framed = false,
+  search = "",
+}: SandboxOptions): string | null {
   const attributes = new Map<string, string>();
 
+  /*
+    จำลอง window: `self === top` = เปิดเป็นแท็บปกติ · `self !== top` = อยู่ใน iframe
+    (สคริปต์จริงใช้คู่นี้ตัดสินว่าจะเด้งป้ายไหม — ดู lib/mourning-notice.ts MOURNING_SKIP_IN_FRAME)
+  */
+  const self = {};
   const context = vm.createContext({
     document: {
       documentElement: {
@@ -149,6 +164,11 @@ function runInitScript({ stored = null, now, storageThrows = false }: SandboxOpt
         if (storageThrows) throw new Error("storage ถูกบล็อก");
         return stored;
       },
+    },
+    window: {
+      self,
+      top: framed ? {} : self,
+      location: { search },
     },
     // สคริปต์เรียก new Date() เอง — ใส่วันที่ปลอมเข้าไปเพื่อให้ผลเทสต์คงที่
     Date: class extends Date {
@@ -305,4 +325,87 @@ test("mourning-editor: การ์ดภาพลากสลับลำดั
 
   /* ต้องยังมีทางใช้คีย์บอร์ด/จอสัมผัส (ปุ่มเลื่อน) — a11y ไม่ถอยหลัง */
   assert.ok(editor.includes("moveImage(index, -1)") && editor.includes("moveImage(index, 1)"), "ปุ่มเลื่อนขึ้น/ลงต้องยังอยู่");
+});
+
+/* ── รอบที่ 181: ป้ายต้องไม่เด้งใน iframe พรีวิวของหลังบ้าน ──────────────────────
+ *
+ * ฟีดแบ็กเจ้าของ: *"แก้ไขเนื้อหาหน้าแรกก็ยังมีป้ายประกาศกวน"* (ในเมนู sidebar ต่อจาก "ส่วนกลาง")
+ * ต้นเหตุ: หลังบ้านฝังพรีวิวเป็น `<iframe>` (ตัวสร้างหน้าเว็บ · ส่วนกลาง · โหมด "หน้าเว็บจริง" = `/th`)
+ *   และสคริปต์ก่อน paint ติด `data-mourning="shown"` ทุกครั้ง ⇒ ป้ายบังทั้งจอทับกรอบพรีวิว
+ * แก้: ถ้าอยู่ใน iframe (และไม่ใช่โหมดพรีวิวป้ายประกาศ `?parts=notice`) = ไม่ต้องเด้ง
+ *   ปลอดภัยเพราะ next.config.ts ตั้ง `frame-ancestors 'self'` ⇒ มีแต่หน้าเราเองที่ฝังเราได้
+ */
+
+test("รอบ 181: อยู่ใน iframe (พรีวิวหลังบ้าน) → ป้ายไม่เด้ง", () => {
+  assert.equal(runInitScript({ now: TODAY, framed: true }), null, "อยู่ใน iframe = ห้ามติด attribute shown");
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?mode=draft" }),
+    null,
+    "พรีวิวฉบับร่างใน iframe ก็ต้องไม่เด้ง",
+  );
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?mode=published" }),
+    null,
+    "พรีวิวฉบับเผยแพร่ใน iframe ก็ต้องไม่เด้ง",
+  );
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?parts=nav" }),
+    null,
+    "โหมดเฉพาะแถบเมนู/ท้ายเว็บก็ต้องไม่เด้ง",
+  );
+});
+
+test("รอบ 181: แท็บปกติยังเด้งตามเดิม (ผู้เข้าชมจริงไม่ถูกกระทบ)", () => {
+  assert.equal(runInitScript({ now: TODAY }), MOURNING_STATE_SHOWN, "เปิดหน้าเว็บตรง ๆ ต้องเห็นป้ายเหมือนเดิม");
+  assert.equal(
+    runInitScript({ now: TODAY, search: "?parts=nav" }),
+    MOURNING_STATE_SHOWN,
+    "แท็บปกติที่มี query แปลก ๆ ก็ยังต้องเด้ง (เงื่อนไข iframe เท่านั้น)",
+  );
+});
+
+test("รอบ 181: ข้อยกเว้นโหมดพรีวิว 'ป้ายประกาศ' (?parts=notice) ต้องเห็นป้ายจริง", () => {
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?parts=notice" }),
+    MOURNING_STATE_SHOWN,
+    "โหมดพรีวิวป้ายประกาศต้องเห็นป้าย (ไม่งั้นดูตัวอย่างไม่ได้)",
+  );
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?mode=draft&parts=notice" }),
+    MOURNING_STATE_SHOWN,
+    "ต้องจับได้แม้ parts อยู่ท้าย query",
+  );
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?mode=published&parts=notice&lang=th" }),
+    MOURNING_STATE_SHOWN,
+    "ต้องจับได้แม้มีพารามิเตอร์ต่อท้าย",
+  );
+  /* ชายขอบ: ต้องไม่จับแบบ "ขึ้นต้นเหมือน" (parts=noticex) */
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?parts=noticex" }),
+    null,
+    "ต้องเทียบทั้งพารามิเตอร์ ไม่ใช่ขึ้นต้นเหมือน",
+  );
+  assert.equal(
+    runInitScript({ now: TODAY, framed: true, search: "?noparts=notice" }),
+    null,
+    "ต้องไม่จับพารามิเตอร์ที่ชื่อคล้ายกัน",
+  );
+});
+
+test("รอบ 181: กติกาเดิมยังอยู่ — กดปิดไว้ถึงสิ้นวันมีผลเหนือทุกอย่าง", () => {
+  const stamp = mourningDateStamp(TODAY);
+  assert.equal(runInitScript({ now: TODAY, stored: stamp, framed: true, search: "?parts=notice" }), null);
+  assert.equal(runInitScript({ now: TODAY, stored: stamp }), null);
+});
+
+test("รอบ 181: สคริปต์ที่ส่งจริงมีเงื่อนไข iframe และไม่รับค่าจาก URL ไปใช้ต่อ", () => {
+  assert.ok(MOURNING_INIT_SCRIPT.includes("window.self!==window.top"), "สคริปต์ต้องเช็กการอยู่ใน iframe");
+  assert.ok(MOURNING_INIT_SCRIPT.includes("parts=notice"), "สคริปต์ต้องมีข้อยกเว้นของโหมดพรีวิวป้ายประกาศ");
+  assert.ok(
+    MOURNING_INIT_SCRIPT.includes("catch(_){}") && MOURNING_INIT_SCRIPT.includes("setAttribute"),
+    "ยังต้องเช็ก storage ก่อน แล้วค่อยติด attribute",
+  );
+  /* ⚠️ ข้อยกเว้นอ่านแค่ "มีพารามิเตอร์นี้ไหม" — ห้ามเอาค่าจาก URL ไปใช้ต่อ */
+  assert.ok(!MOURNING_INIT_SCRIPT.includes("decodeURIComponent"), "ห้ามถอดรหัสค่าจาก URL มาใช้");
 });

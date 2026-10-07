@@ -42,10 +42,27 @@ export const mourningDateStamp = dayStamp;
 export const isMourningMuted = isMutedToday;
 
 /**
- * สคริปต์ก่อน paint ของประกาศไว้อาลัย (รายละเอียดกติกาอยู่ใน lib/day-mute.ts)
+ * เงื่อนไข "ห้ามเด้ง" ของหน้าต่างไว้อาลัย: **อยู่ใน iframe ของหลังบ้าน (พรีวิว)**
+ *
+ * ที่มา (รอบที่ 181 · ฟีดแบ็กเจ้าของ): *"แก้ไขเนื้อหาหน้าแรกก็ยังมีป้ายประกาศกวน"*
+ * หน้าจอหลังบ้านทุกตัวที่ฝังพรีวิวจะใช้ `<iframe>` (ตัวสร้างหน้าเว็บ · ส่วนกลาง · โหมด "หน้าเว็บจริง")
+ * ⇒ ถ้าปล่อยให้ป้ายบังทั้งจอเด้งในกรอบพรีวิว จะแก้เนื้อหาไม่ได้ และเด้งซ้ำทุกครั้งที่รีเฟรช
+ *
+ * ทำไมใช้ "อยู่ใน iframe" เป็นตัวตัดสินได้: `next.config.ts` ตั้ง `frame-ancestors 'self'` (รอบที่ 170)
+ * ⇒ เฉพาะหน้าเว็บของเราเองเท่านั้นที่ฝังเราได้ และบริบทเดียวที่ทำเช่นนั้นคือ **พรีวิวของหลังบ้าน**
+ *
+ * ⚠️ **ข้อยกเว้น:** โหมดพรีวิว "ป้ายประกาศ" (`?parts=notice` ของแท็บส่วนกลาง) ต้องเห็นป้ายจริง
+ *    ⇒ ตรวจจาก query ของ URL เอง (อ่านได้ก่อน paint จึงไม่มีอาการวาบ)
+ * ⚠️ เปิดหน้าเว็บตรง ๆ (แท็บปกติ/ผู้เข้าชมจริง) = `window.self === window.top` ⇒ ป้ายยังเด้งตามปกติ
+ * ⚠️ ห้ามรับ "ค่า" จาก URL มาตรวจ — ที่นี่ตรวจแค่ว่า *มี* `parts=notice` ตรงตัว (ไม่ใช่ค่าที่เอาไปใช้ต่อ)
  */
+export const MOURNING_SKIP_IN_FRAME =
+  "window.self!==window.top&&!/(^|[?&])parts=notice(&|$)/.test(window.location.search)";
+
+/** สคริปต์ก่อน paint ของประกาศไว้อาลัย (รายละเอียดกติกาอยู่ใน lib/day-mute.ts) */
 export const MOURNING_INIT_SCRIPT = buildDayMuteInitScript({
   storageKey: MOURNING_STORAGE_KEY,
   attribute: MOURNING_ATTRIBUTE,
   shownValue: MOURNING_STATE_SHOWN,
+  skipWhen: MOURNING_SKIP_IN_FRAME,
 });
