@@ -156,6 +156,28 @@ create index if not exists page_document_revision_page_idx on page_document_revi
 -- ทำไมเก็บ bytea ไม่เก็บไฟล์บนดิสก์:
 --   แผนจริงของผู้ใช้คือ "สำรองข้อมูล → ยัด Docker → ย้ายไปเซิร์ฟเวอร์ที่เช่า" ⇒ ให้ `pg_dump` ก้อนเดียวพาทุกอย่างไป
 --   ไม่มีไฟล์ค้างบนดิสก์ที่ต้อง sync/ลืม backup · พาธที่เก็บในบล็อกคือ `/media/<id>` (พาธ ไม่ใช่ URL เต็ม — D9)
+/* ── สไลด์หน้าแรก + แคมเปญ (migration 0027 · รอบที่ 184) ────────────────────────
+   โมดูล "สไลด์ & แคมเปญ" — แยกจากบล็อก hero เพราะเป็นของระดับเว็บและมีการตั้งเวลา
+   ⚠️ แหล่งความจริงของสคีมาคือ db/migrations/*.sql (ไฟล์นี้เป็นเอกสารอ้างอิง) */
+create table if not exists hero_slide (
+  id text primary key,
+  sort_order integer not null default 0,
+  media_path text not null,
+  alt_th text not null default '',
+  alt_en text not null default '',
+  focus_x integer not null default 50 check (focus_x between 0 and 100),
+  focus_y integer not null default 50 check (focus_y between 0 and 100),
+  zoom numeric(4, 2) not null default 1 check (zoom between 1 and 2),
+  is_active boolean not null default true,
+  deleted_at timestamptz,
+  deleted_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  updated_by text not null default ''
+);
+
+create index if not exists hero_slide_order_idx on hero_slide (sort_order) where deleted_at is null;
+
 create table if not exists media (
   id         text        primary key,
   filename   text        not null,
