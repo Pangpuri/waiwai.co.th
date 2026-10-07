@@ -43,6 +43,7 @@ export const PUBLIC_READ_TABLES: readonly string[] = [
   "product_ingredient",
   "recipe",
   "news",
+  "hero_slide",
 ];
 
 /** ตารางที่ **ฟอร์มสาธารณะ** เขียน/อ่าน (ทางเขียนเดียวที่คนนอกแตะได้) */
