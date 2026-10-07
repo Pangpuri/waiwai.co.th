@@ -45,6 +45,8 @@ export const PUBLIC_READ_TABLES: readonly string[] = [
   "news",
   "hero_slide",
   "hero_slide_card",
+  "campaign",
+  "campaign_slide",
   "hero_setting",
 ];
 
