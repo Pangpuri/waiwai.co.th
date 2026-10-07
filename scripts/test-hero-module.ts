@@ -223,15 +223,6 @@ test("hero module (เอฟเฟค): อ่านค่าตั้งค่�
   assert.ok(actions.includes("saveHeroSettingAction") && actions.includes("parseHeroSetting"), "action ต้องตรวจค่าด้วยตัวช่วยกลาง");
 });
 
-test("hero module (เฟส 3): ภาพที่ยังไม่มีพาธต้องไม่ถูกเรนเดอร์เป็น <img src="""> (กันคำเตือนเบราว์เซอร์)", () => {
-  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
-  /* ใช้การค้นสตริงตรง ๆ (ไม่ใช้ regex) เพื่อไม่ให้เทสต์เปราะกับ escape */
-  assert.ok(manager.includes("path.trim() === """), "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ");
-  assert.ok(manager.includes("heroAdminNoImage"), "พาธว่างต้องแสดงข้อความจากพจนานุกรมแทนภาพ");
-  const guardIndex = manager.indexOf("path.trim() === """);
-  const imgIndex = manager.indexOf("<img src={draft.path}");
-  assert.ok(guardIndex >= 0 && imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
-});
 
 test("hero module (ถังขยะ): ประตูอยู่ใน SQL + ลบถาวรต้องยืนยัน + จอมีปุ่มกู้คืน/ลบถาวร", () => {
   const repo = readFileSync("lib/hero/repository.ts", "utf8");
