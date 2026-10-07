@@ -22,6 +22,7 @@ import { maintenancePage } from "./areas/th/maintenance.ts";
 import { adminMaintenance } from "./areas/th/adminMaintenance.ts";
 import { adminErasure } from "./areas/th/adminErasure.ts";
 import { adminTemplate } from "./areas/th/adminTemplate.ts";
+import { adminHero } from "./areas/th/adminHero.ts";
 import { adminTrash } from "./areas/th/adminTrash.ts";
 import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/th/adminBlockTypes.ts";
@@ -87,6 +88,7 @@ export const th = {
     ...adminMaintenance,
     ...adminErasure,
     ...adminTrash,
+    ...adminHero,
     ...adminTemplate,
     ...adminPreviewLink,
     ...thAdminNotice,

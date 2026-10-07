@@ -22,6 +22,7 @@ import { maintenancePage } from "./areas/en/maintenance.ts";
 import { adminMaintenance } from "./areas/en/adminMaintenance.ts";
 import { adminErasure } from "./areas/en/adminErasure.ts";
 import { adminTemplate } from "./areas/en/adminTemplate.ts";
+import { adminHero } from "./areas/en/adminHero.ts";
 import { adminTrash } from "./areas/en/adminTrash.ts";
 import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/en/adminBlockTypes.ts";
@@ -88,6 +89,7 @@ export const en: Messages = {
     ...adminMaintenance,
     ...adminErasure,
     ...adminTrash,
+    ...adminHero,
     ...adminTemplate,
     ...adminPreviewLink,
     ...enAdminNotice,

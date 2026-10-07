@@ -3,6 +3,7 @@
  * ต้องมีคีย์ชุดเดียวกับ areas/th/admin.ts เป๊ะ (ถ้าขาด → typecheck แดง)
  */
 import type { Messages } from "@/lib/i18n/messages/th";
+import type { adminHero as thAdminHero } from "@/lib/i18n/messages/areas/th/adminHero";
 import type { adminMedia as thAdminMedia } from "@/lib/i18n/messages/areas/th/adminMedia";
 import type { adminSettings as thAdminSettings } from "@/lib/i18n/messages/areas/th/adminSettings";
 import type { adminDraft as thAdminDraft } from "@/lib/i18n/messages/areas/th/adminDraft";
@@ -45,7 +46,8 @@ type MovedKeys =
   | keyof typeof thAdminTemplate
   | keyof typeof thAdminRbac
   | keyof typeof thAdminBlockTypes
-  | keyof typeof thAdminSchedule;
+  | keyof typeof thAdminSchedule
+  | keyof typeof thAdminHero;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",
@@ -102,45 +104,8 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   imageHint: "Drag an image into the box — that is all it takes.",
   imagePathLabel: "File path",
   /* Hero slides & campaigns (round 184) */
-  navHero: "Slides & campaigns",
-  auditHeroSave: "Hero slide updated",
-  heroAdminAdd: "Add slide",
-  heroAdminAddHint: "After adding, pick an image and fill in the description (Thai is required)",
-  heroAdminRemove: "Remove",
-  heroAdminToggle: "Show/hide",
-  heroAdminMoveUp: "Move up",
-  heroAdminMoveDown: "Move down",
-  heroAdminDragHint: "Drag a card to reorder (or use the up/down buttons)",
-  heroAdminSave: "Save",
-  heroAdminImage: "Image path",
-  heroAdminAltTh: "Image description (Thai)",
-  heroAdminAltEn: "Image description (English)",
-  heroAdminOrder: "Order",
-  heroAdminEffect: "Transition effect",
-  heroAdminSpeed: "Speed (seconds per image)",
-  heroAdminEffectFade: "Fade",
-  heroAdminEffectSlide: "Slide",
-  heroAdminEffectZoom: "Zoom",
-  heroAdminEffectNone: "Instant cut (no effect)",
-  heroAdminEffectSave: "Save effect",
-  heroAdminTitle: "Slides & campaigns",
-  heroAdminIntro: "Slides shown on the home page — images and positioning come from this module (with no slides, the template set is used)",
-  heroAdminCount: "{n} slides are live",
-  heroAdminEmpty: "No slides yet",
-  heroAdminActive: "Live",
-  heroAdminInactive: "Hidden",
-  heroAdminFocus: "Focus point",
-  heroAdminZoom: "Zoom",
-  heroAdminSeeSite: "See it on the home page",
-  heroAdminNextStep: "Coming next: add/remove images · drag to reorder · 3x3 focus picker · zoom · trash · revision history",
   blockImageLabel: "Image for this block",
   /* Hero slides (round 183 · phase ค) */
-  blockSlidesTitle: "Slide images",
-  blockSlidesCount: "{n} of {max} images",
-  blockSlidesHint: "2 or more images = the site rotates them automatically (the first shows first) · an empty slot is skipped",
-  blockSlidesAdd: "Add slide image",
-  blockSlidesFocus: "Image position (point kept in the frame)",
-  blockSlidesZoom: "Image zoom",
   cardImageLabel: "Image for this card",
   backToBlock: "Back to the whole block",
   pickCardHint: "Pick a card to edit (or just click a card in the preview).",

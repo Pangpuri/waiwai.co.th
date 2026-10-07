@@ -1,0 +1,46 @@
+/*
+ * Dictionary area: admin — "Slides & campaigns" module (round 185)
+ *
+ * Split out of the admin area per the check:i18n rule ("area over the limit ⇒ split, never raise the ceiling").
+ * ⚠️ Image descriptions/translations are fields for the admin to fill in — we do not translate content for them.
+ */
+export const adminHero = {
+  navHero: "Slides & campaigns",
+  auditHeroSave: "Hero slide updated",
+  heroAdminAdd: "Add slide",
+  heroAdminAddHint: "After adding, pick an image and fill in the description (Thai is required)",
+  heroAdminRemove: "Remove",
+  heroAdminToggle: "Show/hide",
+  heroAdminMoveUp: "Move up",
+  heroAdminMoveDown: "Move down",
+  heroAdminDragHint: "Drag a card to reorder (or use the up/down buttons)",
+  heroAdminSave: "Save",
+  heroAdminImage: "Image path",
+  heroAdminAltTh: "Image description (Thai)",
+  heroAdminAltEn: "Image description (English)",
+  heroAdminOrder: "Order",
+  heroAdminEffect: "Transition effect",
+  heroAdminSpeed: "Speed (seconds per image)",
+  heroAdminEffectFade: "Fade",
+  heroAdminEffectSlide: "Slide",
+  heroAdminEffectZoom: "Zoom",
+  heroAdminEffectNone: "Instant cut (no effect)",
+  heroAdminEffectSave: "Save effect",
+  heroAdminTitle: "Slides & campaigns",
+  heroAdminIntro: "Slides shown on the home page — images and positioning come from this module (with no slides, the template set is used)",
+  heroAdminCount: "{n} slides are live",
+  heroAdminEmpty: "No slides yet",
+  heroAdminActive: "Live",
+  heroAdminInactive: "Hidden",
+  heroAdminFocus: "Focus point",
+  heroAdminZoom: "Zoom",
+  heroAdminSeeSite: "See it on the home page",
+  heroAdminNextStep: "Coming next: add/remove images · drag to reorder · 3x3 focus picker · zoom · trash · revision history",
+  blockSlidesTitle: "Slide images",
+  blockSlidesCount: "{n} of {max} images",
+  blockSlidesHint: "2 or more images = the site rotates them automatically (the first shows first) · an empty slot is skipped",
+  blockSlidesAdd: "Add slide image",
+  blockSlidesFocus: "Image position (point kept in the frame)",
+  blockSlidesZoom: "Image zoom",
+  heroAdminImagePlaceholder: "/media/... or /slide/...",
+};

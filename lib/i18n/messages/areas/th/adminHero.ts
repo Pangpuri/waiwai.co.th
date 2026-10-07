@@ -1,0 +1,46 @@
+/*
+ * พื้นที่พจนานุกรม: หลังบ้าน — โมดูล "สไลด์ & แคมเปญ" (รอบที่ 185)
+ *
+ * แยกจากพื้นที่ admin ตามกติกาด่าน check:i18n ("พื้นที่ชนเพดาน ⇒ แยกพื้นที่ย่อย อย่าขยายเพดาน")
+ * ⚠️ คำอธิบายภาพ/คำแปลเป็นช่องให้แอดมินกรอกเอง — เราไม่แปลเนื้อหาให้
+ */
+export const adminHero = {
+  navHero: "สไลด์ & แคมเปญ",
+  auditHeroSave: "แก้สไลด์หน้าแรก",
+  heroAdminAdd: "เพิ่มสไลด์",
+  heroAdminAddHint: "เพิ่มแล้วเลือกภาพ + กรอกคำอธิบายภาพ (ภาษาไทยบังคับ)",
+  heroAdminRemove: "ลบ",
+  heroAdminToggle: "เปิด/ปิด",
+  heroAdminMoveUp: "เลื่อนขึ้น",
+  heroAdminMoveDown: "เลื่อนลง",
+  heroAdminDragHint: "ลากการ์ดเพื่อสลับลำดับได้ (หรือใช้ปุ่มเลื่อนขึ้น/ลง)",
+  heroAdminSave: "บันทึก",
+  heroAdminImage: "พาธภาพ",
+  heroAdminAltTh: "คำอธิบายภาพ (ไทย)",
+  heroAdminAltEn: "คำอธิบายภาพ (อังกฤษ)",
+  heroAdminOrder: "ลำดับที่",
+  heroAdminEffect: "เอฟเฟคเปลี่ยนภาพ",
+  heroAdminSpeed: "ความเร็ว (วินาทีต่อภาพ)",
+  heroAdminEffectFade: "จาง (fade)",
+  heroAdminEffectSlide: "เลื่อน (slide)",
+  heroAdminEffectZoom: "ซูม (zoom)",
+  heroAdminEffectNone: "ตัดภาพทันที (ไม่มีเอฟเฟค)",
+  heroAdminEffectSave: "บันทึกเอฟเฟค",
+  heroAdminTitle: "สไลด์ & แคมเปญ",
+  heroAdminIntro: "สไลด์ที่แสดงบนหน้าแรก — ภาพและตำแหน่งมาจากโมดูลนี้ (ถ้าไม่มีสไลด์ หน้าแรกจะใช้ชุดภาพในเทมเพลตแทน)",
+  heroAdminCount: "มี {n} สไลด์ที่แสดงอยู่",
+  heroAdminEmpty: "ยังไม่มีสไลด์ในระบบ",
+  heroAdminActive: "แสดงอยู่",
+  heroAdminInactive: "ซ่อนอยู่",
+  heroAdminFocus: "จุดโฟกัส",
+  heroAdminZoom: "ซูม",
+  heroAdminSeeSite: "ดูผลบนหน้าแรก",
+  heroAdminNextStep: "เฟสถัดไปของโมดูลนี้: เพิ่ม/ลบภาพ · ลากสลับลำดับ · เลือกจุดโฟกัส 3×3 · ซูม · ถังขยะ · ประวัติการแก้",
+  blockSlidesTitle: "ภาพสไลด์",
+  blockSlidesCount: "มี {n} จาก {max} ภาพ",
+  blockSlidesHint: "ใส่ 2 ภาพขึ้นไป = หน้าเว็บหมุนภาพให้เอง (ภาพแรกแสดงก่อน) · ยังไม่เลือกภาพ = ข้ามภาพนั้น",
+  blockSlidesAdd: "เพิ่มภาพสไลด์",
+  blockSlidesFocus: "จัดตำแหน่งภาพ (จุดที่อยู่กลางกรอบ)",
+  blockSlidesZoom: "ซูมภาพ",
+  heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
+};
