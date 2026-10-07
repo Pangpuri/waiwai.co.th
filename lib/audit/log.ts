@@ -18,6 +18,7 @@ export type AuditAction =
   | "publish"
   | "restore-revision"
   | "content-reorder"
+  | "hero-save"
   | "product-revision-restore"
   | "recipe-revision-restore"
   | "news-revision-restore"

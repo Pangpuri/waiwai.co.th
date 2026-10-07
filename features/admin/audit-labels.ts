@@ -24,6 +24,7 @@ export function auditStamp(iso: string): string {
 
 export function auditActionLabel(strings: Messages["admin"], action: string): string {
   const map: Record<string, string | undefined> = {
+    "hero-save": strings.auditHeroSave,
     "login-success": strings.auditLoginSuccess,
     "login-failure": strings.auditLoginFailure,
     logout: strings.auditLogout,

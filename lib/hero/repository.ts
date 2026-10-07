@@ -117,3 +117,60 @@ export async function saveHeroPageSlide(
   );
   return { created: result.rows[0]?.created === true };
 }
+
+/* ── ส่วนเขียน (หลังบ้าน) — รอบที่ 184 เฟส 3 ─────────────────────────────────────
+   ⚠️ ทุกฟังก์ชันต้องผ่านการตรวจสิทธิ์ที่ action แล้ว (ชั้นนี้ไม่รู้จักผู้ใช้)
+   ⚠️ ประตูลบ/ย้าย อยู่ใน SQL เสมอ (`where deleted_at is null`) — ไม่พึ่ง UI
+*/
+
+/** เพิ่มสไลด์ใหม่ (ยังไม่เลือกภาพ) — ต่อท้ายลำดับเสมอ · คืน id ที่สร้าง */
+export async function createHeroPageSlide(actor: string): Promise<string | null> {
+  const id = `hero-${Date.now().toString(36)}`;
+  const result = await getPool().query(
+    `insert into hero_slide (id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
+     values ($1, (select coalesce(max(sort_order), 0) + 10 from hero_slide), '', '', '', 50, 50, 1, true, $2)
+     on conflict (id) do nothing`,
+    [id, actor],
+  );
+  return (result.rowCount ?? 0) > 0 ? id : null;
+}
+
+/** บันทึกภาพ/คำอธิบาย/จุดโฟกัส/ซูม/เปิด-ปิด ของสไลด์หนึ่งใบ (ไม่แตะลำดับ) */
+export async function updateHeroPageSlide(
+  id: string,
+  input: { readonly mediaPath: string; readonly altTh: string; readonly altEn: string; readonly focusX: number; readonly focusY: number; readonly zoom: number; readonly isActive: boolean },
+  actor: string,
+): Promise<boolean> {
+  const result = await getPool().query(
+    `update hero_slide
+        set media_path = $2, alt_th = $3, alt_en = $4, focus_x = $5, focus_y = $6, zoom = $7, is_active = $8,
+            updated_at = now(), updated_by = $9
+      where id = $1 and deleted_at is null`,
+    [id, input.mediaPath, input.altTh, input.altEn, input.focusX, input.focusY, input.zoom, input.isActive, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** ตั้งลำดับใหม่ทั้งชุด (ผู้เรียกส่งรายการ id ที่เรียงแล้ว) — ใช้ทั้งการลากสลับและปุ่มขึ้น/ลง */
+export async function reorderHeroPageSlides(orderedIds: readonly string[], actor: string): Promise<number> {
+  let changed = 0;
+  for (const [index, id] of orderedIds.entries()) {
+    const result = await getPool().query(
+      `update hero_slide set sort_order = $2, updated_at = now(), updated_by = $3
+        where id = $1 and deleted_at is null and sort_order <> $2`,
+      [id, (index + 1) * 10, actor],
+    );
+    changed += result.rowCount ?? 0;
+  }
+  return changed;
+}
+
+/** ย้ายเข้าถังขยะ (soft delete) — ประตูอยู่ใน SQL */
+export async function trashHeroPageSlide(id: string, actor: string): Promise<boolean> {
+  const result = await getPool().query(
+    `update hero_slide set deleted_at = now(), deleted_by = $2, updated_at = now(), updated_by = $2
+      where id = $1 and deleted_at is null`,
+    [id, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}

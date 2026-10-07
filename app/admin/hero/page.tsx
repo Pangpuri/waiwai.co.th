@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { addHeroSlideAction } from "@/app/admin/hero/actions";
 import { listHeroPageSlidesForAdmin } from "@/lib/hero/repository";
 import { fillTemplate } from "@/lib/i18n/template";
 
@@ -36,30 +38,17 @@ export default async function AdminHeroPage() {
         </p>
       </header>
 
+      <form action={addHeroSlideAction}>
+        <button type="submit" className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold">
+          {s.heroAdminAdd}
+        </button>
+      </form>
+      <p className="text-fg-muted -mt-3 text-xs">{s.heroAdminAddHint}</p>
+
       {slides.length === 0 ? (
         <p className="border-line text-fg-muted rounded-xl border border-dashed p-6 text-sm">{s.heroAdminEmpty}</p>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {slides.map((slide) => (
-            <li key={slide.id} className="border-line bg-surface flex flex-col overflow-hidden rounded-xl border">
-              {/* ภาพตัวอย่าง — พาธมาจากคลัง/โปรเจกต์ จึงใช้ <img> ธรรมดา (แบบเดียวกับตัวเรนเดอร์บล็อก) */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={slide.mediaPath} alt={slide.altTh} className="bg-bg-subtle h-40 w-full object-cover" />
-              <div className="flex flex-col gap-1 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-fg text-sm font-semibold">{slide.id}</p>
-                  <span className="text-fg-muted text-xs">
-                    {slide.isActive ? s.heroAdminActive : s.heroAdminInactive}
-                  </span>
-                </div>
-                <p className="text-fg-muted text-xs break-all">{slide.mediaPath}</p>
-                <p className="text-fg-muted text-xs">
-                  {s.heroAdminFocus}: {slide.focusX}% {slide.focusY}% · {s.heroAdminZoom}: {slide.zoom}×
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <HeroSlideManager slides={slides} strings={s} />
       )}
     </div>
   );
