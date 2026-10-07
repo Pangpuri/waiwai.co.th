@@ -487,3 +487,35 @@ create table if not exists entity_revision (
 );
 
 create index if not exists entity_revision_lookup_idx on entity_revision (kind, entity_id, revision desc);
+
+/* ── แคมเปญ (migration 0031 · รอบที่ 190) ──────────────────────────────────────
+   แคมเปญเป็น "ของของตัวเอง" — เลือกได้ว่าจะแสดงบนสไลด์ไหน (ไม่ผูก 1:1)
+   · ไม่ผูกสไลด์เลย = แสดงทุกสไลด์
+*/
+create table if not exists campaign (
+  id text primary key,
+  name text not null default '',
+  title_th text not null default '', title_en text not null default '',
+  body_th text not null default '', body_en text not null default '',
+  cta_label_th text not null default '', cta_label_en text not null default '',
+  cta_href text not null default '',
+  anchor_x integer not null default 8, anchor_y integer not null default 50,
+  starts_at timestamptz, ends_at timestamptz,
+  is_active boolean not null default true,
+  status text not null default 'draft' check (status in ('draft', 'published')),
+  sort_order integer not null default 0,
+  deleted_at timestamptz, deleted_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  updated_by text not null default '',
+  constraint campaign_anchor_x_check check (anchor_x between 0 and 100),
+  constraint campaign_anchor_y_check check (anchor_y between 0 and 100),
+  constraint campaign_window_check check (ends_at is null or starts_at is null or ends_at > starts_at)
+);
+
+create table if not exists campaign_slide (
+  campaign_id text not null references campaign (id) on delete cascade,
+  slide_id text not null references hero_slide (id) on delete cascade,
+  sort_order integer not null default 0,
+  primary key (campaign_id, slide_id)
+);
