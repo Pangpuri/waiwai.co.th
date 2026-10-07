@@ -3,23 +3,29 @@
 import { useRef, useState } from "react";
 
 import {
+  addHeroSlideAction,
   moveHeroSlideAction,
   removeHeroSlideAction,
   reorderHeroSlidesAction,
   saveHeroSlideAction,
 } from "@/app/admin/hero/actions";
+import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS, heroFocusPresetId } from "@/lib/blocks/hero-slides";
 import type { HeroPageSlide } from "@/lib/hero/model";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
- * ตัวจัดการสไลด์หน้าแรก (รอบที่ 184 · เฟส 3)
+ * ตัวจัดการสไลด์หน้าแรก (รอบที่ 184–187)
  *
  * - **ลากการ์ดเพื่อสลับลำดับ** (HTML5 drag & drop · ไม่เพิ่ม dependency) แล้วส่งลำดับใหม่เข้า Server Action
  *   · มีปุ่ม "เลื่อนขึ้น/ลง" เป็นทางสำรองสำหรับคีย์บอร์ด/จอสัมผัส (a11y)
- * - ต่อการ์ด: แก้พาธภาพ · คำอธิบายไทย/อังกฤษ · **จุดโฟกัส 9 จุด** · **ซูม** · เปิด/ปิด · ลบ (ย้ายเข้าถังขยะ)
+ * - **ช่องภาพใช้ `ImageDrop` ตัวเดียวกับตัวสร้างหน้า/สินค้า** (รอบที่ 187) ⇒ เลือกจากคลังภาพ · อัปโหลดจากเครื่อง ·
+ *   ลากวาง · ย่อภาพอัตโนมัติ · แก้คำอธิบายภาพในตัว
+ * - **การ์ด "+" ท้ายกริด** — ให้เห็นชัดว่ากดเพิ่มสไลด์ได้ (เจ้าของขอ)
+ * - ต่อการ์ด: จุดโฟกัส 9 จุด · ซูม · เปิด/ปิด · ลบ (ย้ายเข้าถังขยะ)
  *   · ทุกอย่างเป็น `<form>` ธรรมดา ⇒ **ใช้ได้แม้ปิด JavaScript** (ลากไม่ได้ แต่กดปุ่มได้)
- * - ⚠️ ห้ามซ้อน `<form>`: ปุ่มเลื่อน/ลบ เป็นฟอร์ม **พี่น้อง** กับการ์ดรายละเอียด (ไม่ซ้อนในกัน)
+ * ⚠️ ห้ามซ้อน `<form>`: ปุ่มเลื่อน/ลบ เป็นฟอร์ม **พี่น้อง** กับการ์ดรายละเอียด (ไม่ซ้อนในกัน)
+ * ⚠️ พาธว่าง = ไม่เรนเดอร์ `<img>` (กันคำเตือน `src=""` ของเบราว์เซอร์)
  */
 export function HeroSlideManager({
   slides,
@@ -29,11 +35,23 @@ export function HeroSlideManager({
   readonly strings: Messages["admin"];
 }) {
   const [order, setOrder] = useState<readonly string[]>(slides.map((slide) => slide.id));
+  /* ฉบับร่างของแต่ละใบ: ช่องภาพ/คำอธิบายแก้ในหน้าจอก่อน แล้วกด "บันทึก" จึงส่งเข้าเซิร์ฟเวอร์ */
+  const [drafts, setDrafts] = useState<Record<string, { path: string; altTh: string; altEn: string }>>(() =>
+    Object.fromEntries(slides.map((slide) => [slide.id, { path: slide.mediaPath, altTh: slide.altTh, altEn: slide.altEn }])),
+  );
   const dragging = useRef<string | null>(null);
   const reorderForm = useRef<HTMLFormElement | null>(null);
   const orderInput = useRef<HTMLInputElement | null>(null);
   const byId = new Map(slides.map((slide) => [slide.id, slide]));
   const ordered = order.map((id) => byId.get(id)).filter((slide): slide is HeroPageSlide => slide !== undefined);
+
+  function draftOf(id: string): { path: string; altTh: string; altEn: string } {
+    return drafts[id] ?? { path: "", altTh: "", altEn: "" };
+  }
+
+  function patchDraft(id: string, patch: Partial<{ path: string; altTh: string; altEn: string }>): void {
+    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { path: "", altTh: "", altEn: "" }), ...patch } }));
+  }
 
   function submitOrder(next: readonly string[]): void {
     setOrder(next);
@@ -62,6 +80,7 @@ export function HeroSlideManager({
 
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {ordered.map((slide, index) => {
+          const draft = draftOf(slide.id);
           const focusId = heroFocusPresetId(slide.focusX, slide.focusY) ?? HERO_FOCUS_PRESETS[4]?.id ?? "center";
           return (
             <li
@@ -75,18 +94,18 @@ export function HeroSlideManager({
                 event.preventDefault();
                 dropOn(slide.id);
               }}
-              className="border-line bg-surface flex cursor-grab flex-col gap-2 rounded-xl border p-2 active:cursor-grabbing"
+              className="border-line bg-surface flex cursor-grab flex-col gap-2 rounded-xl border p-3 active:cursor-grabbing"
             >
-              {/* ภาพตัวอย่าง + ลำดับ */}
+              {/* ภาพตัวอย่าง + ลำดับ (ใช้ค่าฉบับร่าง ⇒ เลือกภาพใหม่แล้วเห็นทันที) */}
               <div className="relative">
-                {/* ⚠️ ไม่มีพาธ = ไม่เรนเดอร์ <img> เลย (ไม่งั้นเบราว์เซอร์เตือน src="" และยิงคำขอเปล่า) */}
-                {slide.mediaPath.trim() === "" ? (
+                {draft.path.trim() === "" ? (
+                  /* ⚠️ ไม่มีพาธ = ไม่เรนเดอร์ <img> เลย (กันคำเตือน src="" และคำขอเปล่า) */
                   <div className="bg-bg-subtle text-fg-muted flex h-32 w-full items-center justify-center rounded-lg text-xs">
                     {strings.heroAdminNoImage}
                   </div>
                 ) : (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={slide.mediaPath} alt={slide.altTh} className="bg-bg-subtle h-32 w-full rounded-lg object-cover" />
+                  <img src={draft.path} alt={draft.altTh} className="bg-bg-subtle h-32 w-full rounded-lg object-cover" />
                 )}
                 <span className="bg-surface/90 text-fg absolute top-1 left-1 rounded px-1.5 py-0.5 text-xs font-semibold">
                   {strings.heroAdminOrder} {index + 1}
@@ -122,23 +141,46 @@ export function HeroSlideManager({
               {/* รายละเอียด */}
               <form action={saveHeroSlideAction} className="flex flex-col gap-2">
                 <input type="hidden" name="id" value={slide.id} />
+                <input type="hidden" name="mediaPath" value={draft.path} />
+
+                {/* ช่องภาพกลาง — เลือกจากคลัง · อัปโหลดจากเครื่อง · ลากวาง (ย่อภาพให้เอง) */}
+                <ImageDrop
+                  strings={strings}
+                  compact
+                  label={strings.heroAdminImage}
+                  value={
+                    draft.path.trim() === ""
+                      ? null
+                      : { path: draft.path, altTh: draft.altTh, altEn: draft.altEn, hasWatermark: false }
+                  }
+                  onChange={(next) =>
+                    patchDraft(slide.id, {
+                      path: next.path ?? "",
+                      altTh: next.altTh ?? draft.altTh,
+                      altEn: next.altEn ?? draft.altEn,
+                    })
+                  }
+                />
+
                 <label className="text-fg-muted flex flex-col gap-1 text-xs">
-                  {strings.heroAdminImage}
+                  {strings.heroAdminAltTh}
                   <input
                     type="text"
-                    name="mediaPath"
-                    defaultValue={slide.mediaPath}
-                    placeholder={strings.heroAdminImagePlaceholder}
+                    name="altTh"
+                    value={draft.altTh}
+                    onChange={(event) => patchDraft(slide.id, { altTh: event.target.value })}
                     className="border-line text-fg rounded-md border px-2 py-1 text-xs"
                   />
                 </label>
                 <label className="text-fg-muted flex flex-col gap-1 text-xs">
-                  {strings.heroAdminAltTh}
-                  <input type="text" name="altTh" defaultValue={slide.altTh} className="border-line text-fg rounded-md border px-2 py-1 text-xs" />
-                </label>
-                <label className="text-fg-muted flex flex-col gap-1 text-xs">
                   {strings.heroAdminAltEn}
-                  <input type="text" name="altEn" defaultValue={slide.altEn} className="border-line text-fg rounded-md border px-2 py-1 text-xs" />
+                  <input
+                    type="text"
+                    name="altEn"
+                    value={draft.altEn}
+                    onChange={(event) => patchDraft(slide.id, { altEn: event.target.value })}
+                    className="border-line text-fg rounded-md border px-2 py-1 text-xs"
+                  />
                 </label>
                 <div className="flex gap-2">
                   <label className="text-fg-muted flex flex-1 flex-col gap-1 text-xs">
@@ -173,6 +215,18 @@ export function HeroSlideManager({
             </li>
           );
         })}
+
+        {/* การ์ด "+" — เพิ่มสไลด์ใหม่ (เจ้าของขอ: ทำที่ว่างให้เห็นว่ากดเพิ่มได้) */}
+        <li className="border-line flex min-h-[16rem] items-center justify-center rounded-xl border border-dashed">
+          <form action={addHeroSlideAction}>
+            <button type="submit" className="text-fg-muted hover:text-fg flex flex-col items-center gap-1 px-6 py-8 text-sm font-semibold">
+              <span aria-hidden="true" className="text-3xl leading-none">
+                +
+              </span>
+              {strings.heroAdminAdd}
+            </button>
+          </form>
+        </li>
       </ul>
     </div>
   );

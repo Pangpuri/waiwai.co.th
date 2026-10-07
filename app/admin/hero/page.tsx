@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
+import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import {
   addHeroSlideAction,
@@ -12,6 +14,7 @@ import {
 import { auditStamp } from "@/features/admin/audit-labels";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
+import { listMedia } from "@/lib/media/repository";
 import { fillTemplate } from "@/lib/i18n/template";
 
 /**
@@ -26,10 +29,14 @@ import { fillTemplate } from "@/lib/i18n/template";
 /** ป้ายของเอฟเฟคแต่ละแบบ (ข้อความจากพจนานุกรม — ไม่พิมพ์ไทยในไฟล์นี้) */
 
 export default async function AdminHeroPage() {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const s = messages.admin;
 
+  /* คลังภาพสำหรับช่องเลือกภาพ — ส่งให้เฉพาะผู้มีสิทธิ์ media (แบบเดียวกับตัวสร้างหน้า · รอบที่ 93) */
+  const imageLibrary: readonly ImageLibraryItem[] = can(user.role, "media")
+    ? (await listMedia(48)).map((item) => ({ id: item.id, filename: item.filename, altTh: item.altTh, altEn: item.altEn }))
+    : [];
   const setting = await loadHeroSetting();
   const effectLabels: Readonly<Record<HeroEffect, string>> = {
     fade: s.heroAdminEffectFade,
@@ -42,7 +49,8 @@ export default async function AdminHeroPage() {
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
   return (
-    <div className="flex flex-col gap-6">
+    <ImageLibraryProvider items={imageLibrary}>
+      <div className="container-site flex flex-col gap-6 py-10">
       <header className="flex flex-col gap-2">
         <h1 className="text-fg text-2xl font-semibold">{s.heroAdminTitle}</h1>
         <p className="text-fg-muted max-w-3xl text-sm">{s.heroAdminIntro}</p>
@@ -142,6 +150,7 @@ export default async function AdminHeroPage() {
           </ul>
         )}
       </section>
-    </div>
+      </div>
+    </ImageLibraryProvider>
   );
 }
