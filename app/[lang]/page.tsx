@@ -16,7 +16,7 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
-import { listHeroPageSlides } from "@/lib/hero/repository";
+import { listHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { countNews, listNews } from "@/lib/news/repository";
@@ -103,7 +103,12 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
     <>
       {/* JSON-LD (X1.4): องค์กร + เว็บไซต์ — ค่ามาจาก "ตั้งค่าส่วนกลาง" ในหลังบ้าน */}
       <JsonLd kind="organization" locale={lang} settings={await loadSiteSettings(lang)} />
-      <Hero locale={lang} messages={messages} dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)} />
+      <Hero
+        locale={lang}
+        messages={messages}
+        dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
+        heroSetting={await loadHeroSetting()}
+      />
       <ProductsShowcase
         locale={lang}
         messages={messages}

@@ -5,6 +5,7 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import { HERO_CARD_HREF } from "../hero-card";
+import { DEFAULT_HERO_SETTING, type HeroSetting } from "@/lib/hero/model";
 import { HERO_SLIDES, type HeroSlideView } from "../slides";
 import { HeroCard } from "./hero-card";
 import { HeroSlider } from "./hero-slider";
@@ -17,6 +18,8 @@ type HeroProps = {
    * หน้าแรกต้องไม่พังเพราะฐานข้อมูล: ตัวอ่านคืน `[]` เมื่อไม่มี DB/ตารางหาย/อ่านไม่สำเร็จ
    */
   readonly dbSlides?: readonly HeroSlideView[];
+  /** เอฟเฟค + ความเร็วจากหลังบ้าน (รอบที่ 185) — ไม่ส่ง = ค่าเริ่มต้น (จาง 5 วิ) */
+  readonly heroSetting?: HeroSetting;
 };
 
 /**
@@ -34,7 +37,7 @@ type HeroProps = {
  *
  * เป็น Server Component: ประกอบข้อความ alt จากพจนานุกรมแล้วส่งข้อมูลธรรมดาเข้า Client Component
  */
-export function Hero({ locale, messages, dbSlides = [] }: HeroProps) {
+export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING }: HeroProps) {
   const m = messages.hero;
 
   const templateSlides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
@@ -56,6 +59,8 @@ export function Hero({ locale, messages, dbSlides = [] }: HeroProps) {
       <div className="relative min-h-[24rem] overflow-hidden bg-overlay text-on-brand lg:min-h-[36rem]">
         <HeroSlider
           slides={slides}
+          effect={heroSetting.effect}
+          intervalMs={heroSetting.intervalMs}
           labels={{
             gallery: m.galleryLabel,
             gotoSlide: m.gotoSlide,

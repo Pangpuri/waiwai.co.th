@@ -150,3 +150,45 @@ function axisValue(token: string, fallback: number): number {
   if (token === "right" || token === "bottom") return 100;
   return fallback;
 }
+
+/* ── เอฟเฟคเปลี่ยนภาพ + ความเร็ว (รอบที่ 185) ────────────────────────────────────
+   ค่าเหล่านี้เป็นของ "hero ทั้งชุด" (ไม่ใช่รายใบ) — เก็บในตาราง `hero_setting` แถวเดียว
+   ⚠️ ที่นี่เป็นแค่ค่าที่อนุญาต/การบีบช่วง — การแสดงผลจริงอยู่ที่ CSS (`[data-effect=…]`)
+*/
+
+export const HERO_EFFECTS = ["fade", "slide", "zoom", "none"] as const;
+export type HeroEffect = (typeof HERO_EFFECTS)[number];
+
+/** เวลาต่อภาพที่ให้เลือก (มิลลิวินาที) — เร็ว/ปกติ/ช้า */
+export const HERO_SPEED_PRESETS: readonly number[] = [3000, 5000, 8000];
+
+export const HERO_INTERVAL_MIN_MS = 2000;
+export const HERO_INTERVAL_MAX_MS = 15000;
+
+export type HeroSetting = {
+  readonly effect: HeroEffect;
+  readonly intervalMs: number;
+};
+
+export const DEFAULT_HERO_SETTING: HeroSetting = { effect: "fade", intervalMs: 5000 };
+
+export function isHeroEffect(value: string): value is HeroEffect {
+  return (HERO_EFFECTS as readonly string[]).includes(value);
+}
+
+/** บีบเวลาต่อภาพให้อยู่ในช่วงที่อ่านทัน (ค่าที่ไม่ใช่ตัวเลข = ค่าเริ่มต้น) */
+export function clampIntervalMs(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_HERO_SETTING.intervalMs;
+  return Math.min(HERO_INTERVAL_MAX_MS, Math.max(HERO_INTERVAL_MIN_MS, Math.round(value)));
+}
+
+/** อ่านค่าเอฟเฟค/ความเร็วจากค่าดิบ (ฐานข้อมูล/ฟอร์ม) — ค่าที่ไม่รู้จักถอยไปใช้ค่าเริ่มต้น ไม่โยน error */
+export function parseHeroSetting(raw: unknown): HeroSetting {
+  const record = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const effect = typeof record["effect"] === "string" ? record["effect"] : "";
+  const interval = record["intervalMs"] ?? record["interval_ms"];
+  return {
+    effect: isHeroEffect(effect) ? effect : DEFAULT_HERO_SETTING.effect,
+    intervalMs: clampIntervalMs(typeof interval === "string" ? Number(interval) : interval),
+  };
+}

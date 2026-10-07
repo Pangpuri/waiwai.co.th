@@ -1,5 +1,6 @@
 "use client";
 
+import type { HeroEffect } from "@/lib/hero/model";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
@@ -42,9 +43,13 @@ type HeroSliderLabels = {
 type HeroSliderProps = {
   readonly slides: readonly HeroSlideView[];
   readonly labels: HeroSliderLabels;
+  /** เอฟเฟคเปลี่ยนภาพ (รอบที่ 185) — ค่ามาจากหลังบ้าน · CSS ที่ `[data-effect=…]` เป็นตัวทำอนิเมชัน */
+  readonly effect?: HeroEffect;
+  /** เวลาต่อภาพ (มิลลิวินาที) — ค่ามาจากหลังบ้าน */
+  readonly intervalMs?: number;
 };
 
-export function HeroSlider({ slides, labels }: HeroSliderProps) {
+export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_SLIDE_INTERVAL_MS }: HeroSliderProps) {
   const total = slides.length;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -58,10 +63,10 @@ export function HeroSlider({ slides, labels }: HeroSliderProps) {
 
     const timer = window.setInterval(() => {
       setIndex((current) => advanceIndex(current, total));
-    }, HERO_SLIDE_INTERVAL_MS);
+    }, intervalMs);
 
     return () => window.clearInterval(timer);
-  }, [paused, total]);
+  }, [paused, total, intervalMs]);
 
   function goTo(next: number) {
     setIndex(advanceIndex(next, total));
@@ -69,7 +74,7 @@ export function HeroSlider({ slides, labels }: HeroSliderProps) {
 
   return (
     <>
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" data-effect={effect}>
         {slides.map((slide, position) => {
           const isActive = position === index;
 

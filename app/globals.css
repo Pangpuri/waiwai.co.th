@@ -835,3 +835,65 @@ div:has(> img[data-mourning-frame]) {
   max-height: min(78dvh, calc(100dvh - 13rem));
   overflow: hidden;
 }
+
+/*
+  ── เอฟเฟคเปลี่ยนภาพของสไลด์หน้าแรก (รอบที่ 185 · โมดูล "สไลด์ & แคมเปญ") ──────
+  ค่าเอฟเฟค/ความเร็วมาจากฐานข้อมูล (`hero_setting`) ⇒ ตัวเลื่อนภาพใส่ `data-effect` ที่กล่อง
+  และ CSS ที่นี่ตัดสินวิธีเปลี่ยนภาพ ล้วน ๆ (ไม่มี JS เพิ่ม)
+  ⚠️ `data-state` เป็น "active"/"idle" อยู่แล้ว (มาจาก HeroSlider)
+  ⚠️ `prefers-reduced-motion: reduce` = ตัดภาพทันทีเสมอ (ไม่บังคับให้ผู้ใช้ดูภาพเคลื่อนไหว)
+*/
+[data-hero-slide] {
+  transition-property: opacity, transform;
+  transition-duration: 600ms;
+  transition-timing-function: ease-out;
+}
+
+/* จาง: สลับความโปร่งใส (ค่าเริ่มต้น) */
+[data-effect="fade"] [data-hero-slide][data-state="active"] {
+  opacity: 1;
+}
+[data-effect="fade"] [data-hero-slide][data-state="idle"] {
+  opacity: 0;
+}
+
+/* เลื่อน: ภาพใหม่ไถลเข้ามาจากขวา */
+[data-effect="slide"] [data-hero-slide][data-state="active"] {
+  opacity: 1;
+  transform: translateX(0);
+}
+[data-effect="slide"] [data-hero-slide][data-state="idle"] {
+  opacity: 0;
+  transform: translateX(6%);
+}
+
+/* ซูม: ภาพใหม่ค่อย ๆ ขยายเข้าที่ (Ken Burns เบา ๆ) */
+[data-effect="zoom"] [data-hero-slide][data-state="active"] {
+  opacity: 1;
+  transform: scale(1);
+}
+[data-effect="zoom"] [data-hero-slide][data-state="idle"] {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
+/* ตัดภาพทันที: ไม่มีอนิเมชันเลย */
+[data-effect="none"] [data-hero-slide] {
+  transition: none;
+}
+[data-effect="none"] [data-hero-slide][data-state="active"] {
+  opacity: 1;
+}
+[data-effect="none"] [data-hero-slide][data-state="idle"] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-hero-slide] {
+    transition: none;
+  }
+  [data-effect="slide"] [data-hero-slide][data-state="idle"],
+  [data-effect="zoom"] [data-hero-slide][data-state="idle"] {
+    transform: none;
+  }
+}

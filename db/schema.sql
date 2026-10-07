@@ -159,6 +159,18 @@ create index if not exists page_document_revision_page_idx on page_document_revi
 /* ── สไลด์หน้าแรก + แคมเปญ (migration 0027 · รอบที่ 184) ────────────────────────
    โมดูล "สไลด์ & แคมเปญ" — แยกจากบล็อก hero เพราะเป็นของระดับเว็บและมีการตั้งเวลา
    ⚠️ แหล่งความจริงของสคีมาคือ db/migrations/*.sql (ไฟล์นี้เป็นเอกสารอ้างอิง) */
+
+/* ── ตั้งค่าเอฟเฟค/ความเร็วของสไลด์หน้าแรก (migration 0028 · รอบที่ 185) ── */
+create table if not exists hero_setting (
+  id text primary key,
+  effect text not null default 'fade' check (effect in ('fade', 'slide', 'zoom', 'none')),
+  interval_ms integer not null default 5000 check (interval_ms between 2000 and 15000),
+  updated_at timestamptz not null default now(),
+  updated_by text not null default ''
+);
+
+insert into hero_setting (id) values ('default') on conflict (id) do nothing;
+
 create table if not exists hero_slide (
   id text primary key,
   sort_order integer not null default 0,

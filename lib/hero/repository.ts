@@ -10,7 +10,13 @@
 
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
-import { sortHeroPageSlides, type HeroPageSlide } from "@/lib/hero/model";
+import {
+  DEFAULT_HERO_SETTING,
+  parseHeroSetting,
+  sortHeroPageSlides,
+  type HeroPageSlide,
+  type HeroSetting,
+} from "@/lib/hero/model";
 
 /** เงื่อนไขกลางของ "สไลด์ที่หน้าเว็บควรเห็น" — ใช้ทุกคำสั่งฝั่งเว็บ (ห้ามพิมพ์ซ้ำ) */
 export const PUBLIC_HERO_CONDITION = "deleted_at is null and is_active";
@@ -171,6 +177,35 @@ export async function trashHeroPageSlide(id: string, actor: string): Promise<boo
     `update hero_slide set deleted_at = now(), deleted_by = $2, updated_at = now(), updated_by = $2
       where id = $1 and deleted_at is null`,
     [id, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/* ── ตั้งค่าเอฟเฟค/ความเร็ว (รอบที่ 185) ──────────────────────────────────────── */
+
+/** อ่านค่าตั้งค่า — **คืนค่าเริ่มต้นเสมอเมื่อมีปัญหา** (ไม่มี DB/ตารางหาย/ค่าเพี้ยน) ⇒ หน้าเว็บไม่พัง */
+export async function loadHeroSetting(): Promise<HeroSetting> {
+  if (!isDatabaseConfigured()) return DEFAULT_HERO_SETTING;
+  try {
+    const result = await readQuery<{ effect: string; interval_ms: number }>(
+      "select effect, interval_ms from hero_setting where id = 'default'",
+    );
+    const row = result.rows[0];
+    return row === undefined ? DEFAULT_HERO_SETTING : parseHeroSetting(row);
+  } catch {
+    return DEFAULT_HERO_SETTING;
+  }
+}
+
+/** บันทึกค่าตั้งค่า (หลังบ้าน) — บีบช่วงค่าที่ชั้นข้อมูลอีกชั้นก่อนเขียน */
+export async function saveHeroSetting(setting: HeroSetting, actor: string): Promise<boolean> {
+  const safe = parseHeroSetting(setting);
+  const result = await getPool().query(
+    `insert into hero_setting (id, effect, interval_ms, updated_at, updated_by)
+     values ('default', $1, $2, now(), $3)
+     on conflict (id) do update set effect = excluded.effect, interval_ms = excluded.interval_ms,
+       updated_at = now(), updated_by = excluded.updated_by`,
+    [safe.effect, safe.intervalMs, actor],
   );
   return (result.rowCount ?? 0) > 0;
 }

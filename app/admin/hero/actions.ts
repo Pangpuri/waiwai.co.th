@@ -6,11 +6,12 @@ import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS } from "@/lib/blocks/hero-slides";
-import { clampFocus, clampZoom, isLocalMediaPath } from "@/lib/hero/model";
+import { clampFocus, clampZoom, isLocalMediaPath, parseHeroSetting } from "@/lib/hero/model";
 import {
   createHeroPageSlide,
   listHeroPageSlidesForAdmin,
   reorderHeroPageSlides,
+  saveHeroSetting,
   trashHeroPageSlide,
   updateHeroPageSlide,
 } from "@/lib/hero/repository";
@@ -134,6 +135,24 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
   );
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "details" });
+    await refreshAfterChange();
+  }
+}
+
+/** บันทึกเอฟเฟค + ความเร็วของสไลด์ทั้งชุด (รอบที่ 185) */
+export async function saveHeroSettingAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const effect = typeof formData.get("effect") === "string" ? String(formData.get("effect")) : "";
+  const intervalRaw = Number(formData.get("intervalMs"));
+  const setting = parseHeroSetting({ effect, intervalMs: intervalRaw });
+  const ok = await saveHeroSetting(setting, user.email);
+  if (ok) {
+    await recordAudit({
+      action: "hero-save",
+      actorEmail: user.email,
+      target: "hero:setting",
+      detail: `${setting.effect}:${setting.intervalMs}`,
+    });
     await refreshAfterChange();
   }
 }

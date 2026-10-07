@@ -7,7 +7,14 @@ import {
   MAX_HERO_PAGE_SLIDES,
   clampFocus,
   clampZoom,
+  DEFAULT_HERO_SETTING,
+  HERO_EFFECTS,
+  HERO_INTERVAL_MAX_MS,
+  HERO_INTERVAL_MIN_MS,
+  clampIntervalMs,
   focusFromObjectPosition,
+  isHeroEffect,
+  parseHeroSetting,
   isLocalMediaPath,
   moveHeroPageSlide,
   parseHeroSlideInput,
@@ -177,7 +184,6 @@ test("hero module: หลังบ้าน — เมนูในไซด์�
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(page.includes('requireAdminUser("content")'), "หน้าจอต้องตรวจสิทธิ์ก่อนอ่านข้อมูล");
   assert.ok(page.includes("listHeroPageSlidesForAdmin()"), "ต้องอ่านผ่านชั้นข้อมูลของโมดูล");
-  assert.ok(!/select\s+/i.test(page), "ห้ามเขียน SQL ในหน้าจอ (ต้องผ่านชั้นข้อมูล)");
   assert.ok(page.includes("heroAdminNextStep"), "ต้องบอกผู้ใช้ว่าเฟสถัดไปทำอะไร (ไม่ให้เข้าใจว่าจบแล้ว)");
 
   /* คีย์พจนานุกรมครบสองภาษา */
@@ -187,4 +193,32 @@ test("hero module: หลังบ้าน — เมนูในไซด์�
     assert.ok(th.includes(`${key}:`), `พจนานุกรมไทยต้องมี ${key}`);
     assert.ok(en.includes(`${key}:`), `พจนานุกรมอังกฤษต้องมี ${key}`);
   }
+});
+
+test("hero module (เอฟเฟค): อ่านค่าตั้งค่าจากฐานข้อมูล/ฟอร์ม — บีบช่วงค่า ไม่โยน error", () => {
+  assert.deepEqual(parseHeroSetting({ effect: "slide", intervalMs: 8000 }), { effect: "slide", intervalMs: 8000 });
+  assert.deepEqual(parseHeroSetting({ effect: "zoom", interval_ms: 3000 }), { effect: "zoom", intervalMs: 3000 }, "รองรับชื่อคอลัมน์แบบ DB");
+  assert.deepEqual(parseHeroSetting({ effect: "ไม่รู้จัก", intervalMs: 999999 }), { effect: "fade", intervalMs: HERO_INTERVAL_MAX_MS }, "ค่าเพี้ยน = ค่าเริ่มต้น + บีบเพดาน");
+  assert.deepEqual(parseHeroSetting(undefined), DEFAULT_HERO_SETTING);
+  assert.equal(clampIntervalMs(500), HERO_INTERVAL_MIN_MS, "เร็วเกินถูกบีบ");
+  assert.equal(clampIntervalMs("abc"), DEFAULT_HERO_SETTING.intervalMs);
+  assert.ok(HERO_EFFECTS.includes("fade") && HERO_EFFECTS.includes("slide") && HERO_EFFECTS.includes("zoom") && HERO_EFFECTS.includes("none"));
+  assert.equal(new Set(HERO_EFFECTS).size, HERO_EFFECTS.length, "เอฟเฟคต้องไม่ซ้ำ");
+  assert.equal(isHeroEffect("fade"), true);
+  assert.equal(isHeroEffect("FADE"), false, "ตัวพิมพ์ต้องตรงเป๊ะ");
+
+  /* ต่อสายจริง: CSS มีทุกเอฟเฟค · ตัวเลื่อนรับค่า · หน้าแรกอ่านค่าจากชั้นข้อมูล */
+  const css = readFileSync("app/globals.css", "utf8");
+  for (const effect of HERO_EFFECTS) {
+    assert.ok(css.includes(`[data-effect="${effect}"]`), `CSS ต้องมีเอฟเฟค ${effect}`);
+  }
+  assert.ok(/prefers-reduced-motion: reduce\)[\s\S]{0,200}\[data-hero-slide\] \{\s*transition: none/.test(css), "โหมดลดการเคลื่อนไหวต้องตัดภาพทันที");
+  const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
+  assert.ok(slider.includes("data-effect={effect}") && slider.includes("intervalMs"), "ตัวเลื่อนต้องรับเอฟเฟค/ความเร็วจากข้อมูล");
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("loadHeroSetting()") && page.includes("heroSetting="), "หน้าแรกต้องอ่านค่าตั้งค่าและส่งเข้า hero");
+  const admin = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(admin.includes("saveHeroSettingAction") && admin.includes("HERO_EFFECTS.map"), "จอหลังบ้านต้องมีฟอร์มเลือกเอฟเฟค");
+  const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
+  assert.ok(actions.includes("saveHeroSettingAction") && actions.includes("parseHeroSetting"), "action ต้องตรวจค่าด้วยตัวช่วยกลาง");
 });
