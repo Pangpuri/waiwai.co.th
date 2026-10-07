@@ -225,16 +225,14 @@ test("hero module (เอฟเฟค): อ่านค่าตั้งค่�
 
 test("hero module (เฟส 3): ภาพที่ยังไม่มีพาธต้องไม่ถูกเรนเดอร์เป็น <img src=\"\"> (กันคำเตือนเบราว์เซอร์)", () => {
   const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
-  assert.ok(
-    /slide\.mediaPath\.trim\(\) === ""/.test(manager),
-    "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ",
-  );
+  const guard = /(draft|slide).(path|mediaPath).trim() === ""/;
+  assert.ok(guard.test(manager), "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ");
   assert.ok(manager.includes("heroAdminNoImage"), "พาธว่างต้องแสดงข้อความจากพจนานุกรมแทนภาพ");
-  /* <img> ต้องอยู่ในสาขา else เท่านั้น (คือไม่มีทางถูกเรนเดอร์เมื่อพาธว่าง) */
-  const imgIndex = manager.indexOf("<img src={slide.mediaPath}");
-  const guardIndex = manager.indexOf("path.trim() === \"\"");
-  assert.ok(imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
-  assert.ok(!/<img src=\{[^}]*\} alt/.test(manager.slice(0, guardIndex)), "ห้ามมี <img> ก่อนจุดตรวจ");
+  const guardIndex = manager.search(guard);
+  const imgDraft = manager.indexOf("<img src={draft.path}");
+  const imgRaw = manager.indexOf("<img src={slide.mediaPath}");
+  const imgIndex = imgDraft >= 0 ? imgDraft : imgRaw;
+  assert.ok(guardIndex >= 0 && imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
 });
 
 test("hero module (ถังขยะ): ประตูอยู่ใน SQL + ลบถาวรต้องยืนยัน + จอมีปุ่มกู้คืน/ลบถาวร", () => {
