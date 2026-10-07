@@ -59,6 +59,27 @@ export const PREVIEW_PARTS_WITHOUT_NOTICE: readonly string[] = CHROME_PARTS.filt
   (part) => PREVIEW_PART_OF[part],
 );
 
+/**
+ * **"ส่วน" ที่หน้าพรีวิวรองรับ** (`?parts=…`) — รายการกลางที่เดียว (ใช้ทั้งหน้าพรีวิวและเทสต์ของ CSS)
+ *
+ * · `nav` · `footer` · `notice` = แท็บของ "ส่วนกลาง" (มาจาก `CHROME_PARTS`)
+ * · **`content` = เฉพาะเนื้อหาหน้า ไม่เอาส่วนกลางเลย** (รอบที่ 182)
+ *   ที่มา (ฟีดแบ็กเจ้าของ): *"จัดการหน้าแรกไม่ต้องโชว์ที่มาจากส่วนกลาง … แถบเมนู footer ไม่ต้องโชว์"*
+ *   ⇒ ตอนจัดเลเยอร์ของหน้า ควรเห็นเฉพาะสิ่งที่ **หน้านั้นเป็นเจ้าของ** (ส่วนกลางไปแก้ที่แท็บของตัวเอง)
+ */
+export const CONTENT_PREVIEW_PART = "content";
+
+export const PREVIEW_PARTS: readonly string[] = [
+  ...PREVIEW_PARTS_WITHOUT_NOTICE,
+  PREVIEW_PART_OF.notice,
+  CONTENT_PREVIEW_PART,
+];
+
+/** เป็นชื่อ "ส่วน" ของพรีวิวที่รองรับไหม (ค่าอื่น = พรีวิวทั้งหน้า) */
+export function isPreviewPart(value: string): boolean {
+  return PREVIEW_PARTS.includes(value);
+}
+
 /** อ่านค่าจาก query → สถานะแท็บ (ค่าที่ไม่รู้จัก = ค่าเริ่มต้น ไม่โยน error) */
 export function chromeTabOf(query: { readonly part?: string; readonly mode?: string }): ChromeTabState {
   const part = (query.part ?? "").trim();

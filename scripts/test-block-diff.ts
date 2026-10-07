@@ -6,6 +6,7 @@ import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } fro
 import { MAX_DIFF_ENTRIES, MAX_DIFF_FIELDS_PER_BLOCK, diffBlockTypes, diffCount, documentDiff, documentsEqual } from "@/lib/blocks/diff";
 import { addColumn, insertBlockAt, moveBlockToLocation, setBlockText, setColumnWidth } from "@/lib/blocks/edit";
 import { BLOCK_SCHEMA_VERSION, createBlock, type Block, type BlockDocument } from "@/lib/blocks/types";
+import { PREVIEW_PARTS } from "@/lib/chrome/workspace-url";
 
 /**
  * เทสต์ X1.5 — ความต่างของสองรุ่นเอกสาร + นโยบายบันทึกอัตโนมัติ
@@ -369,7 +370,10 @@ test("chrome: แท็บ navbar/ป้ายประกาศ/ท้ายเ
   assert.ok(ws.includes("noticePreviewSrcCurrent") && ws.includes("noticePreviewSrcDraft"), "แถบขวาต้องรับพรีวิวของป้ายประกาศ");
   assert.ok(/part === "notice"[\s\S]{0,80}noticePreviewSrc/.test(ws), "เลือก src ตามแท็บ (ป้ายประกาศต้องไม่ใช้ src ของ navbar)");
   assert.ok(page.includes("parts=notice"), "หน้า chrome ต้องส่งพรีวิวเฉพาะป้ายประกาศ");
-  assert.ok(preview.includes('query.parts === "notice"'), "หน้าพรีวิวต้องรองรับ parts=notice");
+  assert.ok(
+    preview.includes("isPreviewPart(") && PREVIEW_PARTS.includes("notice"),
+    "หน้าพรีวิวต้องรองรับ parts=notice ผ่านรายการกลาง PREVIEW_PARTS (รอบที่ 182 เลิกพิมพ์ชื่อโหมดซ้ำในหน้า)",
+  );
   assert.ok(css.includes('[data-preview-parts="notice"]'), "ต้องมีกฎซ่อนหัวเว็บ/ท้ายเว็บ/เนื้อหาในโหมดป้ายประกาศ");
   /* โหมดป้ายประกาศต้องไม่ซ่อนตัวป้ายประกาศเอง (ตรวจแบบสตริงล้วน — เลี่ยง regex flag /s ที่ TS target ไม่รับ) */
   const noticeBlock = css.slice(css.indexOf('[data-preview-parts="notice"]'));

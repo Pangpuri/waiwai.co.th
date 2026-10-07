@@ -484,17 +484,30 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
   ⚠️ **ต้องมี `html` นำหน้า (0,2,1) เท่ากับกฎที่เปิดป้าย** `html[data-mourning="shown"] [data-mourning-notice]`
      และต้องดัก **ทั้งสองสถานะ** (ยังไม่เด้ง / เด้งแล้ว) ไม่งั้นกฎเปิดจะชนะแล้วป้ายเด้งทับพรีวิว
      · เคสจริงรอบที่ 58 = `nav` · เคสจริงรอบที่ 179 = `footer` (กฎเดิมไม่มี `html` นำหน้า ⇒ ความจำเพาะ (0,2,0) ⇒ แพ้)
-  ⚠️ เพิ่มโหมดใหม่ใน `CHROME_PARTS` แล้ว **ต้องเพิ่มชื่อโหมดในรายการนี้ด้วย** — มีเทสต์บังคับที่ `scripts/test-chrome-preset.ts`
+  ⚠️ เพิ่มโหมดใหม่ใน `PREVIEW_PARTS` (lib/chrome/workspace-url.ts) แล้ว **ต้องเพิ่มชื่อโหมดในรายการนี้ด้วย** — มีเทสต์บังคับที่ `scripts/test-chrome-preset.ts`
   ⚠️ ห้ามซ่อน `[data-mourning-notice]` ในโหมด `notice` — โหมดนั้นต้องเห็นป้าย (มีเทสต์กันที่ `scripts/test-block-diff.ts`)
 */
 html[data-preview-parts="nav"] [data-mourning-notice],
 html[data-preview-parts="footer"] [data-mourning-notice],
+html[data-preview-parts="content"] [data-mourning-notice],
 html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice],
-html[data-preview-parts="footer"] html[data-mourning="shown"] [data-mourning-notice] {
+html[data-preview-parts="footer"] html[data-mourning="shown"] [data-mourning-notice],
+html[data-preview-parts="content"] html[data-mourning="shown"] [data-mourning-notice] {
   display: none;
 }
 
 [data-preview-parts="nav"] [data-preview-content] {
+  display: none;
+}
+
+/*
+  ── พรีวิว "เฉพาะเนื้อหาหน้า" (?parts=content) — รอบที่ 182 ──
+  ฟีดแบ็กเจ้าของ: *"จัดการหน้าแรกไม่ต้องโชว์ที่มาจากส่วนกลาง … แถบเมนู footer ไม่ต้องโชว์"*
+  ⇒ ซ่อน **หัวเว็บ/ท้ายเว็บของ layout** (ส่วนกลาง) แต่ **คงเนื้อหาไว้** (ต่างจากโหมด nav/footer ที่ซ่อนเนื้อหา)
+  · หัวเว็บ: ซ่อนอยู่แล้วด้วยธง `data-preview-chrome="1"` ด้านบน (พรีวิวทุกโหมดไม่ใช้หัวเว็บของ layout)
+  · หน้าเพจยังเรนเดอร์เอกสารฉบับร่าง ⇒ สิ่งที่เห็น = สิ่งที่จะบันทึก
+*/
+[data-preview-parts="content"] footer[data-layout-footer] {
   display: none;
 }
 

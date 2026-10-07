@@ -10,6 +10,7 @@ import { parseBlockDocument } from "@/lib/blocks/parse";
 import { loadDocumentRow, type DocumentStatus } from "@/lib/blocks/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { loadFooterConfig, loadNavbarConfig } from "@/lib/chrome/loader";
+import { isPreviewPart } from "@/lib/chrome/workspace-url";
 import { isLocale } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { isDatabaseConfigured } from "@/lib/content/repository";
@@ -59,9 +60,17 @@ export default async function PreviewPage({
     ⇒ ติดธงให้ CSS ซ่อนป้ายประกาศ (ซึ่งเป็นโอเวอร์เลย์เต็มจอ) และซ่อนเนื้อหาหน้า ⇒ เห็นหัวเว็บชัด ๆ
     ⚠️ มีผลเฉพาะในพรีวิวนี้ — ไม่แตะโค้ดที่ออกใช้งานจริง (หน้าเว็บสาธารณะ)
   */
-  /* parts: nav = เฉพาะแถบเมนู · footer = เฉพาะท้ายเว็บ · notice = เฉพาะป้ายประกาศ (รอบที่ 159) */
-  const requestedParts =
-    query.parts === "footer" ? "footer" : query.parts === "nav" ? "nav" : query.parts === "notice" ? "notice" : null;
+  /*
+    parts: nav = เฉพาะแถบเมนู · footer = เฉพาะท้ายเว็บ · notice = เฉพาะป้ายประกาศ (รอบที่ 159)
+           content = **เฉพาะเนื้อหาหน้า — ไม่เอาส่วนกลาง (แถบเมนู/ท้ายเว็บ/ป้ายประกาศ)** (รอบที่ 182)
+
+    ที่มา (ฟีดแบ็กเจ้าของ): *"จัดการหน้าแรกไม่ต้องโชว์ที่มาจากส่วนกลาง … แถบเมนู footer ไม่ต้องโชว์"*
+    ⇒ ตอนจัดเลเยอร์ของหน้า ควรเห็นแค่สิ่งที่ **หน้านี้เป็นเจ้าของ** ส่วนที่มาจากส่วนกลางไปแก้ที่แท็บนั้น ๆ
+    ⚠️ รายชื่อโหมดทั้งหมดอยู่ที่ `PREVIEW_PARTS` (lib/chrome/workspace-url.ts) — ห้ามพิมพ์ซ้ำที่นี่
+    ⚠️ หน้านี้เรนเดอร์ **เอกสารฉบับร่าง** (ไม่ดึงข้อมูลหน้าเว็บจริง) ⇒ สิ่งที่เห็น = สิ่งที่จะบันทึก
+  */
+  const partsQuery = (query.parts ?? "").trim();
+  const requestedParts = isPreviewPart(partsQuery) ? partsQuery : null;
   /* หัวเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ด้วย postMessage) */
   const navbarConfig = await loadNavbarConfig(lang);
   /* ท้ายเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ผ่าน postMessage) */
@@ -95,7 +104,13 @@ export default async function PreviewPage({
             : `document.documentElement.setAttribute("data-preview-chrome","1");document.documentElement.setAttribute("data-preview-parts","${requestedParts}");`
         }
       />
-      {requestedParts === "footer" ? null : <SiteHeaderLive locale={lang} messages={messages} initial={navbarConfig} />}
+      {/*
+        แถบเมนูสดใช้เฉพาะเมื่อพรีวิว "ทั้งหน้า" (ไม่มี parts) หรือโหมดเฉพาะแถบเมนู
+        ⚠️ โหมด content = ไม่ต้องเห็นส่วนกลางเลย (รอบที่ 182) · โหมด footer/notice ก็ไม่ต้องเห็น
+      */}
+      {requestedParts === null || requestedParts === "nav" ? (
+        <SiteHeaderLive locale={lang} messages={messages} initial={navbarConfig} />
+      ) : null}
       {requestedParts === "footer" ? <SiteFooterLive locale={lang} messages={messages} initial={footerConfig} /> : null}
 
       {status === "draft" ? (

@@ -22,11 +22,14 @@ import {
 import { MOURNING_PAGE_KEY, defaultMourningConfig } from "@/lib/mourning/config";
 import {
   CHROME_WORKSPACE_PATH,
-  PREVIEW_PARTS_WITHOUT_NOTICE,
+  CONTENT_PREVIEW_PART,
   chromeTabHref,
+  PREVIEW_PARTS,
+  PREVIEW_PARTS_WITHOUT_NOTICE,
   chromeTabOf,
   isChromeMode,
   isChromePart,
+  isPreviewPart,
   type ChromeTabState,
 } from "@/lib/chrome/workspace-url";
 import { TRASH_KINDS, emptyTrashCounts, isTrashKind, trashTotal } from "@/lib/trash/plan";
@@ -445,9 +448,13 @@ test("chrome-preview: ทุกโหมดพรีวิวที่ไม่�
     "โหมด notice ต้องเห็นป้ายประกาศ (ห้ามซ่อน)",
   );
 
-  /* หน้าพรีวิวต้องรองรับทุกชื่อโหมดจริง (ค่าเพี้ยน = ไม่มีอะไรถูกซ่อน) */
+  /*
+    หน้าพรีวิวต้องรองรับทุกชื่อโหมดจริง (ค่าเพี้ยน = ไม่มีอะไรถูกซ่อน)
+    รอบที่ 182: เลิกพิมพ์ชื่อโหมดซ้ำในหน้า — ยึดรายการกลาง `PREVIEW_PARTS` ที่เดียว
+  */
+  assert.ok(preview.includes("isPreviewPart("), "หน้าพรีวิวต้องตรวจชื่อโหมดด้วยรายการกลาง PREVIEW_PARTS");
   for (const part of PREVIEW_PARTS_WITHOUT_NOTICE) {
-    assert.ok(preview.includes(`query.parts === "${part}"`), `หน้าพรีวิวต้องรองรับ parts=${part}`);
+    assert.ok(PREVIEW_PARTS.includes(part), `รายการกลางต้องมี parts=${part}`);
   }
 
   /* จำนวนโหมดใน CSS ต้องครบตามชนิดจริง — เพิ่มโหมดใหม่แล้วลืมใส่กฎ = แดงทันที */
@@ -455,4 +462,63 @@ test("chrome-preview: ทุกโหมดพรีวิวที่ไม่�
     css.includes(`html[data-preview-parts="${part}"] html[data-mourning="shown"] [data-mourning-notice]`),
   );
   assert.equal(covered.length, PREVIEW_PARTS_WITHOUT_NOTICE.length, "ต้องมีกฎครบทุกโหมดที่ไม่ใช่ notice");
+});
+
+/* ── 10) พรีวิว "เฉพาะเนื้อหาหน้า" (?parts=content) — รอบที่ 182 ──────────────────
+ *
+ * ฟีดแบ็กเจ้าของ: *"จัดการหน้าแรกไม่ต้องโชว์ที่มาจากส่วนกลาง … แถบเมนู footer ไม่ต้องโชว์
+ *   แต่เราต้องจัดการส่วนสไลด์ … เห็นเหมือนหน้าบ้าน แต่ไม่ใช่ดึงข้อมูลจากหน้าบ้าน"*
+ * ⇒ ตอนจัดเลเยอร์ของหน้า ต้องเห็นเฉพาะสิ่งที่ **หน้านั้นเป็นเจ้าของ** ส่วนกลางไปแก้ที่แท็บของตัวเอง
+ */
+
+test("content mode: รายการกลาง PREVIEW_PARTS มี content และตรวจค่าเพี้ยนได้", () => {
+  assert.ok(PREVIEW_PARTS.includes(CONTENT_PREVIEW_PART), "รายการกลางต้องมี content");
+  assert.equal(CONTENT_PREVIEW_PART, "content");
+  assert.equal(isPreviewPart("content"), true);
+  for (const part of ["nav", "footer", "notice", "content"]) assert.equal(isPreviewPart(part), true, `${part} ต้องผ่าน`);
+  for (const bad of ["", " ", "CONTENT", "contents", "all", "<script>"]) {
+    assert.equal(isPreviewPart(bad), false, `"${bad}" ต้องไม่ผ่าน (ตกไปเป็นพรีวิวทั้งหน้า)`);
+  }
+  /* ต้องไม่มีชื่อซ้ำในรายการกลาง (กันก๊อปวางแล้วซ้ำ) */
+  assert.equal(new Set(PREVIEW_PARTS).size, PREVIEW_PARTS.length, "รายการกลางต้องไม่มีค่าซ้ำ");
+});
+
+test("content mode: หน้าพรีวิวใช้รายการกลาง + ไม่เรนเดอร์แถบเมนูสดในโหมด content", () => {
+  const preview = sourceOf("app/[lang]/preview/[page]/page.tsx");
+  assert.ok(preview.includes("isPreviewPart(partsQuery)"), "ต้องตรวจชื่อโหมดด้วยรายการกลาง (ไม่พิมพ์ชื่อซ้ำ)");
+  assert.ok(
+    /requestedParts === null \|\| requestedParts === "nav"[\s\S]{0,80}SiteHeaderLive/.test(preview),
+    "แถบเมนูสดต้องแสดงเฉพาะพรีวิวทั้งหน้า/โหมด nav (โหมด content ต้องไม่เห็นส่วนกลาง)",
+  );
+  assert.ok(preview.includes("requestedParts === \"footer\" ? <SiteFooterLive"), "ท้ายเว็บสดยังใช้เฉพาะโหมด footer");
+});
+
+test("content mode: ตัวสร้างหน้าเว็บส่ง parts=content ในโหมดฉบับร่าง/เผยแพร่", () => {
+  const builder = sourceOf("features/admin/ui/block-builder.tsx");
+  assert.ok(
+    builder.includes(`?mode=\${previewMode}&parts=\${CONTENT_PREVIEW_PART}`),
+    "พรีวิวฉบับร่าง/เผยแพร่ต้องตัดส่วนกลางออก (parts=content)",
+  );
+  assert.ok(
+    builder.includes('previewMode === "live"') && builder.includes("previewLiveSrc"),
+    "โหมด \"หน้าเว็บจริง\" ยังชี้หน้าเว็บสาธารณะ (เห็นส่วนกลางครบตามความหมายของโหมด)",
+  );
+});
+
+test("content mode: CSS ซ่อนหัวเว็บ/ท้ายเว็บของ layout แต่คงเนื้อหาไว้", async () => {
+  const css = await readStrippedCss();
+  assert.ok(
+    css.includes('[data-preview-parts="content"] footer[data-layout-footer]'),
+    "โหมด content ต้องซ่อนท้ายเว็บของ layout",
+  );
+  assert.ok(
+    css.includes('[data-preview-chrome="1"] header[data-layout-header]'),
+    "หัวเว็บของ layout ถูกซ่อนทุกโหมดพรีวิวอยู่แล้ว (ธง data-preview-chrome)",
+  );
+  /* ต่างจากโหมด nav/footer: โหมด content ต้อง **ไม่** ซ่อนเนื้อหา */
+  const contentBlock = css.slice(css.indexOf('[data-preview-parts="content"] footer[data-layout-footer]'));
+  assert.ok(
+    !contentBlock.slice(0, contentBlock.indexOf("}")).includes("[data-preview-content]"),
+    "โหมด content ต้องคงเนื้อหาหน้าไว้ (ห้ามซ่อนเหมือนโหมด nav/footer)",
+  );
 });

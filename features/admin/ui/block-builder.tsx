@@ -16,6 +16,7 @@ import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
 import { DROP_IMAGE_MESSAGE, NAVBAR_MESSAGE, NAVBAR_SELECT_ID, NOTICE_SELECT_ID, PREVIEW_MESSAGE, SELECT_MESSAGE } from "@/features/blocks/ui/preview-frame";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
+import { CONTENT_PREVIEW_PART } from "@/lib/chrome/workspace-url";
 import {
   addCard,
   addColumn,
@@ -540,9 +541,19 @@ export function BlockBuilder({
         ? null
         : (schedule ?? null);
 
-  /* พรีวิวโหลดจาก "เส้นทางฝั่งเว็บจริง" จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม เหมือนหน้าจริง */
+  /*
+    พรีวิวโหลดจาก "เส้นทางฝั่งเว็บจริง" จึงได้ฟอนต์/ธีม/ความกว้างเหมือนหน้าจริง
+    รอบที่ 182 (ฟีดแบ็กเจ้าของ): *"จัดการหน้าแรกไม่ต้องโชว์ที่มาจากส่วนกลาง … แถบเมนู footer ไม่ต้องโชว์"*
+    ⇒ โหมดฉบับร่าง/เผยแพร่ ใช้ `parts=content` = เห็นเฉพาะ **เนื้อหาของหน้านี้** (ตัดแถบเมนู/ท้ายเว็บ/ป้ายประกาศ)
+      เพื่อให้จัดลำดับเลเยอร์ได้ง่าย · ส่วนกลางไปแก้ที่แท็บ "ส่วนกลางของเว็บ" (`/admin/builder/chrome`)
+    ⚠️ โหมด "หน้าเว็บจริง" (`previewLiveSrc` = หน้าเว็บสาธารณะ) **ยังเห็นส่วนกลางครบ** — นั่นคือความหมายของโหมดนี้
+       (ใช้เทียบว่าของจริงหน้าตาเป็นอย่างไรเมื่อมีเมนู/ท้ายเว็บล้อมอยู่)
+    ⚠️ หน้านี้ยังเรนเดอร์ **เอกสารฉบับร่าง** ⇒ สิ่งที่เห็น = สิ่งที่จะบันทึก (ไม่ดึงข้อมูลหน้าเว็บจริง)
+  */
   const previewSrc =
-    previewMode === "live" ? (previewLiveSrc ?? "/th") : `/th/preview/${page}?mode=${previewMode}`;
+    previewMode === "live"
+      ? (previewLiveSrc ?? "/th")
+      : `/th/preview/${page}?mode=${previewMode}&parts=${CONTENT_PREVIEW_PART}`;
 
   /** ส่งฉบับร่างที่กำลังแก้เข้าพรีวิวทันที (ยังไม่ต้องบันทึก) */
   const postToFrame = useCallback(() => {
