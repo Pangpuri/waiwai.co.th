@@ -134,3 +134,30 @@ test("campaigns: พรีวิวลากกำหนดจุดยึด �
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(page.includes("mediaPath: slide.mediaPath"), "หน้าจอต้องส่งภาพของสไลด์มาให้พรีวิว");
 });
+
+test("campaigns: หน้าเว็บจับคู่แคมเปญกับสไลด์ + วางตามจุดยึดที่ลากไว้", () => {
+  const hero = readFileSync("features/home/ui/hero.tsx", "utf8");
+  assert.ok(hero.includes("campaigns?: readonly CampaignData[]"), "hero ต้องรับแคมเปญจากหลังบ้าน");
+  assert.ok(
+    hero.includes("campaign.slideIds.length === 0 || campaign.slideIds.includes(slide.id)"),
+    "ไม่เลือกสไลด์ = ทุกสไลด์ · เลือกไว้ = เฉพาะสไลด์นั้น",
+  );
+  assert.ok(hero.includes("anchorX: card.anchorX") && hero.includes("anchorY: card.anchorY"), "ต้องส่งจุดยึดเข้าไปด้วย");
+
+  const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
+  assert.ok(
+    slider.includes('left: (activeCards[0]?.anchorX ?? 8) + "%"') && slider.includes('top: (activeCards[0]?.anchorY ?? 50) + "%"'),
+    "การ์ดบนหน้าเว็บต้องวางด้วย left/top เป็นเปอร์เซ็นต์",
+  );
+  assert.ok(slider.includes('"translate(-"'), "ต้องเลื่อนกลับครึ่งหนึ่งของตัวเอง (สูตรเดียวกับพรีวิวหลังบ้าน)");
+
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("campaigns={await listLiveCampaigns()}"), "หน้าแรกต้องอ่านแคมเปญที่ยังไม่หมดเวลา");
+  assert.ok(!page.includes("listLiveHeroCards"), "ต้องไม่มีระบบการ์ดผูกสไลด์เดิมหลงเหลือ");
+
+  /* ระบบซ้อนต้องถูกถอดออกจริง */
+  const adminPage = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(!adminPage.includes("cardsBySlide"), "หน้าจอสไลด์ต้องไม่โหลดการ์ดแบบผูกสไลด์แล้ว");
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  assert.ok(!manager.includes("HeroCardEditor"), "พาเนลการ์ดเดิมต้องถูกถอดออกจากหน้าสไลด์");
+});
