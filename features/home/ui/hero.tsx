@@ -67,6 +67,8 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
       ctaHref: card.ctaHref,
       /* ตำแหน่งสำเร็จรูป (สำหรับสไตล์สำรอง) — จุดยึดจริงส่งแยกไปแล้ว */
       position: anchorPresetOf(card.anchorX, card.anchorY) ?? "center",
+      imagePath: card.imagePath,
+      imageAlt: locale === "en" && card.imageAltEn.trim() !== "" ? card.imageAltEn : card.imageAltTh,
       anchorX: card.anchorX,
       anchorY: card.anchorY,
     }));

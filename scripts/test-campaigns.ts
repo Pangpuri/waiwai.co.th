@@ -26,6 +26,9 @@ const base = {
   body: { th: "", en: "" },
   ctaLabel: { th: "", en: "" },
   ctaHref: "",
+  imagePath: "",
+  imageAltTh: "",
+  imageAltEn: "",
   anchorX: 50,
   anchorY: 50,
   startsAt: "",
@@ -82,6 +85,8 @@ test("campaigns: ตรวจค่าฟอร์ม + คำเตือนค
     title: { th: "หัวข้อ", en: "" },
     body: { th: "รายละเอียด", en: "" },
     ctaHref: "/products",
+    imagePath: "",
+    imageAltTh: "",
     status: "published",
   });
   assert.deepEqual(ready, [], "ครบทุกอย่าง = ไม่มีคำเตือน");
@@ -204,4 +209,19 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(page.includes("feedbackOf(") && page.includes("savedMessages[feedback.code]"), "หน้าจอต้องแสดงข้อความจากรหัส");
   assert.ok(page.includes('role="status"'), "แบนเนอร์ต้องประกาศให้โปรแกรมอ่านหน้าจอรู้ (a11y)");
+});
+
+test("campaign image: พาธในเว็บเท่านั้น + ต้องมีคำอธิบายภาพไทย + ไม่เรนเดอร์ <img> เมื่อไม่มีภาพ", () => {
+  const model = readFileSync("lib/campaigns/model.ts", "utf8");
+  assert.ok(model.includes("isSafeCampaignImagePath"), "ต้องมีตัวตรวจพาธภาพ");
+  assert.ok(model.includes('imageAltTh: มีภาพแล้วต้องมีคำอธิบายภาพภาษาไทย'), "มีภาพต้องมี alt ไทย");
+  const repo = readFileSync("lib/campaigns/repository.ts", "utf8");
+  assert.ok(repo.includes("image_path") && repo.includes("input.imagePath"), "ชั้นข้อมูลต้องอ่าน/เขียนพาธภาพ");
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("<ImageDrop"), "หน้าจอแคมเปญต้องมีช่องเลือกภาพ (คลัง/เครื่อง/ลากวาง)");
+  assert.ok(manager.includes('name="imagePath"'), "ค่าภาพต้องถูกส่งไปกับฟอร์มบันทึก");
+  assert.ok(manager.indexOf("<ImageDrop") < manager.indexOf("<form action={saveCampaignAction}"), "ช่องภาพต้องอยู่นอกฟอร์ม (กัน <form> ซ้อน)");
+  const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
+  assert.ok(slider.includes("card.imagePath.trim() === \"\" ? null :"), "ไม่มีภาพ = ไม่เรนเดอร์ <img>");
+  assert.ok(slider.includes("card.imageAlt"), "ต้องใช้คำอธิบายภาพเป็น alt");
 });

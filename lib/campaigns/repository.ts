@@ -26,6 +26,9 @@ type CampaignRow = {
   readonly cta_label_th: string;
   readonly cta_label_en: string;
   readonly cta_href: string;
+  readonly image_path: string;
+  readonly image_alt_th: string;
+  readonly image_alt_en: string;
   readonly anchor_x: number;
   readonly anchor_y: number;
   readonly starts_at: Date | string | null;
@@ -36,7 +39,7 @@ type CampaignRow = {
 };
 
 const COLUMNS = `id, name, title_th, title_en, body_th, body_en, cta_label_th, cta_label_en, cta_href,
-       anchor_x, anchor_y, starts_at, ends_at, is_active, status, sort_order`;
+       image_path, image_alt_th, image_alt_en, anchor_x, anchor_y, starts_at, ends_at, is_active, status, sort_order`;
 
 function toIso(value: Date | string | null): string | null {
   if (value === null) return null;
@@ -53,6 +56,9 @@ function toCampaign(row: CampaignRow, slideIds: readonly string[]): Campaign {
     body: text(row.body_th, row.body_en),
     ctaLabel: text(row.cta_label_th, row.cta_label_en),
     ctaHref: row.cta_href,
+    imagePath: row.image_path,
+    imageAltTh: row.image_alt_th,
+    imageAltEn: row.image_alt_en,
     anchorX: row.anchor_x,
     anchorY: row.anchor_y,
     startsAt: toIso(row.starts_at),
@@ -143,8 +149,9 @@ export async function updateCampaign(id: string, input: CampaignInput, actor: st
       `update campaign
           set name = $2, title_th = $3, title_en = $4, body_th = $5, body_en = $6,
               cta_label_th = $7, cta_label_en = $8, cta_href = $9,
-              anchor_x = $10, anchor_y = $11, starts_at = $12, ends_at = $13, is_active = $14,
-              updated_at = now(), updated_by = $15
+              image_path = $10, image_alt_th = $11, image_alt_en = $12,
+              anchor_x = $13, anchor_y = $14, starts_at = $15, ends_at = $16, is_active = $17,
+              updated_at = now(), updated_by = $18
         where id = $1 and deleted_at is null`,
       [
         id,
@@ -156,6 +163,9 @@ export async function updateCampaign(id: string, input: CampaignInput, actor: st
         input.ctaLabel.th,
         input.ctaLabel.en,
         input.ctaHref,
+        input.imagePath,
+        input.imageAltTh,
+        input.imageAltEn,
         input.anchorX,
         input.anchorY,
         input.startsAt,

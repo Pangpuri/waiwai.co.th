@@ -63,4 +63,5 @@ export const adminHeroCards = {
   feedbackCampaignTrashed: "ย้ายแคมเปญเข้าถังขยะสำเร็จ",
   feedbackErrorInvalid: "บันทึกไม่สำเร็จ — ข้อมูลไม่ครบหรือไม่ถูกต้อง (ตรวจหัวข้อไทยและช่วงเวลา)",
   feedbackErrorSaveFailed: "บันทึกไม่สำเร็จ — ระบบฐานข้อมูลขัดข้อง กรุณาลองใหม่",
+  campaignImage: "ภาพการ์ดแคมเปญ",
 };

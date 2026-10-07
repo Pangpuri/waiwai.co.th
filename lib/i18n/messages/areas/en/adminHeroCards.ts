@@ -63,4 +63,5 @@ export const adminHeroCards = {
   feedbackCampaignTrashed: "Campaign moved to trash",
   feedbackErrorInvalid: "Could not save — missing or invalid data (check the Thai title and the time window)",
   feedbackErrorSaveFailed: "Could not save — the database is unavailable, please try again",
+  campaignImage: "Campaign card image",
 };

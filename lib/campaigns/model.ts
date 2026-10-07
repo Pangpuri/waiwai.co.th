@@ -38,6 +38,10 @@ export type Campaign = {
   readonly body: CampaignText;
   readonly ctaLabel: CampaignText;
   readonly ctaHref: string;
+  /** พาธภาพในการ์ด (ว่าง = การ์ดข้อความล้วน) — รอบที่ 193 */
+  readonly imagePath: string;
+  readonly imageAltTh: string;
+  readonly imageAltEn: string;
   readonly anchorX: number;
   readonly anchorY: number;
   readonly startsAt: string | null;
@@ -55,6 +59,10 @@ export type CampaignInput = {
   readonly body: CampaignText;
   readonly ctaLabel: CampaignText;
   readonly ctaHref: string;
+  /** พาธภาพในการ์ด (ว่าง = การ์ดข้อความล้วน) — รอบที่ 193 */
+  readonly imagePath: string;
+  readonly imageAltTh: string;
+  readonly imageAltEn: string;
   readonly anchorX: number;
   readonly anchorY: number;
   readonly startsAt: string | null;
@@ -103,6 +111,13 @@ export function toDateTimeLocalValue(iso: string | null): string {
   return new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
+/** พาธภาพที่ปลอดภัย — ต้องเป็นพาธในเว็บ (มติ D9: ห้ามเก็บ URL เต็ม) · ว่างได้ = ไม่มีภาพ */
+export function isSafeCampaignImagePath(value: string): boolean {
+  const path = value.trim();
+  if (path === "") return true;
+  return path.startsWith("/") && !path.startsWith("//") && !path.includes("://");
+}
+
 /** ลิงก์ที่ปลอดภัย — พาธในเว็บ หรือปลายทางที่ระบุโปรโตคอลชัดเจน */
 export function isSafeCampaignHref(value: string): boolean {
   const href = value.trim();
@@ -147,12 +162,15 @@ export function isCampaignLiveNow(
  * ใช้เตือนในหน้าจอ เพื่อกันปัญหาที่เจ้าของกังวล: *"แคมเปญเปล่าบ้าง อะไรบ้างเละแน่"*
  * ⚠️ เป็น **คำเตือน** ไม่บล็อกการบันทึก (ยกเว้นค่าที่ผิดรูปแบบซึ่ง `parseCampaignInput` ปฏิเสธ)
  */
-export function campaignReadiness(campaign: Pick<Campaign, "name" | "title" | "body" | "ctaHref" | "status">): readonly string[] {
+export function campaignReadiness(campaign: Pick<Campaign, "name" | "title" | "body" | "ctaHref" | "imagePath" | "imageAltTh" | "status">): readonly string[] {
   const problems: string[] = [];
   if (campaign.name.trim() === "") problems.push("name: ควรตั้งชื่อเพื่อแยกแคมเปญในหลังบ้าน");
   if (campaign.title.th.trim() === "") problems.push("title.th: ยังไม่มีหัวข้อ (แคมเปญจะไม่ขึ้นเว็บ)");
   if (campaign.body.th.trim() === "" && campaign.body.en.trim() === "") problems.push("body: ยังไม่มีข้อความรายละเอียด");
   if (campaign.ctaHref.trim() === "") problems.push("ctaHref: ยังไม่มีลิงก์ปุ่ม (การ์ดจะไม่มีปุ่มให้กด)");
+  if (campaign.imagePath.trim() !== "" && campaign.imageAltTh.trim() === "") {
+    problems.push("imageAltTh: มีภาพแล้วต้องมีคำอธิบายภาพภาษาไทย");
+  }
   if (campaign.status === "published" && campaign.title.th.trim() === "") {
     problems.push("status: เผยแพร่แล้วแต่ยังไม่มีหัวข้อ ⇒ จะไม่มีอะไรแสดงบนเว็บ");
   }
@@ -183,6 +201,9 @@ export function parseCampaignInput(raw: unknown): CampaignParseOutcome {
   const body = text("body");
   const ctaLabel = text("ctaLabel");
   const ctaHref = typeof record["ctaHref"] === "string" ? record["ctaHref"].trim() : "";
+  const imagePath = typeof record["imagePath"] === "string" ? record["imagePath"].trim() : "";
+  const imageAltTh = typeof record["imageAltTh"] === "string" ? record["imageAltTh"].trim() : "";
+  const imageAltEn = typeof record["imageAltEn"] === "string" ? record["imageAltEn"].trim() : "";
   const startsAt = normalizeMoment(record["startsAt"]);
   const endsAt = normalizeMoment(record["endsAt"]);
   const slideIdsRaw = Array.isArray(record["slideIds"]) ? record["slideIds"] : [];
@@ -190,6 +211,8 @@ export function parseCampaignInput(raw: unknown): CampaignParseOutcome {
 
   if (title.th === "") problems.push("title.th: ต้องมีหัวข้อภาษาไทย");
   if (!isSafeCampaignHref(ctaHref)) problems.push("ctaHref: ต้องเป็นพาธในเว็บ หรือ http(s)/mailto/tel");
+  if (!isSafeCampaignImagePath(imagePath)) problems.push("imagePath: ต้องเป็นพาธในเว็บ (ห้าม URL เต็ม)");
+  if (imagePath !== "" && imageAltTh === "") problems.push("imageAltTh: มีภาพแล้วต้องมีคำอธิบายภาพภาษาไทย");
   if (startsAt !== null && endsAt !== null && Date.parse(endsAt) <= Date.parse(startsAt)) {
     problems.push("endsAt: ต้องอยู่หลังเวลาเริ่ม");
   }
@@ -204,6 +227,9 @@ export function parseCampaignInput(raw: unknown): CampaignParseOutcome {
       body,
       ctaLabel,
       ctaHref,
+      imagePath,
+      imageAltTh,
+      imageAltEn,
       anchorX: clampAnchor(record["anchorX"]),
       anchorY: clampAnchor(record["anchorY"]),
       startsAt,

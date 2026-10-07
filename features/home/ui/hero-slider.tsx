@@ -50,6 +50,10 @@ export type HeroCardView = {
   readonly position: "left" | "center" | "right";
   /** จุดยึดเป็นเปอร์เซ็นต์ของพื้นที่สไลด์ (รอบที่ 190) — ตรงกับที่ลากในหลังบ้าน */
   readonly anchorX?: number;
+  /** พาธภาพของการ์ด (รอบที่ 193) — ว่าง = การ์ดข้อความล้วน */
+  readonly imagePath?: string;
+  /** คำอธิบายภาพ (alt) — ผู้ใช้กรอกในหลังบ้าน · ว่าง = ใช้หัวข้อแทน */
+  readonly imageAlt?: string;
   readonly anchorY?: number;
 };
 
@@ -147,6 +151,9 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
             >
               {activeCards.map((card) => (
                 <div key={card.id} className="flex flex-col gap-1">
+                  {card.imagePath === undefined || card.imagePath.trim() === "" ? null : (
+                    <img src={card.imagePath} alt={card.imageAlt === undefined || card.imageAlt.trim() === "" ? card.title : card.imageAlt} className="mb-1 h-24 w-full rounded-lg object-cover sm:h-28" />
+                  )}
                   <p className="text-fg text-base font-bold sm:text-lg">{card.title}</p>
                   {card.body.trim() === "" ? null : <p className="text-fg-muted text-xs sm:text-sm">{card.body}</p>}
                   {card.ctaLabel.trim() === "" || card.ctaHref.trim() === "" ? null : (
