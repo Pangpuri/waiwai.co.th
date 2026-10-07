@@ -7,10 +7,13 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { scheduledPublishOverview } from "@/lib/blocks/publish-scheduler";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { fillTemplate } from "@/lib/i18n/template";
 import { maintenanceFlagOf, MAINTENANCE_ENV_VAR } from "@/lib/maintenance/plan";
 import { describeRetention } from "@/lib/retention/format";
 import { type RetentionClass } from "@/lib/retention/plan";
 import { retentionOverview } from "@/lib/retention/purge";
+import { contentTrashStats } from "@/lib/trash/content";
+import { CONTENT_TRASH_KINDS, CONTENT_TRASH_SCREENS, type ContentTrashKind } from "@/lib/trash/plan";
 import { trashStats } from "@/lib/trash/repository";
 
 /**
@@ -52,8 +55,18 @@ export default async function AdminHomePage() {
     ถังขยะ (X2.4) — นับของที่รอกู้คืน/ลบถาวร
     อ่านล้วน + คืน 0 เมื่อไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
     อ่านเฉพาะเมื่อมีสิทธิ์ (เหตุผลเดียวกับระยะเก็บด้านบน)
+    รอบที่ 175: นับ **เนื้อหา** (สินค้า/เมนู/ข่าว) ด้วย — เดิมการ์ดนับแค่ภาพ/พรีเซ็ต ⇒ เจ้าของเห็นไม่ครบ
   */
   const trash = canTrash ? await trashStats() : null;
+  const contentTrash = canTrash ? await contentTrashStats() : null;
+  const trashTotalAll = (trash?.total ?? 0) + (contentTrash?.total ?? 0);
+
+  /* ป้ายชื่อของแต่ละชนิดเนื้อหาในถัง — เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที */
+  const contentTrashLabels: Readonly<Record<ContentTrashKind, string>> = {
+    product: strings.trashContentProduct,
+    recipe: strings.trashContentRecipe,
+    news: strings.trashContentNews,
+  };
 
   /*
     งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — ทุกบทบาทมีสิทธิ์ `content` จึงไม่ต้องซ่อนการ์ด
@@ -224,15 +237,15 @@ export default async function AdminHomePage() {
       </section>
       ) : null}
 
-      {/* ── ถังขยะ (X2.4) — เฉพาะผู้มีสิทธิ์ trash ────────────────────────────── */}
-      {canTrash && trash !== null ? (
+      {/* ── ถังขยะ (X2.4 · ขยายรอบที่ 175) — เฉพาะผู้มีสิทธิ์ trash ─────────────── */}
+      {canTrash && trash !== null && contentTrash !== null ? (
       <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.trashCardTitle}</h2>
           <p className="text-fg-muted text-xs">{strings.trashCardHint}</p>
         </div>
         <p className="text-fg text-sm font-semibold">
-          {trash.total === 0 ? strings.trashCardEmpty : strings.trashCardCount.replace("{count}", String(trash.total))}
+          {trashTotalAll === 0 ? strings.trashCardEmpty : strings.trashCardCount.replace("{count}", String(trashTotalAll))}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Link
@@ -242,10 +255,35 @@ export default async function AdminHomePage() {
             {strings.trashTitle}
           </Link>
           <span className="text-fg-muted text-xs">
-            {strings.trashStats
-              .replace("{media}", String(trash.media))
-              .replace("{preset}", String(trash.preset))}
+            {fillTemplate(strings.trashStats, {
+              media: trash.media,
+              preset: trash.preset,
+              chrome: trash.chromePreset,
+            })}
           </span>
+        </div>
+
+        {/* เนื้อหาในถัง (รอบที่ 175) — ของแต่ละชนิดกู้คืน/ลบถาวรในแท็บถังขยะของหน้าจอนั้น */}
+        <div className="border-line flex flex-col gap-2 border-t pt-3">
+          <p className="text-fg-muted text-xs">
+            {fillTemplate(strings.trashContentStats, {
+              product: contentTrash.product,
+              recipe: contentTrash.recipe,
+              news: contentTrash.news,
+            })}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {CONTENT_TRASH_KINDS.map((kind) => (
+              <Link
+                key={kind}
+                href={CONTENT_TRASH_SCREENS[kind]}
+                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {contentTrashLabels[kind]}
+              </Link>
+            ))}
+          </div>
+          <p className="text-fg-muted text-[11px]">{strings.trashContentHint}</p>
         </div>
       </section>
       ) : null}

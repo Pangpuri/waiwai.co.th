@@ -157,7 +157,7 @@ import {
   trashMedia,
   trashStats,
 } from "@/lib/trash/repository";
-import { purgeExpiredContentTrash } from "@/lib/trash/content";
+import { contentTrashStats, purgeExpiredContentTrash } from "@/lib/trash/content";
 import { listReorderItems, parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
@@ -343,6 +343,9 @@ async function main(): Promise<void> {
 
   /* 33) ถังขยะเนื้อหา: ตัวลบอัตโนมัติลบเฉพาะของที่พ้นกำหนด (รอบที่ 170) */
   await checkContentTrashPurge();
+
+  /* 34) ถังขยะเนื้อหา: ตัวนับบนการ์ด `/admin` ตรงกับของจริง (รอบที่ 175) */
+  await checkContentTrashStats();
 
   await closePool();
 
@@ -2997,6 +3000,123 @@ async function checkContentTrashPurge(): Promise<void> {
     );
   } finally {
     await getPool().query("delete from product where id = any($1::text[])", [[oldProductId, freshProductId, activeProductId]]);
+    if (newsId !== "") await deleteNews(newsId);
+    if (recipeId !== "") await deleteRecipe(recipeId);
+
+    assert.equal(await countWhere("product where id like 'p99999%'", []), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+  }
+}
+
+/**
+ * 34) ถังขยะเนื้อหา: **ตัวนับบนการ์ด `/admin` ตรงกับของจริง** (รอบที่ 175)
+ *
+ * ที่มา: การ์ดหน้าภาพรวมคือสิ่งที่บอกผู้ดูแลว่า "ถังมีอะไรบ้าง กี่รายการ" ⇒ ตัวนับเพี้ยน = เข้าใจผิดทั้งระบบ
+ *   (ยอดต่ำกว่าจริง = คิดว่าไม่มีของค้าง · ยอดสูงกว่าจริง = หาของไม่เจอ)
+ * วงจรนี้พิสูจน์ 4 ข้อ: ของ 3 ชนิดถูกนับ · **ของที่ยังใช้งานอยู่ไม่ถูกนับ** · กู้คืนแล้วยอดลดกลับ · ยอดรวม = ผลบวกของทุกชนิด
+ *
+ * ⚠️ ใช้ **ผลต่าง (delta)** เทียบก่อน/หลัง ไม่ใช่ยอดสัมบูรณ์ — ฐานข้อมูลจริงมีของในถังของคนอื่นได้เสมอ
+ *    (บทเรียนรอบที่ 127: เทสต์ห้ามพึ่ง "สภาพแวดล้อมว่าง")
+ */
+async function checkContentTrashStats(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+
+  const actor = "check-db-content-trash-stats@example.invalid";
+  const trashedProductId = "p999996";
+  const activeProductId = "p999997";
+  let newsId = "";
+  let recipeId = "";
+
+  const productOf = (id: string, nameTh: string, sortOrder: number): ProductInput => ({
+    id,
+    categoryId,
+    sourceId: "",
+    sourceUrl: "",
+    nameTh,
+    nameEn: "",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
+    sortOrder,
+  });
+
+  const before = await contentTrashStats();
+
+  try {
+    await upsertProduct(productOf(trashedProductId, "ทดสอบตัวนับถัง (จะย้ายเข้า)", -99996), actor, null, { imageMode: "keep" });
+    await upsertProduct(productOf(activeProductId, "ทดสอบตัวนับถัง (ใช้งานอยู่)", -99997), actor, null, { imageMode: "keep" });
+
+    newsId = await createNewsForAdmin(
+      {
+        titleTh: "ข่าวทดสอบตัวนับถังเนื้อหา",
+        titleEn: "",
+        excerptTh: "",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-02T10:30",
+        status: "published",
+        body: [{ type: "paragraph", text: "ทดสอบตัวนับถังขยะเนื้อหา" }],
+      },
+      actor,
+    );
+    recipeId = await createRecipeForAdmin(
+      {
+        titleTh: "เมนูทดสอบตัวนับถังเนื้อหา",
+        titleEn: "",
+        videoId: "dQw4w9WgXcQ",
+        publishedOn: "2018-10-09",
+        sortOrder: 998,
+        coverPath: null,
+        status: "published",
+      },
+      actor,
+    );
+
+    /* 1) ยังไม่มีใครย้ายเข้า ⇒ ยอดต้องเท่าเดิม (ของที่ยังใช้งานอยู่ต้องไม่ถูกนับ) */
+    const active = await contentTrashStats();
+    assert.deepEqual(
+      { product: active.product, recipe: active.recipe, news: active.news },
+      { product: before.product, recipe: before.recipe, news: before.news },
+      "ของที่ยังใช้งานอยู่ต้องไม่ถูกนับเป็นของในถัง",
+    );
+    assert.equal(active.total, active.product + active.recipe + active.news, "ยอดรวมต้องเท่าผลบวกของทุกชนิด");
+
+    /* 2) ย้ายเข้าถัง 3 ชนิด ⇒ ชนิดละ +1 เป๊ะ */
+    await setProductTrashed(trashedProductId, true, actor);
+    await setNewsTrashed(newsId, true, actor);
+    await setRecipeTrashed(recipeId, true, actor);
+
+    const trashed = await contentTrashStats();
+    assert.equal(trashed.product - before.product, 1, "ต้องนับสินค้าในถังเพิ่ม 1");
+    assert.equal(trashed.news - before.news, 1, "ต้องนับข่าวในถังเพิ่ม 1");
+    assert.equal(trashed.recipe - before.recipe, 1, "ต้องนับเมนูในถังเพิ่ม 1");
+    assert.equal(trashed.total - before.total, 3, "ยอดรวมต้องเพิ่ม 3");
+
+    /* 3) กู้คืนข่าว ⇒ ยอดชนิดนั้นกลับเท่าเดิม อีกสองชนิดไม่กระทบ */
+    await setNewsTrashed(newsId, false, actor);
+    const restored = await contentTrashStats();
+    assert.equal(restored.news, before.news, "กู้คืนแล้วต้องไม่ถูกนับเป็นของในถัง");
+    assert.equal(restored.product - before.product, 1, "กู้คืนข่าวต้องไม่กระทบยอดสินค้า");
+    assert.equal(restored.recipe - before.recipe, 1, "กู้คืนข่าวต้องไม่กระทบยอดเมนู");
+    assert.equal(restored.total, trashed.total - 1, "ยอดรวมต้องลดลง 1 หลังกู้คืน");
+
+    done(
+      "ถังขยะเนื้อหา: ตัวนับบนการ์ดตรงกับของจริง",
+      "นับ 3 ชนิด · ของที่ใช้งานอยู่ไม่ถูกนับ · กู้คืนแล้วยอดลด · ยอดรวม = ผลบวกของทุกชนิด",
+    );
+  } finally {
+    await getPool().query("delete from product where id = any($1::text[])", [[trashedProductId, activeProductId]]);
     if (newsId !== "") await deleteNews(newsId);
     if (recipeId !== "") await deleteRecipe(recipeId);
 

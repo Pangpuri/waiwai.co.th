@@ -118,3 +118,19 @@ export function contentTrashTotal(counts: Readonly<Record<ContentTrashKind, numb
 export function summarizeContentTrash(counts: Readonly<Record<ContentTrashKind, number>>): string {
   return CONTENT_TRASH_KINDS.map((kind) => `${kind}=${counts[kind]}`).join(" ");
 }
+
+/**
+ * หน้าจอที่ "กู้คืน/ลบถาวร" ของในถังของแต่ละชนิดเนื้อหา (รอบที่ 175)
+ *
+ * ทำไมต้องเป็นค่ากลางตัวเดียว
+ * - การ์ดถังขยะบน `/admin` + หน้าถังขยะ ต้อง **ลิงก์ไปที่เดียวกันเสมอ**
+ *   ถ้าพิมพ์พาธซ้ำสองที่ วันหนึ่งมีคนเปลี่ยนชื่อแท็บแล้วลิงก์เสียโดยไม่มีใครรู้
+ *   (มีเทสต์สแกนว่าพาธนี้ตรงกับแท็บจริงของหน้าจอนั้น)
+ * - ⚠️ **เจตนาเดิมจากรอบที่ 170 ยังอยู่:** เนื้อหาไม่มีหน้า "ถังขยะกลาง" —
+ *   ของแต่ละชนิดกู้คืน/ลบถาวรใน **แท็บ `trash` ของหน้าจอนั้น** (ที่เห็นบริบทของข้อมูลครบกว่า)
+ */
+export const CONTENT_TRASH_SCREENS: Readonly<Record<ContentTrashKind, string>> = {
+  product: "/admin/products?tab=trash",
+  recipe: "/admin/recipes?tab=trash",
+  news: "/admin/news?tab=trash",
+};

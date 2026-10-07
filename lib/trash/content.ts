@@ -42,6 +42,37 @@ export type ContentTrashPurgeReport = {
   readonly total: number;
 };
 
+export type ContentTrashStats = Readonly<Record<ContentTrashKind, number>> & { readonly total: number };
+
+function statsOf(counts: Readonly<Record<ContentTrashKind, number>>): ContentTrashStats {
+  return { ...counts, total: contentTrashTotal(counts) };
+}
+
+/**
+ * นับ **ของในถังเนื้อหาที่ยังกู้คืนได้** แยกชนิด (รอบที่ 175) — สำหรับการ์ด `/admin` + หน้าถังขยะ
+ *
+ * ต่างจาก `purgeExpiredContentTrash` ตรงที่ **ไม่สนวันหมดอายุ** — นับทุกแถวที่ `deleted_at is not null`
+ * (คือ "ของที่ยังกู้คืนได้ตอนนี้") ⇒ การ์ดจึงบอกได้ครบว่าถังมีอะไรบ้าง ไม่ใช่แค่ที่ใกล้ถูกลบ
+ *
+ * ⚠️ **ไม่มี DB = คืน 0 ทุกชนิด** (ไม่โยน error) — หลักเดียวกับ `trashStats()` ของภาพ/พรีเซ็ต
+ *    เพราะหน้าภาพรวมหลังบ้านต้องไม่พังเพราะเรื่องฐานข้อมูล (มีป้ายเตือนแยกอยู่แล้ว)
+ */
+export async function contentTrashStats(): Promise<ContentTrashStats> {
+  if (!isDatabaseConfigured()) return statsOf(emptyContentTrashCounts());
+
+  const pool = getPool();
+  const counts = emptyContentTrashCounts();
+
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const { rows } = await pool.query<{ n: number }>(
+      `select count(*)::int as n from ${CONTENT_TABLES[kind]} where deleted_at is not null`,
+    );
+    counts[kind] = rows[0]?.n ?? 0;
+  }
+
+  return statsOf(counts);
+}
+
 /**
  * ลบถาวรของในถังขยะเนื้อหาที่พ้นระยะเก็บ — `dryRun` = นับเฉย ๆ
  * คืน `null` = ยังไม่ได้ตั้งฐานข้อมูล

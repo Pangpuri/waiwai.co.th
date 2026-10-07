@@ -4,8 +4,10 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { TRASH_RETENTION_DAYS, RETENTION_CLASSES, trashCutoffFor } from "@/lib/retention/plan";
+import { can } from "@/lib/auth/roles";
 import {
   CONTENT_TRASH_KINDS,
+  CONTENT_TRASH_SCREENS,
   TRASH_AUDIT_ACTIONS,
   TRASH_KINDS,
   contentTrashTotal,
@@ -312,4 +314,135 @@ test("trash-content: ตัวลบกลางต้องเรียกด�
   assert.ok(schema.includes("product_admin_idx"), "สินค้าต้องมีดัชนีของถังขยะ");
   assert.ok(schema.includes("recipe_admin_idx"), "เมนูอาหารต้องมีดัชนีของถังขยะ");
   assert.ok(schema.includes("news_admin_idx"), "ข่าวต้องมีดัชนีของถังขยะ");
+});
+
+/* ── 4) ดัชนีถังขยะเนื้อหา + ทางไปถึง (รอบที่ 175) ──────────────────────────────
+ *
+ * ที่มา: รอบที่ 174 ปิด "ลบถาวรของข่าว" แล้ว แต่ผู้ดูแลยัง **มองไม่เห็นจากที่เดียว** ว่าถังมีอะไรบ้าง
+ * (การ์ด `/admin` นับแค่ภาพ/พรีเซ็ต) ⇒ รอบนี้เพิ่มตัวนับ + ทะเบียนลิงก์
+ * เทสต์ชุดนี้กัน 3 เรื่องที่พังเงียบได้:
+ *   1. ลิงก์พาไปแท็บที่ไม่มีจริง (เปลี่ยนชื่อแท็บแล้วลืมแก้)
+ *   2. ชนิดหนึ่งไม่มีปุ่มลบถาวร / ลบได้แม้ของยังใช้งานอยู่ (ประตู SQL หาย)
+ *   3. ตัวเติม `{placeholder}` ไม่ครบ ⇒ หน้าจอโชว์ `{chrome}` ดิบ ๆ ให้ผู้ใช้เห็น
+ */
+
+const CONTENT_SCREEN_FILES: Readonly<Record<string, string>> = {
+  product: "app/admin/products/page.tsx",
+  recipe: "app/admin/recipes/page.tsx",
+  news: "app/admin/news/page.tsx",
+};
+
+const CONTENT_REPOSITORY_FILES: Readonly<Record<string, string>> = {
+  product: "lib/products/repository.ts",
+  recipe: "lib/recipes/repository.ts",
+  news: "lib/news/repository.ts",
+};
+
+test("trash-content: ทะเบียนหน้าจอของถังขยะเนื้อหา — ครบทุกชนิด และชี้ไปแท็บที่มีจริง", () => {
+  assert.deepEqual(
+    Object.keys(CONTENT_TRASH_SCREENS).sort(),
+    [...CONTENT_TRASH_KINDS].sort(),
+    "ทุกชนิดต้องมีหน้าจอของตัวเอง (เพิ่มชนิดใหม่แล้วลืมใส่ = แดง)",
+  );
+
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const path = CONTENT_TRASH_SCREENS[kind];
+    assert.ok(path.endsWith("?tab=trash"), `${kind}: ต้องชี้ไปแท็บถังขยะ (พบ ${path})`);
+
+    const file = CONTENT_SCREEN_FILES[kind];
+    assert.ok(file !== undefined, `${kind}: ต้องประกาศไฟล์หน้าจอในเทสต์ด้วย`);
+    const source = sourceOf(file);
+
+    /* แท็บต้องมีจริงในหน้าจอนั้น — ตรวจทั้งแบบ TAB_IDS และแบบเทียบสตริงตรง (products ใช้แบบหลัง) */
+    const hasTabId = /\["all", "draft", "published", "trash"\]/.test(source) || source.includes('tab === "trash"');
+    assert.ok(hasTabId, `${file}: ต้องรองรับแท็บ "trash"`);
+
+    /* พาธฐานต้องตรงกับทะเบียนกลาง
+       (products เขียนพาธเต็มที่รวม `?tab=trash` · recipes/news สร้างแท็บจาก `TAB_IDS`/`tabHref`
+        ⇒ ตรวจพาธฐานพอ ส่วน "แท็บมีจริงไหม" ตรวจด้วย `hasTabId` ด้านบน) */
+    const basePath = path.split("?")[0];
+    assert.ok(source.includes(`"${basePath}"`), `${file}: ต้องมีพาธฐานตรงกับทะเบียนกลาง (${basePath})`);
+  }
+});
+
+test("trash-content: ทุกชนิดมีปุ่มลบถาวร และประตู 'ต้องอยู่ในถัง' อยู่ที่ SQL", () => {
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const pageFile = CONTENT_SCREEN_FILES[kind];
+    assert.ok(pageFile !== undefined, `${kind}: ต้องประกาศไฟล์หน้าจอในเทสต์ด้วย`);
+    const page = sourceOf(pageFile);
+    const action = `delete${kind[0]?.toUpperCase()}${kind.slice(1)}ForeverAction`;
+    assert.ok(page.includes(action), `${pageFile}: ต้องมีปุ่มลบถาวร (${action})`);
+
+    /* ปุ่มต้องแสดงเฉพาะของในถัง (ไม่ให้ผู้ใช้กดลบของที่ยังใช้งานอยู่) */
+    assert.ok(
+      /item\.trashed \? \(|entry\.trashed \? \(/.test(page) || page.includes("trashed ?"),
+      `${pageFile}: ปุ่มลบถาวรต้องผูกกับสถานะ "อยู่ในถัง"`,
+    );
+
+    const repoFile = CONTENT_REPOSITORY_FILES[kind];
+    assert.ok(repoFile !== undefined, `${kind}: ต้องประกาศไฟล์ repository ในเทสต์ด้วย`);
+    const repo = sourceOf(repoFile);
+    const fn = `delete${kind[0]?.toUpperCase()}${kind.slice(1)}Forever`;
+    assert.ok(repo.includes(fn), `${repoFile}: ต้องมี ${fn}()`);
+    assert.ok(repo.includes(`and deleted_at is not null`), `${repoFile}: ${fn}() ต้องมีประตู "ต้องอยู่ในถัง" ที่ SQL`);
+  }
+});
+
+test("trash-content: การ์ด /admin และหน้าถังขยะ ต้องโชว์ครบทุกชนิด + ลิงก์ไปถึง", () => {
+  for (const file of ["app/admin/page.tsx", "app/admin/trash/page.tsx"]) {
+    const source = sourceOf(file);
+    assert.ok(source.includes("contentTrashStats("), `${file}: ต้องนับของในถังเนื้อหาด้วย`);
+    assert.ok(source.includes("CONTENT_TRASH_SCREENS"), `${file}: ต้องลิงก์จากทะเบียนกลาง (ไม่พิมพ์พาธเอง)`);
+    assert.ok(source.includes("CONTENT_TRASH_KINDS.map("), `${file}: ต้องวนทุกชนิด (เพิ่มชนิดใหม่แล้วโผล่เอง)`);
+  }
+
+  /* ยอดรวมบนการ์ดต้องรวมเนื้อหา (ไม่งั้นผู้ดูแลเห็น "ว่าง" ทั้งที่มีของ) */
+  const overview = sourceOf("app/admin/page.tsx");
+  assert.ok(overview.includes("trashTotalAll"), "การ์ดต้องมียอดรวมของทุกถัง ไม่ใช่แค่ภาพ/พรีเซ็ต");
+
+  /* สิทธิ์: ใครที่เห็นการ์ด (trash ⊂ publisher) ต้องเข้าแท็บเนื้อหาทุกแท็บได้ (content ⊂ editor)
+     ⇒ ไม่มีลิงก์ "กดแล้วเด้ง /admin/denied" (บทเรียนรอบที่ 85) */
+  assert.ok(can("publisher", "trash"), "ผู้ที่เห็นการ์ดถังขยะคือ publisher ขึ้นไป");
+  for (const permission of ["content", "media", "presets"] as const) {
+    assert.ok(can("publisher", permission), `publisher ต้องมีสิทธิ์ ${permission} (เปิดหน้าจอที่ลิงก์ไปถึงได้)`);
+  }
+  assert.ok(!can("editor", "trash"), "editor ต้องไม่เห็นการ์ดถังขยะ (ตรวจสิทธิ์จริงฝั่งเซิร์ฟเวอร์อยู่ที่ requireAdminUser)");
+
+  /* ด่าน DB ต้องพิสูจน์ตัวนับกับข้อมูลจริง */
+  const checkDb = sourceOf("scripts/check-db.ts");
+  assert.ok(checkDb.includes("checkContentTrashStats"), "check:db ต้องมีวงจรตัวนับถังขยะเนื้อหา");
+});
+
+test("trash-content: ตัวเติม {placeholder} ต้องครบทั้ง TH/EN (กันหน้าจอโชว์ {chrome} ดิบ)", () => {
+  const placeholders: Readonly<Record<string, readonly string[]>> = {
+    trashStats: ["{media}", "{preset}", "{chrome}"],
+    trashContentStats: ["{product}", "{recipe}", "{news}"],
+  };
+
+  for (const locale of ["th", "en"]) {
+    const dictionary = sourceOf(`lib/i18n/messages/areas/${locale}/adminTrash.ts`);
+    for (const [key, tokens] of Object.entries(placeholders)) {
+      const match = dictionary.match(new RegExp(`${key}: "([^"]+)"`));
+      assert.ok(match !== null, `${locale}/adminTrash.ts: ต้องมีคีย์ ${key}`);
+      const body = match[1] ?? "";
+      for (const token of tokens) {
+        assert.ok(body.includes(token), `${locale}/${key} ต้องมี ${token}`);
+      }
+    }
+  }
+
+  /* ทุกจุดที่เติมคีย์นี้ต้องส่งค่าครบทุกตัว (ไม่งั้นผู้ใช้เห็นวงเล็บปีกกาค้างบนจอ) */
+  for (const file of ["app/admin/page.tsx", "app/admin/trash/page.tsx"]) {
+    const source = sourceOf(file);
+    if (source.includes("strings.trashStats")) {
+      for (const key of ["media:", "preset:", "chrome:"]) {
+        assert.ok(source.includes(key), `${file}: fillTemplate(strings.trashStats) ต้องส่ง ${key}`);
+      }
+    }
+    if (source.includes("strings.trashContentStats")) {
+      for (const key of ["product:", "recipe:", "news:"]) {
+        assert.ok(source.includes(key), `${file}: fillTemplate(strings.trashContentStats) ต้องส่ง ${key}`);
+      }
+    }
+  }
 });
