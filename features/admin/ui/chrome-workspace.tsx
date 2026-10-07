@@ -132,18 +132,13 @@ export function ChromeWorkspace({
     return () => window.removeEventListener(MOURNING_LIVE_EVENT, handler);
   }, []);
 
+  /*
+    ส่งค่าล่าสุดเข้า iframe ทุกครั้งที่ "ค่าที่กำลังแก้" เปลี่ยน (พิมพ์แล้วพรีวิวขยับ)
+    หรือเมื่อ iframe ถูกสร้างใหม่ (สลับแท็บ/โหมด/กดโหลดใหม่) — ใช้ `postLiveValues` ตัวเดียว
+    ⚠️ ห้ามคัดลอกเนื้อในฟังก์ชันมาวางซ้ำที่นี่ (รอบที่ 170 แก้ lint + บั๊กวงเล็บที่ทำให้ป้ายไม่ถูกส่ง)
+  */
   useEffect(() => {
-    const target = frameRef.current?.contentWindow;
-    if (target === null || target === undefined) return;
-    if (liveNavbar.sent) {
-      target.postMessage({ type: NAVBAR_MESSAGE, config: liveNavbar.value }, window.location.origin);
-    }
-    if (liveFooter.sent) {
-      target.postMessage({ type: FOOTER_MESSAGE, config: liveFooter.value }, window.location.origin);
-    if (liveNotice.sent) {
-      target.postMessage({ type: MOURNING_MESSAGE, config: liveNotice.value }, window.location.origin);
-    }
-    }
+    postLiveValues();
   }, [postLiveValues, mode, reloadKey, part]);
 
   /* ท้ายเว็บใช้พรีวิวคนละโหมด (โชว์ท้ายเว็บอย่างเดียว) — แถบเมนู/ป้ายประกาศใช้โหมด nav */

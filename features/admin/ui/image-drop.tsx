@@ -2,7 +2,14 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { cropImageFile, shrinkImageFile, shrinkSummary, type ShrinkOutcome } from "@/features/admin/ui/image-resize";
+import {
+  aspectConfirmation,
+  cropImageFile,
+  readImageSize,
+  shrinkImageFile,
+  shrinkSummary,
+  type ShrinkOutcome,
+} from "@/features/admin/ui/image-resize";
 import { fillTemplate } from "@/lib/i18n/template";
 import { useFormStatus } from "react-dom";
 
@@ -105,6 +112,12 @@ export function ImageDrop({
   const [shrinkNote, setShrinkNote] = useState<string | null>(null);
   /* หมายเหตุการครอปสัดส่วน (รอบที่ 168) — ข้อความจากพจนานุกรม */
   const [cropNote, setCropNote] = useState<string | null>(null);
+  /* ไฟล์ที่รอยืนยันครอปก่อนอัปโหลด (รอบที่ 170) — null = ไม่มีอะไรค้าง */
+  const [pendingCrop, setPendingCrop] = useState<{
+    readonly file: File;
+    readonly ratio: string;
+    readonly aspect: string;
+  } | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const appliedPath = useRef<string | null>(null);
@@ -124,18 +137,39 @@ export function ImageDrop({
    * ⚠️ รอบที่ 99: **ย่อ/แปลงเป็น WebP ก่อนส่ง** (ทำในเบราว์เซอร์ ไม่เพิ่ม dependency)
    *    ถ้าย่อไม่สำเร็จ/ไฟล์ไม่เล็กลง = ใช้ไฟล์เดิม · เบราว์เซอร์เก่าที่ไม่มี `DataTransfer` = ส่งไฟล์เดิม (ไม่พัง)
    */
-  async function submitFile(file: File | undefined | null): Promise<void> {
+  /**
+   * เตรียมไฟล์ก่อนส่ง — ถ้าช่องนี้กำหนดสัดส่วนเป้าหมาย (ป้ายประกาศ = 3:1) ให้ **เตือนก่อน** เมื่อไฟล์ผิดสัดส่วน
+   * (รอบที่ 170) โดยยังไม่ส่งขึ้นเซิร์ฟเวอร์ · สัดส่วนตรง/อ่านขนาดไม่ได้ = ส่งทันทีเหมือนเดิม
+   */
+  async function prepareFile(file: File | undefined | null): Promise<void> {
     if (file === undefined || file === null) {
       setLocalError("no-file");
       return;
     }
     setLocalError(null);
+    setShrinkNote(null);
+    setCropNote(null);
+    setPendingCrop(null);
+
+    if (cropAspect !== undefined) {
+      const size = await readImageSize(file);
+      if (size !== null) {
+        const check = aspectConfirmation(size.width, size.height, cropAspect);
+        if (check.required) {
+          setPendingCrop({ file, ratio: check.ratio, aspect: String(cropAspect) });
+          return;
+        }
+      }
+    }
+
+    await uploadFile(file);
+  }
+
+  /** ส่งไฟล์จริง (ย่อ/ครอป + ใส่กลับ input + requestSubmit) — เส้นทางเดียวกับปุ่มไม่ใช้ JS */
+  async function uploadFile(file: File): Promise<void> {
     const input = inputRef.current;
     const form = formRef.current;
     if (input === null || form === null) return;
-
-    setShrinkNote(null);
-    setCropNote(null);
 
     /*
       รอบที่ 168: ถ้าช่องนี้กำหนดสัดส่วนเป้าหมาย (ป้ายประกาศ = 3:1) ให้ **ครอปกลางภาพ** ก่อนส่ง
@@ -164,6 +198,14 @@ export function ImageDrop({
       /* เบราว์เซอร์เก่า: ส่งไฟล์ที่ผู้ใช้เลือกไว้ใน input ตามเดิม */
     }
     form.requestSubmit();
+  }
+
+  /** ผู้ใช้ยืนยันครอปแล้ว → ส่งไฟล์ที่ค้างอยู่ตามเส้นทางปกติ */
+  function confirmPendingCrop(): void {
+    const pending = pendingCrop;
+    if (pending === null) return;
+    setPendingCrop(null);
+    void uploadFile(pending.file);
   }
 
   const current = value ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
@@ -204,7 +246,7 @@ export function ImageDrop({
           onDrop={(event) => {
             event.preventDefault();
             setDragging(false);
-            submitFile(event.dataTransfer.files.item(0));
+            void prepareFile(event.dataTransfer.files.item(0));
           }}
           onClick={() => inputRef.current?.click()}
           role="button"
@@ -255,13 +297,44 @@ export function ImageDrop({
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.item(0) ?? null;
-            if (file !== null) void submitFile(file);
+            if (file !== null) void prepareFile(file);
           }}
         />
 
         {/* ปุ่มนี้มีไว้ให้ใช้งานได้แม้ปิด JavaScript (ปกติลากวาง/เลือกไฟล์แล้วส่งทันที) */}
         <UploadButton label={strings.imageChoose} pendingLabel={strings.imageUploading} />
       </form>
+
+      {/*
+        เตือน "ก่อน" อัปโหลด (รอบที่ 170) — ไฟล์ผิดสัดส่วนจะยังไม่ถูกส่งขึ้นเซิร์ฟเวอร์
+        ผู้ใช้เลือกได้ว่าจะครอปต่อ หรือเปลี่ยนภาพ (เลือกภาพอื่น = เปิดหน้าต่างเลือกไฟล์ให้เลย)
+      */}
+      {pendingCrop === null ? null : (
+        <div role="status" className="border-brand-red bg-surface flex flex-col gap-2 rounded-lg border p-2">
+          <p className="text-fg text-xs font-semibold">
+            {fillTemplate(strings.imageCropConfirm, { ratio: pendingCrop.ratio, aspect: pendingCrop.aspect })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={confirmPendingCrop}
+              className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-lg px-3 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {strings.imageCropConfirmYes}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCrop(null);
+                inputRef.current?.click();
+              }}
+              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-3 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {strings.imageCropConfirmNo}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/*
         เลือกภาพจากคลัง (หนี้จากรอบที่ 81 · ปิดรอบที่ 93)

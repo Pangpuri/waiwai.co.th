@@ -13,6 +13,8 @@ import {
   MAX_MOURNING_IMAGES,
   MOURNING_IMAGE_ASPECT,
   diffMourningConfig,
+  moveImageTo,
+  selectedImageAfterMove,
   type MourningChange,
   type MourningConfig,
   type MourningImageConfig,
@@ -186,6 +188,8 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
    * "แกลเลอรีเรียงแถวเดียว + เพิ่มรูปตรงส่วนนั้นได้เลย" ⇒ เห็นภาพทั้งหมดเป็นแถว แล้วเลือกทีละใบมาแก้ด้านล่าง
    */
   const [selectedImage, setSelectedImage] = useState(0);
+  /** ดัชนีภาพที่กำลังลากอยู่ (รอบที่ 170) — null = ไม่ได้ลาก (ใช้ทำไฮไลต์ตอนลาก) */
+  const [dragImage, setDragImage] = useState<number | null>(null);
 
   /* ช่องภาพที่ยังไม่ได้วางไฟล์ถูกตัดออกตอนบันทึก — กด "+" ทิ้งไว้ก็ไม่ทำให้บันทึกไม่ผ่าน */
   const payload = JSON.stringify({ ...config, images: config.images.filter((image) => image.path.trim() !== "") });
@@ -223,6 +227,16 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
       return { ...current, images };
     });
     setSelectedImage((current) => (current === index ? index + direction : current));
+  }
+
+  /**
+   * ย้ายภาพจากตำแหน่ง `from` ไปแทรกที่ตำแหน่ง `to` (รอบที่ 170)
+   * ใช้ทั้งการลากวางในแกลเลอรีและปุ่ม "ตั้งเป็นภาพแรก" — ตรรกะอยู่ที่ `lib/mourning/config.ts` (ทดสอบได้)
+   */
+  function reorderImage(from: number, to: number) {
+    if (from === to) return;
+    setConfig((current) => ({ ...current, images: moveImageTo(current.images, from, to) }));
+    setSelectedImage((current) => selectedImageAfterMove(current, from, to));
   }
 
   function changeLabel(change: MourningChange): string {
@@ -311,9 +325,18 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
             return (
               <div
                 key={`mourning-tile-${index}`}
+                draggable
+                onDragStart={() => setDragImage(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (dragImage !== null) reorderImage(dragImage, index);
+                  setDragImage(null);
+                }}
+                onDragEnd={() => setDragImage(null)}
                 className={`flex shrink-0 flex-col gap-1 rounded-xl border p-1.5 ${compact ? "w-24" : "w-40"} ${
                   isSelected ? "border-brand-red bg-surface-raised" : "border-line bg-surface"
-                }`}
+                } ${dragImage === index ? "opacity-50" : ""}`}
               >
                 <button
                   type="button"
@@ -327,12 +350,17 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
                     </span>
                   ) : (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={image.path} alt={image.altTh} className="bg-bg-subtle h-14 w-full rounded-lg object-cover" />
+                    <img src={image.path} alt={image.altTh} draggable={false} className="bg-bg-subtle h-14 w-full rounded-lg object-cover" />
                   )}
                 </button>
 
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-fg-muted text-xs font-semibold">{index + 1}</span>
+                  <span className="text-fg-muted flex items-center gap-1 text-xs font-semibold">
+                    <span aria-hidden className="cursor-grab" title={strings.mourningDragHandle}>
+                      ⠿
+                    </span>
+                    {index + 1}
+                  </span>
                   <div className="flex gap-1">
                     <TinyButton label="‹" disabled={index === 0} onClick={() => moveImage(index, -1)} />
                     <TinyButton label="›" disabled={index === config.images.length - 1} onClick={() => moveImage(index, 1)} />
@@ -362,9 +390,21 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
         {/* แผงแก้ภาพที่เลือก — วางไฟล์/คำอธิบายของ "ใบที่เลือก" เท่านั้น */}
         {config.images.length === 0 ? null : (
           <div className="border-line bg-surface-raised flex flex-col gap-2 rounded-xl border p-3">
-            <p className="text-fg text-sm font-semibold">
-              {fillTemplate(strings.imageNumber, { n: Math.min(selectedImage, config.images.length - 1) + 1 })}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-fg text-sm font-semibold">
+                {fillTemplate(strings.imageNumber, { n: Math.min(selectedImage, config.images.length - 1) + 1 })}
+              </p>
+              {/* ย้ายภาพที่เลือกไปเป็นภาพแรก (รอบที่ 170) — ทางลัดของการลากวาง (ใช้บนคีย์บอร์ด/จอสัมผัสได้) */}
+              {config.images.length > 1 && Math.min(selectedImage, config.images.length - 1) > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => reorderImage(Math.min(selectedImage, config.images.length - 1), 0)}
+                  className="border-line text-fg hover:bg-surface focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {strings.mourningSetFirst}
+                </button>
+              ) : null}
+            </div>
             <ImageDrop
               strings={strings}
               label={strings.mourningImageFileLabel}

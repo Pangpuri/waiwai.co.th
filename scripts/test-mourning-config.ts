@@ -8,8 +8,10 @@ import {
   MOURNING_PAGE_KEY,
   defaultMourningConfig,
   diffMourningConfig,
+  moveImageTo,
   mourningErrorsOf,
   parseMourningConfig,
+  selectedImageAfterMove,
   validateMourningConfig,
 } from "@/lib/mourning/config";
 
@@ -171,4 +173,41 @@ test("mourning: ช่องภาพที่ยังไม่ได้วา�
   assert.ok(outcome.ok);
   assert.equal(outcome.config.images.length, 1, "เหลือเฉพาะภาพที่มีไฟล์จริง");
   assert.equal(outcome.config.images[0]?.path, "/media/real");
+});
+
+/* ── จัดลำดับภาพ (รอบที่ 170) ─────────────────────────────────────────────────── */
+
+test("mourning: ย้ายภาพไปตำแหน่งใหม่ได้จริง (ลากวาง/ตั้งเป็นภาพแรก)", () => {
+  const list = ["a", "b", "c", "d"] as const;
+
+  /* ตั้งเป็นภาพแรก (ปุ่ม "ตั้งเป็นภาพแรก" = ย้ายไป index 0) */
+  assert.deepEqual(moveImageTo(list, 2, 0), ["c", "a", "b", "d"]);
+  /* ลากไปท้ายสุด */
+  assert.deepEqual(moveImageTo(list, 0, 3), ["b", "c", "d", "a"]);
+  /* ย้ายไปกลาง */
+  assert.deepEqual(moveImageTo(list, 3, 1), ["a", "d", "b", "c"]);
+  /* ตำแหน่งเดิม = คืนรายการเดิม */
+  assert.deepEqual(moveImageTo(list, 1, 1), list);
+});
+
+test("mourning: ย้ายภาพด้วยดัชนีเพี้ยนต้องไม่ทำข้อมูลหาย", () => {
+  const list = ["a", "b", "c"] as const;
+  assert.deepEqual(moveImageTo(list, -1, 0), list);
+  assert.deepEqual(moveImageTo(list, 0, 9), list);
+  assert.deepEqual(moveImageTo(list, 9, 0), list);
+  assert.deepEqual(moveImageTo([], 0, 0), []);
+});
+
+test("mourning: ดัชนีที่เลือกต้องติดตามภาพที่ย้ายเสมอ", () => {
+  /* เลือกภาพที่ลาก = เลือกตามไปตำแหน่งใหม่ */
+  assert.equal(selectedImageAfterMove(2, 2, 0), 0);
+  /* ย้ายภาพที่อยู่ "ก่อน" ที่เลือก ไปไว้ที่/หลังที่เลือก = ดัชนีที่เลือกขยับลง 1 */
+  assert.equal(selectedImageAfterMove(3, 1, 3), 2);
+  /* ย้ายภาพที่อยู่ "หลัง" ที่เลือก มาไว้ที่/ก่อนที่เลือก = ดัชนีที่เลือกขยับขึ้น 1 */
+  assert.equal(selectedImageAfterMove(1, 3, 0), 2);
+  /* ย้ายไปไกลจากที่เลือก (ไม่คาบเกี่ยว) = ไม่ขยับ */
+  assert.equal(selectedImageAfterMove(0, 2, 3), 0);
+  assert.equal(selectedImageAfterMove(3, 1, 2), 3);
+  /* ไม่มีการย้าย = เท่าเดิม */
+  assert.equal(selectedImageAfterMove(1, 2, 2), 1);
 });

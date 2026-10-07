@@ -5,4 +5,9 @@
 export const enAdminNotice = {
   imageCropApplied: "This image is not {aspect}:1 — center-cropped (source {ratio})",
   imageCropWarn: "This image is not {aspect}:1 — it will be cropped to the notice frame when displayed",
+  imageCropConfirm: "This image is {ratio} (not {aspect}:1) — it will be center-cropped before upload",
+  imageCropConfirmYes: "Upload and crop",
+  imageCropConfirmNo: "Choose another image",
+  mourningSetFirst: "Set as first image",
+  mourningDragHandle: "Drag to reorder images",
 };

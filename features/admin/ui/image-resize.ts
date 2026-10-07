@@ -155,6 +155,38 @@ export function isAspectMismatch(width: number, height: number, aspect: number, 
 }
 
 /**
+ * ตัดสินใจว่า "ต้องเตือนผู้ใช้ก่อนอัปโหลดไหม" (รอบที่ 170 · ตรรกะล้วน — ทดสอบได้)
+ *
+ * ใช้กับช่องภาพที่กำหนดสัดส่วนเป้าหมาย (ป้ายประกาศ = 3:1): ผู้ใช้เลือกไฟล์ผิดสัดส่วน
+ * ⇒ ยังไม่ส่งขึ้นเซิร์ฟเวอร์ แต่ถามยืนยันก่อน (พร้อมบอกสัดส่วนต้นฉบับเป็นข้อความอ่านง่าย)
+ * ค่าเข้าใช้ไม่ได้ = ไม่ต้องยืนยัน (ผู้เรียกถอยไปใช้เส้นทางเดิม)
+ */
+export function aspectConfirmation(
+  width: number,
+  height: number,
+  aspect: number,
+): { readonly required: boolean; readonly ratio: string } {
+  const required = isAspectMismatch(width, height, aspect);
+  return { required, ratio: required ? ratioLabel(width, height) : "" };
+}
+
+/**
+ * อ่านขนาดจริงของไฟล์ภาพในเบราว์เซอร์ (รอบที่ 170) — คืน `null` เมื่ออ่านไม่ได้/เบราว์เซอร์เก่า
+ * ไม่โยน error (ผู้เรียกจะถอยไปอัปโหลดตามเดิม)
+ */
+export async function readImageSize(file: File): Promise<{ readonly width: number; readonly height: number } | null> {
+  if (typeof createImageBitmap !== "function") return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * กรอบครอป "กลางภาพ" ที่ใหญ่ที่สุดสำหรับสัดส่วนที่ต้องการ (ตรรกะล้วน — ทดสอบได้)
  * ไม่มีอะไรต้องครอป (สัดส่วนตรงอยู่แล้ว) = คืนกรอบเต็มภาพ
  * ค่าเข้าไม่ถูกต้อง = คืน `null` (ผู้เรียกจะถอยไปใช้ไฟล์เดิม)

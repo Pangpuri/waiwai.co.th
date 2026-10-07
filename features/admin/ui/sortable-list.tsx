@@ -47,11 +47,6 @@ export function SortableList({
   const [dirty, setDirty] = useState(false);
   const byId = new Map(items.map((item) => [item.id, item]));
 
-  const applyOrder = (next: string[]): void => {
-    setOrder(next);
-    setDirty(true);
-  };
-
   const move = (id: string, delta: number): void => {
     setOrder((current) => {
       const from = current.indexOf(id);

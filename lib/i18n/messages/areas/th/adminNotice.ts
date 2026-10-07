@@ -7,4 +7,11 @@
 export const thAdminNotice = {
   imageCropApplied: "ภาพนี้ไม่ใช่ {aspect}:1 — ครอปกลางภาพให้แล้ว (ต้นฉบับ {ratio})",
   imageCropWarn: "ภาพนี้ไม่ใช่ {aspect}:1 — ตอนแสดงผลจะถูกครอปตามกรอบป้าย",
+  /* เตือน "ก่อน" อัปโหลด (รอบที่ 170) — ผู้ใช้เลือกไฟล์ผิดสัดส่วนแล้วยังไม่ส่งขึ้นเซิร์ฟเวอร์ */
+  imageCropConfirm: "ภาพนี้สัดส่วน {ratio} (ไม่ใช่ {aspect}:1) — ระบบจะครอปกลางภาพให้ก่อนอัปโหลด",
+  imageCropConfirmYes: "อัปโหลดและครอป",
+  imageCropConfirmNo: "เลือกภาพอื่น",
+  /* จัดลำดับภาพในป้ายประกาศ (รอบที่ 170) */
+  mourningSetFirst: "ตั้งเป็นภาพแรก",
+  mourningDragHandle: "ลากเพื่อสลับลำดับภาพ",
 };

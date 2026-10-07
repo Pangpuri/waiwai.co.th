@@ -9,6 +9,7 @@ import {
   MAX_UPLOAD_EDGE,
   SHRINK_MIN_BYTES,
   WEBP_QUALITY,
+  aspectConfirmation,
   centerCropRect,
   isAspectMismatch,
   ratioLabel,
@@ -199,4 +200,44 @@ test("crop: ครอปจริงต้องใช้ผลลัพธ์�
   assert.ok(source.includes("context.drawImage(bitmap, rect.x, rect.y, rect.width, rect.height"), "ต้องวาดจากกรอบครอปจริง");
   assert.ok(source.includes("} catch {"), "ต้องมี try/catch (ห้ามทำให้อัปโหลดพัง)");
   assert.ok(source.includes('typeof createImageBitmap !== "function"'), "เบราว์เซอร์เก่า = ส่งไฟล์เดิม");
+});
+
+/* ── เตือนสัดส่วน "ก่อน" อัปโหลด (รอบที่ 170) ─────────────────────────────────── */
+
+test("crop: ตัดสินใจเตือนก่อนอัปโหลดจากสัดส่วนต้นฉบับ + บอกสัดส่วนที่อ่านง่าย", () => {
+  /* สัดส่วนตรง = ไม่ต้องถาม */
+  assert.deepEqual(aspectConfirmation(3000, 1000, 3), { required: false, ratio: "" });
+  assert.deepEqual(aspectConfirmation(2999, 1000, 3), { required: false, ratio: "" }, "ต่างไม่ถึง 2% = ยังถือว่าตรง");
+
+  /* สัดส่วนผิด = ต้องถาม พร้อมป้ายสัดส่วนต้นฉบับ */
+  assert.deepEqual(aspectConfirmation(1600, 900, 3), { required: true, ratio: "16:9" });
+  assert.deepEqual(aspectConfirmation(900, 1600, 3), { required: true, ratio: "9:16" });
+
+  /* ค่าเพี้ยน = ไม่ต้องถาม (ผู้เรียกใช้เส้นทางเดิม ไม่พัง) */
+  assert.equal(aspectConfirmation(Number.NaN, 100, 3).required, false);
+  assert.equal(aspectConfirmation(0, 100, 3).required, false);
+});
+
+test("crop: ช่องภาพที่กำหนดสัดส่วนต้อง 'ถามยืนยัน' ก่อนส่งไฟล์ขึ้นเซิร์ฟเวอร์", () => {
+  const drop = read("features", "admin", "ui", "image-drop.tsx");
+
+  assert.ok(drop.includes("await readImageSize(file)"), "ต้องอ่านขนาดจริงก่อนตัดสินใจ (ไม่ใช่หลังอัปโหลด)");
+  assert.ok(drop.includes("aspectConfirmation("), "ใช้ตรรกะกลางตัวเดียวกับที่ทดสอบ");
+  assert.ok(
+    drop.includes("setPendingCrop({ file, ratio: check.ratio, aspect: String(cropAspect) })"),
+    "ผิดสัดส่วน = ยังไม่ส่ง แต่ถามก่อน",
+  );
+  assert.ok(
+    drop.includes("if (cropped.cropped)") || drop.includes("await cropImageFile(file, cropAspect)"),
+    "กดยืนยันแล้วยังใช้เส้นทางครอปเดิม",
+  );
+  assert.ok(drop.includes("void uploadFile(pending.file)"), "กดยืนยันแล้วจึงส่งไฟล์จริง");
+  assert.ok(drop.includes("strings.imageCropConfirm"), "ข้อความยืนยันมาจากพจนานุกรม (ไม่มีสตริงไทยใน .tsx)");
+  assert.ok(drop.includes("strings.imageCropConfirmYes") && drop.includes("strings.imageCropConfirmNo"), "มีทั้งยืนยันและเลือกภาพอื่น");
+
+  /* ⚠️ ต้องไม่ "ส่งทันที" อีกแล้วเมื่อไฟล์ผิดสัดส่วน — จุดตัดสินต้องอยู่ก่อน uploadFile */
+  const prepareIndex = drop.indexOf("async function prepareFile(");
+  const confirmIndex = drop.indexOf("setPendingCrop({ file, ratio: check.ratio");
+  const uploadIndex = drop.indexOf("await uploadFile(file);");
+  assert.ok(prepareIndex >= 0 && confirmIndex > prepareIndex && uploadIndex > confirmIndex, "ลำดับ: ตรวจ → ถาม → ส่ง");
 });

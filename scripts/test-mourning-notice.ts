@@ -284,3 +284,25 @@ test("CSS: จางข้ามภาพของหน้าต่างไว
     `transition ของภาพต้องจาง ${MOURNING_SLIDE_FADE_MS}ms ให้ตรงกับ MOURNING_SLIDE_FADE_MS`,
   );
 });
+
+/* ── จัดลำดับภาพในตัวแก้ป้ายประกาศ (รอบที่ 170) ────────────────────────────────── */
+
+test("mourning-editor: การ์ดภาพลากสลับลำดับได้ + มีปุ่มตั้งเป็นภาพแรก (ไม่กระทบปุ่มเดิม)", () => {
+  const editor = readFileSync(path.join(PROJECT_ROOT, "features", "admin", "ui", "mourning-editor.tsx"), "utf8");
+
+  /* ใช้ตรรกะกลางจาก lib (ทดสอบตรงแล้วใน test-mourning-config.ts) — ห้ามเขียนซ้ำในคอมโพเนนต์ */
+  assert.ok(editor.includes("moveImageTo("), "ตัวแก้ต้องใช้ moveImageTo ตัวกลาง");
+  assert.ok(editor.includes("selectedImageAfterMove("), "ดัชนีที่เลือกต้องติดตามภาพที่ย้าย");
+
+  /* ลากวาง */
+  assert.ok(editor.includes("draggable"), "การ์ดภาพต้องลากได้");
+  assert.ok(editor.includes("onDragStart=") && editor.includes("onDrop="), "มีการเริ่มลากและจุดวาง");
+  assert.ok(editor.includes("onDragEnd="), "ต้องเคลียร์สถานะลากเมื่อปล่อยนอกจุดวาง");
+
+  /* ทางลัด + คำใบ้ (มาจากพจนานุกรม) */
+  assert.ok(editor.includes("strings.mourningSetFirst"), "ต้องมีปุ่มตั้งเป็นภาพแรก");
+  assert.ok(editor.includes("strings.mourningDragHandle"), "ต้องมีคำใบ้การลาก (ไม่ใช่ข้อความไทยใน .tsx)");
+
+  /* ต้องยังมีทางใช้คีย์บอร์ด/จอสัมผัส (ปุ่มเลื่อน) — a11y ไม่ถอยหลัง */
+  assert.ok(editor.includes("moveImage(index, -1)") && editor.includes("moveImage(index, 1)"), "ปุ่มเลื่อนขึ้น/ลงต้องยังอยู่");
+});

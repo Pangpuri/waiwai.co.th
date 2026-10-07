@@ -197,6 +197,35 @@ export function mourningErrorsOf(issues: readonly MourningIssue[]): readonly Mou
   return issues.filter((entry) => entry.severity === "error");
 }
 
+/* ── จัดลำดับภาพในป้ายประกาศ (รอบที่ 170 · ตรรกะล้วน — ทดสอบได้) ─────────────── */
+
+/**
+ * ย้ายภาพจากตำแหน่ง `from` ไปแทรกที่ตำแหน่ง `to`
+ * ใช้ทั้งการลากวางในแกลเลอรีและปุ่ม "ตั้งเป็นภาพแรก" (to = 0)
+ * ค่าดัชนีที่ใช้อ้างนอกช่วง = คืนรายการเดิม (ไม่ทำข้อมูลหาย)
+ */
+export function moveImageTo<T>(images: readonly T[], from: number, to: number): readonly T[] {
+  if (from === to) return images;
+  if (from < 0 || to < 0 || from >= images.length || to >= images.length) return images;
+  const next = [...images];
+  const [moved] = next.splice(from, 1);
+  if (moved === undefined) return images;
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/**
+ * ดัชนีที่ "เลือกอยู่" ควรอยู่ที่ไหนหลังย้ายภาพ — ต้องติดตามภาพที่เลือกเสมอ
+ * ไม่งั้นแผงแก้ด้านล่างจะชี้ไปคนละภาพทันทีหลังจัดลำดับ
+ */
+export function selectedImageAfterMove(current: number, from: number, to: number): number {
+  if (from === to) return current;
+  if (current === from) return to;
+  if (from < current && to >= current) return current - 1;
+  if (from > current && to <= current) return current + 1;
+  return current;
+}
+
 /* ── บอกผู้ใช้ว่า "แก้ส่วนไหนไปแล้ว และบันทึกหรือยัง" (ผู้ใช้สั่ง รอบที่ 38) ──────── */
 
 export type MourningChangeKind =
