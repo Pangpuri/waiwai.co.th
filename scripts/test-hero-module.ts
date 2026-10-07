@@ -223,15 +223,13 @@ test("hero module (เอฟเฟค): อ่านค่าตั้งค่�
   assert.ok(actions.includes("saveHeroSettingAction") && actions.includes("parseHeroSetting"), "action ต้องตรวจค่าด้วยตัวช่วยกลาง");
 });
 
-test("hero module (เฟส 3): ภาพที่ยังไม่มีพาธต้องไม่ถูกเรนเดอร์เป็น <img src=\"\"> (กันคำเตือนเบราว์เซอร์)", () => {
+test("hero module (เฟส 3): ภาพที่ยังไม่มีพาธต้องไม่ถูกเรนเดอร์เป็น <img src="""> (กันคำเตือนเบราว์เซอร์)", () => {
   const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
-  const guard = /(draft|slide).(path|mediaPath).trim() === ""/;
-  assert.ok(guard.test(manager), "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ");
+  /* ใช้การค้นสตริงตรง ๆ (ไม่ใช้ regex) เพื่อไม่ให้เทสต์เปราะกับ escape */
+  assert.ok(manager.includes("path.trim() === """), "ต้องเช็คพาธว่างก่อนเรนเดอร์ภาพ");
   assert.ok(manager.includes("heroAdminNoImage"), "พาธว่างต้องแสดงข้อความจากพจนานุกรมแทนภาพ");
-  const guardIndex = manager.search(guard);
-  const imgDraft = manager.indexOf("<img src={draft.path}");
-  const imgRaw = manager.indexOf("<img src={slide.mediaPath}");
-  const imgIndex = imgDraft >= 0 ? imgDraft : imgRaw;
+  const guardIndex = manager.indexOf("path.trim() === """);
+  const imgIndex = manager.indexOf("<img src={draft.path}");
   assert.ok(guardIndex >= 0 && imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
 });
 
