@@ -10,15 +10,20 @@ import {
   CONTENT_TRASH_SCREENS,
   TRASH_AUDIT_ACTIONS,
   TRASH_KINDS,
+  TRASH_VIEW_KINDS,
   contentTrashTotal,
   daysLeftInTrash,
   emptyContentTrashCounts,
   emptyTrashCounts,
+  isContentTrashKind,
   isTrashExpired,
   isTrashKind,
+  isTrashViewKind,
+  mergeTrashEntries,
   summarizeContentTrash,
   summarizeTrash,
   trashTotal,
+  type TrashEntryLike,
 } from "@/lib/trash/plan";
 
 /**
@@ -157,7 +162,9 @@ test("trash: การลบถาวรมีเงื่อนไข 'ต้�
   const exported = actions.match(/export async function/g) ?? [];
   assert.equal(exported.length, 4, "ต้องมี 4 action (กู้คืน · ลบถาวร · ล้างถัง · ลบตามกำหนด)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
-  assert.ok(actions.includes("isTrashKind("), "ต้องตรวจชนิดของก่อนแตะฐานข้อมูล");
+  /* รอบที่ 176: หน้าถังขยะรับ "ชนิดรวม" (เนื้อหาด้วย) ⇒ ต้องตรวจด้วย isTrashViewKind แล้วแยกทางที่ชั้นล่าง */
+  assert.ok(actions.includes("isTrashViewKind(kind)"), "ต้องตรวจชนิดรวม (ครอบเนื้อหา) ก่อนแตะฐานข้อมูล");
+  assert.ok(actions.includes("isTrashKind(kind)"), "ต้องยังแยกทางไป repository ของภาพ/พรีเซ็ต");
 
   const page = sourceOf("app/admin/trash/page.tsx");
   assert.ok(page.includes('requireAdminUser("trash")'), "หน้าถังขยะต้องมีสิทธิ์ถังขยะ (X1.10)");
@@ -445,4 +452,137 @@ test("trash-content: ตัวเติม {placeholder} ต้องครบ�
       }
     }
   }
+});
+
+/* ── 5) ตารางรวมที่ /admin/trash (รอบที่ 176) ───────────────────────────────────
+ *
+ * มติเจ้าของ: "เห็นและจัดการจากที่เดียว" ⇒ หน้าถังขยะแสดง 6 ชนิดในตารางเดียว
+ * เทสต์ชุดนี้กัน 4 เรื่องที่พังเงียบได้:
+ *   1. ชนิดรวมไม่ครบ/ซ้ำ ⇒ แถวบางชนิดกดแล้วไม่ทำงาน (หรือกดซ้ำไปโดนของผิดชนิด)
+ *   2. merge ไม่นิ่งเมื่อเวลาซ้าย Migration ชนกัน ⇒ ตารางสลับตำแหน่งเองทุกครั้งที่เรนเดอร์
+ *   3. คำสั่งของเนื้อหาหลงประตู `deleted_at is not null` ⇒ ลบของที่ยังใช้งานอยู่ได้
+ *   4. ป้ายชนิด/คำเตือน "ลบทั้งหมด" หาย ⇒ ผู้ใช้กดลบทั้งถังโดยไม่รู้ว่าครอบเนื้อหาด้วย
+ */
+
+test("trash-view: ชนิดรวมครอบทั้งสองชุด ไม่ซ้ำ และตรวจค่าจากฟอร์มได้", () => {
+  assert.deepEqual([...TRASH_VIEW_KINDS], ["media", "preset", "chromePreset", "product", "recipe", "news"]);
+  assert.equal(new Set(TRASH_VIEW_KINDS).size, TRASH_VIEW_KINDS.length, "ชนิดรวมต้องไม่ซ้ำ");
+
+  for (const kind of TRASH_KINDS) {
+    assert.equal(isTrashViewKind(kind), true, `${kind} ต้องผ่านตัวตรวจรวม`);
+  }
+  for (const kind of CONTENT_TRASH_KINDS) {
+    assert.equal(isTrashKind(kind), false, `${kind} ไม่ใช่ชนิดของถังรวม (คนละชุดโดยเจตนา)`);
+    assert.equal(isContentTrashKind(kind), true, `${kind} ต้องผ่านตัวตรวจของเนื้อหา`);
+    assert.equal(isTrashViewKind(kind), true, `${kind} ต้องผ่านตัวตรวจรวม (หน้าถังขยะรับค่านี้)`);
+  }
+
+  /* ค่าที่ไม่รู้จักต้องไม่ผ่าน — กันการยิงฟอร์มปลอมมาหาชนิดอื่น */
+  for (const bad of ["", "MEDIA", "product ", " products", "products", "news; drop table news", "trash", "users"]) {
+    assert.equal(isTrashViewKind(bad), false, `"${bad}" ต้องไม่ใช่ชนิดที่รู้จัก`);
+  }
+  assert.equal(isContentTrashKind("media"), false, "ภาพไม่ใช่ชนิดของเนื้อหา");
+});
+
+test("trash-view: mergeTrashEntries เรียงใหม่สุดก่อน · นิ่งเมื่อเวลาซ้ำ · ไม่แก้ของเดิม", () => {
+  const rows: readonly TrashEntryLike[] = [
+    {
+      kind: "news",
+      id: "n2",
+      label: "ข่าว",
+      detail: null,
+      sizeBytes: null,
+      deletedAt: "2026-10-01T00:00:00.000Z",
+      deletedBy: null,
+    },
+    {
+      kind: "media",
+      id: "m1",
+      label: "ภาพ",
+      detail: "image/webp",
+      sizeBytes: 1024,
+      deletedAt: "2026-10-03T00:00:00.000Z",
+      deletedBy: "a@example.invalid",
+    },
+    {
+      kind: "product",
+      id: "p1",
+      label: "สินค้า",
+      detail: null,
+      sizeBytes: null,
+      deletedAt: "2026-10-03T00:00:00.000Z",
+      deletedBy: null,
+    },
+  ];
+
+  const merged = mergeTrashEntries(rows);
+  assert.equal(merged.length, 3, "ต้องครบทุกแถว");
+  assert.equal(merged[0]?.deletedAt, "2026-10-03T00:00:00.000Z", "ใหม่สุดต้องอยู่บน");
+  /* สองแถวเวลาซ้ำ ⇒ เรียงด้วย kind (media < product) ให้ผลนิ่งทุกครั้ง */
+  assert.deepEqual(merged.map((row) => row.kind), ["media", "product", "news"], "ลำดับต้องนิ่ง: ใหม่→เก่า แล้วตัดสินด้วย kind");
+
+  /* pure: ไม่แก้ลิสต์ที่ส่งเข้ามา และเรียกซ้ำได้ผลเท่าเดิม */
+  assert.equal(rows[0]?.kind, "news", "ห้ามแก้ลิสต์ต้นทาง");
+  assert.deepEqual(mergeTrashEntries(rows), merged, "เรียกซ้ำต้องได้ผลเดิม (นิ่ง)");
+  assert.deepEqual(mergeTrashEntries([]), [], "ไม่มีของ ⇒ ว่าง ไม่โยน error");
+});
+
+test("trash-view: คำสั่งของเนื้อหามีประตู 'อยู่ในถังเท่านั้น' และไม่รับชื่อตารางจากผู้ใช้", () => {
+  const content = sourceOf("lib/trash/content.ts");
+
+  assert.ok(content.includes("export async function listContentTrash"), "ต้องมีตัวอ่านรายการของในถังเนื้อหา");
+  for (const guard of [
+    "where deleted_at is not null", // listContentTrash
+    "where id = $1 and deleted_at is not null", // restore + delete ถาวร
+    "delete from ${CONTENT_TABLES[kind]} where deleted_at is not null", // ลบทั้งถังของเนื้อหา
+  ]) {
+    assert.ok(content.includes(guard), `ต้องมีประตู SQL: ${guard}`);
+  }
+
+  assert.ok(content.includes("const CONTENT_TABLES"), "ชื่อตารางต้องมาจากค่าคงที่ (ไม่รับจากฟอร์ม)");
+  assert.ok(content.includes("recordAudit"), "กู้คืน/ลบถาวรต้องมีร่องรอยใน audit log");
+  assert.ok(content.includes("if (!isDatabaseConfigured()) return []"), "ไม่มี DB = คืน [] ไม่โยน error");
+
+  /* actions ต้องเรียกตัวของเนื้อหา (ไม่ใช่ยัด logic ไว้ในไฟล์ action) */
+  const actions = sourceOf("app/admin/trash/actions.ts");
+  for (const fn of ["restoreContentTrashItem(", "deleteContentTrashItemPermanently(", "emptyContentTrash("]) {
+    assert.ok(actions.includes(fn), `action ต้องเรียก ${fn}`);
+  }
+  assert.ok(actions.includes("revalidatePath(path)"), "ต้อง revalidate แท็บถังขยะของจอเนื้อหาด้วย");
+});
+
+test("trash-view: ตารางรวม + ป้ายชนิดครบ 6 + คำเตือนก่อนกดลบทั้งถัง", () => {
+  const page = sourceOf("app/admin/trash/page.tsx");
+  assert.ok(page.includes("listContentTrash("), "หน้าถังขยะต้องดึงรายการเนื้อหาด้วย");
+  assert.ok(page.includes("mergeTrashEntries("), "ต้องรวมเป็นตารางเดียว");
+  assert.ok(page.includes("daysLeftInTrash("), "แถวเนื้อหาต้องมีเวลาก่อนลบถาวรเหมือนภาพ/พรีเซ็ต");
+  assert.equal(page.match(/listContentTrash\(\)/g)?.length, 1, "ต้องอ่านเนื้อหาครั้งเดียว (ไม่ยิงคิวรีซ้ำ)");
+
+  const list = sourceOf("features/admin/ui/trash-list.tsx");
+  for (const key of [
+    "trashKindMedia",
+    "trashKindPreset",
+    "trashKindChromePreset",
+    "trashKindProduct",
+    "trashKindRecipe",
+    "trashKindNews",
+  ]) {
+    assert.ok(list.includes(key), `ป้ายชนิดต้องมีครบทั้ง 6 (${key})`);
+  }
+  assert.ok(list.includes("trashEmptyIncludesContent"), "ปุ่มลบทั้งหมดต้องเตือนว่าครอบเนื้อหาด้วย");
+  assert.ok(!list.includes("dangerouslySetInnerHTML"), "ห้ามฝัง HTML ดิบในตารางถังขยะ");
+
+  /* พจนานุกรมต้องมีคีย์ครบทั้งสองภาษา (ด่าน check:i18n ตรวจคู่กันอยู่แล้ว — ย้ำที่ระดับนี้ด้วย) */
+  for (const locale of ["th", "en"]) {
+    const dictionary = sourceOf(`lib/i18n/messages/areas/${locale}/adminTrash.ts`);
+    for (const key of ["trashKindProduct", "trashKindRecipe", "trashKindNews", "trashEmptyIncludesContent", "trashTableHint"]) {
+      assert.ok(dictionary.includes(`${key}:`), `${locale}/adminTrash.ts ต้องมีคีย์ ${key}`);
+    }
+  }
+
+  /* ด่าน DB ต้องพิสูจน์วงจรจริงของตารางรวม */
+  const checkDb = sourceOf("scripts/check-db.ts");
+  assert.ok(checkDb.includes("checkContentTrashTable"), "check:db ต้องมีวงจรตารางรวมถังขยะ");
+  assert.ok(checkDb.includes("restoreContentTrashItem("), "ต้องพิสูจน์กู้คืนจากตารางรวมกับ DB จริง");
+  assert.ok(checkDb.includes("deleteContentTrashItemPermanently("), "ต้องพิสูจน์ลบถาวรจากตารางรวมกับ DB จริง");
 });

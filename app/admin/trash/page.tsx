@@ -8,21 +8,29 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { describeRetention } from "@/lib/retention/format";
 import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
-import { contentTrashStats } from "@/lib/trash/content";
-import { daysLeftInTrash, CONTENT_TRASH_KINDS, CONTENT_TRASH_SCREENS, type ContentTrashKind } from "@/lib/trash/plan";
-import { listTrash, trashStats, type TrashEntry } from "@/lib/trash/repository";
+import { contentTrashStats, listContentTrash } from "@/lib/trash/content";
+import {
+  CONTENT_TRASH_KINDS,
+  CONTENT_TRASH_SCREENS,
+  daysLeftInTrash,
+  mergeTrashEntries,
+  type ContentTrashKind,
+} from "@/lib/trash/plan";
+import { listTrash, trashStats } from "@/lib/trash/repository";
 
 /**
- * ถังขยะ (X2.4 · รอบที่ 78 · ขยายรอบที่ 175) — ที่พักของสิ่งที่ "ลบ" จากคลังภาพ/พรีเซ็ต
+ * ถังขยะ (X2.4 · รอบที่ 78 · ขยายรอบที่ 175/176) — ที่พักของสิ่งที่ "ลบ"
  *
  * ทำไมต้องมี
  * - ก่อนหน้านี้การลบทุกจุดเป็น **ลบถาวรทันที** ⇒ ผู้ใช้ที่ไม่ได้เป็นช่างเทคนิคเผลอกดลบ = ข้อมูลหายถาวร
  * - หน้านี้ให้ "กู้คืน" และ "ลบถาวร" ด้วยการกดครั้งเดียว พร้อมบอกว่าเหลือเวลาอีกกี่วันก่อนระบบลบให้เอง
  *
- * รอบที่ 175: เพิ่ม **ดัชนีของถังขยะเนื้อหา** (สินค้า/เมนู/ข่าว) ที่นี่
- * - ⚠️ ยังไม่ย้ายรายการเนื้อหามาที่หน้านี้ (เจตนาเดิม: ของแต่ละชนิดจัดการในแท็บถังขยะของหน้าจอนั้น)
- *   แต่ผู้ดูแลต้อง **เห็นจากที่เดียวว่าถังมีอะไรบ้าง และไปถึงได้** โดยไม่ต้องเดา
- * - ตัวเลขดึงจาก `contentTrashStats()` (ของที่ยังกู้คืนได้ทุกแถว ไม่ใช่แค่ที่พ้นกำหนด)
+ * รอบที่ 175: เพิ่ม **ดัชนีของถังขยะเนื้อหา** (ตัวนับ + ลิงก์ไปแท็บของจอนั้น)
+ * รอบที่ 176 (มติเจ้าของ "เห็นและจัดการจากที่เดียว"): **ตารางรวมทุกชนิด 6 ชนิด**
+ * - แถวเนื้อหา (สินค้า/เมนู/ข่าว) ถูกเรนเดอร์ในตารางเดียวกับภาพ/พรีเซ็ต ⇒ กดกู้คืน/ลบถาวรได้จากที่นี่
+ *   (ไม่ต้องสลับไป 3 จอ) · บล็อกดัชนีด้านบนยังอยู่เพื่อ **กระโดดไปแก้ที่จอของชนิดนั้น** เมื่อต้องดูบริบท
+ * - ยังไม่ย้ายการแก้ไข/เผยแพร่มาที่นี่ — ทำเฉพาะ "กู้คืน/ลบถาวร" ตามเจตนาของถัง
+ * - ⚠️ ตัวเลขระยะเก็บของทุกชนิดใช้ค่าเดียวกัน (`TRASH_RETENTION_DAYS`) ⇒ 30 วันเท่ากันหมด
  *
  * ⚠️ ต้องล็อกอินก่อนเสมอ (`requireAdminUser("<permission>")`) — ของในถังยังเป็นข้อมูลของบริษัท
  * ⚠️ ตัวเลขระยะเก็บดึงจาก `lib/retention/plan.ts` (ห้ามพิมพ์จำนวนวันในหน้านี้)
@@ -33,10 +41,12 @@ export default async function AdminTrashPage() {
   const strings = messages.admin;
 
   const configured = isDatabaseConfigured();
-  const entries: readonly TrashEntry[] = configured ? await listTrash() : [];
+  /* ตารางรวม: ภาพ/พรีเซ็ต (ถังเดิม) + เนื้อหา (รอบที่ 176) — เนื้อหาคืน [] เมื่อไม่มี DB */
+  const entries = mergeTrashEntries([...(configured ? await listTrash() : []), ...(await listContentTrash())]);
   const stats = configured ? await trashStats() : { media: 0, preset: 0, chromePreset: 0, total: 0 };
   /* เนื้อหาในถัง — ไม่มี DB = 0 ทุกชนิด (หน้าจอต้องไม่พัง) */
   const contentTrash = await contentTrashStats();
+  const totalAll = stats.total + contentTrash.total;
 
   /* ป้ายชื่อของแต่ละชนิดเนื้อหา — เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที */
   const contentTrashLabels: Readonly<Record<ContentTrashKind, string>> = {
@@ -67,6 +77,9 @@ export default async function AdminTrashPage() {
     trashKindMedia: strings.trashKindMedia,
     trashKindPreset: strings.trashKindPreset,
     trashKindChromePreset: strings.trashKindChromePreset,
+    trashKindProduct: strings.trashKindProduct,
+    trashKindRecipe: strings.trashKindRecipe,
+    trashKindNews: strings.trashKindNews,
     trashDaysLeft: strings.trashDaysLeft,
     trashDueNow: strings.trashDueNow,
     trashRestore: strings.trashRestore,
@@ -76,6 +89,7 @@ export default async function AdminTrashPage() {
     trashDeleteForeverWarning: strings.trashDeleteForeverWarning,
     trashEmptyAction: strings.trashEmptyAction,
     trashConfirmEmpty: strings.trashConfirmEmpty,
+    trashEmptyIncludesContent: strings.trashEmptyIncludesContent,
     trashEmptyDone: strings.trashEmptyDone,
     trashNotFound: strings.trashNotFound,
     trashNoPreview: strings.trashNoPreview,
@@ -100,6 +114,9 @@ export default async function AdminTrashPage() {
 
       {configured ? (
         <>
+          <p className="text-fg text-sm font-semibold">
+            {totalAll === 0 ? strings.trashEmpty : fillTemplate(strings.trashCardCount, { count: totalAll })}
+          </p>
           <p className="text-fg-muted text-xs">
             {fillTemplate(strings.trashStats, {
               media: stats.media,
@@ -108,7 +125,7 @@ export default async function AdminTrashPage() {
             })}
           </p>
 
-          {/* ดัชนีถังขยะเนื้อหา (รอบที่ 175) — เห็นครบจากที่เดียว + ไปกู้คืน/ลบถาวรในแท็บของหน้าจอนั้น */}
+          {/* ดัชนีถังขยะเนื้อหา (รอบที่ 175 · ยังมีประโยชน์หลังรอบ 176) — กระโดดไปจอของชนิดนั้นเมื่อต้องดูบริบท */}
           <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-4">
             <div className="flex flex-col gap-0.5">
               <h2 className="text-fg text-sm font-semibold">{strings.trashContentTitle}</h2>
@@ -138,6 +155,7 @@ export default async function AdminTrashPage() {
             <p className="border-line bg-surface text-fg-muted rounded-2xl border p-5 text-sm">{strings.trashEmpty}</p>
           ) : (
             <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-4">
+              <p className="text-fg-muted text-xs">{strings.trashTableHint}</p>
               <TrashTable rows={rows} strings={trashStrings} label={strings.trashListLabel} />
               <div className="border-line flex flex-col gap-2 border-t pt-3">
                 <EmptyTrashForm strings={trashStrings} />

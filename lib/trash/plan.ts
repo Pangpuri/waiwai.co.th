@@ -134,3 +134,50 @@ export const CONTENT_TRASH_SCREENS: Readonly<Record<ContentTrashKind, string>> =
   recipe: "/admin/recipes?tab=trash",
   news: "/admin/news?tab=trash",
 };
+
+/* ── ชนิดรวมของ "ถังขยะ" ทั้งหน้า (รอบที่ 176) ──────────────────────────────────
+ *
+ * เดิมรอบที่ 170 แยกสองชุดโดยเจตนา (`TRASH_KINDS` = ภาพ/พรีเซ็ต · `CONTENT_TRASH_KINDS` = เนื้อหา)
+ * เพราะเนื้อหามีแท็บถังขยะของตัวเอง · **รอบที่ 176 เจ้าของสั่งให้เห็น/จัดการจากที่เดียว**
+ * ⇒ ยังคงสองชุดเดิมไว้ (ประตู SQL/ฟังก์ชันของแต่ละฝ่ายไม่เปลี่ยน) แล้วเพิ่ม "ชนิดรวม" สำหรับหน้าจอ
+ *   เฉพาะที่ `/admin/trash` — ของแต่ละชนิดยังเข้าได้จากแท็บเดิมด้วย (เป็นทางที่สอง ไม่ใช่ย้ายบ้าน)
+ * ⚠️ ตัวตรวจค่าจากฟอร์มที่หน้าถังขยะต้องใช้ `isTrashViewKind()` (ไม่ใช่ `isTrashKind()`)
+ *    ไม่งั้นกดกู้คืนสินค้า/เมนู/ข่าวจากตารางรวมแล้วจบที่ `invalid` เงียบ ๆ
+ */
+
+export type TrashViewKind = TrashKind | ContentTrashKind;
+
+export const TRASH_VIEW_KINDS: readonly TrashViewKind[] = [...TRASH_KINDS, ...CONTENT_TRASH_KINDS];
+
+export function isContentTrashKind(value: string): value is ContentTrashKind {
+  return (CONTENT_TRASH_KINDS as readonly string[]).includes(value);
+}
+
+export function isTrashViewKind(value: string): value is TrashViewKind {
+  return isTrashKind(value) || isContentTrashKind(value);
+}
+
+/** แถวของในถังแบบกลาง — ทั้งภาพ/พรีเซ็ตและเนื้อหาแปลงมาเป็นรูปเดียวกันเพื่อแสดงในตารางเดียว */
+export type TrashEntryLike = {
+  readonly kind: TrashViewKind;
+  readonly id: string;
+  readonly label: string;
+  readonly detail: string | null;
+  readonly sizeBytes: number | null;
+  readonly deletedAt: string;
+  readonly deletedBy: string | null;
+};
+
+/**
+ * รวมสองแหล่งเป็นตารางเดียว — เรียงใหม่สุดก่อน
+ * ⚠️ เรียงด้วย `deletedAt` อย่างเดียวจะไม่นิ่งเมื่อเวลาซ้ำ ⇒ ใช้ `kind`+`id` เป็นตัวตัดสินรอง
+ *   (ผลลัพธ์จึงเท่าเดิมทุกครั้งที่เรนเดอร์ — สำคัญกับเทสต์/การเทียบภาพหน้าจอ)
+ */
+export function mergeTrashEntries(entries: readonly TrashEntryLike[]): readonly TrashEntryLike[] {
+  return [...entries].sort((a, b) => {
+    if (a.deletedAt !== b.deletedAt) return a.deletedAt < b.deletedAt ? 1 : -1;
+    const left = `${a.kind}:${a.id}`;
+    const right = `${b.kind}:${b.id}`;
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}

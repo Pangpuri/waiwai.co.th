@@ -11,7 +11,7 @@ import {
 } from "@/app/admin/trash/actions";
 import { INITIAL_TRASH_STATE, type TrashActionState } from "@/features/admin/trash-state";
 import { fillTemplate } from "@/lib/i18n/template";
-import type { TrashKind } from "@/lib/trash/plan";
+import type { TrashViewKind } from "@/lib/trash/plan";
 
 /**
  * ส่วนที่ต้องมี JS ของ "ถังขยะ" (X2.4)
@@ -36,6 +36,9 @@ export type TrashStrings = {
   readonly trashKindMedia: string;
   readonly trashKindPreset: string;
   readonly trashKindChromePreset: string;
+  readonly trashKindProduct: string;
+  readonly trashKindRecipe: string;
+  readonly trashKindNews: string;
   readonly trashDaysLeft: string;
   readonly trashDueNow: string;
   readonly trashRestore: string;
@@ -45,6 +48,7 @@ export type TrashStrings = {
   readonly trashDeleteForeverWarning: string;
   readonly trashEmptyAction: string;
   readonly trashConfirmEmpty: string;
+  readonly trashEmptyIncludesContent: string;
   readonly trashEmptyDone: string;
   readonly trashNotFound: string;
   readonly trashNoPreview: string;
@@ -53,7 +57,7 @@ export type TrashStrings = {
 };
 
 export type TrashRow = {
-  readonly kind: TrashKind;
+  readonly kind: TrashViewKind;
   readonly id: string;
   readonly label: string;
   readonly detail: string | null;
@@ -65,9 +69,10 @@ export type TrashRow = {
 
 /**
  * ป้ายชื่อชนิดของในถัง — ใช้ `switch` ครอบทุกชนิดโดยเจตนา
- * ⇒ เพิ่มชนิดใหม่ใน `TRASH_KINDS` แล้ว type/การคอมไพล์จะฟ้องที่นี่ทันที (ไม่ตกหล่นเงียบ ๆ)
+ * ⇒ เพิ่มชนิดใหม่ใน `TRASH_VIEW_KINDS` แล้ว type/การคอมไพล์จะฟ้องที่นี่ทันที (ไม่ตกหล่นเงียบ ๆ)
+ * (รอบที่ 176: ครอบเนื้อหาด้วย เพราะตารางรวมแสดง 6 ชนิด)
  */
-function kindLabelOf(strings: TrashStrings, kind: TrashKind): string {
+function kindLabelOf(strings: TrashStrings, kind: TrashViewKind): string {
   switch (kind) {
     case "media":
       return strings.trashKindMedia;
@@ -75,6 +80,12 @@ function kindLabelOf(strings: TrashStrings, kind: TrashKind): string {
       return strings.trashKindPreset;
     case "chromePreset":
       return strings.trashKindChromePreset;
+    case "product":
+      return strings.trashKindProduct;
+    case "recipe":
+      return strings.trashKindRecipe;
+    case "news":
+      return strings.trashKindNews;
   }
 }
 
@@ -248,6 +259,8 @@ export function EmptyTrashForm({ strings }: { readonly strings: TrashStrings }) 
       </label>
       <Submit label={strings.trashEmptyAction} danger />
       <StatusLine state={state} strings={strings} />
+      {/* รอบที่ 176: ปุ่มนี้ลบของ "ทุกชนิด" ในถัง (รวมสินค้า/เมนู/ข่าว) ⇒ ต้องบอกให้ชัดก่อนกด */}
+      <span className="text-brand-red basis-full text-[11px]">{strings.trashEmptyIncludesContent}</span>
     </form>
   );
 }

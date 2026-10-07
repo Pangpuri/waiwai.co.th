@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminUser } from "@/lib/auth/dal";
 import { isDatabaseConfigured } from "@/lib/content/repository";
-import { isTrashKind } from "@/lib/trash/plan";
+import {
+  deleteContentTrashItemPermanently,
+  emptyContentTrash,
+  restoreContentTrashItem,
+} from "@/lib/trash/content";
+import { isTrashKind, isTrashViewKind } from "@/lib/trash/plan";
 import {
   deleteTrashItemPermanently,
   emptyTrash,
@@ -14,35 +19,43 @@ import {
 import type { TrashActionState } from "@/features/admin/trash-state";
 
 /**
- * Server Actions ของ "ถังขยะ" (X2.4)
+ * Server Actions ของ "ถังขยะ" (X2.4 · ขยายรอบที่ 176)
  *
  * กติกาความปลอดภัย
  * - ทุก action เริ่มด้วย `requireAdminUser("<permission>")` เสมอ (ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง UI)
- * - `kind` จากฟอร์ม **ต้องผ่าน `isTrashKind()` ก่อน** — ค่าที่ไม่รู้จักจบที่ `invalid` ไม่แตะฐานข้อมูล
- *   (ชั้นล่างยังมี `TABLES` แบบค่าคงที่ ⇒ ต่อให้หลุดมาก็ไม่กลายเป็น SQL)
- * - การลบถาวรทำได้เฉพาะของที่ **อยู่ในถังแล้ว** (เงื่อนไขอยู่ใน SQL ของ repository)
+ * - `kind` จากฟอร์ม **ต้องผ่าน `isTrashViewKind()` ก่อน** (ครอบทั้งภาพ/พรีเซ็ตและเนื้อหา)
+ *   - ค่าที่ไม่รู้จักจบที่ `invalid` ไม่แตะฐานข้อมูล
+ *   - จากนั้น **แยกทาง**: `isTrashKind()` → repository ของถังขยะรวม · ที่เหลือ = เนื้อหา → `lib/trash/content.ts`
+ *   - ชั้นล่างทั้งสองฝ่ายมีชื่อตารางแบบค่าคงที่ ⇒ ต่อให้หลุดมาก็ไม่กลายเป็น SQL
+ * - การลบถาวรทำได้เฉพาะของที่ **อยู่ในถังแล้ว** (เงื่อนไขอยู่ใน SQL ของ repository/content)
  * - `revalidatePath` ทั้งหน้าถังขยะและหน้าต้นทาง เพราะทั้งคู่แสดงข้อมูลชุดเดียวกัน
+ *   (รอบที่ 176: ของเนื้อหาที่กู้คืน/ลบจากตารางรวมต้องหายจากแท็บถังขยะของจอนั้นด้วย)
  */
 
 const TRASH_PATH = "/admin/trash";
 const MEDIA_PATH = "/admin/media";
+/** หน้าจอของเนื้อหา — แท็บ "ถังขยะ" ของแต่ละจอแสดงรายการชุดเดียวกับตารางรวม */
+const CONTENT_PATHS: readonly string[] = ["/admin/products", "/admin/recipes", "/admin/news"];
 
 function revalidateTrash(): void {
   revalidatePath(TRASH_PATH);
   revalidatePath(MEDIA_PATH);
   revalidatePath("/admin/builder/home");
+  for (const path of CONTENT_PATHS) revalidatePath(path);
 }
 
-/** กู้คืนของจากถัง (ภาพ/พรีเซ็ตกลับมาใช้งานตามเดิม) */
+/** กู้คืนของจากถัง (ภาพ/พรีเซ็ต หรือ เนื้อหา) — กลับมาใช้งานตามเดิม */
 export async function restoreTrashAction(_previous: TrashActionState, formData: FormData): Promise<TrashActionState> {
   const user = await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return { status: "failed", code: "db-missing", count: null };
 
   const kind = String(formData.get("kind") ?? "").trim();
   const id = String(formData.get("id") ?? "").trim();
-  if (!isTrashKind(kind) || id === "") return { status: "failed", code: "invalid", count: null };
+  if (!isTrashViewKind(kind) || id === "") return { status: "failed", code: "invalid", count: null };
 
-  const restored = await restoreTrashItem(kind, id, user.email);
+  const restored = isTrashKind(kind)
+    ? await restoreTrashItem(kind, id, user.email)
+    : await restoreContentTrashItem(kind, id, user.email);
   if (!restored) return { status: "failed", code: "missing", count: null };
 
   revalidateTrash();
@@ -56,16 +69,21 @@ export async function deleteTrashItemAction(_previous: TrashActionState, formDat
 
   const kind = String(formData.get("kind") ?? "").trim();
   const id = String(formData.get("id") ?? "").trim();
-  if (!isTrashKind(kind) || id === "") return { status: "failed", code: "invalid", count: null };
+  if (!isTrashViewKind(kind) || id === "") return { status: "failed", code: "invalid", count: null };
 
-  const deleted = await deleteTrashItemPermanently(kind, id, user.email);
+  const deleted = isTrashKind(kind)
+    ? await deleteTrashItemPermanently(kind, id, user.email)
+    : await deleteContentTrashItemPermanently(kind, id, user.email);
   if (!deleted) return { status: "failed", code: "missing", count: null };
 
   revalidateTrash();
   return { status: "ok", code: "deleted", count: null };
 }
 
-/** ลบถาวรทุกอย่างในถัง (ผู้ดูแลสั่งเอง) — **ต้องติ๊กยืนยันก่อน** เพราะกู้คืนไม่ได้ */
+/**
+ * ลบถาวรทุกอย่างในถัง (ผู้ดูแลสั่งเอง) — **ต้องติ๊กยืนยันก่อน** เพราะกู้คืนไม่ได้
+ * รอบที่ 176: ครอบ **เนื้อหาด้วย** (ปุ่มเขียนว่า "ทั้งหมด" ⇒ ต้องไม่เหลือของค้างไว้เงียบ ๆ)
+ */
 export async function emptyTrashAction(_previous: TrashActionState, formData: FormData): Promise<TrashActionState> {
   const user = await requireAdminUser("trash");
   if (!isDatabaseConfigured()) return { status: "failed", code: "db-missing", count: null };
@@ -73,7 +91,10 @@ export async function emptyTrashAction(_previous: TrashActionState, formData: Fo
   /* ด่านยืนยันอยู่ที่เซิร์ฟเวอร์ (ไม่ใช่แค่ติ๊กในหน้าจอ) */
   if (formData.get("confirm") !== "yes") return { status: "failed", code: "invalid", count: null };
 
-  const removed = await emptyTrash(user.email);
+  const removedMedia = await emptyTrash(user.email);
+  const removedContent = await emptyContentTrash(user.email);
+  const removed = removedMedia + removedContent;
+
   revalidateTrash();
   return { status: "ok", code: "emptied", count: removed };
 }

@@ -114,3 +114,157 @@ export async function purgeExpiredContentTrash(
 
   return { at: now.toISOString(), dryRun, counts, total };
 }
+
+/* ── ตารางรวมที่ /admin/trash (รอบที่ 176) ────────────────────────────────────
+ *
+ * มติเจ้าของ 2026-10-07: "เห็นและจัดการจากที่เดียว" ⇒ หน้าถังขยะแสดงเนื้อหารวมกับภาพ/พรีเซ็ต
+ * กติกาที่คงเดิม (ห้ามผ่อน)
+ * - **ประตูอยู่ที่ SQL**: กู้คืน/ลบถาวรของเนื้อหาทุกคำสั่งมี `deleted_at is not null`
+ *   ⇒ ของที่ยังใช้งานอยู่ถูกแตะไม่ได้ แม้ยิงฟอร์มปลอมเข้ามา
+ * - ชื่อตารางมาจาก `CONTENT_TABLES` (ค่าคงที่) ⇒ ค่าจากฟอร์มไม่กลายเป็น SQL
+ * - ไม่มี DB = คืนค่าว่าง/0/`false` ไม่โยน error
+ * - ทุกการกระทำที่สำเร็จมีร่องรอยใน audit log (target `<kind>:<id>`)
+ */
+
+/** ชื่อที่คนอ่านรู้เรื่องของแต่ละตาราง — ค่าว่างทั้งคู่ถอยไปใช้ id (ไม่โชว์ช่องว่างให้สับสน) */
+const CONTENT_LABEL_SQL: Readonly<Record<ContentTrashKind, string>> = {
+  product: "coalesce(nullif(name_th, ''), nullif(name_en, ''), id)",
+  recipe: "coalesce(nullif(title_th, ''), nullif(title_en, ''), id)",
+  news: "coalesce(nullif(title_th, ''), nullif(title_en, ''), id)",
+};
+
+/** แถวของในถังของชนิดเนื้อหา — รูปเดียวกับ `TrashEntry` ของภาพ/พรีเซ็ต (ให้ตารางเดียวเรนเดอร์ได้) */
+export type ContentTrashEntry = {
+  readonly kind: ContentTrashKind;
+  readonly id: string;
+  readonly label: string;
+  /** รหัสของรายการ (ช่วยหาต่อในจอของชนิดนั้น) — เนื้อหาไม่มีขนาดไฟล์ */
+  readonly detail: string | null;
+  readonly sizeBytes: null;
+  readonly deletedAt: string;
+  /**
+   * ⚠️ ตารางเนื้อหา **ไม่มีคอลัมน์ `deleted_by`** (ต่างจาก media/block_preset/chrome_preset)
+   * ⇒ ใช้ `updated_by` ซึ่งถูกเขียนตอนย้ายเข้าถัง · ถ้ามีคนแก้ของที่อยู่ในถังภายหลัง ค่านี้อาจเป็นคนนั้น
+   *    (ข้อจำกัดของสคีมาเดิม — บันทึกใน § 10 รอบที่ 176)
+   */
+  readonly deletedBy: string | null;
+};
+
+/** รายการของในถังของเนื้อหา (ใหม่สุดก่อน) — แยกคิวรีต่อชนิดเพื่อใช้ดัชนีของแต่ละตาราง */
+export async function listContentTrash(limit = 200): Promise<readonly ContentTrashEntry[]> {
+  if (!isDatabaseConfigured()) return [];
+
+  const capped = Math.max(1, Math.min(limit, 500));
+  const pool = getPool();
+  const entries: ContentTrashEntry[] = [];
+
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const { rows } = await pool.query<{
+      id: string;
+      label: string;
+      deleted_at: Date;
+      updated_by: string | null;
+    }>(
+      `select id, ${CONTENT_LABEL_SQL[kind]} as label, deleted_at, updated_by
+         from ${CONTENT_TABLES[kind]}
+        where deleted_at is not null
+        order by deleted_at desc
+        limit $1`,
+      [capped],
+    );
+
+    for (const row of rows) {
+      entries.push({
+        kind,
+        id: row.id,
+        label: row.label,
+        detail: row.id,
+        sizeBytes: null,
+        deletedAt: new Date(row.deleted_at).toISOString(),
+        deletedBy: row.updated_by,
+      });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * กู้คืนเนื้อหาจากถัง — **ทำได้เฉพาะของที่อยู่ในถังแล้ว** (ประตูอยู่ที่ SQL)
+ * คืน `false` = ไม่มีแถวที่เข้าเงื่อนไข (ไม่มีจริง/ยังใช้งานอยู่/ถูกลบถาวรไปแล้ว)
+ */
+export async function restoreContentTrashItem(
+  kind: ContentTrashKind,
+  id: string,
+  actorEmail: string | null,
+): Promise<boolean> {
+  if (!isDatabaseConfigured() || id === "") return false;
+
+  const result = await getPool().query(
+    `update ${CONTENT_TABLES[kind]}
+        set deleted_at = null, updated_at = now(), updated_by = $2
+      where id = $1 and deleted_at is not null`,
+    [id, actorEmail],
+  );
+
+  const restored = (result.rowCount ?? 0) > 0;
+  if (restored) {
+    await recordAudit({
+      action: TRASH_AUDIT_ACTIONS.restore,
+      actorEmail,
+      target: `${kind}:${id}`,
+      detail: "restored",
+    });
+  }
+  return restored;
+}
+
+/**
+ * ลบเนื้อหา **ถาวรจากถังขยะ** — ประตูเดียวกับจอของแต่ละชนิด (`and deleted_at is not null`)
+ * ⚠️ ลบสินค้าแล้วส่วนผสมหายตาม (cascade) — ตั้งใจ (ของที่ยังใช้งานอยู่ไม่มีทางเข้าเงื่อนไขนี้)
+ */
+export async function deleteContentTrashItemPermanently(
+  kind: ContentTrashKind,
+  id: string,
+  actorEmail: string | null,
+): Promise<boolean> {
+  if (!isDatabaseConfigured() || id === "") return false;
+
+  const result = await getPool().query(`delete from ${CONTENT_TABLES[kind]} where id = $1 and deleted_at is not null`, [id]);
+
+  const deleted = (result.rowCount ?? 0) > 0;
+  if (deleted) {
+    await recordAudit({
+      action: TRASH_AUDIT_ACTIONS.permanent,
+      actorEmail,
+      target: `${kind}:${id}`,
+      detail: "permanent",
+    });
+  }
+  return deleted;
+}
+
+/**
+ * ลบถาวร **ทุกอย่าง** ในถังขยะเนื้อหา (ปุ่ม "ลบถาวรทั้งหมด" ที่หน้าถังขยะ) — คืนจำนวนที่ลบ
+ * ⚠️ ยังไม่พ้นระยะก็ลบได้ (ผู้ดูแลสั่งเอง · มีด่านติ๊กยืนยันอยู่ที่ action)
+ */
+export async function emptyContentTrash(actorEmail: string | null): Promise<number> {
+  if (!isDatabaseConfigured()) return 0;
+
+  const counts = emptyContentTrashCounts();
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const result = await getPool().query(`delete from ${CONTENT_TABLES[kind]} where deleted_at is not null`);
+    counts[kind] = result.rowCount ?? 0;
+  }
+
+  const total = contentTrashTotal(counts);
+  if (total > 0) {
+    await recordAudit({
+      action: TRASH_AUDIT_ACTIONS.permanent,
+      actorEmail,
+      target: `${TRASH_AUDIT_TARGET}-content`,
+      detail: `empty ${summarizeContentTrash(counts)}`,
+    });
+  }
+  return total;
+}

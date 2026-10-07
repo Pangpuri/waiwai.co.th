@@ -157,7 +157,7 @@ import {
   trashMedia,
   trashStats,
 } from "@/lib/trash/repository";
-import { contentTrashStats, purgeExpiredContentTrash } from "@/lib/trash/content";
+import { contentTrashStats, deleteContentTrashItemPermanently, listContentTrash, purgeExpiredContentTrash, restoreContentTrashItem } from "@/lib/trash/content";
 import { listReorderItems, parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
@@ -346,6 +346,9 @@ async function main(): Promise<void> {
 
   /* 34) ถังขยะเนื้อหา: ตัวนับบนการ์ด `/admin` ตรงกับของจริง (รอบที่ 175) */
   await checkContentTrashStats();
+
+  /* 35) ตารางรวมที่ `/admin/trash`: อ่าน/กู้คืน/ลบถาวรของเนื้อหาจากที่เดียว (รอบที่ 176) */
+  await checkContentTrashTable();
 
   await closePool();
 
@@ -3000,6 +3003,132 @@ async function checkContentTrashPurge(): Promise<void> {
     );
   } finally {
     await getPool().query("delete from product where id = any($1::text[])", [[oldProductId, freshProductId, activeProductId]]);
+    if (newsId !== "") await deleteNews(newsId);
+    if (recipeId !== "") await deleteRecipe(recipeId);
+
+    assert.equal(await countWhere("product where id like 'p99999%'", []), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+  }
+}
+
+/**
+ * 35) ตารางรวมที่ `/admin/trash` (รอบที่ 176) — **วงจรจริงกับฐานข้อมูล**
+ *
+ * ที่มา: เจ้าของสั่ง "เห็นและจัดการจากที่เดียว" ⇒ หน้าถังขยะเรนเดอร์เนื้อหารวมกับภาพ/พรีเซ็ต
+ * ⇒ ต้องพิสูจน์ว่าฟังก์ชันที่หน้าจอเรียกนั้น (ก) อ่านได้จริง (ข) กู้คืน/ลบถาวรได้จริง
+ *    (ค) **แตะของที่ยังใช้งานอยู่ไม่ได้** (ประตู `deleted_at is not null` อยู่ที่ SQL)
+ *    (ง) เรียกซ้ำครั้งที่สอง = ไม่สำเร็จ (ไม่ใช่ลบซ้ำ/กู้ซ้ำแบบเงียบ ๆ)
+ *
+ * ⚠️ ใช้ id เฉพาะของวงจรนี้แล้วลบใน `finally` เสมอ · ของที่ยังใช้งานอยู่ต้องรอดครบ
+ */
+async function checkContentTrashTable(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+
+  const actor = "check-db-trash-table@example.invalid";
+  const trashedProductId = "p999990";
+  const activeProductId = "p999991";
+  let newsId = "";
+  let recipeId = "";
+
+  const productOf = (id: string, nameTh: string, sortOrder: number): ProductInput => ({
+    id,
+    categoryId,
+    sourceId: "",
+    sourceUrl: "",
+    nameTh,
+    nameEn: "",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
+    sortOrder,
+  });
+
+  try {
+    await upsertProduct(productOf(trashedProductId, "ทดสอบตารางรวม (จะย้ายเข้า)", -99990), actor, null, { imageMode: "keep" });
+    await upsertProduct(productOf(activeProductId, "ทดสอบตารางรวม (ใช้งานอยู่)", -99991), actor, null, { imageMode: "keep" });
+
+    newsId = await createNewsForAdmin(
+      {
+        titleTh: "ข่าวทดสอบตารางรวมถังขยะ",
+        titleEn: "",
+        excerptTh: "",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-03T10:30",
+        status: "published",
+        body: [{ type: "paragraph", text: "ทดสอบตารางรวมถังขยะ" }],
+      },
+      actor,
+    );
+    recipeId = await createRecipeForAdmin(
+      {
+        titleTh: "เมนูทดสอบตารางรวมถังขยะ",
+        titleEn: "",
+        videoId: "dQw4w9WgXcQ",
+        publishedOn: "2018-10-09",
+        sortOrder: 997,
+        coverPath: null,
+        status: "published",
+      },
+      actor,
+    );
+
+    /* 1) ยังไม่ย้ายเข้า ⇒ รายการต้องไม่โผล่ (อ่านอย่างเดียว ต้องไม่เห็นของที่ใช้งานอยู่) */
+    const before = await listContentTrash();
+    for (const id of [trashedProductId, newsId, recipeId]) {
+      assert.equal(before.some((row) => row.id === id), false, `ของที่ยังใช้งานอยู่ต้องไม่อยู่ในถัง (${id})`);
+    }
+
+    /* 2) ย้ายเข้าถัง ⇒ โผล่ครบทั้งสามชนิด พร้อมชื่อ/วันที่ที่อ่านได้ */
+    await setProductTrashed(trashedProductId, true, actor);
+    await setNewsTrashed(newsId, true, actor);
+    await setRecipeTrashed(recipeId, true, actor);
+
+    const rows = await listContentTrash();
+    const find = (id: string) => rows.find((row) => row.id === id);
+    const productRow = find(trashedProductId);
+    const newsRow = find(newsId);
+    const recipeRow = find(recipeId);
+
+    assert.ok(productRow !== undefined && productRow.kind === "product", "สินค้าต้องโผล่ที่ตารางรวมในฐานะชนิด product");
+    assert.ok(newsRow !== undefined && newsRow.kind === "news", "ข่าวต้องโผล่ที่ตารางรวมในฐานะชนิด news");
+    assert.ok(recipeRow !== undefined && recipeRow.kind === "recipe", "เมนูต้องโผล่ที่ตารางรวมในฐานะชนิด recipe");
+    assert.equal(productRow.label, "ทดสอบตารางรวม (จะย้ายเข้า)", "ต้องใช้ชื่อที่คนอ่านรู้เรื่อง (ไม่ใช่ id)");
+    assert.equal(Number.isNaN(new Date(productRow.deletedAt).getTime()), false, "วันที่ย้ายเข้าต้องแปลงได้");
+
+    /* 3) กู้คืนข่าวจากตารางรวม ⇒ หลุดจากถังจริง (และเรียกซ้ำ = false) */
+    assert.equal(await restoreContentTrashItem("news", newsId, actor), true, "กู้คืนข่าวจากตารางรวมต้องสำเร็จ");
+    assert.equal(await countWhere("news where id = $1 and deleted_at is null", [newsId]), 1, "กู้คืนแล้วต้องใช้งานได้ตามเดิม");
+    assert.equal(await restoreContentTrashItem("news", newsId, actor), false, "เรียกกู้คืนซ้ำต้องไม่สำเร็จ (ไม่อยู่ในถังแล้ว)");
+    assert.equal((await listContentTrash()).some((row) => row.id === newsId), false, "กู้คืนแล้วต้องหลุดจากรายการถัง");
+
+    /* 4) ประตู fail-closed: กู้คืน/ลบ ของที่ **ยังใช้งานอยู่** ต้องไม่ทำอะไรเลย */
+    assert.equal(await restoreContentTrashItem("product", activeProductId, actor), false, "กู้คืนของที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await deleteContentTrashItemPermanently("product", activeProductId, actor), false, "ลบถาวรของที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await countWhere("product where id = $1 and deleted_at is null", [activeProductId]), 1, "ของที่ใช้งานอยู่ต้องอยู่ครบ");
+
+    /* 5) ลบถาวรของในถัง ⇒ หายจริง (และเรียกซ้ำ = false) */
+    assert.equal(await deleteContentTrashItemPermanently("product", trashedProductId, actor), true, "ลบถาวรสินค้าในถังต้องสำเร็จ");
+    assert.equal(await countWhere("product where id = $1", [trashedProductId]), 0, "ลบถาวรแล้วแถวต้องหายจริง");
+    assert.equal(await deleteContentTrashItemPermanently("product", trashedProductId, actor), false, "ลบซ้ำต้องไม่สำเร็จ");
+
+    done(
+      "ตารางรวมถังขยะ: อ่าน/กู้คืน/ลบถาวรของเนื้อหาจากที่เดียว",
+      "ของใช้งานอยู่ไม่โผล่ · กู้คืนแล้วหลุดจากถัง · ลบถาวรหายจริง · ประตู 'อยู่ในถัง' กันของใช้งานอยู่",
+    );
+  } finally {
+    await getPool().query("delete from product where id = any($1::text[])", [[trashedProductId, activeProductId]]);
     if (newsId !== "") await deleteNews(newsId);
     if (recipeId !== "") await deleteRecipe(recipeId);
 
