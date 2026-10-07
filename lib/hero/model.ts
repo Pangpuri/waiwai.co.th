@@ -126,3 +126,27 @@ export function moveHeroPageSlide(
   next[to] = moved;
   return next;
 }
+
+/**
+ * แปลง `object-position` ของเดิม (`features/home/slides.ts`) ให้เป็นจุดโฟกัสร้อยละ
+ * รูปแบบที่รองรับ: `"center center"` · `"center 35%"` · `"20% 35%"` (คำสำคัญ: left/center/right · top/center/bottom)
+ * ⚠️ อ่านไม่ได้ = กลางภาพ (ไม่เดา) — ใช้ตอนย้ายสไลด์เดิมขึ้นฐานข้อมูล
+ */
+export function focusFromObjectPosition(value: string): { readonly x: number; readonly y: number } {
+  const parts = value.trim().toLowerCase().split(/\s+/).filter((part) => part !== "");
+  if (parts.length === 0) return { x: 50, y: 50 };
+  const [first = "", second = ""] = parts;
+  if (parts.length === 1) return { x: axisValue(first, 50), y: 50 };
+  return { x: axisValue(first, 50), y: axisValue(second, 50) };
+}
+
+function axisValue(token: string, fallback: number): number {
+  if (token.endsWith("%")) {
+    const parsed = Number.parseFloat(token.slice(0, -1));
+    return Number.isFinite(parsed) ? clamp(parsed, 0, 100) : fallback;
+  }
+  /* คำสำคัญของ CSS — ใช้ค่ากลางของช่วงนั้น ๆ */
+  if (token === "left" || token === "top") return 0;
+  if (token === "right" || token === "bottom") return 100;
+  return fallback;
+}
