@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 import { legacyRedirectRules } from "@/lib/routing/redirects";
+import { contentSecurityPolicy } from "@/lib/security/csp";
 
 const nextConfig: NextConfig = {
   /*
@@ -44,9 +45,10 @@ const nextConfig: NextConfig = {
 
     เว็บนี้ไม่ใช้กล้อง/ไมโครโฟน และไม่เรียก Geolocation API เลย → ปิดสิทธิ์ไว้ล่วงหน้า
 
-    ⚠️ จงใจ **ไม่ตั้ง Content-Security-Policy** เพราะเว็บนี้ใช้สคริปต์ inline ก่อน paint
-    (ธีม/สถานะป๊อปอัพ/การ์ด — ดู features/shell/ui/inline-script.tsx) CSP ที่เข้มจะบล็อกสคริปต์เหล่านั้น
-    ทำให้หน้าวาบ · ถ้าจะทำ CSP ต้องใช้ nonce ซึ่งกระทบเรื่อง static rendering → เป็นงานแยกที่ต้องคุยกันก่อน
+    ⚠️ **CSP (รอบที่ 170):** ใช้ **แบบไม่ใช้ nonce** เพื่อคง ISR/static (เอกสาร Next ยืนยันว่า nonce
+    บังคับให้ทุกหน้าเป็น dynamic ⇒ ปิด ISR/CDN cache) ⇒ นโยบายยังต้องมี `'unsafe-inline'` สำหรับ
+    สคริปต์ก่อน paint + สคริปต์ RSC ของ Next แต่ล็อกที่เหลือ (object/base/form/frame-ancestors/frame-src)
+    · ตรรกะทั้งหมดอยู่ที่ `lib/security/csp.ts` (pure + มีเทสต์) · เหตุผลเต็มอยู่ในไฟล์นั้น
   */
   /*
     ── URL เก่า → 301 ──────────────────────────────────────────────────────────
@@ -78,6 +80,12 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          /*
+            CSP (รอบที่ 170) — ค่ามาจาก `lib/security/csp.ts` (แหล่งความจริงเดียว · pure + มีเทสต์)
+            ⚠️ ต้องเป็น `frame-ancestors 'self'` คู่กับ `X-Frame-Options: SAMEORIGIN`
+            เพราะหลังบ้านฝัง iframe พรีวิวของตัวเอง (same-origin) — `'none'` จะทำให้พรีวิวพัง
+          */
+          { key: "Content-Security-Policy", value: contentSecurityPolicy({ isDev: process.env.NODE_ENV === "development" }) },
         ],
       },
     ];

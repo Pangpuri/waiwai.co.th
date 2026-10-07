@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import nextConfig from "../next.config.ts";
+import { CSP_REQUIRED_DIRECTIVES, contentSecurityPolicy } from "@/lib/security/csp";
 
 /**
  * ด่านของ "การตั้งค่าตอน deploy" — กันเคสที่ตั้งไว้ผิดที่จนเว็บจริงไม่มีผล
@@ -41,21 +42,33 @@ test("next.config.ts: ต้องตั้ง header ความปลอด�
   }
 });
 
-test("next.config.ts: จงใจไม่ตั้ง Content-Security-Policy", async () => {
+test("next.config.ts: ตั้ง Content-Security-Policy จากแหล่งความจริงเดียว (แบบไม่ใช้ nonce)", async () => {
   const headers = nextConfig.headers;
   if (typeof headers !== "function") return;
 
   const rules = await headers();
-  const keys = rules.flatMap((rule) => rule.headers.map((entry) => entry.key.toLowerCase()));
+  const globalRule = rules.find((rule) => rule.source === "/(.*)");
+  const csp = globalRule?.headers.find((entry) => entry.key.toLowerCase() === "content-security-policy")?.value;
 
-  /*
-    เว็บนี้ใช้สคริปต์ inline ก่อน paint (ธีม/สถานะป๊อปอัพ/การ์ด) — CSP ที่ไม่มี nonce จะบล็อกสคริปต์เหล่านั้น
-    แล้วหน้าจะวาบ · ถ้าวันหนึ่งจะทำ CSP ต้องทำ nonce + ทบทวนผลต่อ static rendering ก่อน (ไม่ใช่แค่เพิ่ม header)
-  */
+  assert.equal(typeof csp, "string", "ต้องมี header Content-Security-Policy ที่กฎ catch-all");
+  if (typeof csp !== "string") return;
+
+  for (const [directive, expected] of Object.entries(CSP_REQUIRED_DIRECTIVES)) {
+    assert.ok(csp.includes(`${directive} ${expected}`), `CSP ต้องมี ${directive} ${expected}`);
+  }
+
+  /* ⭐ ต้องไม่ใช้ nonce — เอกสาร Next ยืนยันว่า nonce บังคับทุกหน้าเป็น dynamic (ปิด ISR) */
+  assert.ok(!csp.includes("nonce-"), "ห้ามใช้ nonce (จะปิด ISR/CDN cache — ดู lib/security/csp.ts)");
+
+  /* ⚠️ ต้องเป็น 'self' ไม่ใช่ 'none' — หลังบ้านฝัง iframe พรีวิวของตัวเอง */
+  assert.ok(csp.includes("frame-ancestors 'self'"), "frame-ancestors ต้องเป็น 'self' ไม่งั้นพรีวิวหลังบ้านพัง");
   assert.ok(
-    !keys.includes("content-security-policy"),
-    "อย่าเพิ่ม CSP แบบสด ๆ — สคริปต์ก่อน paint ต้องมี nonce ก่อน ไม่งั้นหน้าจะวาบ/พัง",
+    csp.includes("frame-src 'self' https://www.youtube-nocookie.com"),
+    "frame-src ต้องยอมให้พรีวิวของเรา + ผู้เล่น YouTube (nocookie) เท่านั้น",
   );
+
+  /* ค่าต้องตรงกับที่โมดูลกลางสร้าง (กันแก้ที่เดียวแล้วหลุด) */
+  assert.equal(csp, contentSecurityPolicy({ isDev: false }), "CSP ต้องมาจาก lib/security/csp.ts");
 });
 
 test("netlify.toml: ต้องไม่ตั้ง header ซ้ำกับ next.config.ts", () => {
