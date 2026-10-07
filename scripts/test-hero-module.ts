@@ -6,6 +6,7 @@ import {
   MAX_HERO_PAGE_SLIDES,
   clampFocus,
   clampZoom,
+  focusFromObjectPosition,
   isLocalMediaPath,
   moveHeroPageSlide,
   parseHeroSlideInput,
@@ -100,4 +101,32 @@ test("hero module: migration 0027 + สคีมา ตรงกัน (ตา�
   assert.ok(migration.includes("check (zoom between 1 and 2)"), "ต้องมีการตรวจช่วงซูม");
   assert.ok(schema.includes("create table if not exists hero_slide"), "schema.sql (เอกสาร) ต้องมีตารางนี้ด้วย");
   assert.ok(/migration 0027/.test(schema), "schema.sql ต้องบอกว่ารอบไหนสร้างตารางนี้");
+});
+
+test("hero module: แปลง object-position เดิม → จุดโฟกัส (ใช้ตอนย้ายสไลด์ขึ้นฐานข้อมูล)", () => {
+  assert.deepEqual(focusFromObjectPosition("center center"), { x: 50, y: 50 });
+  assert.deepEqual(focusFromObjectPosition("center 35%"), { x: 50, y: 35 }, "ค่าจริงของภาพงานฉลอง/ภาพเปิดตัว 3 รส");
+  assert.deepEqual(focusFromObjectPosition("20% 35%"), { x: 20, y: 35 });
+  assert.deepEqual(focusFromObjectPosition("left top"), { x: 0, y: 0 });
+  assert.deepEqual(focusFromObjectPosition("right bottom"), { x: 100, y: 100 });
+  assert.deepEqual(focusFromObjectPosition("50%"), { x: 50, y: 50 }, "ให้ค่าเดียว = แกน x");
+  assert.deepEqual(focusFromObjectPosition(""), { x: 50, y: 50 }, "ว่าง = กลางภาพ");
+  assert.deepEqual(focusFromObjectPosition("ไม่รู้จัก"), { x: 50, y: 50 }, "อ่านไม่ได้ = กลางภาพ (ไม่เดา)");
+  assert.deepEqual(focusFromObjectPosition("150% -5%"), { x: 100, y: 0 }, "บีบให้อยู่ในช่วง 0–100");
+
+  /* สคริปต์นำเข้าต้องไม่ทับลำดับที่คนจัดไว้ + ต้องมีโหมดดูผล */
+  const script = readFileSync("scripts/import-hero-slides.ts", "utf8");
+  assert.ok(script.includes("preserveOrder: true"), "ตัวนำเข้าต้องคง sort_order เดิม (บทเรียนรอบ 140)");
+  assert.ok(script.includes("--dry-run"), "ต้องมีโหมดดูผลอย่างเดียว");
+  assert.ok(!/\bdelete\b/i.test(script.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")), "ตัวนำเข้าต้องไม่ลบข้อมูล");
+});
+
+test("hero module: ชั้นอ่านฝั่งเว็บต้อง fallback ปลอดภัย (ไม่มี DB/ตารางหาย = คืน [] ไม่ throw)", () => {
+  const repository = readFileSync("lib/hero/repository.ts", "utf8");
+  assert.ok(repository.includes("PUBLIC_HERO_CONDITION"), "ต้องมีเงื่อนไขกลางของฝั่งเว็บ");
+  assert.ok(repository.includes("deleted_at is null and is_active"), "เงื่อนไขต้องกันทั้งของในถังและของที่ปิดไว้");
+  assert.ok(repository.includes("if (!isDatabaseConfigured()) return [];"), "ไม่มี DB = คืนรายการว่างทันที");
+  assert.ok(repository.includes("await readQuery<"), "ฝั่งเว็บต้องอ่านผ่านประตูอ่านอย่างเดียว (readQuery)");
+  assert.ok(/catch \{[\s\S]{0,120}return \[\];/.test(repository), "อ่านพังต้องกลืนแล้วคืนรายการว่าง (หน้าเว็บห้ามพังเพราะ DB)");
+  assert.ok(repository.includes("listHeroPageSlidesForAdmin"), "หลังบ้านใช้ getPool (สิทธิ์เต็ม) แยกจากฝั่งเว็บ");
 });
