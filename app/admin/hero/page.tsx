@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CampaignManager, type CampaignSlideOption } from "@/features/admin/ui/campaign-manager";
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
 import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -13,6 +14,7 @@ import {
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
 import type { HeroCard } from "@/lib/hero/cards";
+import { listCampaignsForAdmin } from "@/lib/campaigns/repository";
 import { listHeroCardsForAdmin } from "@/lib/hero/cards-repository";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
@@ -30,10 +32,12 @@ import { fillTemplate } from "@/lib/i18n/template";
  */
 /** ป้ายของเอฟเฟคแต่ละแบบ (ข้อความจากพจนานุกรม — ไม่พิมพ์ไทยในไฟล์นี้) */
 
-export default async function AdminHeroPage() {
+export default async function AdminHeroPage({ searchParams }: { searchParams: Promise<{ readonly tab?: string }> }) {
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const s = messages.admin;
+  /* แท็บในหน้าเดียว (มติเจ้าของ): สไลด์ | แคมเปญ — จำแท็บใน URL */
+  const tab = (await searchParams).tab === "campaigns" ? "campaigns" : "slides";
 
   /* คลังภาพสำหรับช่องเลือกภาพ — ส่งให้เฉพาะผู้มีสิทธิ์ media (แบบเดียวกับตัวสร้างหน้า · รอบที่ 93) */
   const imageLibrary: readonly ImageLibraryItem[] = can(user.role, "media")
@@ -52,6 +56,8 @@ export default async function AdminHeroPage() {
   const cardsBySlide: Record<string, HeroCard[]> = {};
   for (const card of await listHeroCardsForAdmin()) (cardsBySlide[card.slideId] ??= []).push(card);
   const nowIso = new Date().toISOString();
+  const campaigns = await listCampaignsForAdmin();
+  const slideOptions: readonly CampaignSlideOption[] = slides.map((slide) => ({ id: slide.id, label: slide.id }));
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
   return (
@@ -69,7 +75,25 @@ export default async function AdminHeroPage() {
         </p>
       </header>
 
-      {/* เอฟเฟค + ความเร็ว (รอบที่ 185) — ใช้กับสไลด์ทั้งชุด */}
+      {/* แท็บ: สไลด์ | แคมเปญ (รอบที่ 190) */}
+      <nav className="border-line flex gap-2 border-b pb-2">
+        <Link
+          href="/admin/hero"
+          aria-current={tab === "slides" ? "page" : undefined}
+          className={tab === "slides" ? "bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold" : "border-line text-fg-muted rounded-md border px-3 py-1.5 text-sm"}
+        >
+          {s.campaignTabSlides}
+        </Link>
+        <Link
+          href="/admin/hero?tab=campaigns"
+          aria-current={tab === "campaigns" ? "page" : undefined}
+          className={tab === "campaigns" ? "bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold" : "border-line text-fg-muted rounded-md border px-3 py-1.5 text-sm"}
+        >
+          {s.campaignTabCampaigns}
+        </Link>
+      </nav>
+      {tab === "slides" ? (
+      <>
       <form action={saveHeroSettingAction} className="border-line bg-surface flex flex-wrap items-end gap-3 rounded-xl border p-3">
         <label className="text-fg-muted flex flex-col gap-1 text-xs">
           {s.heroAdminEffect}
@@ -156,6 +180,10 @@ export default async function AdminHeroPage() {
           </ul>
         )}
       </section>
+      </>
+      ) : (
+        <CampaignManager campaigns={campaigns} slideOptions={slideOptions} strings={s} nowIso={nowIso} />
+      )}
       </div>
     </ImageLibraryProvider>
   );
