@@ -48,6 +48,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     /* "กิจกรรมของฉัน" (B3 · รอบที่ 90) — ทุกบทบาทเข้าถึงได้ (ร่องรอยของตัวเอง) */
     { href: "/admin/activity", label: messages.admin.activityTitle, permission: "content" },
     { href: "/admin/builder/chrome", label: messages.admin.chromeTitle, permission: "presets" },
+    { href: "/admin/hero", label: messages.admin.heroAdminTitle, permission: "content" },
     { href: "/admin/builder/home", label: messages.admin.builderTitle, permission: "content" },
     { href: "/admin/builder/mourning", label: messages.admin.mourningTitle, permission: "presets" },
     { href: "/admin/content/home", label: messages.admin.contentTitle, permission: "content" },
@@ -74,6 +75,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       label: messages.admin.navGroupContent,
       items: [
         { href: "/admin/builder/chrome", label: messages.admin.navChrome },
+        { href: "/admin/hero", label: messages.admin.navHero },
         { href: "/admin/builder/home", label: messages.admin.navHome },
         { href: "/admin/builder/about", label: messages.admin.navAbout },
         { href: "/admin/builder/executives", label: messages.admin.navExecutives },

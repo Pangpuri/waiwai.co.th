@@ -161,3 +161,30 @@ test("hero module: ต่อสายหน้าแรก — สไลด์�
   assert.ok(page.includes("managedHeroSlideViews("), "ต้องแปลงวิวผ่านตัวช่วยกลาง (ไม่ประกอบเองในหน้า)");
   assert.ok(page.includes("revalidate = 300"), "หน้าแรกยังต้องเป็น ISR 300 วิเหมือนเดิม");
 });
+
+test("hero module: หลังบ้าน — เมนูในไซด์บาร์ + หน้าจอ /admin/hero (สิทธิ์ · อ่านผ่านชั้นข้อมูล)", () => {
+  const layout = readFileSync("app/admin/layout.tsx", "utf8");
+  /* เมนูต้องอยู่ "ต่อจากส่วนกลางของเว็บ" ทั้งในลิสต์ด้านบนและกลุ่มไซด์บาร์ */
+  const linksIndex = layout.indexOf('{ href: "/admin/builder/chrome", label: messages.admin.chromeTitle');
+  const heroLinkIndex = layout.indexOf('{ href: "/admin/hero", label: messages.admin.heroAdminTitle');
+  assert.ok(heroLinkIndex > linksIndex, "เมนูลิสต์ต้องมี /admin/hero ต่อจากส่วนกลางของเว็บ");
+  const sidebarChrome = layout.indexOf("{ href: \"/admin/builder/chrome\", label: messages.admin.navChrome }");
+  const sidebarHero = layout.indexOf("{ href: \"/admin/hero\", label: messages.admin.navHero }");
+  assert.ok(sidebarHero > sidebarChrome, "ไซด์บาร์ต้องมีสไลด์ & แคมเปญ ต่อจากส่วนกลางของเว็บ");
+  assert.ok(layout.includes('permission: "content"') && layout.includes('"/admin/hero"'), "เมนูต้องผูกสิทธิ์");
+
+  /* หน้าจอ: ตรวจสิทธิ์ + อ่านผ่านชั้นข้อมูล (ไม่ประกอบ SQL เองในหน้าจอ) */
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes('requireAdminUser("content")'), "หน้าจอต้องตรวจสิทธิ์ก่อนอ่านข้อมูล");
+  assert.ok(page.includes("listHeroPageSlidesForAdmin()"), "ต้องอ่านผ่านชั้นข้อมูลของโมดูล");
+  assert.ok(!/select\s+/i.test(page), "ห้ามเขียน SQL ในหน้าจอ (ต้องผ่านชั้นข้อมูล)");
+  assert.ok(page.includes("heroAdminNextStep"), "ต้องบอกผู้ใช้ว่าเฟสถัดไปทำอะไร (ไม่ให้เข้าใจว่าจบแล้ว)");
+
+  /* คีย์พจนานุกรมครบสองภาษา */
+  const th = readFileSync("lib/i18n/messages/areas/th/admin.ts", "utf8");
+  const en = readFileSync("lib/i18n/messages/areas/en/admin.ts", "utf8");
+  for (const key of ["navHero", "heroAdminTitle", "heroAdminIntro", "heroAdminCount", "heroAdminEmpty", "heroAdminActive", "heroAdminInactive", "heroAdminFocus", "heroAdminZoom", "heroAdminSeeSite", "heroAdminNextStep"]) {
+    assert.ok(th.includes(`${key}:`), `พจนานุกรมไทยต้องมี ${key}`);
+    assert.ok(en.includes(`${key}:`), `พจนานุกรมอังกฤษต้องมี ${key}`);
+  }
+});

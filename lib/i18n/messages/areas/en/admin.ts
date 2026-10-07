@@ -101,6 +101,18 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   fieldEnOptional: "English (optional)",
   imageHint: "Drag an image into the box — that is all it takes.",
   imagePathLabel: "File path",
+  /* Hero slides & campaigns (round 184) */
+  navHero: "Slides & campaigns",
+  heroAdminTitle: "Slides & campaigns",
+  heroAdminIntro: "Slides shown on the home page — images and positioning come from this module (with no slides, the template set is used)",
+  heroAdminCount: "{n} slides are live",
+  heroAdminEmpty: "No slides yet",
+  heroAdminActive: "Live",
+  heroAdminInactive: "Hidden",
+  heroAdminFocus: "Focus point",
+  heroAdminZoom: "Zoom",
+  heroAdminSeeSite: "See it on the home page",
+  heroAdminNextStep: "Coming next: add/remove images · drag to reorder · 3x3 focus picker · zoom · trash · revision history",
   blockImageLabel: "Image for this block",
   /* Hero slides (round 183 · phase ค) */
   blockSlidesTitle: "Slide images",

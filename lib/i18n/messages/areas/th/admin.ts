@@ -56,6 +56,18 @@ export const admin = {
   fieldEnOptional: "อังกฤษ (ไม่บังคับ)",
   imageHint: "ลากภาพมาวางในกรอบได้เลย",
   imagePathLabel: "พาธไฟล์",
+  /* โมดูล "สไลด์ & แคมเปญ" (รอบที่ 184) */
+  navHero: "สไลด์ & แคมเปญ",
+  heroAdminTitle: "สไลด์ & แคมเปญ",
+  heroAdminIntro: "สไลด์ที่แสดงบนหน้าแรก — ภาพและตำแหน่งมาจากโมดูลนี้ (ถ้าไม่มีสไลด์ หน้าแรกจะใช้ชุดภาพในเทมเพลตแทน)",
+  heroAdminCount: "มี {n} สไลด์ที่แสดงอยู่",
+  heroAdminEmpty: "ยังไม่มีสไลด์ในระบบ",
+  heroAdminActive: "แสดงอยู่",
+  heroAdminInactive: "ซ่อนอยู่",
+  heroAdminFocus: "จุดโฟกัส",
+  heroAdminZoom: "ซูม",
+  heroAdminSeeSite: "ดูผลบนหน้าแรก",
+  heroAdminNextStep: "เฟสถัดไปของโมดูลนี้: เพิ่ม/ลบภาพ · ลากสลับลำดับ · เลือกจุดโฟกัส 3×3 · ซูม · ถังขยะ · ประวัติการแก้",
   blockImageLabel: "ภาพของบล็อกนี้",
   /* สไลด์ของบล็อก "แบนเนอร์เปิดหน้า" (รอบที่ 183 · เฟส (ค)) */
   blockSlidesTitle: "ภาพสไลด์",
