@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -11,7 +12,15 @@ import {
   setHeroSlideImage,
   setHeroSlideZoom,
 } from "@/lib/blocks/edit";
-import { HERO_FOCUS_PRESETS, HERO_SLIDE_SECONDS, HERO_ZOOM_PRESETS, heroFocusPresetId } from "@/lib/blocks/hero-slides";
+import {
+  HERO_FOCUS_PRESETS,
+  HERO_SLIDESHOW_CLASS,
+  HERO_SLIDE_SECONDS,
+  HERO_ZOOM_PRESETS,
+  heroFocusPresetId,
+  heroSlideVars,
+  heroSlideshowClass,
+} from "@/lib/blocks/hero-slides";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { BLOCK_SCHEMA_VERSION, MAX_HERO_SLIDES, createBlock, type BlockDocument } from "@/lib/blocks/types";
 
@@ -229,4 +238,75 @@ test("hero slides: เอกสารเดิม (ไม่มี slides) ย�
   const fresh = createBlock("hero", "hero-1");
   assert.ok(fresh.type === "hero");
   assert.equal(fresh.slides, undefined);
+});
+
+/* ── เฟส (ข): การแสดงผล — ตัวคำนวณสไตล์ (ตรรกะล้วน) + CSS/ตัวเรนเดอร์ต่อสายจริง ────────
+ *
+ * ตรรกะการหมุนอยู่ที่ CSS ทั้งหมด ⇒ สิ่งที่ต้องพิสูจน์คือ "ค่าที่คำนวณได้ถูกต้อง"
+ * และ "CSS มีชุด keyframes ครบทุกจำนวนใบ + เคารพ reduced-motion"
+ */
+
+test("hero slides (ข): heroSlideshowClass เลือกชุด keyframes ตามจำนวนใบ (บีบ 2–6)", () => {
+  assert.equal(heroSlideshowClass(2), "hero-slides-2");
+  assert.equal(heroSlideshowClass(3), "hero-slides-3");
+  assert.equal(heroSlideshowClass(MAX_HERO_SLIDES), `hero-slides-${MAX_HERO_SLIDES}`);
+  /* ค่าที่หลุดช่วงต้องไม่ทำ CSS พัง */
+  assert.equal(heroSlideshowClass(1), "hero-slides-2", "1 ใบยังต้องมีคลาสที่ CSS รู้จัก");
+  assert.equal(heroSlideshowClass(0), "hero-slides-2");
+  assert.equal(heroSlideshowClass(-3), "hero-slides-2");
+  assert.equal(heroSlideshowClass(MAX_HERO_SLIDES + 5), `hero-slides-${MAX_HERO_SLIDES}`, "เกินเพดานถูกบีบ");
+});
+
+test("hero slides (ข): heroSlideVars ให้ delay/span/โฟกัส/ซูม ตรงกับที่ CSS ใช้", () => {
+  const slide = { focusX: 0, focusY: 100, zoom: 1.5 };
+  const first = heroSlideVars(0, 3, slide);
+  const third = heroSlideVars(2, 3, slide);
+
+  assert.equal(first["--hero-delay"], "0s", "ใบแรกเริ่มทันที");
+  assert.equal(third["--hero-delay"], `${2 * HERO_SLIDE_SECONDS}s`, "ใบที่ 3 เริ่มหลัง 2 สล็อต");
+  assert.equal(first["--hero-span"], `${3 * HERO_SLIDE_SECONDS}s`, "หนึ่งรอบ = เวลาต่อภาพ × จำนวนใบ");
+  assert.equal(first["--hero-focus"], "0% 100%", "จุดโฟกัสเป็น X% Y% (ใช้กับ object-position)");
+  assert.equal(first["--hero-zoom"], "1.5", "ซูมเป็นตัวคูณของ scale()");
+
+  /* ค่าที่หลุดช่วง: index ต้องไม่เกินจำนวนใบ · count 0 ต้องไม่ทำให้ span เป็น 0s */
+  assert.equal(heroSlideVars(9, 3, slide)["--hero-delay"], `${2 * HERO_SLIDE_SECONDS}s`, "index เกินถูกบีบที่ใบสุดท้าย");
+  assert.equal(heroSlideVars(-1, 3, slide)["--hero-delay"], "0s", "index ติดลบถูกบีบที่ใบแรก");
+  assert.equal(heroSlideVars(0, 0, slide)["--hero-span"], `${HERO_SLIDE_SECONDS}s`, "count 0 ต้องไม่เป็น 0s");
+});
+
+test("hero slides (ข): ตัวเรนเดอร์ + CSS ต่อสายจริง (CSS ล้วน · ไม่มี JS · เคารพ reduced-motion)", () => {
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes("heroSlideshowClass("), "ตัวเรนเดอร์ต้องใช้คลาสจากตัวช่วยกลาง (ไม่พิมพ์เอง)");
+  assert.ok(renderer.includes("heroSlideVars("), "ตัวเรนเดอร์ต้องใช้ CSS variable จากตัวช่วยกลาง");
+  assert.ok(renderer.includes("HERO_SLIDESHOW_CLASS"), "ต้องมีคลาสกล่องสไลด์กลาง");
+  assert.equal(HERO_SLIDESHOW_CLASS, "hero-slideshow", "ชื่อคลาสกลางต้องตรงกับที่ globals.css ใช้");
+  assert.ok(
+    renderer.includes('(block.slides ?? []).filter((slide) => slide.image !== null)'),
+    "สไลด์ที่ยังไม่เลือกภาพต้องถูกข้าม (ไม่ทำเลย์เอาต์พัง)",
+  );
+  assert.ok(!renderer.includes("setInterval") && !renderer.includes("setTimeout"), "ห้ามมี JS หมุนภาพในตัวเรนเดอร์");
+  assert.ok(
+    /slideMedia\.length === 0[\s\S]{0,220}media === null \? null/.test(renderer),
+    "ไม่มีสไลด์ = ถอยไปใช้ภาพเดี่ยวเหมือนเดิม",
+  );
+
+  const css = readFileSync("app/globals.css", "utf8");
+  assert.ok(css.includes(".hero-slide img"), "ต้องมีกฎใส่โฟกัส/ซูมให้ตัว <img>");
+  assert.ok(css.includes("object-position: var(--hero-focus"), "โฟกัสต้องมาจาก CSS variable");
+  assert.ok(css.includes("scale(var(--hero-zoom"), "ซูมต้องมาจาก CSS variable");
+  assert.ok(css.includes("animation-duration: var(--hero-span"), "ความยาวรอบมาจาก CSS variable");
+  assert.ok(css.includes("animation-delay: var(--hero-delay"), "เวลารอของแต่ละใบมาจาก CSS variable");
+  for (let count = 2; count <= MAX_HERO_SLIDES; count += 1) {
+    assert.ok(css.includes(`.hero-slides-${count} .hero-slide`), `ต้องมีชุด keyframes ของ ${count} ใบ`);
+    assert.ok(css.includes(`@keyframes hero-fade-${count}`), `ต้องมี @keyframes hero-fade-${count}`);
+  }
+  assert.ok(
+    css.includes("@media (prefers-reduced-motion: reduce)") &&
+      /prefers-reduced-motion: reduce\)[\s\S]{0,160}\.hero-slide \{\s*animation: none/.test(css),
+    "โหมดลดการเคลื่อนไหวต้องหยุดหมุน",
+  );
+  assert.ok(
+    /prefers-reduced-motion: reduce\)[\s\S]{0,260}\.hero-slide:not\(:first-child\)/.test(css),
+    "โหมดลดการเคลื่อนไหวต้องแสดงเฉพาะภาพแรก",
+  );
 });

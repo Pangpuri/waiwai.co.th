@@ -530,6 +530,130 @@ html[data-preview-parts="content"] html[data-mourning="shown"] [data-mourning-no
 }
 
 /*
+  ── สไลด์ของบล็อก "แบนเนอร์เปิดหน้า" (รอบที่ 183 · เฟส (ข)) ──────────────────────
+  หลังบ้านเก็บ "จุดโฟกัส (X% Y%) + ซูม" ต่อภาพ ⇒ ที่นี่ส่งต่อไปให้ตัว <img>
+  · ตัวหมุนภาพใช้ **CSS animation ล้วน ไม่มี JS** (ตัวเรนเดอร์ส่ง `--hero-span` = เวลาต่อภาพ × จำนวนใบ)
+  · แต่ละใบมี `--hero-delay` ของตัวเอง = สล็อตของมันในรอบเดียว
+  ⚠️ ตาราง keyframes ต้องเขียนแยกต่อจำนวนใบ (2–6) เพราะ CSS คำนวณเปอร์เซ็นต์จากจำนวนไม่ได้
+  ⚠️ `prefers-reduced-motion: reduce` = หยุดหมุน + แสดงเฉพาะภาพแรก (ไม่บังคับให้ผู้ใช้ดูภาพเคลื่อนไหว)
+  ⚠️ เพิ่มจำนวนใบสูงสุดแล้ว ต้องเพิ่มชุด keyframes ที่นี่ด้วย (และที่นั่นมีเทสต์คุม)
+*/
+.hero-slide img {
+  object-position: var(--hero-focus, 50% 50%);
+  transform: scale(var(--hero-zoom, 1));
+}
+
+.hero-slide {
+  animation-duration: var(--hero-span, 5s);
+  animation-delay: var(--hero-delay, 0s);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/*
+  หมายเหตุการอ่าน keyframes: ใบหนึ่ง "เห็นชัด" ตั้งแต่ 0% จนถึงจุดเริ่มจาง แล้วจางหายภายใน ~10% ของรอบ
+  จากนั้นซ่อนไว้จนครบรอบ (ภาพถัดไปมี delay ต่างกัน 1 สล็อต ⇒ ไม่มีช่วงที่ไม่มีภาพเลย)
+*/
+.hero-slides-2 .hero-slide {
+  animation-name: hero-fade-2;
+}
+@keyframes hero-fade-2 {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  50%,
+  90% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.hero-slides-3 .hero-slide {
+  animation-name: hero-fade-3;
+}
+@keyframes hero-fade-3 {
+  0%,
+  23.33% {
+    opacity: 1;
+  }
+  33.33%,
+  90% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.hero-slides-4 .hero-slide {
+  animation-name: hero-fade-4;
+}
+@keyframes hero-fade-4 {
+  0%,
+  17% {
+    opacity: 1;
+  }
+  25%,
+  92% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.hero-slides-5 .hero-slide {
+  animation-name: hero-fade-5;
+}
+@keyframes hero-fade-5 {
+  0%,
+  14% {
+    opacity: 1;
+  }
+  20%,
+  94% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.hero-slides-6 .hero-slide {
+  animation-name: hero-fade-6;
+}
+@keyframes hero-fade-6 {
+  0%,
+  11.67% {
+    opacity: 1;
+  }
+  16.67%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ภาพแรกต้องเห็นทันทีแม้ยังไม่ hydrate (ไม่มี JS ในกล่องนี้เลย — CSS คุมทั้งหมด) */
+.hero-slideshow .hero-slide:first-child {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide {
+    animation: none;
+  }
+  .hero-slide:not(:first-child) {
+    display: none;
+  }
+}
+
+/*
   ── ซ่อนบล็อกตามขนาดจอ (X1.6) ──
   ใช้ `data-hide-on="mobile tablet"` + `display:none` (ไม่ใช้คลาส `hidden md:block` ของ Tailwind
   เพราะบล็อกมี display ได้หลายแบบ — สั่ง `block` ทับจะทำให้เลย์เอาต์เพี้ยน)

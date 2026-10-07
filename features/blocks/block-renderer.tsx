@@ -1,9 +1,12 @@
+import type { CSSProperties } from "react";
+
 import { blockRenderStringsFor, type BlockRenderStrings } from "@/features/blocks/render-strings";
 import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
 import { CareerFormFields, ContactFormFields } from "@/features/forms/ui/form-fields";
 import { SubmitForm } from "@/features/forms/ui/submit-form";
 import { NewsletterForm } from "@/features/home/ui/newsletter-form";
 import { hiddenSizesOf, layoutOf, type Block, type BlockCard, type BlockDocument, type BlockMedia, type JobBoardItem } from "@/lib/blocks/types";
+import { HERO_SLIDESHOW_CLASS, heroSlideVars, heroSlideshowClass } from "@/lib/blocks/hero-slides";
 import { localizedBlockHref } from "@/lib/blocks/href";
 import { pageOutline } from "@/lib/blocks/outline";
 import {
@@ -179,9 +182,38 @@ function BlockView({
           `bg-bg-subtle w-full rounded-2xl object-cover ${heroHeightClass(block.style)}`,
           "100vw",
         );
+        /*
+          สไลด์หลายภาพ (รอบที่ 183 · เฟส (ข)) — มีสไลด์ที่เลือกภาพแล้ว ≥1 ใบ ⇒ หมุนให้เองด้วย **CSS ล้วน ไม่มี JS**
+          · ใบที่ 1 แสดงก่อน แล้วไล่ต่อตาม `--hero-delay` (แต่ละใบมีสล็อตของตัวเองในรอบเดียว)
+          · จุดโฟกัส + ซูม ส่งผ่าน CSS variable ⇒ `globals.css` ใส่ `object-position`/`scale()` ให้ตัว <img>
+            (ครอบ/จัดตำแหน่งได้โดยไม่ต้องตัดไฟล์ภาพ)
+          · ไม่มีสไลด์/สไลด์ยังไม่เลือกภาพ ⇒ ถอยไปใช้ `image` เดี่ยว (พฤติกรรมเดิมเป๊ะ)
+          ⚠️ ค่าที่เปลี่ยนตามใบอยู่ใน CSS variable (ไม่ใช่ inline style) เพื่อให้ keyframes/reduced-motion คุมได้จากที่เดียว
+        */
+        const slideMedia = (block.slides ?? []).filter((slide) => slide.image !== null);
+        const visual =
+          slideMedia.length === 0 ? (
+            media === null ? null : <span {...editAttrs(editable, "image", { media: true })}>{media}</span>
+          ) : (
+            <span
+              {...editAttrs(editable, "slides", { media: true })}
+              className={`bg-bg-subtle ${HERO_SLIDESHOW_CLASS} ${heroSlideshowClass(slideMedia.length)} relative block w-full overflow-hidden rounded-2xl ${heroHeightClass(block.style)}`}
+            >
+              {slideMedia.map((slide, index) => (
+                <span
+                  key={slide.id}
+                  className="hero-slide absolute inset-0 block"
+                  /* ⚠️ CSS variable ไม่มีในชนิดของ React ⇒ cast เป็น CSSProperties (ไม่ใช่ `any`) */
+                  style={heroSlideVars(index, slideMedia.length, slide) as CSSProperties}
+                >
+                  {image(slide.image, language, "h-full w-full object-cover", "100vw")}
+                </span>
+              ))}
+            </span>
+          );
         return (
           <div className={`${container} flex flex-col gap-5`}>
-            {media === null ? null : <span {...editAttrs(editable, "image", { media: true })}>{media}</span>}
+            {visual}
             <div className={`flex flex-col gap-3 ${align}`}>
               <h2 className={heading} {...editAttrs(editable, "title")}>
                 {text(block.title, language)}
