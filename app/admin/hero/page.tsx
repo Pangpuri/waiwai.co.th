@@ -12,6 +12,8 @@ import {
   saveHeroSettingAction,
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
+import type { HeroCard } from "@/lib/hero/cards";
+import { listHeroCardsForAdmin } from "@/lib/hero/cards-repository";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { listMedia } from "@/lib/media/repository";
@@ -46,6 +48,10 @@ export default async function AdminHeroPage() {
   };
   const slides = await listHeroPageSlidesForAdmin();
   const trashed = await listTrashedHeroPageSlides();
+  /* การ์ดแคมเปญ: จัดกลุ่มตามสไลด์ เพื่อแสดงในพาเนลของการ์ดสไลด์แต่ละใบ */
+  const cardsBySlide: Record<string, HeroCard[]> = {};
+  for (const card of await listHeroCardsForAdmin()) (cardsBySlide[card.slideId] ??= []).push(card);
+  const nowIso = new Date().toISOString();
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
   return (
@@ -99,7 +105,7 @@ export default async function AdminHeroPage() {
       {slides.length === 0 ? (
         <p className="border-line text-fg-muted rounded-xl border border-dashed p-6 text-sm">{s.heroAdminEmpty}</p>
       ) : (
-        <HeroSlideManager slides={slides} strings={s} />
+        <HeroSlideManager slides={slides} strings={s} cards={cardsBySlide} nowIso={nowIso} />
       )}
 
       {/* ── ถังขยะสไลด์ (รอบที่ 186) — กู้คืนได้ · ลบถาวรต้องยืนยัน ───────────────── */}

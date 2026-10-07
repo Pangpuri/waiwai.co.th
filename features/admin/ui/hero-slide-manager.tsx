@@ -9,8 +9,10 @@ import {
   reorderHeroSlidesAction,
   saveHeroSlideAction,
 } from "@/app/admin/hero/actions";
+import { HeroCardEditor } from "@/features/admin/ui/hero-card-editor";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS, heroFocusPresetId } from "@/lib/blocks/hero-slides";
+import type { HeroCard } from "@/lib/hero/cards";
 import type { HeroPageSlide } from "@/lib/hero/model";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -29,9 +31,15 @@ import type { Messages } from "@/lib/i18n/messages/th";
  */
 export function HeroSlideManager({
   slides,
+  cards = {},
   strings,
+  nowIso,
 }: {
   readonly slides: readonly HeroPageSlide[];
+  /** การ์ดแคมเปญของแต่ละสไลด์ (คีย์ = id สไลด์) */
+  readonly cards?: Readonly<Record<string, readonly HeroCard[]>>;
+  /** เวลาปัจจุบันจากเซิร์ฟเวอร์ (ใช้แสดงสถานะแคมเปญ) */
+  readonly nowIso: string;
   readonly strings: Messages["admin"];
 }) {
   const [order, setOrder] = useState<readonly string[]>(slides.map((slide) => slide.id));
@@ -212,6 +220,9 @@ export function HeroSlideManager({
                   {strings.heroAdminSave}
                 </button>
               </form>
+
+              {/* การ์ดบนสไลด์ (แคมเปญ) — รอบที่ 188 */}
+              <HeroCardEditor slideId={slide.id} cards={cards[slide.id] ?? []} strings={strings} nowIso={nowIso} />
             </li>
           );
         })}
