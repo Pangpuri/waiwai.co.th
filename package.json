@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "node --import ./scripts/alias-hook.mjs scripts/dev-clean.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
