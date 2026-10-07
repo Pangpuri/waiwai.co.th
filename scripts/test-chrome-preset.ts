@@ -20,6 +20,14 @@ import {
   validateChromePresetConfig,
 } from "@/lib/chrome/presets";
 import { MOURNING_PAGE_KEY, defaultMourningConfig } from "@/lib/mourning/config";
+import {
+  CHROME_WORKSPACE_PATH,
+  chromeTabHref,
+  chromeTabOf,
+  isChromeMode,
+  isChromePart,
+  type ChromeTabState,
+} from "@/lib/chrome/workspace-url";
 import { TRASH_KINDS, emptyTrashCounts, isTrashKind, trashTotal } from "@/lib/trash/plan";
 import { th } from "@/lib/i18n/messages/th";
 
@@ -300,4 +308,98 @@ test("chrome-preset: ใช้ชุดแล้วต้องเก็บฉ�
   const migration = sourceOf("db/migrations/0011-chrome-draft-undo.sql");
   assert.ok(migration.includes("create table if not exists chrome_draft_undo"), "ตารางต้อง idempotent");
   assert.ok(migration.includes("page        text        primary key"), "หนึ่งส่วน = หนึ่งแถว");
+});
+
+/* ── 8) แท็บของ "ส่วนกลาง" เก็บใน URL (รอบที่ 178) ────────────────────────────────
+ *
+ * ฟีดแบ็กเจ้าของ: *"ส่วนกลางของเว็บยังไม่มีการเซฟสเตท ทำแท็บไหน รีเฟรชควรยังเป็นแท็บนั้นต่อ
+ *   เช่นเลือกป้ายประกาศไว้ แล้วอยากดูตัวอย่างการประกาศ พอรีเฟรชมันเด้งกลับไปแถบเมนูก่อน"*
+ * ⇒ แท็บ (part) + มุมมอง (mode) ต้องอยู่ใน query string และ **ต้องไม่ถูกทับตอน mount**
+ */
+
+test("chrome-tabs: chromeTabOf อ่านค่าจาก URL และถอยค่าเริ่มต้นเมื่อค่าใช้ไม่ได้", () => {
+  assert.deepEqual(chromeTabOf({}), { part: "navbar", mode: "draft" }, "ไม่ส่งค่ามา = ค่าเริ่มต้นเดิม (ไม่เปลี่ยนพฤติกรรมเก่า)");
+  assert.deepEqual(chromeTabOf({ part: "notice" }), { part: "notice", mode: "draft" });
+  assert.deepEqual(chromeTabOf({ mode: "overview" }), { part: "navbar", mode: "overview" });
+  assert.deepEqual(chromeTabOf({ part: "footer", mode: "current" }), { part: "footer", mode: "current" });
+
+  /* ค่าที่ไม่รู้จัก/พิมพ์ผิด/มีช่องว่าง/พยายามยัด payload → ค่าเริ่มต้น (ห้าม throw) */
+  for (const bad of ["", " ", "NOTICE", "nav", "navbarx", "notice;drop", "<script>", "١٢٣"]) {
+    assert.equal(isChromePart(bad), false, `part "${bad}" ต้องไม่ผ่าน`);
+    const state = chromeTabOf({ part: bad });
+    assert.deepEqual(state, { part: "navbar", mode: "draft" }, `part "${bad}" ต้องถอยไปค่าเริ่มต้น`);
+  }
+  for (const bad of ["", "draft ", "DRAFT", "preview", "overview;drop"]) {
+    assert.equal(isChromeMode(bad), false, `mode "${bad}" ต้องไม่ผ่าน`);
+    assert.deepEqual(chromeTabOf({ mode: bad }), { part: "navbar", mode: "draft" }, `mode "${bad}" ต้องถอยไปค่าเริ่มต้น`);
+  }
+
+  /* ตัวตรวจเดี่ยว ๆ ต้องตรงกับรายการจริง */
+  for (const part of ["navbar", "notice", "footer"]) assert.equal(isChromePart(part), true);
+  for (const mode of ["current", "draft", "overview"]) assert.equal(isChromeMode(mode), true);
+  /* ค่าที่มีช่องว่างหัว-ท้าย: ตัวอ่าน URL ตัดให้ (URL ที่คัดลอกมามักติดช่องว่าง) แต่ตัวตรวจดิบเข้มกว่า */
+  assert.equal(isChromePart("  notice"), false, "ตัวตรวจดิบไม่ตัดช่องว่างให้");
+  assert.deepEqual(chromeTabOf({ part: "  notice  " }), { part: "notice", mode: "draft" }, "chromeTabOf ตัดช่องว่างก่อนตรวจ");
+  assert.deepEqual(chromeTabOf({ mode: " overview " }), { part: "navbar", mode: "overview" });
+
+  assert.equal(isChromePart("current"), false, "ค่าของอีกแกนต้องไม่ผ่าน");
+  assert.equal(isChromeMode("footer"), false);
+});
+
+test("chrome-tabs: chromeTabHref ใส่เฉพาะค่าที่ไม่ใช่ค่าเริ่มต้น + ไป-กลับได้ (round-trip)", () => {
+  assert.equal(chromeTabHref({ part: "navbar", mode: "draft" }), CHROME_WORKSPACE_PATH, "ค่าเริ่มต้น = URL เปล่า");
+  assert.equal(chromeTabHref({ part: "notice", mode: "draft" }), `${CHROME_WORKSPACE_PATH}?part=notice`);
+  assert.equal(chromeTabHref({ part: "navbar", mode: "overview" }), `${CHROME_WORKSPACE_PATH}?mode=overview`);
+  assert.equal(
+    chromeTabHref({ part: "footer", mode: "overview" }),
+    `${CHROME_WORKSPACE_PATH}?part=footer&mode=overview`,
+    "ลำดับพารามิเตอร์ต้องคงที่ (part ก่อน mode)",
+  );
+  assert.equal(
+    chromeTabHref({ part: "notice", mode: "overview" }, "/admin/other"),
+    "/admin/other?part=notice&mode=overview",
+    "ใช้ base อื่นได้ (หน้าจอ/เทสต์)",
+  );
+
+  /* round-trip: สร้าง URL แล้วอ่านกลับต้องได้สถานะเดิมทุกชุด */
+  const states: ChromeTabState[] = [];
+  for (const part of ["navbar", "notice", "footer"] as const) {
+    for (const mode of ["current", "draft", "overview"] as const) states.push({ part, mode });
+  }
+  for (const state of states) {
+    const href = chromeTabHref(state);
+    const query = new URLSearchParams(href.split("?")[1] ?? "");
+    assert.deepEqual(
+      chromeTabOf({ part: query.get("part") ?? undefined, mode: query.get("mode") ?? undefined }),
+      state,
+      `ไป-กลับต้องได้ค่าเดิม (${state.part}/${state.mode})`,
+    );
+  }
+});
+
+test("chrome-tabs: หน้าจอต่อสายจริง — ค่าเริ่มต้นจาก URL และไม่รีเซ็ตแท็บตอน mount", () => {
+  const page = sourceOf("app/admin/builder/chrome/page.tsx");
+  assert.ok(page.includes("searchParams"), "หน้าเซิร์ฟเวอร์ต้องอ่าน searchParams (ไม่งั้นรีเฟรชแล้วค่าไม่กลับมา)");
+  assert.ok(page.includes("chromeTabOf(query)"), "ต้องแปลงด้วยตัวช่วยกลาง (ไม่ตีความเอง)");
+  assert.ok(
+    page.includes("initialPart={initialTab.part}") && page.includes("initialMode={initialTab.mode}"),
+    "ต้องส่งค่าเริ่มต้นเข้าเวิร์กสเปซ",
+  );
+
+  const client = sourceOf("features/admin/ui/chrome-workspace.tsx");
+  assert.ok(client.includes("useState<ChromePart>(initialPart)"), "ต้องเริ่มจากค่าที่รับมา (ห้าม hardcode \"navbar\")");
+  assert.ok(client.includes("useState<ChromeMode>(initialMode)"), "ต้องเริ่มจากค่าที่รับมา (ห้าม hardcode \"draft\")");
+  assert.ok(client.includes("window.history.replaceState(null, \"\", chromeTabHref(next))"), "สลับแท็บต้องอัปเดต URL");
+
+  /* กันถอยหลัง: เขียน URL/เซ็ตแท็บได้จาก handler เท่านั้น (ถ้าใส่ใน useEffect ค่าจาก URL จะถูกทับตอน mount) */
+  assert.equal(client.match(/window\.history\.replaceState\(/g)?.length, 1, "ต้องเขียน URL ที่จุดเดียว (ใน syncTabUrl)");
+  assert.equal(client.match(/setPart\(/g)?.length, 1, "ต้องเซ็ต part ที่จุดเดียว (ใน selectPart)");
+  assert.equal(client.match(/setMode\(/g)?.length, 1, "ต้องเซ็ต mode ที่จุดเดียว (ใน selectMode)");
+  for (const hook of ["selectPart", "selectMode"]) {
+    assert.ok(client.includes(`onClick={() => ${hook}(`), `ปุ่มแท็บต้องเรียก ${hook}`);
+  }
+
+  /* สถานะที่เลือกต้องบอกให้โปรแกรมอ่านรู้ด้วย (a11y) */
+  assert.ok(client.includes('aria-current={part === entry.key ? "true" : undefined}'), "แท็บที่เลือกต้องมี aria-current");
+  assert.ok(client.includes("aria-pressed={mode === entry.key}"), "ปุ่มมุมมองต้องมี aria-pressed");
 });

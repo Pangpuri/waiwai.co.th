@@ -24,6 +24,7 @@ import {
   type ChromePreset,
 } from "@/lib/chrome/presets";
 import { listChromePresets, readChromeDraftUndo } from "@/lib/chrome/preset-repository";
+import { chromeTabOf } from "@/lib/chrome/workspace-url";
 import { FOOTER_PAGE_KEY, defaultFooterConfig, parseFooterConfig } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY, applyPageMenu, defaultNavbarConfig, parseNavbarConfig } from "@/lib/chrome/navbar";
 import { defaultPages } from "@/lib/pages/model";
@@ -46,11 +47,22 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: "Site-wide parts", robots: { index: false, follow: false } };
 }
 
-export default async function ChromePage() {
+export default async function ChromePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly part?: string; readonly mode?: string }>;
+}) {
   const user = await requireAdminUser("presets");
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
+
+  /*
+    แท็บเริ่มต้นมาจาก URL (รอบที่ 178 — ฟีดแบ็กเจ้าของ: "ทำแท็บไหน รีเฟรชควรยังเป็นแท็บนั้นต่อ")
+    ⚠️ อ่านก่อนเช็ก DB เพื่อให้พฤติกรรมเดียวกันทั้งกรณีมี/ไม่มีฐานข้อมูล · ค่าที่ไม่รู้จักถอยไปค่าเริ่มต้น
+  */
+  const query = await searchParams;
+  const initialTab = chromeTabOf(query);
 
   if (!isDatabaseConfigured()) {
     return (
@@ -222,6 +234,8 @@ export default async function ChromePage() {
       <ChromePresetIoPanel strings={presetStrings} maxImport={MAX_CHROME_PRESET_IMPORT} />
 
       <ChromeWorkspace
+        initialPart={initialTab.part}
+        initialMode={initialTab.mode}
         strings={{
           partsLabel: strings.chromePartsLabel,
           partNavbar: strings.chromePartNavbar,

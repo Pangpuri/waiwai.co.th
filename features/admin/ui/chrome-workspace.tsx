@@ -3,6 +3,13 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { FOOTER_MESSAGE, MOURNING_LIVE_EVENT, MOURNING_MESSAGE, NAVBAR_MESSAGE } from "@/features/blocks/ui/preview-frame";
+import {
+  DEFAULT_CHROME_MODE,
+  DEFAULT_CHROME_PART,
+  chromeTabHref,
+  type ChromeMode,
+  type ChromePart,
+} from "@/lib/chrome/workspace-url";
 
 /**
  * "ส่วนกลางของเว็บ" — พื้นที่ทำงานแบบแท็บ (ผู้ใช้สั่ง รอบที่ 55)
@@ -16,12 +23,18 @@ import { FOOTER_MESSAGE, MOURNING_LIVE_EVENT, MOURNING_MESSAGE, NAVBAR_MESSAGE }
  * - **ซ้าย = แท็บ "ส่วนของเว็บ"**: แถบเมนู · ป้ายประกาศ · ท้ายเว็บ (ไม่ซ่อนในรายการอีก)
  * - **ขวา = แท็บ "มุมมอง"**: หน้าเว็บปัจจุบัน · ที่กำลังแก้ · ภาพรวม (สรุป + ปุ่มตัดสินใจ)
  *
+ * รอบที่ 178 (ฟีดแบ็กเจ้าของ: *"ทำแทรปไหน รีเฟรชควรยังเป็นแทรปนั้นต่อ"*)
+ * - แท็บที่เลือก **ติดอยู่ใน URL** (`?part=notice&mode=draft`) ⇒ รีเฟรช/F5 ไม่เด้งกลับแถบเมนู
+ * - เซิร์ฟเวอร์อ่าน `searchParams` ส่งมาเป็น `initialPart`/`initialMode` (ดู `lib/chrome/workspace-url.ts`)
+ * - สลับแท็บ = `history.replaceState` (ไม่ยิงคำขอใหม่ ⇒ เร็ว และไม่เสียค่าที่พิมพ์ค้างในฟอร์ม)
+ *
  * ⚠️ ตัวแก้แต่ละส่วนถูกส่งเข้ามาเป็น slot จาก Server Component (หน้าจอไม่ต้องรู้รายละเอียด)
  *    และค่าที่กำลังแก้ของแถบเมนูถูกส่งต่อเข้า iframe ให้เห็นทันที (hot reload)
+ * ⚠️ ห้ามรีเซ็ต `part`/`mode` ด้วย `useEffect` ตอน mount — จะทำให้ค่าจาก URL ถูกทับทันที
  */
 
-export type ChromePart = "navbar" | "notice" | "footer";
-export type ChromeMode = "current" | "draft" | "overview";
+/** @deprecated ใช้ชนิดจาก `@/lib/chrome/workspace-url` (เก็บ re-export ไว้ให้ของเดิมไม่พัง) */
+export type { ChromeMode, ChromePart };
 
 type Strings = {
   readonly partsLabel: string;
@@ -43,6 +56,8 @@ type Strings = {
 
 export function ChromeWorkspace({
   strings,
+  initialPart = DEFAULT_CHROME_PART,
+  initialMode = DEFAULT_CHROME_MODE,
   previewSrcCurrent,
   previewSrcDraft,
   footerPreviewSrcCurrent,
@@ -55,6 +70,9 @@ export function ChromeWorkspace({
   overview,
 }: {
   readonly strings: Strings;
+  /** แท็บเริ่มต้น (มาจาก URL — รอบที่ 178) · ไม่ส่งมา = แถบเมนู/ฉบับร่าง */
+  readonly initialPart?: ChromePart;
+  readonly initialMode?: ChromeMode;
   readonly previewSrcCurrent: string;
   readonly previewSrcDraft: string;
   /* ป้ายประกาศมีพรีวิวของตัวเอง (รอบที่ 159 · ฟีดแบ็กเจ้าของ: คลิกแท็บป้ายประกาศแล้วยังเห็น navbar) */
@@ -67,8 +85,8 @@ export function ChromeWorkspace({
   readonly footerPreviewSrcDraft: string;
   readonly overview: ReactNode;
 }) {
-  const [part, setPart] = useState<ChromePart>("navbar");
-  const [mode, setMode] = useState<ChromeMode>("draft");
+  const [part, setPart] = useState<ChromePart>(initialPart);
+  const [mode, setMode] = useState<ChromeMode>(initialMode);
   const [reloadKey, setReloadKey] = useState(0);
   const [liveNavbar, setLiveNavbar] = useState<{ readonly sent: boolean; readonly value: unknown }>({
     sent: false,
@@ -173,6 +191,28 @@ export function ChromeWorkspace({
       active ? "bg-brand-red text-on-brand" : "border-line text-fg border hover:bg-surface-raised"
     }`;
 
+  /*
+    รอบที่ 178 — เก็บ "แท็บที่เลือก" ไว้ใน URL (ฟีดแบ็กเจ้าของ: ทำแท็บไหน รีเฟรชควรอยู่แท็บนั้นต่อ)
+    ใช้ `history.replaceState` ไม่ใช่ `router.push` เพราะ
+    - ไม่ยิงคำขอใหม่ ⇒ สลับแท็บเร็ว และ **ค่าที่พิมพ์ค้างในฟอร์มไม่หาย**
+    - ไม่เพิ่มประวัติเบราว์เซอร์ (ปุ่มย้อนกลับยังพาออกจากหน้าอย่างที่ผู้ใช้คาดหวัง)
+    ⚠️ ต้องเรียกจาก handler เท่านั้น — ห้ามย้ายไป `useEffect` (จะเขียน URL ทับตอน mount และค่าจาก URL หาย)
+  */
+  const syncTabUrl = useCallback((next: { readonly part: ChromePart; readonly mode: ChromeMode }): void => {
+    if (typeof window === "undefined") return;
+    window.history.replaceState(null, "", chromeTabHref(next));
+  }, []);
+
+  const selectPart = (next: ChromePart): void => {
+    setPart(next);
+    syncTabUrl({ part: next, mode });
+  };
+
+  const selectMode = (next: ChromeMode): void => {
+    setMode(next);
+    syncTabUrl({ part, mode: next });
+  };
+
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
       {/* ── ซ้าย: หน้าต่างใหญ่ (พรีวิว) — สลับมาไว้ซ้ายตามที่ผู้ใช้สั่ง รอบที่ 57 ── */}
@@ -181,7 +221,13 @@ export function ChromeWorkspace({
           <p className="text-fg-muted text-xs font-semibold uppercase">{strings.viewLabel}</p>
           <div className="flex flex-wrap gap-1.5">
             {modeTabs.map((entry) => (
-              <button key={entry.key} type="button" onClick={() => setMode(entry.key)} className={tabClass(mode === entry.key)}>
+              <button
+                key={entry.key}
+                type="button"
+                onClick={() => selectMode(entry.key)}
+                aria-pressed={mode === entry.key}
+                className={tabClass(mode === entry.key)}
+              >
                 {entry.label}
               </button>
             ))}
@@ -235,7 +281,8 @@ export function ChromeWorkspace({
             <button
               key={entry.key}
               type="button"
-              onClick={() => setPart(entry.key)}
+              onClick={() => selectPart(entry.key)}
+              aria-current={part === entry.key ? "true" : undefined}
               className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left text-xs font-semibold focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none ${
                 part === entry.key ? "border-brand-red bg-surface-raised text-fg" : "border-line text-fg hover:bg-surface-raised"
               }`}
