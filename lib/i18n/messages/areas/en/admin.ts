@@ -102,6 +102,13 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   imageHint: "Drag an image into the box — that is all it takes.",
   imagePathLabel: "File path",
   blockImageLabel: "Image for this block",
+  /* Hero slides (round 183 · phase ค) */
+  blockSlidesTitle: "Slide images",
+  blockSlidesCount: "{n} of {max} images",
+  blockSlidesHint: "2 or more images = the site rotates them automatically (the first shows first) · an empty slot is skipped",
+  blockSlidesAdd: "Add slide image",
+  blockSlidesFocus: "Image position (point kept in the frame)",
+  blockSlidesZoom: "Image zoom",
   cardImageLabel: "Image for this card",
   backToBlock: "Back to the whole block",
   pickCardHint: "Pick a card to edit (or just click a card in the preview).",

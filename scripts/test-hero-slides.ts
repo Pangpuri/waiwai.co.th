@@ -310,3 +310,70 @@ test("hero slides (ข): ตัวเรนเดอร์ + CSS ต่อสา
     "โหมดลดการเคลื่อนไหวต้องแสดงเฉพาะภาพแรก",
   );
 });
+
+/* ── เฟส (ค): แผงจัดการสไลด์ในตัวสร้างหน้าเว็บ ──────────────────────────────────────
+ *
+ * ตรวจจากซอร์ส (ไม่มี DOM ในโปรเจกต์นี้) — เน้น 3 เรื่องที่พังแล้วเจ็บ:
+ *   1. ปุ่ม/ช่องทุกอย่างต้องเรียก "ตัวช่วยกลาง" (ไม่ประกอบเอกสารเองในหน้าจอ)
+ *   2. ต้องมีเพดานจำนวน + ปิดปุ่มเมื่อถึงเพดาน (ไม่ให้สร้างเกินแล้วถูกปฏิเสธตอนบันทึก)
+ *   3. ต้องไม่มีข้อความไทยฝังใน .tsx (ด่าน check:i18n ตรวจซ้ำอีกชั้น)
+ */
+
+test("hero slides (ค): แผงตัวแก้ในกรณี hero ใช้ตัวช่วยกลาง + มีเพดาน + ปุ่มโฟกัส/ซูมครบ", () => {
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+
+  /* ตัวช่วยกลาง (หน้าจอไม่ประกอบสไลด์เอง) */
+  for (const fn of [
+    "addHeroSlide(",
+    "removeHeroSlide(",
+    "moveHeroSlide(",
+    "setHeroSlideImage(",
+    "setHeroSlideFocus(",
+    "setHeroSlideZoom(",
+  ]) {
+    assert.ok(builder.includes(fn), `ตัวแก้ต้องเรียก ${fn}`);
+  }
+  assert.ok(builder.includes("HERO_FOCUS_PRESETS.map("), "ปุ่มโฟกัสต้องมาจากทะเบียนกลาง (9 จุด)");
+  assert.ok(builder.includes("HERO_ZOOM_PRESETS.map("), "ตัวเลือกระดับซูมต้องมาจากทะเบียนกลาง");
+  assert.ok(builder.includes("heroFocusPresetId("), "ต้องไฮไลต์จุดโฟกัสปัจจุบันด้วยตัวช่วยกลาง");
+
+  /* เพดาน + ปิดปุ่ม */
+  assert.ok(
+    builder.includes("disabled={(block.slides ?? []).length >= MAX_HERO_SLIDES}"),
+    "ถึงเพดานแล้วต้องกดเพิ่มไม่ได้",
+  );
+  assert.ok(builder.includes("blockSlidesCount") && builder.includes("blockSlidesAdd"), "ต้องใช้คีย์พจนานุกรม (ไม่พิมพ์ข้อความเอง)");
+
+  /* ปุ่มย้ายขึ้น/ลง ปิดที่ขอบ */
+  assert.ok(builder.includes('disabled={index === 0}'), "สไลด์ใบแรกย้ายขึ้นไม่ได้");
+  assert.ok(
+    builder.includes("disabled={index === (block.slides ?? []).length - 1}"),
+    "สไลด์ใบสุดท้ายย้ายลงไม่ได้",
+  );
+
+  /* a11y: กลุ่มปุ่มโฟกัสต้องมีชื่อ + บอกสถานะที่เลือก */
+  assert.ok(builder.includes('role="group"') && builder.includes("aria-label={strings.blockSlidesFocus}"), "กลุ่มปุ่มโฟกัสต้องมีชื่อ");
+  assert.ok(builder.includes("aria-pressed={active}"), "ปุ่มโฟกัสต้องบอกว่าอันไหนถูกเลือก");
+
+  /* ไม่มีข้อความไทยใน .tsx (ปุ่มลูกศรใช้สัญลักษณ์ + aria-label จากพจนานุกรม) */
+  const thai = /[\u0E00-\u0E7F]/;
+  const start = builder.indexOf("สไลด์หลายภาพ (รอบที่ 183");
+  assert.ok(start > 0, "ต้องพบแผงสไลด์ในตัวแก้");
+  /* ตัดเฉพาะ "โค้ด" ของแผง (หลังคอมเมนต์อธิบาย) จนถึงกรณีถัดไป */
+  const codeStart = builder.indexOf("*/", start) + 2;
+  const codeEnd = builder.indexOf('        case "', codeStart);
+  const panelCode = builder.slice(codeStart, codeEnd > codeStart ? codeEnd : codeStart + 6000);
+  assert.ok(!thai.test(panelCode), "โค้ดแผงสไลด์ต้องไม่มีข้อความไทย (ใช้พจนานุกรมเท่านั้น)");
+});
+
+test("hero slides (ค): คีย์พจนานุกรมของแผงสไลด์มีครบทั้งไทย/อังกฤษ", () => {
+  const th = readFileSync("lib/i18n/messages/areas/th/admin.ts", "utf8");
+  const en = readFileSync("lib/i18n/messages/areas/en/admin.ts", "utf8");
+  for (const key of ["blockSlidesTitle", "blockSlidesCount", "blockSlidesHint", "blockSlidesAdd", "blockSlidesFocus", "blockSlidesZoom"]) {
+    assert.ok(th.includes(`${key}:`), `พจนานุกรมไทยต้องมี ${key}`);
+    assert.ok(en.includes(`${key}:`), `พจนานุกรมอังกฤษต้องมี ${key}`);
+  }
+  /* ตัวนับใช้ตัวแทน {n}/{max} ให้ fillTemplate เติม */
+  assert.ok(th.includes("blockSlidesCount: \"มี {n} จาก {max} ภาพ\""), "ตัวนับไทยต้องมี {n}/{max}");
+  assert.ok(en.includes("blockSlidesCount: \"{n} of {max} images\""), "ตัวนับอังกฤษต้องมี {n}/{max}");
+});

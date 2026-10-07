@@ -57,6 +57,13 @@ export const admin = {
   imageHint: "ลากภาพมาวางในกรอบได้เลย",
   imagePathLabel: "พาธไฟล์",
   blockImageLabel: "ภาพของบล็อกนี้",
+  /* สไลด์ของบล็อก "แบนเนอร์เปิดหน้า" (รอบที่ 183 · เฟส (ค)) */
+  blockSlidesTitle: "ภาพสไลด์",
+  blockSlidesCount: "มี {n} จาก {max} ภาพ",
+  blockSlidesHint: "ใส่ 2 ภาพขึ้นไป = หน้าเว็บหมุนภาพให้เอง (ภาพแรกแสดงก่อน) · ยังไม่เลือกภาพ = ข้ามภาพนั้น",
+  blockSlidesAdd: "เพิ่มภาพสไลด์",
+  blockSlidesFocus: "จัดตำแหน่งภาพ (จุดที่อยู่กลางกรอบ)",
+  blockSlidesZoom: "ซูมภาพ",
   cardImageLabel: "ภาพของการ์ดใบนี้",
   backToBlock: "กลับไปดูทั้งบล็อก",
   pickCardHint: "คลิกการ์ดใบที่ต้องการแก้ (หรือคลิกการ์ดในพรีวิวได้เลย)",

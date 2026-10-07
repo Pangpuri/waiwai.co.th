@@ -16,11 +16,18 @@ import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
 import { DROP_IMAGE_MESSAGE, NAVBAR_MESSAGE, NAVBAR_SELECT_ID, NOTICE_SELECT_ID, PREVIEW_MESSAGE, SELECT_MESSAGE } from "@/features/blocks/ui/preview-frame";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
+import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
 import { CONTENT_PREVIEW_PART } from "@/lib/chrome/workspace-url";
+import {
+  HERO_FOCUS_PRESETS,
+  HERO_ZOOM_PRESETS,
+  heroFocusPresetId,
+} from "@/lib/blocks/hero-slides";
 import {
   addCard,
   addColumn,
   addGalleryItem,
+  addHeroSlide,
   addJobItem,
   addRecipeItem,
   addRosterMember,
@@ -28,6 +35,11 @@ import {
   addTableRow,
   canAddCard,
   canAddGalleryItem,
+  moveHeroSlide,
+  removeHeroSlide,
+  setHeroSlideFocus,
+  setHeroSlideImage,
+  setHeroSlideZoom,
   canAddJobItem,
   canAddRecipeItem,
   canAddRosterMember,
@@ -124,6 +136,19 @@ type Revision = {
   readonly createdAt: string;
   readonly createdBy: string | null;
   readonly blockCount: number;
+};
+
+/** สัญลักษณ์ของปุ่มเลือกจุดโฟกัส 9 จุด (คีย์ตรงกับ HERO_FOCUS_PRESETS) — เป็นสัญลักษณ์ ไม่ใช่ข้อความ จึงไม่ต้องแปล */
+const HERO_FOCUS_GLYPHS: Readonly<Record<string, string>> = {
+  "top-left": "↖",
+  top: "↑",
+  "top-right": "↗",
+  left: "←",
+  center: "•",
+  right: "→",
+  "bottom-left": "↙",
+  bottom: "↓",
+  "bottom-right": "↘",
 };
 
 type PreviewMode = "draft" | "published" | "live";
@@ -945,6 +970,88 @@ export function BlockBuilder({
               <SingleField idBase={`${base}-cta-href`} label="cta href" value={block.ctaHref} onChange={(next) => update(setBlockString(document, block.id, "ctaHref", next))} />
               <div id={`${base}-image`}>
                 <ImageDrop strings={strings} label={strings.blockImageLabel} value={block.image} onChange={(patch) => update(setBlockImage(document, block.id, patch))} />
+              </div>
+
+              {/*
+                ── สไลด์หลายภาพ (รอบที่ 183 · เฟส (ค)) ─────────────────────────────
+                เพิ่ม/ลบ/สลับลำดับภาพ · เลือกจุดโฟกัส 9 จุด (3×3) · เลือกซูม ⇒ เก็บในเอกสารเดียวกับหน้าเว็บ
+                ⇒ พิมพ์แล้วพรีวิวเปลี่ยนทันทีผ่านกลไกเดิม (ส่งเอกสารที่กำลังแก้เข้าพรีวิว)
+                ⚠️ ปุ่มโฟกัสใช้สัญลักษณ์ลูกศร + `aria-label` จากพจนานุกรม (ไม่พิมพ์ข้อความไทยใน .tsx)
+                ⚠️ ไม่มีสไลด์ = หน้าเว็บใช้ "ภาพของบล็อกนี้" ด้านบนเหมือนเดิม (เอกสารเก่าไม่เปลี่ยน)
+              */}
+              <div className="border-line flex flex-col gap-2 rounded-lg border p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-col">
+                    <p className="text-fg text-xs font-semibold">{strings.blockSlidesTitle}</p>
+                    <p className="text-fg-muted text-[11px]">
+                      {fillTemplate(strings.blockSlidesCount, { n: (block.slides ?? []).length, max: MAX_HERO_SLIDES })}
+                    </p>
+                  </div>
+                  <TinyButton
+                    label={strings.blockSlidesAdd}
+                    disabled={(block.slides ?? []).length >= MAX_HERO_SLIDES}
+                    onClick={() => update(addHeroSlide(document, block.id))}
+                  />
+                </div>
+                <p className="text-fg-muted text-[11px]">{strings.blockSlidesHint}</p>
+
+                {(block.slides ?? []).map((slide, index) => (
+                  <div key={slide.id} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-fg-muted text-xs font-semibold">{fillTemplate(strings.blockItemNumber, { n: index + 1 })}</p>
+                      <div className="flex items-center gap-1">
+                        <TinyButton label="↑" disabled={index === 0} onClick={() => update(moveHeroSlide(document, block.id, slide.id, -1))} />
+                        <TinyButton
+                          label="↓"
+                          disabled={index === (block.slides ?? []).length - 1}
+                          onClick={() => update(moveHeroSlide(document, block.id, slide.id, 1))}
+                        />
+                        <TinyButton label={strings.blockRemoveImage} onClick={() => update(removeHeroSlide(document, block.id, slide.id))} />
+                      </div>
+                    </div>
+
+                    <div id={`${base}-slide-${index}`}>
+                      <ImageDrop
+                        strings={strings}
+                        compact
+                        label={strings.blockImageLabel}
+                        value={slide.image}
+                        onChange={(next) => update(setHeroSlideImage(document, block.id, slide.id, next))}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <p className="text-fg-muted text-xs font-semibold">{strings.blockSlidesFocus}</p>
+                      <div role="group" aria-label={strings.blockSlidesFocus} className="flex flex-wrap gap-1">
+                        {HERO_FOCUS_PRESETS.map((preset) => {
+                          const active = heroFocusPresetId(slide.focusX, slide.focusY) === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              aria-label={preset.id}
+                              aria-pressed={active}
+                              onClick={() => update(setHeroSlideFocus(document, block.id, slide.id, preset.x, preset.y))}
+                              className={`rounded-md border px-2 py-1 text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                active ? "border-brand-red text-fg" : "border-line text-fg-muted hover:bg-surface-raised"
+                              }`}
+                            >
+                              {HERO_FOCUS_GLYPHS[preset.id] ?? "•"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <SelectField
+                      idBase={`${base}-zoom-${index}`}
+                      label={strings.blockSlidesZoom}
+                      value={String(slide.zoom)}
+                      options={HERO_ZOOM_PRESETS.map((zoom) => ({ value: String(zoom), label: `${zoom}×` }))}
+                      onChange={(next) => update(setHeroSlideZoom(document, block.id, slide.id, Number(next)))}
+                    />
+                  </div>
+                ))}
               </div>
             </>
           );
