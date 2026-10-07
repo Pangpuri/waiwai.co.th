@@ -37,6 +37,28 @@ export function isChromeMode(value: string): value is ChromeMode {
   return (CHROME_MODES as readonly string[]).includes(value);
 }
 
+/**
+ * ชื่อ "ส่วน" ที่ **หน้าพรีวิว** ใช้ใน query (`?parts=…`) — คนละคำกับแท็บของหน้าจอ
+ * · แท็บหน้าจอ = `navbar` (ผู้ใช้เห็นเป็น "แถบเมนู") · พรีวิวใช้ `nav` (ของเดิมตั้งแต่รอบที่ 57)
+ * ⚠️ ประกาศเป็น `Record<ChromePart, string>` ⇒ เพิ่มแท็บใหม่แล้ว TypeScript **บังคับ** ให้ระบุชื่อพรีวิว (ลืมไม่ได้)
+ * ⚠️ หน้าพรีวิวรับเฉพาะค่าที่อยู่ในรายการนี้ (`app/[lang]/preview/[page]/page.tsx`) และ `app/globals.css`
+ *    ต้องมีกฎซ่อนป้ายประกาศของทุกค่าที่ไม่ใช่ `notice` — มีเทสต์บังคับที่ `scripts/test-chrome-preset.ts`
+ */
+export const PREVIEW_PART_OF: Readonly<Record<ChromePart, string>> = {
+  navbar: "nav",
+  notice: "notice",
+  footer: "footer",
+};
+
+/**
+ * โหมดพรีวิวที่ไม่ใช่ป้ายประกาศ — ต้อง **ซ่อนป้ายประกาศ** (โอเวอร์เลย์เต็มจอ)
+ *
+ * ฟีดแบ็กเจ้าของ รอบที่ 179: *"ตั้งค่าท้ายเว็บแล้วมีหน้าประกาศเด้งมากวน · ให้เหมือนส่วนเมนู"*
+ */
+export const PREVIEW_PARTS_WITHOUT_NOTICE: readonly string[] = CHROME_PARTS.filter((part) => part !== "notice").map(
+  (part) => PREVIEW_PART_OF[part],
+);
+
 /** อ่านค่าจาก query → สถานะแท็บ (ค่าที่ไม่รู้จัก = ค่าเริ่มต้น ไม่โยน error) */
 export function chromeTabOf(query: { readonly part?: string; readonly mode?: string }): ChromeTabState {
   const part = (query.part ?? "").trim();

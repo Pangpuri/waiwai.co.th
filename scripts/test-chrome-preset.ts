@@ -22,6 +22,7 @@ import {
 import { MOURNING_PAGE_KEY, defaultMourningConfig } from "@/lib/mourning/config";
 import {
   CHROME_WORKSPACE_PATH,
+  PREVIEW_PARTS_WITHOUT_NOTICE,
   chromeTabHref,
   chromeTabOf,
   isChromeMode,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/chrome/workspace-url";
 import { TRASH_KINDS, emptyTrashCounts, isTrashKind, trashTotal } from "@/lib/trash/plan";
 import { th } from "@/lib/i18n/messages/th";
+import { readStrippedCss } from "./css-source.ts";
 
 /**
  * เทสต์ W3b — พรีเซ็ตของส่วนกลาง (แถบเมนู · ท้ายเว็บ · ป้ายประกาศ)
@@ -402,4 +404,55 @@ test("chrome-tabs: หน้าจอต่อสายจริง — ค่�
   /* สถานะที่เลือกต้องบอกให้โปรแกรมอ่านรู้ด้วย (a11y) */
   assert.ok(client.includes('aria-current={part === entry.key ? "true" : undefined}'), "แท็บที่เลือกต้องมี aria-current");
   assert.ok(client.includes("aria-pressed={mode === entry.key}"), "ปุ่มมุมมองต้องมี aria-pressed");
+});
+
+/* ── 9) พรีวิว "เฉพาะส่วน": ป้ายประกาศต้องไม่เด้งกวนในโหมดที่ไม่ใช่ notice (รอบที่ 179) ──
+ *
+ * ฟีดแบ็กเจ้าของ: *"การตั้งค่าหน้าส่วนของท้ายเว็บ ตอนนี้มีหน้าประกาศเด้งมากวน
+ *   ใช้ลักษณะเดียวกับส่วนเมนูที่ เวลาเข้าไปจัดการตั้งค่า ไม่มีป้ายประกาศกวน"*
+ * ต้นเหตุจริง: กฎซ่อนป้ายของโหมด `footer` ไม่มี `html` นำหน้า ⇒ ความจำเพาะ (0,2,0)
+ *   ⇒ **แพ้** กฎเปิดป้าย `html[data-mourning="shown"] [data-mourning-notice]` (0,2,1) ⇒ ป้ายเด้งทับพรีวิว
+ *   (บทเรียนเดียวกับที่แก้ไว้ให้ `nav` ตั้งแต่รอบที่ 58 — รอบนี้ทำเป็นด่านกันถอยหลังทุกโหมด)
+ */
+
+test("chrome-preview: ทุกโหมดพรีวิวที่ไม่ใช่ notice ต้องซ่อนป้ายประกาศ (ความจำเพาะเท่ากฎเปิด)", async () => {
+  const css = await readStrippedCss();
+
+  /* ⚠️ ชื่อในพรีวิวไม่เหมือนชื่อแท็บ (`navbar` → `nav`) — ใช้รายการกลางจาก lib เพื่อไม่ให้ลืมโหมดใหม่ */
+  const preview = sourceOf("app/[lang]/preview/[page]/page.tsx");
+  for (const part of PREVIEW_PARTS_WITHOUT_NOTICE) {
+    /* ต้องมี `html` นำหน้า (0,2,1) — และดักทั้งสถานะ "ยังไม่เด้ง" กับ "เด้งแล้ว" */
+    assert.ok(
+      css.includes(`html[data-preview-parts="${part}"] [data-mourning-notice]`),
+      `โหมด ${part} ต้องซ่อนป้ายประกาศ (มี html นำหน้า)`,
+    );
+    assert.ok(
+      css.includes(`html[data-preview-parts="${part}"] html[data-mourning="shown"] [data-mourning-notice]`),
+      `โหมด ${part} ต้องซ่อนป้ายแม้ถูกเปิดแล้ว (data-mourning="shown") — ไม่งั้นป้ายเด้งทับพรีวิว`,
+    );
+  }
+
+  /* ห้ามเหลือกฎแบบไม่นำหน้า `html` (คือตัวบั๊กเดิม) — เฉพาะบรรทัดที่เป็น selector ต้นบรรทัด */
+  const stripped = css
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("[data-preview-parts=") && line.includes("[data-mourning-notice]"));
+  assert.deepEqual(stripped, [], "ห้ามมีกฎซ่อนป้ายที่ไม่มี `html` นำหน้า (แพ้กฎเปิด ⇒ ป้ายเด้ง)");
+
+  /* โหมด notice ต้อง "ไม่" ซ่อนป้าย (ตรงข้าม) */
+  assert.ok(
+    !css.includes('html[data-preview-parts="notice"] [data-mourning-notice]'),
+    "โหมด notice ต้องเห็นป้ายประกาศ (ห้ามซ่อน)",
+  );
+
+  /* หน้าพรีวิวต้องรองรับทุกชื่อโหมดจริง (ค่าเพี้ยน = ไม่มีอะไรถูกซ่อน) */
+  for (const part of PREVIEW_PARTS_WITHOUT_NOTICE) {
+    assert.ok(preview.includes(`query.parts === "${part}"`), `หน้าพรีวิวต้องรองรับ parts=${part}`);
+  }
+
+  /* จำนวนโหมดใน CSS ต้องครบตามชนิดจริง — เพิ่มโหมดใหม่แล้วลืมใส่กฎ = แดงทันที */
+  const covered = PREVIEW_PARTS_WITHOUT_NOTICE.filter((part) =>
+    css.includes(`html[data-preview-parts="${part}"] html[data-mourning="shown"] [data-mourning-notice]`),
+  );
+  assert.equal(covered.length, PREVIEW_PARTS_WITHOUT_NOTICE.length, "ต้องมีกฎครบทุกโหมดที่ไม่ใช่ notice");
 });

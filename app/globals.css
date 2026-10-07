@@ -476,13 +476,21 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
   ⚠️ มีผลเฉพาะในพรีวิว (attribute ตั้งโดยสคริปต์ในหน้า /[lang]/preview/[page])
 */
 /*
-  ⚠️ บทเรียน รอบที่ 58: ต้องมี `html` นำหน้าเพื่อให้ความจำเพาะ (0,2,1) **เท่ากับ**
-  กฎที่เปิดป้าย `html[data-mourning="shown"] [data-mourning-notice]` — ไม่งั้นกฎเปิดจะชนะแล้วป้ายเด้งทับพรีวิว
-  (ของเดิมเป็น `[data-preview-parts="nav"] [data-mourning-notice]` = (0,2,0) ⇒ แพ้)
-  ใช้ `html[data-preview-parts]` + อยู่ทีหลังในไฟล์ ⇒ ชนะเมื่อความจำเพาะเท่ากัน
+  ── พรีวิว "เฉพาะส่วน" ที่ไม่ใช่ป้ายประกาศ ⇒ ซ่อนป้ายประกาศ (โอเวอร์เลย์เต็มจอ) ──
+  รอบที่ 57 ตั้งกฎนี้ไว้ให้ `nav` · **รอบที่ 179 ขยายมาที่ `footer`**
+  ฟีดแบ็กเจ้าของ: *"การตั้งค่าหน้าส่วนของท้ายเว็บ ตอนนี้มีหน้าประกาศเด้งมากวน
+    ใช้ลักษณะเดียวกับส่วนเมนูที่ เวลาเข้าไปจัดการตั้งค่า ไม่มีป้ายประกาศกวน"*
+
+  ⚠️ **ต้องมี `html` นำหน้า (0,2,1) เท่ากับกฎที่เปิดป้าย** `html[data-mourning="shown"] [data-mourning-notice]`
+     และต้องดัก **ทั้งสองสถานะ** (ยังไม่เด้ง / เด้งแล้ว) ไม่งั้นกฎเปิดจะชนะแล้วป้ายเด้งทับพรีวิว
+     · เคสจริงรอบที่ 58 = `nav` · เคสจริงรอบที่ 179 = `footer` (กฎเดิมไม่มี `html` นำหน้า ⇒ ความจำเพาะ (0,2,0) ⇒ แพ้)
+  ⚠️ เพิ่มโหมดใหม่ใน `CHROME_PARTS` แล้ว **ต้องเพิ่มชื่อโหมดในรายการนี้ด้วย** — มีเทสต์บังคับที่ `scripts/test-chrome-preset.ts`
+  ⚠️ ห้ามซ่อน `[data-mourning-notice]` ในโหมด `notice` — โหมดนั้นต้องเห็นป้าย (มีเทสต์กันที่ `scripts/test-block-diff.ts`)
 */
 html[data-preview-parts="nav"] [data-mourning-notice],
-html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice] {
+html[data-preview-parts="footer"] [data-mourning-notice],
+html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice],
+html[data-preview-parts="footer"] html[data-mourning="shown"] [data-mourning-notice] {
   display: none;
 }
 
@@ -494,16 +502,13 @@ html[data-preview-parts="nav"] html[data-mourning="shown"] [data-mourning-notice
   ── พรีวิว "เฉพาะท้ายเว็บ" (?parts=footer) — W3 ──
   แทนท้ายเว็บของ layout ด้วยท้ายเว็บสด (SiteFooterLive) ⇒ ซ่อนอันของ layout + ซ่อนเนื้อหา
   ⚠️ ใช้ธง `data-layout-footer` (ไม่ใช่ `footer[data-site-footer]`) เพราะท้ายเว็บสดใช้คอมโพเนนต์เดียวกัน
+  ⚠️ กฎซ่อน "ป้ายประกาศ" ของโหมดนี้อยู่รวมกับโหมด `nav` ด้านบน (รอบที่ 179) — ที่นี่ไม่ต้องเขียนซ้ำ
 */
 [data-preview-parts="footer"] header[data-layout-header] {
   display: none;
 }
 
 [data-preview-parts="footer"] footer[data-layout-footer] {
-  display: none;
-}
-
-[data-preview-parts="footer"] [data-mourning-notice] {
   display: none;
 }
 
