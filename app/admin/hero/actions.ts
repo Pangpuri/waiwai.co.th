@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -28,9 +29,15 @@ import {
  */
 
 /** หลังแก้ข้อมูลแล้ว: สั่งให้หน้าเว็บสร้างใหม่ + หน้าจอหลังบ้านรีเฟรช */
-async function refreshAfterChange(): Promise<void> {
+/**
+ * ปิดรอบการบันทึก: สั่งหน้าเว็บสร้างใหม่ **แล้ว Redirect กลับพร้อมรหัสผลลัพธ์**
+ * ⇒ ผู้ใช้เห็นข้อความ "บันทึกสำเร็จ/ไม่สำเร็จ" เสมอ (มติเจ้าของ 2026-10-07: ห้ามเงียบ)
+ * ⚠️ `redirect()` ต้องอยู่นอก try/catch (มันโยน error พิเศษของ Next)
+ */
+async function refreshAfterChange(flag: string): Promise<void> {
   revalidatePath("/admin/hero");
   await refreshPublicSite("page");
+  redirect(`/admin/hero?saved=${flag}`);
 }
 
 /** เพิ่มสไลด์ใหม่ (ยังไม่เลือกภาพ) */
@@ -39,7 +46,7 @@ export async function addHeroSlideAction(): Promise<void> {
   const id = await createHeroPageSlide(user.email);
   if (id !== null) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "add" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-added");
   }
 }
 
@@ -49,9 +56,10 @@ export async function removeHeroSlideAction(formData: FormData): Promise<void> {
   const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
   if (id === "") return;
   const ok = await trashHeroPageSlide(id, user.email);
+  if (!ok) redirect("/admin/hero?error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "trash" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-removed");
   }
 }
 
@@ -79,7 +87,7 @@ export async function moveHeroSlideAction(formData: FormData): Promise<void> {
   const changed = await reorderHeroPageSlides(order, user.email);
   if (changed > 0) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: delta === 1 ? "down" : "up" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-moved");
   }
 }
 
@@ -99,7 +107,7 @@ export async function reorderHeroSlidesAction(formData: FormData): Promise<void>
   const changed = await reorderHeroPageSlides(order, user.email);
   if (changed > 0) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: "hero:order", detail: "reorder" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-reordered");
   }
 }
 
@@ -135,9 +143,10 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
     },
     user.email,
   );
+  if (!ok) redirect("/admin/hero?error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "details" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-saved");
   }
 }
 
@@ -148,6 +157,7 @@ export async function saveHeroSettingAction(formData: FormData): Promise<void> {
   const intervalRaw = Number(formData.get("intervalMs"));
   const setting = parseHeroSetting({ effect, intervalMs: intervalRaw });
   const ok = await saveHeroSetting(setting, user.email);
+  if (!ok) redirect("/admin/hero?error=save-failed");
   if (ok) {
     await recordAudit({
       action: "hero-save",
@@ -155,7 +165,7 @@ export async function saveHeroSettingAction(formData: FormData): Promise<void> {
       target: "hero:setting",
       detail: `${setting.effect}:${setting.intervalMs}`,
     });
-    await refreshAfterChange();
+    await refreshAfterChange("effect-saved");
   }
 }
 
@@ -165,9 +175,10 @@ export async function restoreHeroSlideAction(formData: FormData): Promise<void> 
   const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
   if (id === "") return;
   const ok = await restoreHeroPageSlide(id, user.email);
+  if (!ok) redirect("/admin/hero?error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "restore" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-restored");
   }
 }
 
@@ -181,8 +192,9 @@ export async function deleteHeroSlideForeverAction(formData: FormData): Promise<
   const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
   if (id === "" || formData.get("confirm") !== "yes") return;
   const ok = await deleteHeroPageSlideForever(id);
+  if (!ok) redirect("/admin/hero?error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `hero:${id}`, detail: "purge" });
-    await refreshAfterChange();
+    await refreshAfterChange("slide-purged");
   }
 }

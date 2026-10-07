@@ -18,6 +18,7 @@ import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/mo
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { listMedia } from "@/lib/media/repository";
 import { fillTemplate } from "@/lib/i18n/template";
+import { feedbackOf, type HeroErrorCode, type HeroSavedCode } from "@/lib/hero/feedback";
 import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
 
 /**
@@ -31,12 +32,34 @@ import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
  */
 /** ป้ายของเอฟเฟคแต่ละแบบ (ข้อความจากพจนานุกรม — ไม่พิมพ์ไทยในไฟล์นี้) */
 
-export default async function AdminHeroPage({ searchParams }: { searchParams: Promise<{ readonly tab?: string }> }) {
+export default async function AdminHeroPage({ searchParams }: { searchParams: Promise<{ readonly tab?: string; readonly saved?: string; readonly error?: string }> }) {
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const s = messages.admin;
   /* แท็บในหน้าเดียว (มติเจ้าของ): สไลด์ | แคมเปญ — จำแท็บใน URL */
-  const tab = (await searchParams).tab === "campaigns" ? "campaigns" : "slides";
+  const query = await searchParams;
+  const tab = query.tab === "campaigns" ? "campaigns" : "slides";
+
+  /* ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07) */
+  const feedback = feedbackOf({ saved: query.saved, error: query.error });
+  const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
+    "slide-added": s.feedbackSlideAdded,
+    "slide-removed": s.feedbackSlideRemoved,
+    "slide-moved": s.feedbackSlideMoved,
+    "slide-reordered": s.feedbackSlideReordered,
+    "slide-saved": s.feedbackSlideSaved,
+    "effect-saved": s.feedbackEffectSaved,
+    "slide-restored": s.feedbackSlideRestored,
+    "slide-purged": s.feedbackSlidePurged,
+    "campaign-added": s.feedbackCampaignAdded,
+    "campaign-saved": s.feedbackCampaignSaved,
+    "campaign-status": s.feedbackCampaignStatus,
+    "campaign-trashed": s.feedbackCampaignTrashed,
+  };
+  const errorMessages: Readonly<Record<HeroErrorCode, string>> = {
+    invalid: s.feedbackErrorInvalid,
+    "save-failed": s.feedbackErrorSaveFailed,
+  };
 
   /* คลังภาพสำหรับช่องเลือกภาพ — ส่งให้เฉพาะผู้มีสิทธิ์ media (แบบเดียวกับตัวสร้างหน้า · รอบที่ 93) */
   const imageLibrary: readonly ImageLibraryItem[] = can(user.role, "media")
@@ -71,6 +94,12 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
           </Link>
         </p>
       </header>
+
+      {feedback === null ? null : (
+        <div role="status" className="border-line bg-surface text-fg rounded-xl border px-3 py-2 text-sm">
+          {feedback.kind === "saved" ? "✓ " + savedMessages[feedback.code] : "⚠ " + errorMessages[feedback.code]}
+        </div>
+      )}
 
       {/* แท็บ: สไลด์ | แคมเปญ (รอบที่ 190) */}
       <nav className="border-line flex gap-2 border-b pb-2">

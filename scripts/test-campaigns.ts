@@ -182,3 +182,26 @@ test("hero trash: ตัวลบอัตโนมัติต่อเข้�
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(page.includes("TRASH_RETENTION_DAYS"), "หน้าจอต้องเติมจำนวนวันจากค่ากลาง");
 });
+
+test("feedback: ทุกการบันทึกต้องบอกผล (สำเร็จ/ไม่สำเร็จ) — ห้ามเงียบ", () => {
+  const feedback = readFileSync("lib/hero/feedback.ts", "utf8");
+  for (const code of ["slide-saved", "effect-saved", "campaign-saved", "campaign-status"]) {
+    assert.ok(feedback.includes('"' + code + '"'), "ต้องมีรหัสผลลัพธ์ " + code);
+  }
+  assert.ok(feedback.includes('"save-failed"') && feedback.includes('"invalid"'), "ต้องมีรหัสความล้มเหลว");
+  assert.ok(feedback.includes("export function feedbackOf"), "ต้องมีตัวอ่านรหัสจาก query");
+
+  const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
+  assert.ok(actions.includes('redirect(`/admin/hero?saved=${flag}`)'), "action ต้อง redirect พร้อมรหัสผลลัพธ์");
+  assert.equal((actions.match(/refreshAfterChange\("/g) ?? []).length, 8, "ทุกทางบันทึกของสไลด์ต้องส่งรหัสผลลัพธ์");
+  assert.ok(actions.includes('redirect("/admin/hero?error=save-failed")'), "บันทึกไม่สำเร็จต้องบอกด้วย");
+
+  const campaignActions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  assert.ok(campaignActions.includes("?tab=campaigns&saved=${flag}"), "แคมเปญต้องกลับไปแท็บเดิมพร้อมรหัสผลลัพธ์");
+  assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 4, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
+  assert.ok(campaignActions.includes('error=invalid'), "ข้อมูลไม่ผ่านต้องบอกว่าไม่สำเร็จ");
+
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("feedbackOf(") && page.includes("savedMessages[feedback.code]"), "หน้าจอต้องแสดงข้อความจากรหัส");
+  assert.ok(page.includes('role="status"'), "แบนเนอร์ต้องประกาศให้โปรแกรมอ่านหน้าจอรู้ (a11y)");
+});

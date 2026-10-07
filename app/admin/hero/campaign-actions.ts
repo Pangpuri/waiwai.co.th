@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -18,9 +19,11 @@ import { countCampaigns, createCampaign, setCampaignStatus, trashCampaign, updat
  * - ⚠️ เผยแพร่ได้เฉพาะค่าที่ผ่านการตรวจ (หัวข้อไทยบังคับ) — กัน "แคมเปญเปล่าขึ้นเว็บ"
  */
 
-async function refreshAfterCampaignChange(): Promise<void> {
+/** ปิดรอบการบันทึกของแคมเปญ: refresh หน้าเว็บ + Redirect กลับแท็บแคมเปญพร้อมรหัสผลลัพธ์ */
+async function refreshAfterCampaignChange(flag: string): Promise<void> {
   revalidatePath("/admin/hero");
   await refreshPublicSite("page");
+  redirect(`/admin/hero?tab=campaigns&saved=${flag}`);
 }
 
 export async function addCampaignAction(): Promise<void> {
@@ -30,7 +33,7 @@ export async function addCampaignAction(): Promise<void> {
   const id = await createCampaign(user.email);
   if (id !== null) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-add" });
-    await refreshAfterCampaignChange();
+    await refreshAfterCampaignChange("campaign-added");
   }
 }
 
@@ -59,12 +62,13 @@ export async function saveCampaignAction(formData: FormData): Promise<void> {
     slideIds,
   });
   /* ค่าไม่ผ่าน = ไม่บันทึก (ไม่เดาแทนผู้ใช้) — หน้าจอจะรีเฟรชกลับไปค่าที่ถูกต้อง */
-  if (!parsed.ok) return;
+  if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid");
 
   const ok = await updateCampaign(id, parsed.value, user.email);
+  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-save" });
-    await refreshAfterCampaignChange();
+    await refreshAfterCampaignChange("campaign-saved");
   }
 }
 
@@ -85,10 +89,11 @@ export async function setCampaignStatusAction(formData: FormData): Promise<void>
       anchorY: Number(formData.get("anchorY")),
       slideIds: formData.getAll("slideIds"),
     });
-    if (!parsed.ok) return;
+    if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid");
   }
 
   const ok = await setCampaignStatus(id, status, user.email);
+  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
   if (ok) {
     await recordAudit({
       action: "hero-save",
@@ -96,7 +101,7 @@ export async function setCampaignStatusAction(formData: FormData): Promise<void>
       target: `campaign:${id}`,
       detail: status === "published" ? "campaign-publish" : "campaign-unpublish",
     });
-    await refreshAfterCampaignChange();
+    await refreshAfterCampaignChange("campaign-status");
   }
 }
 
@@ -105,8 +110,9 @@ export async function removeCampaignAction(formData: FormData): Promise<void> {
   const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
   if (id === "") return;
   const ok = await trashCampaign(id, user.email);
+  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-trash" });
-    await refreshAfterCampaignChange();
+    await refreshAfterCampaignChange("campaign-trashed");
   }
 }
