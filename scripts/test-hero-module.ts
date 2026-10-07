@@ -232,7 +232,7 @@ test("hero module (เฟส 3): ภาพที่ยังไม่มีพ�
   assert.ok(manager.includes("heroAdminNoImage"), "พาธว่างต้องแสดงข้อความจากพจนานุกรมแทนภาพ");
   /* <img> ต้องอยู่ในสาขา else เท่านั้น (คือไม่มีทางถูกเรนเดอร์เมื่อพาธว่าง) */
   const imgIndex = manager.indexOf("<img src={slide.mediaPath}");
-  const guardIndex = manager.indexOf('slide.mediaPath.trim() === ""');
+  const guardIndex = manager.indexOf("path.trim() === \"\"");
   assert.ok(imgIndex > guardIndex, "แท็ก <img> ต้องอยู่หลังการตรวจพาธว่าง");
   assert.ok(!/<img src=\{[^}]*\} alt/.test(manager.slice(0, guardIndex)), "ห้ามมี <img> ก่อนจุดตรวจ");
 });
