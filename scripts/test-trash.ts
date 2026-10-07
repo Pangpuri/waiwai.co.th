@@ -5,12 +5,16 @@ import { test } from "node:test";
 
 import { TRASH_RETENTION_DAYS, RETENTION_CLASSES, trashCutoffFor } from "@/lib/retention/plan";
 import {
+  CONTENT_TRASH_KINDS,
   TRASH_AUDIT_ACTIONS,
   TRASH_KINDS,
+  contentTrashTotal,
   daysLeftInTrash,
+  emptyContentTrashCounts,
   emptyTrashCounts,
   isTrashExpired,
   isTrashKind,
+  summarizeContentTrash,
   summarizeTrash,
   trashTotal,
 } from "@/lib/trash/plan";
@@ -248,4 +252,64 @@ test("trash: ตัวอย่างภาพของในถัง — ต�
   const list = sourceOf("features/admin/ui/trash-list.tsx");
   assert.ok(list.includes("/admin/trash/thumbnail/"), "หน้าถังขยะต้องแสดงตัวอย่างภาพ");
   assert.ok(list.includes('row.kind === "media"'), "แสดงตัวอย่างเฉพาะแถวที่เป็นภาพ");
+});
+
+/* ── 3) ถังขยะ "เนื้อหา" (รอบที่ 170) — สินค้า/เมนูอาหาร/ข่าว ─────────────────── */
+
+test("trash-content: ชนิด/ยอด/สรุปของถังขยะเนื้อหา", () => {
+  assert.deepEqual([...CONTENT_TRASH_KINDS], ["product", "recipe", "news"]);
+
+  const counts = { product: 2, recipe: 1, news: 4 };
+  assert.equal(contentTrashTotal(counts), 7);
+  assert.equal(summarizeContentTrash(counts), "product=2 recipe=1 news=4");
+  assert.equal(contentTrashTotal(emptyContentTrashCounts()), 0);
+  assert.equal(summarizeContentTrash(emptyContentTrashCounts()), "product=0 recipe=0 news=0");
+
+  /* ต้องเป็นคนละชุดกับถังขยะรวม (/admin/trash) — ของ 3 ชนิดนี้มีแท็บของตัวเอง */
+  for (const kind of CONTENT_TRASH_KINDS) {
+    assert.ok(!(TRASH_KINDS as readonly string[]).includes(kind), `${kind} ต้องไม่อยู่ใน TRASH_KINDS ของ /admin/trash`);
+  }
+});
+
+test("trash-content: ตัวลบต้องมีประตู 'อยู่ในถังเท่านั้น' + ใช้เวลาตัดจากค่ากลาง + dryRun เส้นทางเดียว", () => {
+  const content = sourceOf("lib/trash/content.ts");
+
+  /* ประตูอยู่ที่ SQL — ของที่ยังใช้งานอยู่ต้องลบไม่ได้แม้เรียกฟังก์ชันตรง ๆ */
+  const deletes = content.match(/delete from \$\{table\} where deleted_at is not null and deleted_at < \$1/g) ?? [];
+  const counts = content.match(/select count\(\*\)::int as n from \$\{table\} where deleted_at is not null and deleted_at < \$1/g) ?? [];
+  assert.equal(deletes.length, 1, "ต้องมีคำสั่งลบเดียวที่ครอบทุกชนิด");
+  assert.equal(counts.length, 1, "dryRun ต้องใช้เงื่อนไขเดียวกับตอนลบจริง");
+  assert.ok(content.includes("trashCutoffIsoFor"), "เวลาตัดต้องมาจาก lib/retention/plan.ts (ค่ากลางเดียว)");
+  assert.ok(content.includes("recordAudit"), "การลบถาวรต้องมีร่องรอย");
+  assert.ok(content.includes("if (!dryRun && total > 0)"), "dry run ต้องไม่บันทึก audit");
+  assert.ok(content.includes("const table = CONTENT_TABLES[kind]"), "ชื่อตารางต้องมาจากค่าคงที่ (ไม่รับจากผู้ใช้)");
+  assert.ok(content.includes("if (!isDatabaseConfigured()) return null"), "ไม่มี DB = คืน null ไม่โยน error");
+
+  /* ตารางทั้งสามต้องมีจริงในสคีมาและมี deleted_at (รอบ 123/135/139) */
+  const schema = sourceOf("db/schema.sql");
+  for (const table of ["product", "recipe", "news"]) {
+    assert.ok(schema.includes(`create table if not exists ${table} (`), `${table} ต้องมีในสคีมา`);
+  }
+});
+
+test("trash-content: ตัวลบกลางต้องเรียกด้วย (cron/ล็อกอิน) ไม่ต้องมีคนกดเอง", () => {
+  const purge = sourceOf("lib/retention/purge.ts");
+  assert.ok(purge.includes("purgeExpiredContentTrash("), "ตัวลบกลางต้องเก็บกวาดถังขยะเนื้อหาด้วย");
+  assert.ok(!purge.includes("delete from product"), "การลบถาวรต้องอยู่ใน lib/trash/content.ts ที่เดียว");
+
+  const cli = sourceOf("scripts/purge.ts");
+  assert.ok(cli.includes("purgeExpiredContentTrash("), "CLI db:purge ต้องรายงาน/ลบถังขยะเนื้อหาด้วย");
+  assert.ok(cli.includes("summarizeContentTrash("), "ต้องสรุปผลลงรายงาน");
+
+  /* ด่าน DB ต้องพิสูจน์วงจรจริง (ลบเฉพาะของพ้นกำหนด · cascade ส่วนผสม · คืนสภาพ) */
+  const checkDb = sourceOf("scripts/check-db.ts");
+  assert.ok(checkDb.includes("checkContentTrashPurge"), "check:db ต้องมีวงจรถังขยะเนื้อหา");
+  assert.ok(checkDb.includes("purgeExpiredContentTrash"), "ต้องพิสูจน์ตัวลบกับ DB จริง");
+  assert.ok(checkDb.includes("product_ingredient where product_id"), "ต้องพิสูจน์ว่าส่วนผสมหายตามสินค้า (cascade)");
+
+  /* สคีมาของ 3 ชนิดต้องมีดัชนีที่ใช้กรองของในถัง (ประสิทธิภาพตอนเก็บกวาด) */
+  const schema = sourceOf("db/schema.sql");
+  assert.ok(schema.includes("product_admin_idx"), "สินค้าต้องมีดัชนีของถังขยะ");
+  assert.ok(schema.includes("recipe_admin_idx"), "เมนูอาหารต้องมีดัชนีของถังขยะ");
+  assert.ok(schema.includes("news_admin_idx"), "ข่าวต้องมีดัชนีของถังขยะ");
 });

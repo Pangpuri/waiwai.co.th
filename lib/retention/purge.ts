@@ -4,6 +4,7 @@ import { getPool, withTransaction } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { purgeExpiredTrash } from "@/lib/trash/repository";
+import { purgeExpiredContentTrash } from "@/lib/trash/content";
 import { purgeExpiredPreviewLinks } from "@/lib/preview-link/repository";
 import {
   PURGE_AUDIT_ACTION,
@@ -254,6 +255,13 @@ async function purgeAndRecord(options: { readonly now: Date; readonly actorEmail
        ⇒ `lib/trash/repository.ts` บันทึก audit ของตัวเอง (`trash-purge`) เมื่อมีของถูกลบจริง
   */
   await purgeExpiredTrash({ now: options.now });
+
+  /*
+    ถังขยะ "เนื้อหา" (รอบที่ 170 — สินค้า/เมนูอาหาร/ข่าว) — ลบถาวรเมื่อพ้นระยะเก็บ
+    ⚠️ คนละชุดกับถังขยะภาพ/พรีเซ็ต: ของ 3 ชนิดนี้มีแท็บถังขยะในหน้าจอของตัวเอง
+       ที่นี่มีหน้าที่แค่ "เก็บกวาดตามกำหนด" · บันทึก audit ของตัวเอง (`trash-purge` · target `trash-content`)
+  */
+  await purgeExpiredContentTrash({ now: options.now });
 
   /*
     ลิงก์พรีวิวชั่วคราว (X2.6) — เก็บกวาดลิงก์ที่ปิดแล้วและพ้นอายุเก็บ

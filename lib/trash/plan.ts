@@ -90,3 +90,31 @@ export function summarizeTrash(counts: Readonly<Record<TrashKind, number>>): str
 export function trashRetentionDays(): number {
   return TRASH_RETENTION_DAYS;
 }
+
+/* ── ถังขยะ "เนื้อหา" (รอบที่ 170) — สินค้า/เมนูอาหาร/ข่าว ─────────────────────────
+ *
+ * แยกจาก `TRASH_KINDS` ข้างบนโดยเจตนา:
+ * - `TRASH_KINDS` = ของที่จัดการรวมที่ `/admin/trash` (ภาพในคลัง · พรีเซ็ตบล็อก · พรีเซ็ตส่วนกลาง)
+ * - `CONTENT_TRASH_KINDS` = สินค้า/เมนู/ข่าว ที่มี **แท็บถังขยะของตัวเอง** ในหน้าจอของแต่ละชนิด
+ *   (กู้คืน/ลบถาวรอยู่ที่นั่น) — ที่นี่มีไว้เพื่อให้ **ตัวลบอัตโนมัติ** รู้จักและลบถาวรเมื่อพ้นกำหนด
+ *   เดิมของ 3 ชนิดนี้ค้างในถังตลอดไป (ไม่มีตัวลบ) ⇒ ปิดหนี้รอบที่ 170
+ * ⚠️ ใช้ระยะเก็บเดียวกัน (`TRASH_RETENTION_DAYS`) และไม่ขึ้นหน้า /privacy (ไม่ใช่ข้อมูลส่วนบุคคล)
+ */
+
+export const CONTENT_TRASH_KINDS = ["product", "recipe", "news"] as const;
+
+export type ContentTrashKind = (typeof CONTENT_TRASH_KINDS)[number];
+
+/** จำนวนเนื้อหาในถังแยกชนิด (นับเป็น 0 ทุกชนิด) — เขียนตรง ๆ ให้ type ฟ้องเมื่อเพิ่มชนิดใหม่ */
+export function emptyContentTrashCounts(): Record<ContentTrashKind, number> {
+  return { product: 0, recipe: 0, news: 0 };
+}
+
+export function contentTrashTotal(counts: Readonly<Record<ContentTrashKind, number>>): number {
+  return CONTENT_TRASH_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
+}
+
+/** สรุปผลเป็นข้อความสั้น ๆ สำหรับ `detail` ของ audit log (รูปแบบเดียวกับ summarizeTrash) */
+export function summarizeContentTrash(counts: Readonly<Record<ContentTrashKind, number>>): string {
+  return CONTENT_TRASH_KINDS.map((kind) => `${kind}=${counts[kind]}`).join(" ");
+}

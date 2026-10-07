@@ -156,6 +156,7 @@ import {
   trashMedia,
   trashStats,
 } from "@/lib/trash/repository";
+import { purgeExpiredContentTrash } from "@/lib/trash/content";
 import { listReorderItems, parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
@@ -338,6 +339,9 @@ async function main(): Promise<void> {
 
   /* 32) Least privilege: role อ่านอย่างเดียวเขียนไม่ได้ · role ฟอร์มแตะเฉพาะตารางฟอร์ม (รอบที่ 169) */
   await checkLeastPrivilege();
+
+  /* 33) ถังขยะเนื้อหา: ตัวลบอัตโนมัติลบเฉพาะของที่พ้นกำหนด (รอบที่ 170) */
+  await checkContentTrashPurge();
 
   await closePool();
 
@@ -2840,6 +2844,149 @@ async function checkTrashForever(): Promise<void> {
     assert.equal(await countWhere("media where id = $1", [mediaId]), 0, "ต้องไม่เหลือภาพทดสอบ");
     assert.equal(await countOfCategory(), beforeCount, "ตัวนับต่อหมวดต้องกลับมาเท่าเดิม");
     assert.deepEqual(await adminRecipeCounts(), beforeRecipeCounts, "ตัวนับเมนูต้องกลับมาเท่าเดิม");
+  }
+}
+
+/**
+ * 33) ถังขยะเนื้อหา: ตัวลบอัตโนมัติ (รอบที่ 170)
+ *
+ * ที่มา: สินค้า/เมนูอาหาร/ข่าว ย้ายเข้าถังขยะได้ตั้งแต่รอบ 123/135/139 แต่ **ไม่มีตัวลบ**
+ * ⇒ ของที่ผู้ดูแลลบแล้วค้างในตารางตลอดไป ⇒ รอบ 170 เพิ่ม `purgeExpiredContentTrash()`
+ *
+ * วงจรนี้พิสูจน์ 5 ข้อ
+ * 1. ลบเฉพาะของที่ `deleted_at` เก่ากว่าจุดตัด (ของที่เพิ่งลบต้องยังอยู่ในถัง)
+ * 2. ครอบทั้งสามตาราง (สินค้า · เมนูอาหาร · ข่าว) ไม่ใช่แค่ตารางเดียว
+ * 3. **ประตูอยู่ที่ SQL**: ของที่ยังใช้งานอยู่ (deleted_at null) ไม่ถูกลบแม้เลยกำหนด
+ * 4. ลบสินค้าแล้ว **ส่วนผสมหายตาม** (`on delete cascade`)
+ * 5. คืนสภาพตารางได้ครบ (finally) — ไม่ทิ้งรอยทดสอบ
+ */
+async function checkContentTrashPurge(): Promise<void> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+
+  const actor = "check-db-content-trash@example.invalid";
+  const oldProductId = "p999993";
+  const freshProductId = "p999994";
+  const activeProductId = "p999995";
+
+  const buildProduct = (id: string, nameTh: string, sortOrder: number): ProductInput => ({
+    id,
+    categoryId,
+    sourceId: "",
+    sourceUrl: "",
+    nameTh,
+    nameEn: "",
+    groupTh: "",
+    groupEn: "",
+    taglineTh: "",
+    taglineEn: "",
+    detailsTh: "",
+    allergensTh: "",
+    netWeightTh: "",
+    fdaNumber: "",
+    packagingTh: "",
+    detailsEn: "",
+    allergensEn: "",
+    netWeightEn: "",
+    packagingEn: "",
+    sortOrder,
+  });
+
+  let newsId = "";
+  let recipeId = "";
+
+  try {
+    await upsertProduct(buildProduct(oldProductId, "ทดสอบถังเนื้อหา (เก่า)", -99991), actor, null, { imageMode: "keep" });
+    await upsertProduct(buildProduct(freshProductId, "ทดสอบถังเนื้อหา (ใหม่)", -99992), actor, null, { imageMode: "keep" });
+    await upsertProduct(buildProduct(activeProductId, "ทดสอบถังเนื้อหา (ใช้งานอยู่)", -99993), actor, null, { imageMode: "keep" });
+
+    /* ส่วนผสมของสินค้าเก่า — ต้องหายตามสินค้าเมื่อถูกลบถาวร (on delete cascade) */
+    await getPool().query(
+      `insert into product_ingredient (product_id, sort_order, name_th, name_en, percent_text)
+         values ($1, 0, 'ส่วนผสมทดสอบ', '', '') on conflict (product_id, sort_order) do nothing`,
+      [oldProductId],
+    );
+
+    newsId = await createNewsForAdmin(
+      {
+        titleTh: "ข่าวทดสอบถังเนื้อหา",
+        titleEn: "",
+        excerptTh: "",
+        excerptEn: "",
+        coverPath: null,
+        publishedLocal: "2026-06-01T10:30",
+        status: "published",
+        body: [{ type: "paragraph", text: "ทดสอบตัวลบถังขยะเนื้อหา" }],
+      },
+      actor,
+    );
+    recipeId = await createRecipeForAdmin(
+      {
+        titleTh: "เมนูทดสอบถังเนื้อหา",
+        titleEn: "",
+        videoId: "dQw4w9WgXcQ",
+        publishedOn: "2018-10-09",
+        sortOrder: 999,
+        coverPath: null,
+        status: "published",
+      },
+      actor,
+    );
+
+    /* ย้ายเข้าถังทั้งหมด + ทำให้ของ "เก่า" พ้นกำหนด (40 วัน > 30) */
+    await setProductTrashed(oldProductId, true, actor);
+    await setProductTrashed(freshProductId, true, actor);
+    await setNewsTrashed(newsId, true, actor);
+    await setRecipeTrashed(recipeId, true, actor);
+
+    const aged = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    await getPool().query("update product set deleted_at = $2 where id = $1", [oldProductId, aged]);
+    await getPool().query("update news set deleted_at = $2 where id = $1", [newsId, aged]);
+    await getPool().query("update recipe set deleted_at = $2 where id = $1", [recipeId, aged]);
+
+    /* 1) dry run ต้องนับได้ทั้งสามตาราง (ไม่ลบจริง) */
+    const dry = await purgeExpiredContentTrash({ dryRun: true });
+    assert.ok(dry !== null, "dry run ต้องได้ผลลัพธ์เมื่อมี DATABASE_URL");
+    assert.ok(dry.counts.product >= 1, `ต้องนับสินค้าที่พ้นกำหนด (พบ ${dry.counts.product})`);
+    assert.ok(dry.counts.news >= 1, `ต้องนับข่าวที่พ้นกำหนด (พบ ${dry.counts.news})`);
+    assert.ok(dry.counts.recipe >= 1, `ต้องนับเมนูที่พ้นกำหนด (พบ ${dry.counts.recipe})`);
+    assert.equal(await countWhere("product where id = $1", [oldProductId]), 1, "dry run ต้องไม่ลบจริง");
+
+    /* 2) ลบจริง */
+    const purged = await purgeExpiredContentTrash();
+    assert.ok(purged !== null, "ลบจริงต้องได้รายงาน");
+    assert.ok(purged.counts.product >= 1 && purged.counts.news >= 1 && purged.counts.recipe >= 1, "ต้องลบครบทั้งสามตาราง");
+
+    assert.equal(await countWhere("product where id = $1", [oldProductId]), 0, "สินค้าที่พ้นกำหนดต้องถูกลบถาวร");
+    assert.equal(await countWhere("product_ingredient where product_id = $1", [oldProductId]), 0, "ส่วนผสมต้องถูกลบตาม (cascade)");
+    assert.equal(await countWhere("news where id = $1", [newsId]), 0, "ข่าวที่พ้นกำหนดต้องถูกลบถาวร");
+    assert.equal(await countWhere("recipe where id = $1", [recipeId]), 0, "เมนูที่พ้นกำหนดต้องถูกลบถาวร");
+    newsId = "";
+    recipeId = "";
+
+    /* 3) ของที่เพิ่งลบ + ของที่ยังใช้งานอยู่ ต้องไม่ถูกแตะ */
+    assert.equal(
+      await countWhere("product where id = $1 and deleted_at is not null", [freshProductId]),
+      1,
+      "ของที่เพิ่งลบต้องยังอยู่ในถัง (ไม่ถูกลบก่อนกำหนด)",
+    );
+    assert.equal(
+      await countWhere("product where id = $1 and deleted_at is null", [activeProductId]),
+      1,
+      "ของที่ยังใช้งานอยู่ต้องไม่ถูกลบเด็ดขาด",
+    );
+
+    done(
+      "ถังขยะเนื้อหา: ตัวลบอัตโนมัติลบเฉพาะของที่พ้นกำหนด",
+      "สินค้า (ส่วนผสม cascade) · เมนูอาหาร · ข่าว · ของเพิ่งลบ/ใช้งานอยู่ไม่ถูกแตะ",
+    );
+  } finally {
+    await getPool().query("delete from product where id = any($1::text[])", [[oldProductId, freshProductId, activeProductId]]);
+    if (newsId !== "") await deleteNews(newsId);
+    if (recipeId !== "") await deleteRecipe(recipeId);
+
+    assert.equal(await countWhere("product where id like 'p99999%'", []), 0, "ต้องไม่เหลือสินค้าทดสอบ");
   }
 }
 

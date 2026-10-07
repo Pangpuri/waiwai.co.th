@@ -16,13 +16,15 @@
  * ตรรกะทั้งหมดอยู่ใน `lib/retention/plan.ts` (บริสุทธิ์) + `lib/retention/purge.ts` (แตะ DB)
  * ⚠️ รอบเดียวกันนี้ลบ **ของในถังขยะที่พ้นกำหนด** ด้วย (X2.4) — ระยะเก็บของถังอยู่ที่ไฟล์นโยบายเดียวกัน
  *    (`TRASH_RETENTION_DAYS` · ภาพ/พรีเซ็ตที่ผู้ดูแลลบ ไม่นับเป็นข้อมูลส่วนบุคคล จึงไม่ขึ้นหน้า /privacy)
+ *    และลบ **ถังขยะเนื้อหา** (สินค้า/เมนูอาหาร/ข่าว · รอบที่ 170) ด้วยกติกาเดียวกัน
  */
 import { closePool, isDatabaseConfigured } from "@/db/pool";
 import { describeRetention } from "@/lib/retention/format";
 import { RETENTION_CLASSES, TRASH_RETENTION_DAYS, retentionDaysFor, summarizePurge } from "@/lib/retention/plan";
 import { purgeExpired, purgeNow, type PurgeReport } from "@/lib/retention/purge";
-import { summarizeTrash } from "@/lib/trash/plan";
+import { summarizeContentTrash, summarizeTrash } from "@/lib/trash/plan";
 import { purgeExpiredTrash, type TrashPurgeReport } from "@/lib/trash/repository";
+import { purgeExpiredContentTrash, type ContentTrashPurgeReport } from "@/lib/trash/content";
 import { PREVIEW_LINK_KEEP_DAYS } from "@/lib/preview-link/plan";
 
 type Options = {
@@ -82,6 +84,11 @@ async function trashDueNow(dryRun: boolean): Promise<TrashPurgeReport | null> {
   return purgeExpiredTrash({ dryRun });
 }
 
+/** นับเนื้อหาในถัง (สินค้า/เมนูอาหาร/ข่าว) ที่พ้นกำหนด — รอบที่ 170 */
+async function contentTrashDueNow(dryRun: boolean): Promise<ContentTrashPurgeReport | null> {
+  return purgeExpiredContentTrash({ dryRun });
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
@@ -94,6 +101,7 @@ async function main(): Promise<void> {
 
   /* นับของในถังที่พ้นกำหนดก่อน (โหมดลบจริง purgeNow จะลบให้เองในรอบเดียวกัน) */
   const trash = await trashDueNow(true);
+  const contentTrash = await contentTrashDueNow(true);
 
   if (options.dryRun) {
     report = await purgeExpired({ dryRun: true });
@@ -116,6 +124,7 @@ async function main(): Promise<void> {
           total: report.total,
           counts: report.counts,
           trash: { total: trash?.total ?? 0, counts: trash?.counts ?? null },
+          contentTrash: { total: contentTrash?.total ?? 0, counts: contentTrash?.counts ?? null },
         },
         null,
         2,
@@ -131,7 +140,12 @@ async function main(): Promise<void> {
     if (trash !== null) {
       process.stdout.write(`    · ${"trash".padEnd(13)} ลบ ${trash.total} รายการ (${summarizeTrash(trash.counts)})\n`);
     }
-    if (report.total === 0 && (trash?.total ?? 0) === 0) {
+    if (contentTrash !== null) {
+      process.stdout.write(
+        `    · ${"trash-content".padEnd(13)} ลบ ${contentTrash.total} รายการ (${summarizeContentTrash(contentTrash.counts)})\n`,
+      );
+    }
+    if (report.total === 0 && (trash?.total ?? 0) === 0 && (contentTrash?.total ?? 0) === 0) {
       process.stdout.write("    (ยังไม่มีข้อมูลที่หมดอายุ — ไม่มีอะไรต้องทำ)\n");
     }
     process.stdout.write(`\n  audit: ${summarizePurge(report.counts)}\n`);

@@ -1,0 +1,85 @@
+import { getPool } from "@/db/pool";
+import { recordAudit } from "@/lib/audit/log";
+import { isDatabaseConfigured } from "@/lib/content/repository";
+import { trashCutoffIsoFor } from "@/lib/retention/plan";
+import {
+  CONTENT_TRASH_KINDS,
+  TRASH_AUDIT_ACTIONS,
+  TRASH_AUDIT_TARGET,
+  contentTrashTotal,
+  emptyContentTrashCounts,
+  summarizeContentTrash,
+  type ContentTrashKind,
+} from "@/lib/trash/plan";
+
+/**
+ * ลบถาวร "เนื้อหาในถังขยะ" ที่พ้นระยะเก็บ (รอบที่ 170) — **ชั้นที่แตะฐานข้อมูล**
+ *
+ * ที่มา: สินค้า/เมนูอาหาร/ข่าว ถูกย้ายเข้าถังขยะได้ตั้งแต่รอบที่ 123/135/139 แต่ **ไม่มีตัวลบอัตโนมัติ**
+ * ⇒ ของที่ผู้ดูแลลบแล้วค้างในตารางตลอดไป (กู้คืนได้ก็จริง แต่ไม่มีใครเก็บกวาด)
+ * รอบนี้ทำให้ใช้กติกาเดียวกับถังขยะภาพ/พรีเซ็ต: `deleted_at` เก่ากว่า `TRASH_RETENTION_DAYS` (30) = ลบถาวร
+ *
+ * กติกาที่ตั้งใจ (เหมือน `lib/trash/repository.ts`)
+ * - **ประตูอยู่ที่ SQL**: ทุกคำสั่งมี `deleted_at is not null` ⇒ ของที่ยังใช้งานอยู่ถูกลบไม่ได้เด็ดขาด
+ * - `dryRun` ใช้คำสั่งรูปแบบเดียวกัน (count แทน delete) ⇒ ตัวเลขบนจอตรงกับสิ่งที่จะถูกลบจริง
+ * - **ไม่มี DB = คืน `null` ไม่โยน error** (การลบต้องไม่ทำให้ระบบหลักพัง)
+ * - ชื่อตารางมาจากค่าคงที่ในโค้ด (ไม่รับจากผู้ใช้) ⇒ ไม่มีทางกลายเป็น SQL injection
+ * - ลบสินค้าแล้ว **ส่วนผสมถูกลบตาม** (`product_ingredient ... on delete cascade`)
+ * - บันทึก audit (`trash-purge` · target `trash-content`) เมื่อลบจริงและมีของถูกลบ
+ */
+
+/** ชื่อตารางของแต่ละชนิด — คีย์คือ `ContentTrashKind` ที่ตรวจแล้วเท่านั้น */
+const CONTENT_TABLES: Readonly<Record<ContentTrashKind, "product" | "recipe" | "news">> = {
+  product: "product",
+  recipe: "recipe",
+  news: "news",
+};
+
+export type ContentTrashPurgeReport = {
+  readonly at: string;
+  readonly dryRun: boolean;
+  readonly counts: Readonly<Record<ContentTrashKind, number>>;
+  readonly total: number;
+};
+
+/**
+ * ลบถาวรของในถังขยะเนื้อหาที่พ้นระยะเก็บ — `dryRun` = นับเฉย ๆ
+ * คืน `null` = ยังไม่ได้ตั้งฐานข้อมูล
+ */
+export async function purgeExpiredContentTrash(
+  options: { readonly now?: Date; readonly dryRun?: boolean } = {},
+): Promise<ContentTrashPurgeReport | null> {
+  if (!isDatabaseConfigured()) return null;
+
+  const now = options.now ?? new Date();
+  const dryRun = options.dryRun === true;
+  const cutoffIso = trashCutoffIsoFor(now);
+  const counts = emptyContentTrashCounts();
+  const pool = getPool();
+
+  for (const kind of CONTENT_TRASH_KINDS) {
+    const table = CONTENT_TABLES[kind];
+    if (dryRun) {
+      const { rows } = await pool.query<{ n: number }>(
+        `select count(*)::int as n from ${table} where deleted_at is not null and deleted_at < $1`,
+        [cutoffIso],
+      );
+      counts[kind] = rows[0]?.n ?? 0;
+    } else {
+      const result = await pool.query(`delete from ${table} where deleted_at is not null and deleted_at < $1`, [cutoffIso]);
+      counts[kind] = result.rowCount ?? 0;
+    }
+  }
+
+  const total = contentTrashTotal(counts);
+  if (!dryRun && total > 0) {
+    await recordAudit({
+      action: TRASH_AUDIT_ACTIONS.purge,
+      actorEmail: null,
+      target: `${TRASH_AUDIT_TARGET}-content`,
+      detail: summarizeContentTrash(counts),
+    });
+  }
+
+  return { at: now.toISOString(), dryRun, counts, total };
+}
