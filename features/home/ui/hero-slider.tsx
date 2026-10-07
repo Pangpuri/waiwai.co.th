@@ -40,6 +40,16 @@ type HeroSliderLabels = {
   readonly watermarkBadge: string;
 };
 
+/** วิวการ์ดแคมเปญที่แปลภาษาแล้ว (ส่งจาก hero.tsx) — รอบที่ 188 */
+export type HeroCardView = {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly ctaLabel: string;
+  readonly ctaHref: string;
+  readonly position: "left" | "center" | "right";
+};
+
 type HeroSliderProps = {
   readonly slides: readonly HeroSlideView[];
   readonly labels: HeroSliderLabels;
@@ -47,9 +57,11 @@ type HeroSliderProps = {
   readonly effect?: HeroEffect;
   /** เวลาต่อภาพ (มิลลิวินาที) — ค่ามาจากหลังบ้าน */
   readonly intervalMs?: number;
+  /** การ์ดแคมเปญของแต่ละสไลด์ (คีย์ = id สไลด์ · ข้อความแปลภาษาแล้ว) — รอบที่ 188 */
+  readonly heroCardViews?: Readonly<Record<string, readonly HeroCardView[]>>;
 };
 
-export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_SLIDE_INTERVAL_MS }: HeroSliderProps) {
+export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_SLIDE_INTERVAL_MS, heroCardViews = {} }: HeroSliderProps) {
   const total = slides.length;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -67,6 +79,10 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
 
     return () => window.clearInterval(timer);
   }, [paused, total, intervalMs]);
+
+  /* การ์ดของสไลด์ที่กำลังแสดง (ถ้ามี) */
+  const activeSlideId = slides[index]?.id ?? "";
+  const activeCards = heroCardViews[activeSlideId] ?? [];
 
   function goTo(next: number) {
     setIndex(advanceIndex(next, total));
@@ -114,6 +130,33 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
         })}
       </div>
 
+        {/* การ์ดแคมเปญของสไลด์ที่กำลังแสดง (รอบที่ 188) — ตำแหน่งตามที่ตั้งในหลังบ้าน */}
+        {activeCards.length > 0 ? (
+          <div
+            className={[
+              "pointer-events-none absolute inset-0 z-10 flex p-4 sm:p-6",
+              activeCards[0]?.position === "center"
+                ? "items-start justify-center"
+                : activeCards[0]?.position === "right"
+                  ? "items-start justify-end"
+                  : "items-start justify-start",
+            ].join(" ")}
+          >
+            <div className="flex w-full max-w-sm flex-col gap-2 rounded-2xl bg-surface/95 p-4 text-fg shadow-lg sm:max-w-md">
+              {activeCards.map((card) => (
+                <div key={card.id} className="flex flex-col gap-1">
+                  <p className="text-fg text-base font-bold sm:text-lg">{card.title}</p>
+                  {card.body.trim() === "" ? null : <p className="text-fg-muted text-xs sm:text-sm">{card.body}</p>}
+                  {card.ctaLabel.trim() === "" || card.ctaHref.trim() === "" ? null : (
+                    <a href={card.ctaHref} className="text-brand-red text-sm font-semibold underline underline-offset-2">
+                      {card.ctaLabel}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       {hasSlideControls(total) ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-8 z-20">
           <div className="container-site flex flex-wrap items-center justify-center gap-3">

@@ -5,6 +5,8 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import { HERO_CARD_HREF } from "../hero-card";
+import type { HeroCard as HeroCardData } from "@/lib/hero/cards";
+import type { HeroCardView } from "./hero-slider";
 import { DEFAULT_HERO_SETTING, type HeroSetting } from "@/lib/hero/model";
 import { HERO_SLIDES, type HeroSlideView } from "../slides";
 import { HeroCard } from "./hero-card";
@@ -20,6 +22,8 @@ type HeroProps = {
   readonly dbSlides?: readonly HeroSlideView[];
   /** เอฟเฟค + ความเร็วจากหลังบ้าน (รอบที่ 185) — ไม่ส่ง = ค่าเริ่มต้น (จาง 5 วิ) */
   readonly heroSetting?: HeroSetting;
+  /** การ์ดแคมเปญจากหลังบ้าน (คีย์ = id สไลด์) — รอบที่ 188 */
+  readonly heroCards?: Readonly<Record<string, readonly HeroCardData[]>>;
 };
 
 /**
@@ -37,7 +41,7 @@ type HeroProps = {
  *
  * เป็น Server Component: ประกอบข้อความ alt จากพจนานุกรมแล้วส่งข้อมูลธรรมดาเข้า Client Component
  */
-export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING }: HeroProps) {
+export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING, heroCards = {} }: HeroProps) {
   const m = messages.hero;
 
   const templateSlides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
@@ -47,6 +51,19 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
 
   /* หลังบ้านมีสไลด์ ⇒ ใช้ของหลังบ้าน · ไม่มี/อ่านไม่ได้ ⇒ เทมเพลตเดิม (พฤติกรรมเดิมเป๊ะ) */
   const slides: readonly HeroSlideView[] = dbSlides.length > 0 ? dbSlides : templateSlides;
+
+  /* แปลงการ์ดเป็นข้อความตามภาษา (ไทยเป็นหลัก · อังกฤษว่าง = ถอยไปใช้ไทย) */
+  const cardViews: Record<string, readonly HeroCardView[]> = {};
+  for (const [slideId, cards] of Object.entries(heroCards)) {
+    cardViews[slideId] = cards.map((card) => ({
+      id: card.id,
+      title: locale === "en" && card.title.en.trim() !== "" ? card.title.en : card.title.th,
+      body: locale === "en" && card.body.en.trim() !== "" ? card.body.en : card.body.th,
+      ctaLabel: locale === "en" && card.ctaLabel.en.trim() !== "" ? card.ctaLabel.en : card.ctaLabel.th,
+      ctaHref: card.ctaHref,
+      position: card.position,
+    }));
+  }
 
   return (
     <section className="relative isolate bg-bg">
@@ -61,6 +78,7 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
           slides={slides}
           effect={heroSetting.effect}
           intervalMs={heroSetting.intervalMs}
+          heroCardViews={cardViews}
           labels={{
             gallery: m.galleryLabel,
             gotoSlide: m.gotoSlide,

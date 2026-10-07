@@ -16,6 +16,7 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
+import { listLiveHeroCards } from "@/lib/hero/cards-repository";
 import { listHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -108,6 +109,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
         messages={messages}
         dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
         heroSetting={await loadHeroSetting()}
+        heroCards={await listLiveHeroCards()}
       />
       <ProductsShowcase
         locale={lang}
