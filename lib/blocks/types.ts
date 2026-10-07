@@ -161,12 +161,38 @@ type BlockBase = {
   readonly visibility?: BlockVisibility;
 };
 
+/**
+ * ภาพหนึ่งใบใน "สไลด์" ของบล็อก hero (รอบที่ 183 · เฟส 2 ส่วน (ก))
+ *
+ * `focusX`/`focusY` = จุดที่ให้อยู่กลางกรอบ (เปอร์เซ็นต์ 0–100 ของภาพ) · `zoom` = ขยายภาพ (1 = พอดีกรอบ)
+ * ⇒ สองค่านี้คือ "การครอบ/จัดตำแหน่ง" โดยไม่ต้องตัดไฟล์ภาพทิ้ง
+ * · `image = null` = ยังไม่ได้เลือกภาพ (validator เตือน · หน้าเว็บข้ามใบนั้น)
+ */
+export type HeroSlideItem = {
+  readonly id: string;
+  readonly image: BlockMedia | null;
+  readonly focusX: number;
+  readonly focusY: number;
+  readonly zoom: number;
+};
+
+/** จำนวนภาพสูงสุดในสไลด์ hero — เกินนี้ผู้ชมจำไม่ได้ว่าเห็นอะไรไปแล้ว */
+export const MAX_HERO_SLIDES = 6;
+export const HERO_ZOOM_MIN = 1;
+export const HERO_ZOOM_MAX = 2;
+
 export type HeroBlock = BlockBase & {
   readonly type: "hero";
   readonly title: LocalizedValue;
   readonly subtitle: LocalizedValue;
   readonly note: LocalizedValue;
+  /** ภาพเดี่ยว (ของเดิม · ใช้เมื่อ `slides` ว่าง) — ยังเก็บไว้ให้เอกสารรุ่นก่อนทำงานเหมือนเดิม */
   readonly image: BlockMedia | null;
+  /**
+   * ภาพสไลด์ (รอบที่ 183) — **ว่าง/ไม่ระบุ = ใช้ `image` เดี่ยวเหมือนเดิมเป๊ะ**
+   * มีมากกว่า 1 ใบ = หน้าเว็บหมุนภาพให้เอง (เฟส (ข)) · ใบแรกแสดงก่อน
+   */
+  readonly slides?: readonly HeroSlideItem[];
   readonly ctaLabel: LocalizedValue;
   readonly ctaHref: string;
 };

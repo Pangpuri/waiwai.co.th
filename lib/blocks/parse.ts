@@ -30,6 +30,9 @@ import {
   isPageLayout,
   nextPrefixedId,
   readVisibility,
+  HERO_ZOOM_MAX,
+  HERO_ZOOM_MIN,
+  MAX_HERO_SLIDES,
   type Block,
   type BlockCard,
   type BlockColumn,
@@ -39,6 +42,7 @@ import {
   type BlockMedia,
   type BlockStyle,
   type BlockTableRow,
+  type HeroSlideItem,
   type JobBoardItem,
   type PageLayout,
   type RecipeCardItem,
@@ -304,6 +308,55 @@ function readTableRows(
     );
     return { id, cells: normalized };
   });
+}
+
+/**
+ * อ่าน "สไลด์" ของบล็อก hero (รอบที่ 183 · เฟส 2 ส่วน (ก)) — ฟิลด์เสริม
+ * · ไม่ส่งมา/ไม่ใช่อาร์เรย์ = `[]` ⇒ เอกสารเดิมไม่เปลี่ยนพฤติกรรม (ยังใช้ `image` เดี่ยว)
+ * · เกิน `MAX_HERO_SLIDES` = ตัดส่วนเกินพร้อม **รายงาน** (ไม่ทำให้เอกสารใช้ไม่ได้)
+ * · `focusX`/`focusY` ถูกบีบให้อยู่ใน 0–100 · `zoom` อยู่ใน 1–2 (ค่าที่เพี้ยนใช้ค่าที่ปลอดภัย ไม่โยน error)
+ */
+function readHeroSlides(entry: Record<string, unknown>, path: string, problems: string[]): readonly HeroSlideItem[] {
+  const raw = entry["slides"];
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    problems.push(`${path}.slides: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (raw.length > MAX_HERO_SLIDES) {
+    problems.push(`${path}.slides: เกิน ${MAX_HERO_SLIDES} ภาพ — ส่วนที่เกินถูกตัดออก`);
+  }
+
+  const slides: HeroSlideItem[] = [];
+  raw.slice(0, MAX_HERO_SLIDES).forEach((item, index) => {
+    const itemPath = `${path}.slides[${index}]`;
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      problems.push(`${itemPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+    const record = item as Record<string, unknown>;
+    slides.push({
+      id: readString(record, "id", `${itemPath}.id`, problems),
+      image: readMedia(record, "image", `${itemPath}.image`, problems),
+      focusX: clampHeroPercent(record["focusX"], 50),
+      focusY: clampHeroPercent(record["focusY"], 50),
+      zoom: clampHeroZoom(record["zoom"]),
+    });
+  });
+
+  return slides;
+}
+
+/** เปอร์เซ็นต์จุดโฟกัส (0–100) — ค่าที่ไม่ใช่ตัวเลขใช้ค่ากลาง (ภาพยังเห็นครบ) */
+function clampHeroPercent(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+/** ระดับซูม (1–2) — ค่าที่ไม่ใช่ตัวเลขถือว่า "ไม่ซูม" */
+function clampHeroZoom(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return HERO_ZOOM_MIN;
+  return Math.min(HERO_ZOOM_MAX, Math.max(HERO_ZOOM_MIN, Math.round(value * 100) / 100));
 }
 
 /** อ่านภาพในแกลเลอรี — ใบที่ยังไม่เลือกภาพ (`image = null`) ยังเก็บไว้ได้ (validator เตือนเอง) */
@@ -629,6 +682,7 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         subtitle: readText(entry, "subtitle", `${path}.subtitle`, problems),
         note: readText(entry, "note", `${path}.note`, problems),
         image: readMedia(entry, "image", `${path}.image`, problems),
+        slides: readHeroSlides(entry, path, problems),
         ctaLabel: readText(entry, "ctaLabel", `${path}.ctaLabel`, problems),
         ctaHref: readString(entry, "ctaHref", `${path}.ctaHref`, problems),
       };

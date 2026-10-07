@@ -1,10 +1,13 @@
 import {
+  HERO_ZOOM_MAX,
+  HERO_ZOOM_MIN,
   MAX_BLOCKS_PER_COLUMN,
   MAX_BLOCKS_PER_PAGE,
   MAX_BLOCKS_TOTAL,
   MAX_CARDS,
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
+  MAX_HERO_SLIDES,
   MAX_JOB_ITEMS,
   MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
@@ -18,6 +21,7 @@ import {
   emptyText,
   equalColumnWidth,
   findBlockLocation,
+  isRowBlock,
   layoutOf,
   nextBlockIdFrom,
   nextColumnId,
@@ -31,6 +35,7 @@ import {
   type BlockStyle,
   type BlockType,
   type BlockVisibility,
+  type HeroSlideItem,
   type PageLayout,
 } from "@/lib/blocks/types";
 
@@ -300,6 +305,130 @@ export function setCardImage(
     const merged = { ...base, ...patch };
     card.image = merged.path.trim() === "" ? null : merged;
   });
+}
+
+/* ── สไลด์ของบล็อก "แบนเนอร์เปิดหน้า" (รอบที่ 183 · เฟส 2 ส่วน (ก)) ─────────────
+   ตรรกะล้วน: เพิ่ม/ลบ/สลับลำดับ · ตั้งภาพ/จุดโฟกัส/ซูม · เพดานมาจากทะเบียนกลาง
+   ⚠️ ทั้งชุดใช้สไตล์เดียวกับที่อื่นในไฟล์นี้: `withBlock(document, id, mutate)` = "แก้ของที่ถูก clone แล้ว"
+      (ไม่ใช่คืนออบเจ็กต์ใหม่) — เขียนผิดแล้วจะเงียบ ⇒ มีเทสต์คุมทุกตัวที่ scripts/test-hero-slides.ts
+   ⚠️ ไม่มีสไลด์ = หน้าเว็บใช้ `image` เดี่ยวเหมือนเดิม (เอกสารเก่าไม่เปลี่ยนพฤติกรรม)
+*/
+
+/** อ่านสไลด์ของบล็อก (คืน `null` ถ้าไม่ใช่ hero · คืน `[]` ถ้าเป็น hero แต่ยังไม่มีสไลด์) */
+export function heroSlidesOf(document: BlockDocument, blockId: string): readonly HeroSlideItem[] | null {
+  /* บล็อกซ้อนได้ 1 ชั้น (row → column) — เดินแบบเดียวกับ findBlockLocation */
+  const flat: Block[] = [...document.blocks];
+  for (const row of document.blocks) {
+    if (isRowBlock(row)) for (const column of row.columns) flat.push(...column.blocks);
+  }
+  const block = flat.find((entry) => entry.id === blockId) ?? null;
+  if (block === null || block.type !== "hero") return null;
+  return block.slides ?? [];
+}
+
+/** รหัสสไลด์ใหม่ — ไล่เลขจากของเดิม กันซ้ำหลังลบแล้วเพิ่ม */
+export function newHeroSlideId(existing: readonly HeroSlideItem[]): string {
+  let index = existing.length + 1;
+  const used = new Set(existing.map((slide) => slide.id));
+  while (used.has(`slide-${index}`)) index += 1;
+  return `slide-${index}`;
+}
+
+/** แก้รายการสไลด์ของบล็อก hero ผ่านฟังก์ชันบริสุทธิ์ (ไม่แตะบล็อกอื่น/ชนิดอื่น) */
+function withHeroSlides(
+  document: BlockDocument,
+  blockId: string,
+  update: (slides: readonly HeroSlideItem[]) => readonly HeroSlideItem[],
+): BlockDocument {
+  const current = heroSlidesOf(document, blockId);
+  if (current === null) return document;
+  const next = update(current);
+  if (next === current) return document;
+
+  return withBlock(document, blockId, (block) => {
+    if (block.type !== "hero") return;
+    (block as { slides?: readonly HeroSlideItem[] }).slides = next;
+  });
+}
+
+/** เพิ่มสไลด์ว่าง (ภาพยังไม่เลือก · โฟกัสกลางภาพ · ไม่ซูม) — เกินเพดาน = ไม่ทำอะไร */
+export function addHeroSlide(document: BlockDocument, blockId: string): BlockDocument {
+  return withHeroSlides(document, blockId, (slides) =>
+    slides.length >= MAX_HERO_SLIDES
+      ? slides
+      : [...slides, { id: newHeroSlideId(slides), image: null, focusX: 50, focusY: 50, zoom: HERO_ZOOM_MIN }],
+  );
+}
+
+export function removeHeroSlide(document: BlockDocument, blockId: string, slideId: string): BlockDocument {
+  return withHeroSlides(document, blockId, (slides) => {
+    if (!slides.some((slide) => slide.id === slideId)) return slides;
+    return slides.filter((slide) => slide.id !== slideId);
+  });
+}
+
+/** ย้ายสไลด์ขึ้น/ลงตาม `delta` (±1) — หลุดขอบ = ไม่ทำอะไร */
+export function moveHeroSlide(document: BlockDocument, blockId: string, slideId: string, delta: number): BlockDocument {
+  return withHeroSlides(document, blockId, (slides) => {
+    const from = slides.findIndex((slide) => slide.id === slideId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= slides.length) return slides;
+    const next = [...slides];
+    const moved = next[from];
+    const target = next[to];
+    if (moved === undefined || target === undefined) return slides;
+    next[from] = target;
+    next[to] = moved;
+    return next;
+  });
+}
+
+/** ตั้งภาพของสไลด์ — `path` ว่าง = ล้างภาพออก (คง alt/watermark เดิมไว้ถ้าไม่ได้ส่งมา) */
+export function setHeroSlideImage(
+  document: BlockDocument,
+  blockId: string,
+  slideId: string,
+  patch: { path?: string; altTh?: string; altEn?: string; hasWatermark?: boolean },
+): BlockDocument {
+  return withHeroSlides(document, blockId, (slides) =>
+    slides.map((slide) => {
+      if (slide.id !== slideId) return slide;
+      const path = (patch.path ?? "").trim();
+      if (path === "") return { ...slide, image: null };
+      return {
+        ...slide,
+        image: {
+          path,
+          altTh: patch.altTh ?? slide.image?.altTh ?? "",
+          altEn: patch.altEn ?? slide.image?.altEn ?? "",
+          hasWatermark: patch.hasWatermark ?? slide.image?.hasWatermark ?? false,
+        },
+      };
+    }),
+  );
+}
+
+/** ตั้งจุดโฟกัส (ค่าถูกบีบให้อยู่ใน 0–100 เหมือนตอนอ่านจากฐานข้อมูล) */
+export function setHeroSlideFocus(
+  document: BlockDocument,
+  blockId: string,
+  slideId: string,
+  focusX: number,
+  focusY: number,
+): BlockDocument {
+  const x = Math.min(100, Math.max(0, Math.round(focusX)));
+  const y = Math.min(100, Math.max(0, Math.round(focusY)));
+  return withHeroSlides(document, blockId, (slides) =>
+    slides.map((slide) => (slide.id === slideId ? { ...slide, focusX: x, focusY: y } : slide)),
+  );
+}
+
+/** ตั้งระดับซูม (บีบให้อยู่ใน 1–2 เหมือนตอนอ่านจากฐานข้อมูล) */
+export function setHeroSlideZoom(document: BlockDocument, blockId: string, slideId: string, zoom: number): BlockDocument {
+  const value = Number.isFinite(zoom) ? Math.min(HERO_ZOOM_MAX, Math.max(HERO_ZOOM_MIN, Math.round(zoom * 100) / 100)) : HERO_ZOOM_MIN;
+  return withHeroSlides(document, blockId, (slides) =>
+    slides.map((slide) => (slide.id === slideId ? { ...slide, zoom: value } : slide)),
+  );
 }
 
 /* ── คอลัมน์ของบล็อก "แถว" (X1.1) ───────────────────────────────────────── */
