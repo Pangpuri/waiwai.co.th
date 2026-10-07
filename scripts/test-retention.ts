@@ -298,3 +298,14 @@ test("retention: สคริปต์ db:purge มีไว้ตั้ง cron
   assert.ok(script.includes("isDatabaseConfigured"), "ต้องไม่ทำงานถ้าไม่มี DATABASE_URL");
   assert.ok(!script.includes("postgres://"), "ห้ามมี connection string ในโค้ด");
 });
+
+/* ── รอบที่ 174: การ์ดระยะเก็บต้องโชว์ยอดถังขยะเนื้อหาที่จะถูกลบด้วย ───────────── */
+
+test("retention: การ์ดโชว์ยอดถังขยะเนื้อหาที่จะถูกลบ (ไม่ปนกับข้อมูลส่วนบุคคล)", () => {
+  const purge = readFileSync(path.join(ROOT, "lib", "retention", "purge.ts"), "utf8");
+  assert.ok(purge.includes("purgeExpiredContentTrash("), "ต้องนับยอดถังขยะเนื้อหาแบบ dry run ในรอบเดียวกัน");
+  assert.ok(purge.includes("contentTrashDue"), "ต้องส่งยอดออกไปให้หน้าจอ");
+
+  const page = readFileSync(path.join(ROOT, "app", "admin", "page.tsx"), "utf8");
+  assert.ok(page.includes("retention.contentTrashDue"), "การ์ดระยะเก็บต้องแสดงยอดนี้");
+});

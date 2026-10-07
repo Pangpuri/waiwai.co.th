@@ -17,6 +17,9 @@ export const adminRetention = {
   retentionDueNow: "Due now",
   retentionDueTotal: "{count} expired rows",
   retentionNothingDue: "Nothing has expired yet",
+  /* Content trash (round 174) — not personal data, but purged in the same run */
+  retentionContentTrashNone: "Content trash (products/recipes/news): nothing due",
+  retentionContentTrashDue: "Content trash (products/recipes/news): {count} item(s) will be deleted permanently",
   retentionPurgeNow: "Delete expired data now",
   retentionPurgeWarning: "Permanent and irreversible — résumé files of expired applications are deleted too.",
   retentionDbMissing: "The database is not configured yet — DATABASE_URL is required before retention can run.",

@@ -94,13 +94,13 @@ test("news admin: ฝั่งเว็บสาธารณะต้องก�
 });
 
 test("news admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
-  /* 2 action ในไฟล์นี้ (บันทึก · ย้าย/กู้ถังขยะ) — นับแบบ >= เพราะมีการอ้างถึงในคอมเมนต์อธิบายกติกาด้วย */
+  /* 5 action ในไฟล์นี้ (บันทึก · ย้าย/กู้ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ) — นับแบบ >= เพราะมีการอ้างถึงในคอมเมนต์ด้วย */
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 4, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    4,
-    "ไฟล์นี้มี 4 action (บันทึก · ถังขยะ · อัปโหลดภาพ · กู้คืนประวัติ)",
+    5,
+    "ไฟล์นี้มี 5 action (บันทึก · ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
@@ -269,4 +269,31 @@ test("news: หน้าข่าวสาธารณะเรียงตา�
     repo.includes("when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc"),
     "ค่าเริ่มต้นต้องไม่เปลี่ยนลำดับข่าวเดิม",
   );
+});
+
+/* ── รอบที่ 174: ลบข่าวถาวรจากถังขยะ (ประตูอยู่ที่ SQL) ───────────────────────── */
+
+test("news admin: ลบถาวรได้เฉพาะของในถัง + มีปุ่มเฉพาะแท็บถังขยะ", () => {
+  const repo = readFileSync("lib/news/repository.ts", "utf8");
+  assert.ok(
+    repo.includes("delete from news where id = $1 and deleted_at is not null"),
+    "deleteNewsForever ต้องมีประตู 'ต้องอยู่ในถัง' ที่ SQL (fail-closed)",
+  );
+
+  const actions = readFileSync("app/admin/news/actions.ts", "utf8");
+  assert.ok(actions.includes("deleteNewsForeverAction"), "ต้องมี Server Action ลบถาวร");
+  assert.ok(actions.includes('requireAdminUser("content")'), "ต้องตรวจสิทธิ์ก่อนลบ");
+  assert.ok(actions.includes('action: "news-delete"'), "ต้องมี audit log ของการลบถาวร");
+
+  const page = readFileSync("app/admin/news/page.tsx", "utf8");
+  assert.ok(page.includes("deleteNewsForeverAction"), "ปุ่มลบถาวรต้องอยู่ในหน้ารายการ");
+  assert.ok(page.includes("m.newsAdminDeleteForeverWarning"), "ต้องมีคำเตือน 'ลบแล้วกู้คืนไม่ได้'");
+  assert.ok(
+    page.includes("action={deleteNewsForeverAction}") && page.includes("{item.trashed ? ("),
+    "ปุ่มลบถาวรต้องแสดงเฉพาะของที่อยู่ในถัง",
+  );
+
+  /* ป้ายเหตุการณ์ใน audit log ต้องมี (กันหน้าจอโชว์รหัสดิบ) */
+  const labels = readFileSync("features/admin/audit-labels.ts", "utf8");
+  assert.ok(labels.includes('"news-delete"'), "ต้องมีป้ายเหตุการณ์ news-delete");
 });

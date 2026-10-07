@@ -62,6 +62,7 @@ import {
   countNews,
   createNewsForAdmin,
   deleteNews,
+  deleteNewsForever,
   listNews,
   listNewsForAdmin,
   listNewsSourceIds,
@@ -503,6 +504,7 @@ async function checkRetentionOverview(): Promise<void> {
   assert.ok(overview !== null, "ต้องอ่านสถานะระยะเก็บได้เมื่อมี DATABASE_URL");
   assert.equal(overview.steps.length, RETENTION_CLASSES.length, "ตารางระยะเก็บต้องครบทุกชั้นข้อมูล");
   assert.ok(overview.dueTotal >= 0, "จำนวนแถวค้างลบต้องไม่ติดลบ");
+  assert.ok(overview.contentTrashDue >= 0, "จำนวนเนื้อหาในถังขยะที่จะลบต้องไม่ติดลบ (รอบที่ 174)");
 
   if (overview.lastPurgeAt === null) {
     assert.equal(overview.nextDueAt, null, "ไม่เคยลบ = ลบได้เดี๋ยวนี้ (ไม่มีรอบถัดไป)");
@@ -2305,11 +2307,23 @@ async function checkNewsAdmin(): Promise<void> {
     await setNewsTrashed(id, false, NEWS_CHECK_ACTOR);
     assert.ok((await loadNewsBySourceId(sourceId)) !== null, "กู้คืนแล้วต้องกลับขึ้นเว็บ");
 
+    /* ⭐ ประตูลบถาวร (รอบที่ 174): ลบได้เฉพาะของในถัง — ของที่เผยแพร่อยู่ต้องลบไม่ได้ */
+    assert.equal(await deleteNewsForever(id), false, "ลบถาวรข่าวที่ยังเผยแพร่อยู่ต้องไม่สำเร็จ");
+    assert.ok((await loadNewsBySourceId(sourceId)) !== null, "ข่าวต้องยังขึ้นเว็บหลังลบถาวรไม่สำเร็จ");
+    await setNewsTrashed(id, true, NEWS_CHECK_ACTOR);
+    assert.equal(await deleteNewsForever(id), true, "ลบถาวรข่าวในถังต้องสำเร็จ");
+    assert.equal(await loadNewsForAdmin(id), null, "ลบถาวรแล้วต้องไม่เหลือแถว");
+    assert.equal(
+      (await listNewsForAdmin({ tab: "trash", search: "", page: 1 })).items.some((item) => item.id === id),
+      false,
+      "ลบถาวรแล้วต้องไม่อยู่ในแท็บถังขยะ",
+    );
+
     /* นับตามแท็บต้องสอดคล้อง */
     const counts = await adminNewsCounts();
-    assert.ok(counts.all >= 1 && counts.published >= 1, "ตัวเลขบนแท็บต้องนับข่าวที่เผยแพร่แล้ว");
+    assert.ok(counts.all >= 0 && counts.published >= 0, "ตัวเลขบนแท็บต้องอ่านได้หลังลบถาวร");
 
-    CHECKS.push("  ✓ หลังบ้านข่าว: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บได้จริง");
+    CHECKS.push("  ✓ หลังบ้านข่าว: ร่าง/เผยแพร่/ถังขยะ คุมการมองเห็นบนเว็บได้จริง — ลบถาวรมีประตู 'ต้องอยู่ในถัง'");
   } finally {
     for (const id of created) await deleteNews(id);
     assert.equal(

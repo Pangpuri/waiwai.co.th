@@ -68,6 +68,10 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   auditNewsSave: "News saved",
   auditNewsTrash: "News moved to trash",
   auditNewsRestore: "News restored",
+  /* Delete forever from trash (round 174) */
+  auditNewsDelete: "News deleted forever",
+  newsAdminDeleteForever: "Delete forever",
+  newsAdminDeleteForeverWarning: "Deleting forever cannot be undone (news images stay in the library)",
   newsAdminCoverAlt: "News cover image",
   newsAdminBlocksEmpty: "No content yet — start with the buttons below",
   newsAdminBlockParagraph: "Paragraph",

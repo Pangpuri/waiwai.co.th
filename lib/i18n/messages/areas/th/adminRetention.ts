@@ -17,6 +17,9 @@ export const adminRetention = {
   retentionDueNow: "ถึงรอบลบแล้ว",
   retentionDueTotal: "มี {count} แถวที่หมดอายุ",
   retentionNothingDue: "ยังไม่มีข้อมูลที่หมดอายุ",
+  /* ถังขยะเนื้อหา (รอบที่ 174) — ไม่ใช่ข้อมูลส่วนบุคคล แต่ถูกลบในรอบเดียวกัน */
+  retentionContentTrashNone: "ถังขยะเนื้อหา (สินค้า/เมนู/ข่าว): ไม่มีรายการที่พ้นกำหนด",
+  retentionContentTrashDue: "ถังขยะเนื้อหา (สินค้า/เมนู/ข่าว) จะถูกลบถาวรอีก {count} รายการ",
   retentionPurgeNow: "ลบข้อมูลที่หมดอายุตอนนี้",
   retentionPurgeWarning: "ลบถาวรและกู้คืนไม่ได้ — ไฟล์เรซูเม่ของใบสมัครที่หมดอายุถูกลบไปด้วย",
   retentionDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — ต้องมี DATABASE_URL ก่อนจึงจะลบตามระยะเก็บได้",

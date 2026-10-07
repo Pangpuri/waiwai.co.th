@@ -49,6 +49,11 @@ export type RetentionOverview = {
   /** แถวที่หมดอายุและจะถูกลบในรอบถัดไป (อ่านล้วน) */
   readonly due: PurgeCounts;
   readonly dueTotal: number;
+  /**
+   * จำนวน **เนื้อหาในถังขยะ** (สินค้า/เมนูอาหาร/ข่าว) ที่พ้นกำหนดและจะถูกลบถาวรในรอบถัดไป (รอบที่ 174)
+   * ⚠️ ไม่ใช่ข้อมูลส่วนบุคคล ⇒ ไม่รวมใน `due`/`dueTotal` (คนละนโยบายกับตารางด้านบน)
+   */
+  readonly contentTrashDue: number;
   /** ตารางระยะเก็บทั้งหมด — ใช้ทั้งบนหน้าจอหลังบ้านและหน้า `/privacy` */
   readonly steps: readonly PurgeStep[];
 };
@@ -233,7 +238,10 @@ export async function retentionOverview(options: { readonly now?: Date } = {}): 
 
   const now = options.now ?? new Date();
   const last = await lastPurgeAt();
-  const due = await purgeExpired({ now, dryRun: true });
+  const [due, contentTrash] = await Promise.all([
+    purgeExpired({ now, dryRun: true }),
+    purgeExpiredContentTrash({ now, dryRun: true }),
+  ]);
   const counts = due?.counts ?? emptyCounts();
 
   return {
@@ -241,6 +249,8 @@ export async function retentionOverview(options: { readonly now?: Date } = {}): 
     nextDueAt: nextPurgeDueAt(last)?.toISOString() ?? null,
     due: counts,
     dueTotal: totalOf(counts),
+    /* ถังขยะเนื้อหา (รอบที่ 174) — ลบในรอบเดียวกัน แต่ไม่ใช่ข้อมูลส่วนบุคคล */
+    contentTrashDue: contentTrash?.total ?? 0,
     steps: planPurge(now),
   };
 }

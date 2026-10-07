@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { trashNewsAction } from "@/app/admin/news/actions";
+import { deleteNewsForeverAction, trashNewsAction } from "@/app/admin/news/actions";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -207,6 +207,20 @@ export default async function AdminNewsPage({
                           {item.trashed ? m.newsAdminRestore : m.newsAdminMoveToTrash}
                         </button>
                       </form>
+
+                      {/* ลบถาวร (รอบที่ 174) — มีเฉพาะของที่อยู่ในถังแล้ว + เตือนให้ชัด (กู้คืนไม่ได้) */}
+                      {item.trashed ? (
+                        <form action={deleteNewsForeverAction} className="flex flex-col gap-0.5">
+                          <input type="hidden" name="id" value={item.id} />
+                          <button
+                            type="submit"
+                            className="border-brand-red text-brand-red hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                          >
+                            {m.newsAdminDeleteForever}
+                          </button>
+                          <span className="text-fg-muted text-[11px]">{m.newsAdminDeleteForeverWarning}</span>
+                        </form>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

@@ -65,6 +65,10 @@ export const adminNews = {
   auditNewsSave: "บันทึกข่าว",
   auditNewsTrash: "ย้ายข่าวเข้าถังขยะ",
   auditNewsRestore: "กู้คืนข่าว",
+  /* ลบถาวรจากถังขยะ (รอบที่ 174) */
+  auditNewsDelete: "ลบข่าวถาวร",
+  newsAdminDeleteForever: "ลบถาวร",
+  newsAdminDeleteForeverWarning: "ลบถาวรแล้วกู้คืนไม่ได้ (ภาพในข่าวยังอยู่ในคลังภาพ)",
   newsAdminBlocksEmpty: "ยังไม่มีเนื้อหา — เริ่มจากกดปุ่มด้านล่าง",
   newsAdminBlockParagraph: "ย่อหน้า",
   newsAdminBlockHeading: "หัวข้อย่อย",

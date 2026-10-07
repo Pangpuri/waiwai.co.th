@@ -45,6 +45,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "news-save": strings.auditNewsSave,
     "news-trash": strings.auditNewsTrash,
     "news-restore": strings.auditNewsRestore,
+    "news-delete": strings.auditNewsDelete,
     "recipe-save": strings.auditRecipeSave,
     "recipe-trash": strings.auditRecipeTrash,
     "recipe-restore": strings.auditRecipeRestore,

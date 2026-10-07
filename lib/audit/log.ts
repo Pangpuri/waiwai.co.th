@@ -30,6 +30,8 @@ export type AuditAction =
   | "news-save"
   | "news-trash"
   | "news-restore"
+  /* ลบข่าวถาวรจากถังขยะ (รอบที่ 174) */
+  | "news-delete"
   /* เมนูอาหาร (รอบที่ 135) */
   | "recipe-save"
   | "recipe-trash"

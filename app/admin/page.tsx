@@ -203,6 +203,13 @@ export default async function AdminHomePage() {
                 : strings.retentionDueTotal.replace("{count}", String(retention.dueTotal))}
             </p>
 
+            {/* ถังขยะเนื้อหา (รอบที่ 174) — ไม่ใช่ข้อมูลส่วนบุคคล (คนละนโยบาย) แต่ลบในรอบเดียวกัน */}
+            <p className="text-fg-muted text-xs">
+              {retention.contentTrashDue === 0
+                ? strings.retentionContentTrashNone
+                : strings.retentionContentTrashDue.replace("{count}", String(retention.contentTrashDue))}
+            </p>
+
             <form action={purgeRetentionNowAction} className="flex flex-col gap-2">
               <button
                 type="submit"

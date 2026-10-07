@@ -14,6 +14,7 @@ import { storeImageFile } from "@/lib/media/upload";
 import { parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
 import {
   createNewsForAdmin,
+  deleteNewsForever,
   loadNewsForAdmin,
   setNewsTrashed,
   updateNewsForAdmin,
@@ -132,6 +133,30 @@ export async function trashNewsAction(formData: FormData): Promise<void> {
     actorEmail: user.email,
     target: `news:${id}`,
     detail: trashed ? "moved-to-trash" : "restored",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+}
+
+/**
+ * ลบข่าว **ถาวรจากถังขยะ** (รอบที่ 174) — ใช้ได้เฉพาะของที่อยู่ในถังแล้ว
+ *
+ * ⚠️ **ประตูไม่ได้อยู่ที่ UI**: `deleteNewsForever()` บังคับ `deleted_at is not null` ที่ SQL
+ *    ⇒ ยิงฟอร์มลบข่าวที่ยังเผยแพร่อยู่ = ไม่มีอะไรเกิดขึ้น (fail-closed · พิสูจน์ใน `check:db`)
+ */
+export async function deleteNewsForeverAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id").trim();
+  if (id === "" || !isDatabaseConfigured()) return;
+
+  const deleted = await deleteNewsForever(id);
+  if (!deleted) return;
+
+  await recordAudit({
+    action: "news-delete",
+    actorEmail: user.email,
+    target: `news:${id}`,
+    detail: "permanent",
   });
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");

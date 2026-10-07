@@ -540,3 +540,19 @@ export async function setNewsTrashed(id: string, trashed: boolean, actor: string
     actor,
   ]);
 }
+
+/**
+ * ลบข่าว **ถาวรจากถังขยะ** (รอบที่ 174) — ใช้เฉพาะหลังบ้าน
+ *
+ * ⚠️ **ประตูอยู่ที่ SQL เอง**: `and deleted_at is not null` ⇒ ข่าวที่ยังใช้งานอยู่ลบไม่ได้
+ *    แม้ action จะถูกเรียกตรง ๆ (fail-closed · เทสต์ได้ที่ `check:db` วงจรข่าวหลังบ้าน)
+ *    หลักเดียวกับ `deleteProductForever()` (รอบ 139) / `deleteRecipeForever()` (รอบ 139)
+ * คืน `true` = ลบจริง 1 แถว · `false` = ไม่เข้าเงื่อนไข (ยังไม่เข้า ถังขยะ/ไม่มีแถว)
+ *
+ * ⚠️ ตัวลบอัตโนมัติ (`purgeExpiredContentTrash` รอบ 170) ก็ลบจากถังเหมือนกัน
+ *    ⇒ ปุ่มนี้มีไว้ให้ผู้ดูแล "ลบทันที" ไม่ต้องรอ 30 วัน
+ */
+export async function deleteNewsForever(id: string): Promise<boolean> {
+  const result = await getPool().query("delete from news where id = $1 and deleted_at is not null", [id]);
+  return (result.rowCount ?? 0) > 0;
+}
