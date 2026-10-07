@@ -24,7 +24,8 @@ const MENU_PAGE_PATHS: Readonly<Record<string, string>> = {
 /**
  * หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — derive จากทะเบียนกลาง
  * ⇒ เพิ่ม/ลบหมวดที่ `lib/blocks/product-detail.ts` แล้วพาธตามมาเอง (ไม่มีสตริงซ้ำให้หลุด)
- * ⚠️ หน้าเหล่านี้ตั้ง `in_menu = false` (migration 0015) ⇒ `sitemap.xml` ข้ามให้อยู่แล้ว
+ * ⚠️ หน้าเหล่านี้ตั้ง `in_menu = false` (migration 0015) ⇒ ไม่ขึ้นเมนู แต่ **ยังขึ้น sitemap ได้**
+ *    ผ่าน `MENU_HIDDEN_INDEXABLE_PAGE_IDS` ด้านล่าง (รอบที่ 170 เปิด index แล้ว)
  */
 const PRODUCT_DETAIL_PAGE_PATHS: Readonly<Record<string, string>> = Object.fromEntries(
   PRODUCT_DETAIL_PAGE_IDS.map((id) => [id, productDetailPathOfId(id)]),
@@ -47,6 +48,17 @@ export function pathForPage(id: string): string {
   const path = PAGE_PATHS[id];
   return path === undefined || path === "" ? "/" : path;
 }
+
+/**
+ * หน้าที่ **ซ่อนจากเมนู** (`in_menu = false`) แต่ **ควรให้เครื่องค้นหาจัดทำดัชนี** (รอบที่ 170)
+ *
+ * ทำไมต้องมีรายการนี้แยกจาก `inMenu`
+ * - `inMenu` = "หน้าโผล่ในเมนูหลัก/navbar ไหม" (เรื่องการนำทาง)
+ * - sitemap = "อยากให้เครื่องค้นหาเก็บไหม" (เรื่อง SEO) — คนละแกนกัน
+ * ⇒ หน้ารายละเอียดหมวดสินค้าไม่ควรอยู่ในเมนู แต่ **ควรอยู่ใน sitemap** (มีข้อมูลสินค้าจริง)
+ * ⚠️ หน้าที่ไม่อยู่ในรายการนี้และ `inMenu = false` จะยังถูกตัดออกจาก sitemap เหมือนเดิม
+ */
+export const MENU_HIDDEN_INDEXABLE_PAGE_IDS: readonly string[] = PRODUCT_DETAIL_PAGE_IDS;
 
 export function isKnownPagePath(id: string): boolean {
   return id in PAGE_PATHS;

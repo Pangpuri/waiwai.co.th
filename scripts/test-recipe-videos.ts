@@ -206,4 +206,8 @@ test("recipes: facade ต้องโหลดวิดีโอ 'หลัง�
   const page = sourceOf("app/[lang]/recipes/page.tsx");
   assert.ok(page.includes("RecipeVideoList"), "หน้า /recipes ต้องแสดงรายการเมนูจากฐานข้อมูล");
   assert.ok(page.includes("listRecipes("), "อ่านเมนูจากฐานข้อมูลจริง");
+
+  /* รอบที่ 170 (มติเจ้าของ): มีเนื้อหาจริงแล้ว ⇒ เปิด index — ห้าม hardcode noindex กลับ */
+  assert.ok(!page.includes("robots: { index: false, follow: false }"), "ห้าม hardcode noindex (เปิด index แล้ว · รอบที่ 170)");
+  assert.ok(page.includes("withPageSeo("), "ต้องผ่าน withPageSeo ⇒ หลังบ้านสั่ง noindex กลับได้ (W2)");
 });

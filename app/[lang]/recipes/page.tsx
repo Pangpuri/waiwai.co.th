@@ -23,12 +23,13 @@ import { withPageSeo } from "@/lib/seo/page-seo";
 export const revalidate = 300;
 
 /**
- * หน้า /recipes (เมนูอาหาร) — **เลย์เอาต์ยังเป็นหน้าตัวอย่าง รอการอนุมัติ** แต่มีเมนูจริงแล้ว
+ * หน้า /recipes (เมนูอาหาร) — **มีเนื้อหาจริงแล้ว (รอบที่ 104) ⇒ เปิดให้จัดทำดัชนี (รอบที่ 170)**
  *
  * ประวัติ
  * - รอบที่ 15: ทำการ์ดตัวอย่าง 3 ใบ × 2 แถว ไว้ดูโครง layout เท่านั้น (ไม่มีข้อมูลจริง ไม่มีคำบรรยายที่แต่งขึ้น)
- * - รอบที่ 104: **มีเมนูวิดีโอจริง 18 เมนูในฐานข้อมูล** (นำเข้าจากเว็บเดิมของแบรนด์) ⇒
- *   แสดงของจริงแทนการ์ดทดสอบ (ยังคง `noindex` ไว้ — หน้าตัวอย่าง · ดู PRODUCT_ROADMAP.md § 9)
+ * - รอบที่ 104: **มีเมนูวิดีโอจริง 18 เมนูในฐานข้อมูล** (นำเข้าจากเว็บเดิมของแบรนด์) ⇒ แสดงของจริงแทนการ์ดทดสอบ
+ * - รอบที่ 170 (มติเจ้าของ 2026-10-07): **เอา `noindex` ออก** — หน้านี้มีเนื้อหาจริงครบแล้ว
+ *   · หลังบ้านยังสั่ง `noindex` กลับได้รายหน้าผ่านช่อง SEO (W2) — `withPageSeo` จะตั้ง `robots` ให้เอง
  */
 
 export async function generateMetadata({
@@ -44,8 +45,7 @@ export async function generateMetadata({
     title: { absolute: messages.recipesPage.meta.title },
     description: messages.recipesPage.meta.description,
     alternates: buildAlternates(lang, "/recipes"),
-    // หน้าตัวอย่าง ไม่ควรถูกจัดทำดัชนี
-    robots: { index: false, follow: false },
+    /* รอบที่ 170: เปิด index (เนื้อหาจริงแล้ว) · ถ้าหลังบ้านตั้ง noindex ⇒ `applySeoToMetadata` ใส่กลับให้ */
     openGraph: {
       title: messages.recipesPage.meta.title,
       description: messages.recipesPage.meta.description,

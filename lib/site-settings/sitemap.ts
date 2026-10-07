@@ -1,5 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
-import { CODE_ONLY_PAGE_PATHS, PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
+import { CODE_ONLY_PAGE_PATHS, MENU_HIDDEN_INDEXABLE_PAGE_IDS, PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/pages/paths";
 import type { PageRecord } from "@/lib/pages/model";
 
 /**
@@ -28,9 +28,17 @@ export function buildSitemapEntries(options: {
   const entries: SitemapEntry[] = [];
 
   for (const page of options.pages) {
-    /* หน้าที่ไม่ให้จัดทำดัชนี (ตั้งในหลังบ้าน หรือตั้งในโค้ด) หรือซ่อนจากเมนู = ไม่อยู่ใน sitemap */
-    if (page.seo.noindex || !page.inMenu) continue;
+    /* หน้าที่ไม่ให้จัดทำดัชนี (ตั้งในหลังบ้าน หรือตั้งในโค้ด) = ไม่อยู่ใน sitemap */
+    if (page.seo.noindex) continue;
     if (PAGES_ALWAYS_NOINDEX.includes(page.id)) continue;
+
+    /*
+      `inMenu = false` = ซ่อนจากเมนู **ไม่ใช่** "ห้าม index"
+      ⇒ หน้าที่อยู่ในทะเบียน "ซ่อนจากเมนูแต่ควร index" (เช่น หน้ารายละเอียดหมวดสินค้า · รอบที่ 170)
+        ยังถูกใส่ใน sitemap · นอกนั้นตัดออกเหมือนเดิม
+    */
+    const indexableDespiteHiddenMenu = MENU_HIDDEN_INDEXABLE_PAGE_IDS.includes(page.id);
+    if (!page.inMenu && !indexableDespiteHiddenMenu) continue;
 
     const path = pathForPage(page.id);
     for (const locale of options.locales) {

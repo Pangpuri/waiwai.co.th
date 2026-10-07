@@ -29,9 +29,9 @@ import { buildSitemapEntries } from "@/lib/site-settings/sitemap";
  * จุดที่ต้องคุม
  * 1. ทะเบียน id ↔ slug ↔ path ตรงกับหมวดจริง (`CATALOG_ITEMS`) — ไม่มีทางหลุด
  * 2. เทมเพลตต่อหมวด mirror หน้า stub เดิม (ชื่อ/ภาพ/คำอธิบาย/ปุ่มย้อนกลับ) และผ่าน parser + validator
- * 3. หน้าเว็บสาธารณะอ่านเอกสารที่เผยแพร่ได้ + ยังเป็น noindex + มีทางถอย
+ * 3. หน้าเว็บสาธารณะอ่านเอกสารที่เผยแพร่ได้ + เปิด index (รอบที่ 170) + มีทางถอย
  * 4. migration 0015 เพิ่มแถว `page` ครบ 6 หน้า (ซ่อนจากเมนู · ใช้ตัวสร้าง)
- * 5. หน้าที่ซ่อนจากเมนูต้องไม่อยู่ใน sitemap
+ * 5. หน้าที่ซ่อนจากเมนูแต่ควร index อยู่ใน sitemap (และหลุดเมื่อสั่ง noindex)
  */
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -137,13 +137,15 @@ test("product-detail: buildBlockTemplate ของหน้า detail คืน�
 
 /* ── 3) หน้าเว็บสาธารณะ ────────────────────────────────────────────────────── */
 
-test("product-detail: หน้า /products/[slug] อ่านเอกสารที่เผยแพร่ + ยัง noindex + มีทางถอย", () => {
+test("product-detail: หน้า /products/[slug] อ่านเอกสารที่เผยแพร่ + เปิด index (รอบที่ 170) + มีทางถอย", () => {
   const source = sourceOf("app/[lang]/products/[slug]/page.tsx");
 
   assert.ok(source.includes("loadLiveBlockDocument(productDetailPageId(item.slug))"), "ต้องโหลดเอกสารของหมวดนั้น");
   assert.ok(source.includes("<BlockDocumentView"), "ต้องใช้ตัวเรนเดอร์เดียวกับพรีวิว");
   assert.ok(source.includes('export const revalidate = 300;'), "ต้องเป็น ISR เหมือนหน้าอื่นที่อ่าน DB");
-  assert.ok(source.includes("robots: { index: false, follow: false }"), "ต้องคง noindex ไว้ก่อน (มติ 2026-10-05)");
+  /* รอบที่ 170 (มติเจ้าของ): เปิด index แล้ว — ห้าม hardcode noindex กลับ */
+  assert.ok(!source.includes("robots: { index: false, follow: false }"), "ห้าม hardcode noindex (เปิด index แล้ว · รอบที่ 170)");
+  assert.ok(source.includes("withPageSeo("), "ต้องผ่าน withPageSeo ⇒ หลังบ้านสั่ง noindex กลับได้ (W2)");
   assert.ok(source.includes("dynamicParams = false"), "ยังล็อก 6 หมวด (ไม่มีหน้า dynamic)");
   assert.ok(source.includes("return ("), "ต้องมีเลย์เอาต์เดิมเป็นทางถอยเมื่อยังไม่เปิดสวิตช์");
 });
@@ -168,7 +170,7 @@ test("product-detail: migration 0015 เพิ่มแถว page ครบ 6 �
 
 /* ── 5) sitemap ───────────────────────────────────────────────────────────── */
 
-test("product-detail: หน้าที่ซ่อนจากเมนู (in_menu = false) ต้องไม่อยู่ใน sitemap", () => {
+test("product-detail: หน้าที่ซ่อนจากเมนูแต่ควร index (รอบที่ 170) อยู่ใน sitemap · noindex หลุดออก", () => {
   const record: PageRecord = {
     id: "product-serda",
     nameTh: "ซือดะ (SERDA)",
@@ -180,6 +182,16 @@ test("product-detail: หน้าที่ซ่อนจากเมนู (in
   };
 
   const entries = buildSitemapEntries({ siteUrl: "https://example.test", pages: [record], locales: LOCALES });
-  /* หน้าในโค้ด (เช่น /privacy) ยังถูกใส่ตามเดิม — ที่ต้องไม่มีคือพาธของหมวดที่ซ่อนจากเมนู */
-  assert.ok(!entries.some((entry) => entry.url.includes("/products")), "หน้าที่ซ่อนจากเมนูต้องไม่ขึ้น sitemap");
+  assert.ok(
+    entries.some((entry) => entry.url.includes("/products/serda")),
+    "หน้ารายละเอียดหมวดต้องขึ้น sitemap (ซ่อนจากเมนู ≠ ห้าม index)",
+  );
+
+  /* แต่ถ้าหลังบ้านสั่ง noindex รายหน้า ⇒ ต้องหลุดจาก sitemap ทันที */
+  const noindex = buildSitemapEntries({
+    siteUrl: "https://example.test",
+    pages: [{ ...record, seo: { ...record.seo, noindex: true } }],
+    locales: LOCALES,
+  });
+  assert.equal(noindex.some((entry) => entry.url.includes("/products")), false, "noindex ต้องไม่อยู่ใน sitemap");
 });

@@ -24,9 +24,9 @@ import { withPageSeo } from "@/lib/seo/page-seo";
  *    (id ของหน้า = `product-<slug>` · ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็น = สิ่งที่ขึ้นเว็บ")
  * 2. ยังไม่เปิด ⇒ เลย์เอาต์ "ตัวอย่างรอการอนุมัติ" ด้านล่าง (เดิม) — ไม่มี DB ก็ยังเปิดหน้าได้
  *
- * ⚠️ **ยังคง `noindex` เสมอ** (มติเจ้าของ 2026-10-05): หน้าเดิมบอก "ยังไม่เปิดใช้งาน" อยู่
- *    ⇒ กันเครื่องค้นหาเก็บข้อความนั้นก่อน · ค่า SEO รายหน้า (title/description/OG) ใช้ได้ แต่ช่อง `noindex`
- *    ในหลังบ้านจะไม่มีผลจนกว่าจะมีมติเปิด index (ดู PRODUCT_ROADMAP.md § 10 รอบที่ 102)
+ * ⚠️ **เปิดให้จัดทำดัชนีแล้ว (รอบที่ 170 · มติเจ้าของ 2026-10-07):** หน้านี้มีข้อมูลสินค้าจริงจากฐานข้อมูล
+ *    (รอบที่ 103–104) และชื่อ/คำอธิบายหมวดไม่ใช่ข้อความ "ยังไม่เปิดใช้งาน" อีกแล้ว ⇒ ถอด `noindex` ออก
+ *    · หลังบ้านยังสั่ง `noindex` กลับได้รายหน้าผ่านช่อง SEO (W2) — `withPageSeo` จะตั้ง `robots` ให้เอง
  */
 
 /*
@@ -88,9 +88,7 @@ export async function generateMetadata({
       */
       title: { absolute: `${m.items[item.id].name} — ${m.title}` },
       description: introTextOf(messages, await loadProductCategory(item.slug), lang),
-      /* ⚠️ บังคับ noindex ไว้ก่อน (มติ 2026-10-05) — `applySeoToMetadata` ไม่ตั้ง index:true
-         ⇒ ค่า SEO จากหลังบ้านทับได้แค่ title/description/OG (ช่อง noindex ในหลังบ้านยังไม่มีผล) */
-      robots: { index: false, follow: false },
+      /* รอบที่ 170: ไม่บังคับ noindex แล้ว — ถ้าหลังบ้านตั้ง noindex `applySeoToMetadata` จะใส่กลับให้ */
       alternates: buildAlternates(lang, `/products/${item.slug}`),
     },
     () => loadPageSeo(productDetailPageId(item.slug)),
