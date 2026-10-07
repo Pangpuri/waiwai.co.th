@@ -39,9 +39,10 @@ export const PAGE_PATHS: Readonly<Record<string, string>> = {
 /**
  * หน้าที่ "ห้ามจัดทำดัชนีเสมอ" — ตั้งไว้ในโค้ดของหน้านั้น ๆ (`robots: { index: false }`)
  * ⚠️ ต้องตรงกับ sitemap: หน้าที่ noindex ต้องไม่อยู่ใน sitemap (ไม่งั้นเครื่องค้นหาสับสน)
- * ปัจจุบัน: /news = หน้าตัวอย่าง (ดู app/[lang]/news/page.tsx)
+ * ตอนนี้ **ว่าง** — เดิมมี `/news` (หน้าตัวอย่างรออนุมัติ) แต่ **เปิด index แล้วรอบที่ 173** (มีเนื้อหาจริง 151 ข่าว)
+ * ⇒ เก็บทะเบียนนี้ไว้ใช้กับหน้าที่ต้อง noindex ตลอดในอนาคต (มีเทสต์คุมว่าไม่ขัดกับโค้ดจริง)
  */
-export const PAGES_ALWAYS_NOINDEX: readonly string[] = ["news"];
+export const PAGES_ALWAYS_NOINDEX: readonly string[] = [];
 
 /** path ภายในเว็บ (ไม่รวม prefix ภาษา) — หน้าแรกได้ "/" */
 export function pathForPage(id: string): string {

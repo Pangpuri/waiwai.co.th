@@ -347,12 +347,14 @@ test("news: หน้ารายการ/หน้าแบ่งหน้า 
   );
 });
 
-test("news: หน้ารายละเอียดเรนเดอร์เนื้อหาที่ผ่านการตรวจแล้ว และยัง noindex", () => {
+test("news: หน้ารายละเอียดเรนเดอร์เนื้อหาที่ผ่านการตรวจแล้ว + เปิด index (รอบที่ 173)", () => {
   const detail = sourceOf("app/[lang]/news/[id]/page.tsx");
   assert.ok(detail.includes("export const revalidate = 300;"));
   assert.ok(detail.includes("<NewsBody"), "ต้องเรนเดอร์ผ่านตัวเรนเดอร์บล็อก (ไม่ใช่ HTML ดิบ)");
   assert.ok(!detail.includes("dangerouslySetInnerHTML"), "ห้ามฉีด HTML จากฐานข้อมูล");
-  assert.ok(detail.includes("robots: { index: false, follow: false }"), "ยังต้อง noindex จนเจ้าของอนุมัติ");
+  /* รอบที่ 173 (มติเจ้าของ): มีเนื้อหาจริงแล้ว ⇒ เปิด index — ห้าม hardcode noindex กลับ */
+  assert.ok(!detail.includes("robots: { index: false, follow: false }"), "ห้าม hardcode noindex (เปิด index แล้ว)");
+  assert.ok(detail.includes("withPageSeo("), "ต้องผ่าน withPageSeo");
   assert.ok(detail.includes("loadMediaSizes"), "ต้องอ่านขนาดรูปจากคลังเพื่อกันภาพกระตุก (CLS)");
 
   const body = sourceOf("features/news/ui/news-body.tsx");

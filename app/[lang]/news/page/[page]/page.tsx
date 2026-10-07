@@ -56,7 +56,7 @@ export async function generateMetadata({
       title: { absolute: `${m.meta.title}${suffix}` },
       description: m.meta.description,
       alternates: buildAlternates(lang, `/news/page/${page}`),
-      robots: { index: false, follow: false },
+      /* รอบที่ 173: เปิด index ให้หน้าจัดหน้า (เนื้อหาต่างกันจริงต่อหน้า) — ไม่มีแถว SEO ของตัวเอง */
       openGraph: { title: `${m.meta.title}${suffix}`, description: m.meta.description },
     },
     async () => null,

@@ -73,9 +73,8 @@ export async function generateMetadata({
       title: { absolute: `${title} — ${messages.newsPage.title}` },
       description: description === "" ? messages.newsPage.meta.description : description,
       alternates: buildAlternates(lang, newsPathOfSourceId(record.sourceId)),
-      /* ⚠️ บังคับ noindex ไว้ก่อน (หน้าตัวอย่างรออนุมัติ) — `applySeoToMetadata` ไม่ตั้ง index:true
-         ⇒ ค่า SEO จากหลังบ้านทับได้แค่ title/description/OG */
-      robots: { index: false, follow: false },
+      /* รอบที่ 173 (มติเจ้าของ): เปิด index — ข่าวมีเนื้อหาจริง · หลังบ้านสั่ง noindex กลับได้ผ่าน withPageSeo
+         ⚠️ ข่าวแต่ละชิ้นไม่มีแถว SEO ของตัวเอง ⇒ ตัวโหลดคืน null ⇒ ช่อง noindex สั่งกลับไม่ได้รายชิ้น */
       openGraph: {
         title,
         description: description === "" ? messages.newsPage.meta.description : description,

@@ -15,7 +15,7 @@ import {
   siteSettingsErrorsOf,
   validateSiteSettings,
 } from "@/lib/site-settings/model";
-import { buildRobots, buildSitemapEntries } from "@/lib/site-settings/sitemap";
+import { buildNewsSitemapEntries, buildRobots, buildSitemapEntries } from "@/lib/site-settings/sitemap";
 
 /** เทสต์ตั้งค่าส่วนกลาง + sitemap/robots (X1.3 + X1.4) — ตรรกะล้วน */
 
@@ -89,8 +89,9 @@ test("buildSitemapEntries: มีทั้ง 2 ภาษา · ตัดหน�
   assert.ok(entries.some((entry) => entry.url === `${SITE.url}/en/about/certifications`));
   assert.equal(entries.find((entry) => entry.url === `${SITE.url}/th`)?.priority, 1);
 
-  /* หน้าที่ noindex ในโค้ด (เช่น /news หน้าตัวอย่าง) ต้องไม่อยู่ใน sitemap ให้ตรงกับ metadata */
-  assert.equal(entries.some((entry) => entry.url.includes("/news")), false, "หน้าที่ noindex เสมอต้องไม่อยู่ใน sitemap");
+  /* รอบที่ 173: เปิด index ข่าวแล้ว ⇒ หน้าหลัก /news ต้องอยู่ใน sitemap (เดิมถูกตัดเพราะ noindex ในโค้ด) */
+  assert.ok(entries.some((entry) => entry.url === `${SITE.url}/th/news`), "หน้าหลักข่าวต้องอยู่ใน sitemap หลังเปิด index");
+  assert.equal(PAGES_ALWAYS_NOINDEX.length, 0, "ทะเบียน 'noindex ในโค้ด' ว่างแล้ว (ข่าวเปิด index รอบ 173)");
 
   const noindex = buildSitemapEntries({
     siteUrl: SITE.url,
@@ -101,6 +102,29 @@ test("buildSitemapEntries: มีทั้ง 2 ภาษา · ตัดหน�
 
   const hidden = buildSitemapEntries({ siteUrl: SITE.url, pages: pages.map((p) => (p.id === "careers" ? { ...p, inMenu: false } : p)), locales: LOCALES });
   assert.equal(hidden.some((entry) => entry.url.includes("/careers")), false);
+});
+
+test("buildNewsSitemapEntries: ข่าวรายชิ้น + หน้าจัดหน้า ครบทั้ง 2 ภาษา", () => {
+  const entries = buildNewsSitemapEntries({
+    siteUrl: "https://example.test/",
+    locales: LOCALES,
+    sourceIds: ["146142", "102621"],
+    pageCount: 3,
+  });
+
+  /* 2 ข่าว + หน้า 2..3 ต่อภาษา */
+  assert.equal(entries.length, (2 + 2) * LOCALES.length);
+  assert.ok(entries.some((entry) => entry.url === "https://example.test/th/news/146142"));
+  assert.ok(entries.some((entry) => entry.url === "https://example.test/en/news/page/3"));
+
+  /* ห้ามใส่หน้า 1 ซ้ำ — หน้าแรกคือ /news ซึ่งอยู่ในตาราง `page` แล้ว */
+  assert.equal(entries.some((entry) => entry.url.includes("/news/page/1")), false, "ห้ามใส่หน้าจัดหน้า 1 ซ้ำ");
+
+  /* ค่าที่อ่านไม่ได้/ว่าง = ไม่พัง และไม่สร้าง URL เสีย */
+  assert.deepEqual(
+    buildNewsSitemapEntries({ siteUrl: "https://x.test", locales: ["th"], sourceIds: ["", "   "], pageCount: Number.NaN }),
+    [],
+  );
 });
 
 test("buildRobots: ปิดหลังบ้าน + หน้าพรีวิว แต่เปิดเว็บหลัก และชี้ sitemap", () => {

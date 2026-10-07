@@ -65,6 +65,43 @@ export function buildSitemapEntries(options: {
   return entries;
 }
 
+/**
+ * รายการ sitemap ของ "ข่าว/กิจกรรม" (รอบที่ 173)
+ *
+ * หน้าหลัก `/news` อยู่ในตาราง `page` แล้ว (ผ่าน `buildSitemapEntries`) — ที่นี่เพิ่ม
+ * **ข่าวรายชิ้น** (`/news/<source_id>`) และ **หน้าจัดหน้า** (`/news/page/<n>`)
+ *
+ * ทำไมต้องมี: เปิด index ข่าวรอบที่ 173 แต่ข่าวรายชิ้น **ไม่ได้อยู่ในตาราง `page`**
+ *   ⇒ ถ้าไม่ใส่ sitemap เครื่องค้นหาจะรู้จักผ่านลิงก์อย่างเดียว (ช้ากว่ามาก)
+ * ⚠️ ตรรกะล้วน (รับ `sourceIds` เป็นรายการ) — ไฟล์นี้ไม่แตะฐานข้อมูล (ผู้เรียกอ่านมาให้)
+ */
+export function buildNewsSitemapEntries(options: {
+  readonly siteUrl: string;
+  readonly locales: readonly Locale[];
+  /** source id ของข่าวที่เผยแพร่แล้ว (ตัวเลขล้วน — ใช้เป็นพาธ `/news/<id>`) */
+  readonly sourceIds: readonly string[];
+  /** จำนวนหน้าจัดหน้าทั้งหมด (รวมหน้าแรก) — หน้าแรกคือ `/news` ซึ่งอยู่ในตาราง `page` แล้ว */
+  readonly pageCount: number;
+}): readonly SitemapEntry[] {
+  const base = options.siteUrl.replace(/\/+$/, "");
+  const entries: SitemapEntry[] = [];
+  const pages = Number.isFinite(options.pageCount) ? Math.max(0, Math.floor(options.pageCount)) : 0;
+
+  for (const locale of options.locales) {
+    for (const sourceId of options.sourceIds) {
+      const id = sourceId.trim();
+      if (id === "") continue;
+      entries.push({ url: `${base}/${locale}/news/${id}`, changeFrequency: "yearly", priority: 0.5 });
+    }
+    /* หน้า 2..N — หน้าแรกคือ /news (อยู่ในตาราง page แล้ว) */
+    for (let page = 2; page <= pages; page += 1) {
+      entries.push({ url: `${base}/${locale}/news/page/${page}`, changeFrequency: "weekly", priority: 0.4 });
+    }
+  }
+
+  return entries;
+}
+
 /** ข้อมูล `robots.txt` (X1.4) — ห้ามให้เครื่องค้นหาเข้าไปในหลังบ้าน/พรีวิว */
 export type RobotsRules = {
   readonly rules: readonly { readonly userAgent: string; readonly allow: string; readonly disallow: readonly string[] }[];

@@ -28,7 +28,9 @@ export const revalidate = 300;
  * ประวัติ
  * - รอบที่ 15: การ์ดทดสอบ 3×2 ไว้ดูโครง layout เท่านั้น (ไม่มีข้อมูลจริง ไม่มีวันที่ที่แต่งขึ้น)
  * - รอบที่ 105: **ข่าวจริง 151 ข่าวจากเว็บเดิมอยู่ในฐานข้อมูล** ⇒ แสดงการ์ดจริง + แบ่งหน้า
- *   หน้า 2 เป็นต้นไปอยู่ที่ `/news/page/<n>` (static/ISR เช่นกัน) · ยังคง `noindex` (รอเจ้าของอนุมัติ)
+ *   หน้า 2 เป็นต้นไปอยู่ที่ `/news/page/<n>` (static/ISR เช่นกัน)
+ * - รอบที่ 173 (มติเจ้าของ 2026-10-07): **เปิดให้จัดทำดัชนี** — มีเนื้อหาจริงแล้ว
+ *   · หลังบ้านยังสั่ง `noindex` กลับได้รายหน้าผ่านช่อง SEO (W2) — `withPageSeo` จะตั้ง `robots` ให้เอง
  *
  * รายละเอียด/เหตุผลทั้งหมด: PRODUCT_ROADMAP.md § 10 รอบที่ 105
  */
@@ -46,8 +48,7 @@ export async function generateMetadata({
     title: { absolute: messages.newsPage.meta.title },
     description: messages.newsPage.meta.description,
     alternates: buildAlternates(lang, "/news"),
-    // หน้าตัวอย่าง ไม่ควรถูกจัดทำดัชนี
-    robots: { index: false, follow: false },
+    /* รอบที่ 173: เปิด index (เนื้อหาจริงแล้ว) · ถ้าหลังบ้านตั้ง noindex `applySeoToMetadata` ใส่กลับให้ */
     openGraph: {
       title: messages.newsPage.meta.title,
       description: messages.newsPage.meta.description,
