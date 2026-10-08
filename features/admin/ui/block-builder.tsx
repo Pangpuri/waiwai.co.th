@@ -1289,6 +1289,15 @@ export function BlockBuilder({
                 ]}
                 onChange={(next) => update(setProductShowcaseOptions(document, block.id, { featuredPerCategory: Number(next) }))}
               />
+              <label className="text-fg-muted flex flex-col gap-1 text-xs">
+                {strings.blockShowcaseCtaHref}
+                <input
+                  type="text"
+                  value={block.ctaHref}
+                  onChange={(event) => update(setBlockString(document, block.id, "ctaHref", event.target.value))}
+                  className="border-line bg-surface text-fg rounded-lg border px-2 py-1 text-sm"
+                />
+              </label>
               <p className="text-fg-muted text-xs">{strings.blockShowcaseHint}</p>
             </>
           );

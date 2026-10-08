@@ -816,6 +816,8 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         type: "productShowcase",
         heading: readText(entry, "heading", `${path}.heading`, problems),
         body: readText(entry, "body", `${path}.body`, problems),
+        ctaLabel: readText(entry, "ctaLabel", `${path}.ctaLabel`, problems),
+        ctaHref: readString(entry, "ctaHref", `${path}.ctaHref`, problems),
         ...options,
       };
     }

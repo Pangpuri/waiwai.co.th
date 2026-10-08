@@ -27,6 +27,8 @@ import { blocks as blocksEn } from "@/lib/i18n/messages/areas/en/blocks";
 
 /** ข้อความของบล็อกไดนามิก "หมวดสินค้า + สินค้าแนะนำ" (รอบที่ 219) */
 export type ShowcaseStrings = {
+  /** "หมวดสินค้า" — หัวข้อย่อยเหนือการ์ดหมวด */
+  readonly categoriesTitle: string;
   readonly featuredTitle: string;
 };
 
@@ -186,7 +188,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
   if (language === "en") {
     return {
       gallery: galleryStringsOf(blocksEn),
-      showcase: { featuredTitle: productsEn.featuredTitle },
+      showcase: { categoriesTitle: productsEn.categoriesTitle, featuredTitle: productsEn.featuredTitle },
       jobBoard: jobBoardStringsOf(careersEn),
       recipe: recipeStringsOf(blocksEn),
       layout: { tocLabel: blocksEn.layoutTocLabel },
@@ -200,7 +202,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
 
   return {
     gallery: galleryStringsOf(blocksTh),
-showcase: { featuredTitle: productsTh.featuredTitle },
+showcase: { categoriesTitle: productsTh.categoriesTitle, featuredTitle: productsTh.featuredTitle },
     jobBoard: jobBoardStringsOf(careersTh),
     recipe: recipeStringsOf(blocksTh),
     layout: { tocLabel: blocksTh.layoutTocLabel },

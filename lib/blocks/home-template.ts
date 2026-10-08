@@ -53,8 +53,11 @@ export function buildHomeTemplate(): BlockDocument {
       version: BLOCK_SCHEMA_VERSION,
       type: "productShowcase",
       style: style(),
-      heading: { th: th.products.categoriesTitle, en: en.products.categoriesTitle },
+      heading: { th: th.products.title, en: en.products.title },
       body: { th: th.products.body, en: en.products.body },
+      /* ปุ่ม "ดูผลิตภัณฑ์ทั้งหมด" (รอบที่ 220) — พาธกลาง จะถูกเติม /<ภาษา> ตอนเรนเดอร์ */
+      ctaLabel: { th: th.actions.viewAllProducts, en: en.actions.viewAllProducts },
+      ctaHref: "/products",
       columns: 3,
       showFeatured: true,
       featuredPerCategory: 1,

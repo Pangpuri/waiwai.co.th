@@ -9,6 +9,7 @@ import {
   productShowcaseView,
 } from "@/lib/blocks/product-showcase";
 import { createBlock, isBlockType } from "@/lib/blocks/types";
+import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { setProductShowcaseOptions } from "@/lib/blocks/edit";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { collectShowcaseBlocks } from "@/lib/blocks/product-showcase-data";
@@ -221,6 +222,25 @@ test("★ product showcase: แสดงสินค้าแนะนำ + ห�
   assert.ok(renderer.includes('from "next/image"'), "ภาพสินค้าต้องใช้ next/image (alt บังคับ)");
 
   const strings = readFileSync("features/blocks/render-strings.ts", "utf8");
-  assert.equal(strings.split("showcase: { featuredTitle:").length - 1, 2, "ต้องมีข้อความทั้ง th และ en");
+  assert.equal(strings.split("featuredTitle: products").length - 1, 2, "ต้องมีข้อความทั้ง th และ en");
   assert.ok(strings.includes("productsTh.featuredTitle") && strings.includes("productsEn.featuredTitle"), "ดึงจากพจนานุกรม products ชุดเดียวกับหน้าเว็บ");
+});
+
+/** ★ รอบที่ 220 — หัวข้อส่วน + ปุ่ม "ดูผลิตภัณฑ์ทั้งหมด" (ให้ตรงหน้าเว็บจริง) */
+test("★ product showcase: หัวข้อส่วน + ปุ่มท้ายส่วน (CTA) ครบและมาจากพจนานุกรม", () => {
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes("strings.showcase.categoriesTitle"), "ต้องมีหัวข้อย่อย 'หมวดสินค้า' จากพจนานุกรม");
+  assert.ok(renderer.includes("block.ctaLabel[language]"), "ปุ่มต้องมีข้อความจากเอกสาร (สองภาษา)");
+  assert.ok(renderer.includes("localizedBlockHref(block.ctaHref, language)"), "ลิงก์ปุ่มต้องเติม /<ภาษา> ด้วยตัวช่วยกลาง (บทเรียนรอบ 101)");
+
+  const strings = readFileSync("features/blocks/render-strings.ts", "utf8");
+  assert.equal(strings.split("categoriesTitle: products").length - 1, 2, "หัวข้อย่อยต้องมีทั้ง th/en");
+
+  const template = buildHomeTemplate();
+  const block = template.blocks.find((row) => row.type === "productShowcase");
+  assert.equal(block?.type, "productShowcase");
+  if (block?.type !== "productShowcase") return;
+  assert.equal(block.ctaHref, "/products", "ปุ่มต้องชี้พาธกลาง /products");
+  assert.ok(block.ctaLabel.th !== "" && block.ctaLabel.en !== "", "ป้ายปุ่มสองภาษาต้องมาจากพจนานุกรม");
+  assert.ok(block.heading.th !== "หมวดสินค้า", "หัวข้อส่วนต้องเป็นหัวข้อของส่วน (ไม่ใช่หัวข้อย่อยหมวด)");
 });

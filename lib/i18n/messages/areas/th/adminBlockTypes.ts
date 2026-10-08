@@ -39,6 +39,7 @@ export const adminBlockTypes = {
   blockJobOpenings: "จำนวนอัตรา (0 = ไม่ระบุ)",
   blockJobQualifications: "คุณสมบัติ",
   blockJobExperience: "ประสบการณ์ (ไม่บังคับ)",
+  blockShowcaseCtaHref: "ลิงก์ปุ่มท้ายส่วน (เว้นว่าง = ไม่มีปุ่ม) เช่น /products",
   blockShowcaseColumns: "จำนวนคอลัมน์",
   blockShowcaseCount: "แสดงจำนวนสินค้าบนการ์ดหมวด",
   blockShowcaseFeatured: "แสดงสินค้าแนะนำ",

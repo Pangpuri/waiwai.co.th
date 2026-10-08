@@ -672,6 +672,7 @@ function BlockView({
                 <p className="text-fg-muted text-sm">{block.body[language]}</p>
               )}
             </div>
+            <h3 className="text-fg text-xl font-semibold">{strings.showcase.categoriesTitle}</h3>
             <ul className={showcaseGrid}>
               {showcase.categories.map((category) => (
                 <li key={category.id} className="border-line bg-surface flex flex-col gap-2 rounded-xl border p-3">
@@ -707,6 +708,15 @@ function BlockView({
                   ))}
                 </ul>
               </>
+            )}
+            {block.ctaLabel[language].trim() === "" || block.ctaHref.trim() === "" ? null : (
+              /* ปุ่มท้ายส่วน (รอบที่ 220) — เก็บ "พาธกลาง" แล้วเติม /<ภาษา> ด้วยตัวช่วยเดียวกับบล็อกอื่น */
+              <a
+                href={localizedBlockHref(block.ctaHref, language)}
+                className="border-line-strong text-fg hover:bg-bg-subtle inline-flex w-fit items-center gap-2 rounded-full border-2 px-5 py-3 text-sm font-bold"
+              >
+                {block.ctaLabel[language]}
+              </a>
             )}
           </div>
         );

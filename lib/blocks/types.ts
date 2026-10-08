@@ -424,6 +424,9 @@ export type ProductShowcaseBlock = BlockBase & {
   readonly type: "productShowcase";
   readonly heading: LocalizedValue;
   readonly body: LocalizedValue;
+  /** ปุ่มท้ายส่วน (เช่น "ดูผลิตภัณฑ์ทั้งหมด") — ว่าง = ไม่มีปุ่ม (รอบที่ 220) */
+  readonly ctaLabel: LocalizedValue;
+  readonly ctaHref: string;
   readonly columns: 1 | 2 | 3;
   readonly showFeatured: boolean;
   readonly featuredPerCategory: number;
@@ -656,6 +659,8 @@ export function createBlock(type: BlockType, id: string): Block {
         type: "productShowcase",
         heading: emptyText(),
         body: emptyText(),
+        ctaLabel: emptyText(),
+        ctaHref: "",
         columns: 3,
         showFeatured: true,
         featuredPerCategory: 1,

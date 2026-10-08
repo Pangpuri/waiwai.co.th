@@ -38,6 +38,7 @@ export const adminBlockTypes = {
   blockJobOpenings: "Openings (0 = not specified)",
   blockJobQualifications: "Qualifications",
   blockJobExperience: "Experience (optional)",
+  blockShowcaseCtaHref: "Section button link (empty = no button), e.g. /products",
   blockShowcaseColumns: "Columns",
   blockShowcaseCount: "Show product count on category cards",
   blockShowcaseFeatured: "Show featured products",
