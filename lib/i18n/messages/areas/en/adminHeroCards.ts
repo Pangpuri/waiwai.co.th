@@ -1,14 +1,11 @@
 /**
- * Dictionary area: admin — slides cards & campaigns (round 188)
+ * Dictionary area: admin — slides & campaigns (round 188 · revisited in round 194)
  *
  * Split out of the `adminHero` area per the check:i18n rule.
  * ⚠️ Card copy (title/body) is entered by the admin — we do not translate content for them.
+ * ⚠️ Round 194 removed the 1:1 slide-card keys (7 unused keys) — the rest is campaign copy.
  */
 export const adminHeroCards = {
-  heroCardSectionTitle: "Cards on slides (campaigns)",
-  heroCardSectionHint: "A card is overlaid on its slide image · set a time window to publish/retire it automatically",
-  heroCardAdd: "Add card",
-  heroCardEmpty: "No cards on this slide yet",
   heroCardTitle: "Title",
   heroCardBody: "Body",
   heroCardCtaLabel: "Button label",
@@ -26,10 +23,7 @@ export const adminHeroCards = {
   heroCardStateExpired: "Expired",
   heroCardSave: "Save card",
   heroCardRemove: "Remove card",
-  heroCardMax: "Up to {max} cards per slide",
   heroCardTitleRequired: "Thai title is required (a card without text is not saved)",
-  heroCardSaveFailed: "Could not save — check the Thai title and that the end time is after the start time",
-  heroCardEnglishOptional: "English fields are optional — fill them in yourself (Thai is used when empty)",
   campaignTabSlides: "Slides",
   campaignTabCampaigns: "Campaigns",
   campaignIntro: "A campaign stands on its own — create it once, choose which slides it appears on (none = all slides) and set a time window to publish/retire it automatically",

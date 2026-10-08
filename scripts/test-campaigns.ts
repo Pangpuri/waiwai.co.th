@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -7,6 +7,7 @@ import {
   CAMPAIGN_STATUSES,
   MAX_CAMPAIGNS,
   anchorPresetOf,
+  campaignCardImage,
   campaignReadiness,
   campaignWindowState,
   clampAnchor,
@@ -211,7 +212,7 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
   assert.ok(page.includes('role="status"'), "แบนเนอร์ต้องประกาศให้โปรแกรมอ่านหน้าจอรู้ (a11y)");
 });
 
-test("campaign image: พาธในเว็บเท่านั้น + ต้องมีคำอธิบายภาพไทย + ไม่เรนเดอร์ <img> เมื่อไม่มีภาพ", () => {
+test("campaign image: พาธในเว็บเท่านั้น + ต้องมีคำอธิบายภาพไทย (ต่อสายจริง หลังบ้าน)", () => {
   const model = readFileSync("lib/campaigns/model.ts", "utf8");
   assert.ok(model.includes("isSafeCampaignImagePath"), "ต้องมีตัวตรวจพาธภาพ");
   assert.ok(model.includes('imageAltTh: มีภาพแล้วต้องมีคำอธิบายภาพภาษาไทย'), "มีภาพต้องมี alt ไทย");
@@ -221,7 +222,101 @@ test("campaign image: พาธในเว็บเท่านั้น + ต�
   assert.ok(manager.includes("<ImageDrop"), "หน้าจอแคมเปญต้องมีช่องเลือกภาพ (คลัง/เครื่อง/ลากวาง)");
   assert.ok(manager.includes('name="imagePath"'), "ค่าภาพต้องถูกส่งไปกับฟอร์มบันทึก");
   assert.ok(manager.indexOf("<ImageDrop") < manager.indexOf("<form action={saveCampaignAction}"), "ช่องภาพต้องอยู่นอกฟอร์ม (กัน <form> ซ้อน)");
+});
+
+/**
+ * ★ ปิดหนี้รอบ 194 — เทสต์เดิมตรวจด้วย "ชื่อตัวแปร" ในไฟล์ (`card.imagePath.trim() === "" ? null :`)
+ * ⇒ เปราะ: เปลี่ยนวิธีเขียนเล็กน้อยแล้วแดงทั้งที่พฤติกรรมถูก · รอบนี้ย้ายการตัดสินมาเป็น "ตรรกะล้วน"
+ * แล้วตรวจที่ **พฤติกรรม** (คืน `null` = ไม่มีภาพ) + **โครงสร้าง** (ไม่มี `<img>` ดิบ) แทน
+ */
+test("★ campaign image: พาธว่าง = ไม่มีภาพให้เรนเดอร์ (ตรรกะล้วน ไม่ค้นชื่อตัวแปร)", () => {
+  const fallback = "หัวข้อการ์ด";
+  assert.equal(campaignCardImage({ imagePath: "", imageAltTh: "คำอธิบาย", imageAltEn: "caption" }, "th", fallback), null, "พาธว่าง = ไม่มีภาพ");
+  assert.equal(campaignCardImage({ imagePath: "   ", imageAltTh: "", imageAltEn: "" }, "th", fallback), null, "มีแต่ช่องว่าง = ไม่มีภาพ");
+  assert.equal(campaignCardImage({ imagePath: "\n\t", imageAltTh: "", imageAltEn: "" }, "en", fallback), null, "ขึ้นบรรทัดใหม่/แท็บ = ไม่มีภาพ");
+
+  const card = { imagePath: "  /media/abc  ", imageAltTh: "คำอธิบายไทย", imageAltEn: "English caption" };
+  assert.deepEqual(campaignCardImage(card, "th", fallback), { path: "/media/abc", alt: "คำอธิบายไทย" }, "พาธถูกตัดช่องว่าง · ไทยใช้ alt ไทย");
+  assert.deepEqual(campaignCardImage(card, "en", fallback), { path: "/media/abc", alt: "English caption" }, "อังกฤษใช้ alt อังกฤษ");
+  assert.deepEqual(
+    campaignCardImage({ ...card, imageAltEn: "   " }, "en", fallback),
+    { path: "/media/abc", alt: "คำอธิบายไทย" },
+    "alt อังกฤษว่าง = ถอยไปใช้ไทย",
+  );
+  assert.deepEqual(
+    campaignCardImage({ imagePath: "/media/abc", imageAltTh: "", imageAltEn: "" }, "th", `  ${fallback}  `),
+    { path: "/media/abc", alt: fallback },
+    "ไม่มี alt เลย = ถอยไปใช้หัวข้อ (ตัดช่องว่าง)",
+  );
+  assert.deepEqual(
+    campaignCardImage({ imagePath: "/media/abc", imageAltTh: "", imageAltEn: "" }, "th", "   "),
+    { path: "/media/abc", alt: "" },
+    "ไม่มีข้อความให้ใช้เลย = alt ว่าง (ภาพประดับ) — ไม่เป็น undefined",
+  );
+});
+
+test("★ campaign image: หน้าเว็บไปทาง `next/image` เท่านั้น + วิวไม่มีพาธดิบ (guard ข้ามไม่ได้)", () => {
   const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
-  assert.ok(slider.includes("card.imagePath.trim() === \"\" ? null :"), "ไม่มีภาพ = ไม่เรนเดอร์ <img>");
-  assert.ok(slider.includes("card.imageAlt"), "ต้องใช้คำอธิบายภาพเป็น alt");
+  assert.ok(!/<img[\s/>]/.test(slider), "ห้ามมีแท็ก <img> ดิบ (ใช้ next/image — ด่าน lint บังคับด้วย)");
+  assert.ok(!/src=(""|'')/.test(slider), "ห้ามมี src ว่างแบบเขียนค่าตรง ๆ");
+  assert.ok(
+    !slider.includes("imagePath") && !slider.includes("imageAlt"),
+    "วิวของการ์ดต้องไม่เหลือพาธ/alt ดิบ — รับแต่ 'ภาพที่ตัดสินแล้ว' (จึงไม่มีทางปล่อย src ว่าง)",
+  );
+
+  const hero = readFileSync("features/home/ui/hero.tsx", "utf8");
+  assert.ok(hero.includes("campaignCardImage(card"), "hero ต้องใช้ตัวตัดสินกลาง (ไม่เช็คพาธเองซ้ำที่อื่น)");
+  assert.ok(!hero.includes("imagePath:"), "ห้ามส่งพาธดิบเข้าวิว");
+});
+
+test("★ ปิดหนี้รอบ 194: 'การ์ดผูกสไลด์ 1:1' ถูกถอดออกทั้งสาย (โค้ด/ตาราง/สิทธิ์/พจนานุกรม)", () => {
+  /* 1) โค้ดที่รันจริง (app/features/lib) ต้องไม่อ้างตารางเดิมอีก */
+  const offenders: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!/\.(ts|tsx)$/.test(entry.name)) continue;
+      if (readFileSync(full, "utf8").includes("hero_slide_card")) offenders.push(full);
+    }
+  };
+  for (const root of ["app", "features", "lib"]) walk(root);
+  assert.deepEqual(offenders, [], "ห้ามเหลือโค้ดที่อ้างตาราง hero_slide_card");
+
+  /* 2) ไฟล์ของสายเดิมต้องหายไปจริง */
+  for (const gone of [
+    "lib/hero/cards.ts",
+    "lib/hero/cards-repository.ts",
+    "app/admin/hero/card-actions.ts",
+    "features/admin/ui/hero-card-editor.tsx",
+  ]) {
+    assert.equal(existsSync(gone), false, `${gone} ต้องถูกถอดออก`);
+  }
+
+  /* 3) ประตูอ่านของหน้าเว็บต้องไม่ขอสิทธิ์ตารางที่ถอดแล้ว */
+  const roles = readFileSync("scripts/db-roles.ts", "utf8");
+  assert.ok(!roles.includes("hero_slide_card"), "PUBLIC_READ_TABLES ต้องไม่มีตารางที่ถอดแล้ว");
+
+  /* 4) migration: ถอดแบบรันซ้ำได้ และไม่แก้ตารางที่จะถอด */
+  const drop = readFileSync("db/migrations/0033-drop-hero-slide-card.sql", "utf8");
+  assert.ok(drop.includes("drop table if exists hero_slide_card"), "ต้องมี drop table แบบ idempotent");
+  assert.ok(!/^alter table hero_slide_card/m.test(drop), "ห้ามแก้ตารางที่กำลังจะถอด");
+
+  /* 5) พจนานุกรม: คีย์ของการ์ด 1:1 ต้องไม่ค้าง (ทั้งสองภาษา) */
+  const deadKeys = [
+    "heroCardSectionTitle",
+    "heroCardSectionHint",
+    "heroCardAdd",
+    "heroCardEmpty",
+    "heroCardMax",
+    "heroCardSaveFailed",
+    "heroCardEnglishOptional",
+  ];
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of deadKeys) assert.ok(!area.includes(key), `คีย์ ${key} ต้องถูกถอดออกจากพื้นที่ ${locale}`);
+  }
 });

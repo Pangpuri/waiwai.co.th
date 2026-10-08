@@ -1,5 +1,6 @@
 "use client";
 
+import type { CampaignCardImage } from "@/lib/campaigns/model";
 import type { HeroEffect } from "@/lib/hero/model";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -50,10 +51,8 @@ export type HeroCardView = {
   readonly position: "left" | "center" | "right";
   /** จุดยึดเป็นเปอร์เซ็นต์ของพื้นที่สไลด์ (รอบที่ 190) — ตรงกับที่ลากในหลังบ้าน */
   readonly anchorX?: number;
-  /** พาธภาพของการ์ด (รอบที่ 193) — ว่าง = การ์ดข้อความล้วน */
-  readonly imagePath?: string;
-  /** คำอธิบายภาพ (alt) — ผู้ใช้กรอกในหลังบ้าน · ว่าง = ใช้หัวข้อแทน */
-  readonly imageAlt?: string;
+  /** ภาพของการ์ด — **ตัดสินมาแล้ว** ว่ามี/ไม่มี (ไม่มีคีย์ = ไม่มีภาพ ⇒ ไม่เรนเดอร์องค์ประกอบภาพเลย) */
+  readonly image?: CampaignCardImage;
   readonly anchorY?: number;
 };
 
@@ -151,8 +150,15 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
             >
               {activeCards.map((card) => (
                 <div key={card.id} className="flex flex-col gap-1">
-                  {card.imagePath === undefined || card.imagePath.trim() === "" ? null : (
-                    <img src={card.imagePath} alt={card.imageAlt === undefined || card.imageAlt.trim() === "" ? card.title : card.imageAlt} className="mb-1 h-24 w-full rounded-lg object-cover sm:h-28" />
+                  {/*
+                    ภาพของการ์ด (รอบที่ 193 · ทบทวนรอบที่ 194)
+                    · ไม่มีภาพ = ไม่มีคีย์ `image` ⇒ **ไม่เรนเดอร์องค์ประกอบภาพเลย** (ไม่ปล่อย src ว่าง)
+                    · ใช้ `next/image` แบบ `fill` ⇒ ต้องมีกล่อง `relative` ครอบ (และได้ย่อขนาด/WebP ให้ด้วย)
+                  */}
+                  {card.image === undefined ? null : (
+                    <span className="relative mb-1 block h-24 w-full overflow-hidden rounded-lg sm:h-28">
+                      <Image src={card.image.path} alt={card.image.alt} fill sizes="(min-width: 640px) 448px, 100vw" className="object-cover" />
+                    </span>
                   )}
                   <p className="text-fg text-base font-bold sm:text-lg">{card.title}</p>
                   {card.body.trim() === "" ? null : <p className="text-fg-muted text-xs sm:text-sm">{card.body}</p>}

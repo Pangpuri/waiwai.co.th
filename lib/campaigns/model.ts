@@ -118,6 +118,32 @@ export function isSafeCampaignImagePath(value: string): boolean {
   return path.startsWith("/") && !path.startsWith("//") && !path.includes("://");
 }
 
+/** ภาพของการ์ดที่พร้อมเรนเดอร์จริง (รอบที่ 194) */
+export type CampaignCardImage = { readonly path: string; readonly alt: string };
+
+/**
+ * ตัดสินว่า "การ์ดนี้มีภาพให้เรนเดอร์ไหม" — **จุดเดียว** ที่ตัดสิน (ตัวเรนเดอร์ไม่ต้องเดาเอง)
+ *
+ * - พาธว่าง/มีแต่ช่องว่าง = `null` ⇒ ตัวเรนเดอร์ **ไม่สร้างองค์ประกอบภาพเลย**
+ *   (สิ่งที่ต้องกัน: `<img src="">` ทำให้เบราว์เซอร์ยิงคำขอไปที่ URL ของหน้าปัจจุบันซ้ำ)
+ * - คำอธิบายภาพ: ภาษาที่ขอ → อีกภาษา → หัวข้อการ์ด (มีภาพแล้วไม่ปล่อย `alt` ว่าง)
+ *
+ * ตรรกะล้วน ไม่แตะ DOM/DB ⇒ เทสต์ได้ตรง ๆ (ดู `scripts/test-campaigns.ts`)
+ */
+export function campaignCardImage(
+  card: Pick<Campaign, "imagePath" | "imageAltTh" | "imageAltEn">,
+  language: "th" | "en",
+  fallbackTitle: string,
+): CampaignCardImage | null {
+  const path = card.imagePath.trim();
+  if (path === "") return null;
+
+  const preferred = (language === "en" ? card.imageAltEn : card.imageAltTh).trim();
+  const other = (language === "en" ? card.imageAltTh : card.imageAltEn).trim();
+  const alt = [preferred, other, fallbackTitle.trim()].find((candidate) => candidate !== "") ?? "";
+  return { path, alt };
+}
+
 /** ลิงก์ที่ปลอดภัย — พาธในเว็บ หรือปลายทางที่ระบุโปรโตคอลชัดเจน */
 export function isSafeCampaignHref(value: string): boolean {
   const href = value.trim();

@@ -5,7 +5,7 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import { HERO_CARD_HREF } from "../hero-card";
-import { anchorPresetOf } from "@/lib/campaigns/model";
+import { anchorPresetOf, campaignCardImage } from "@/lib/campaigns/model";
 import type { Campaign as CampaignData } from "@/lib/campaigns/model";
 import type { HeroCardView } from "./hero-slider";
 import { DEFAULT_HERO_SETTING, type HeroSetting } from "@/lib/hero/model";
@@ -59,19 +59,24 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
   for (const slide of slides) {
     const matching = campaigns.filter((campaign) => campaign.slideIds.length === 0 || campaign.slideIds.includes(slide.id));
     if (matching.length === 0) continue;
-    cardViews[slide.id] = matching.map((card) => ({
-      id: card.id,
-      title: locale === "en" && card.title.en.trim() !== "" ? card.title.en : card.title.th,
-      body: locale === "en" && card.body.en.trim() !== "" ? card.body.en : card.body.th,
-      ctaLabel: locale === "en" && card.ctaLabel.en.trim() !== "" ? card.ctaLabel.en : card.ctaLabel.th,
-      ctaHref: card.ctaHref,
-      /* ตำแหน่งสำเร็จรูป (สำหรับสไตล์สำรอง) — จุดยึดจริงส่งแยกไปแล้ว */
-      position: anchorPresetOf(card.anchorX, card.anchorY) ?? "center",
-      imagePath: card.imagePath,
-      imageAlt: locale === "en" && card.imageAltEn.trim() !== "" ? card.imageAltEn : card.imageAltTh,
-      anchorX: card.anchorX,
-      anchorY: card.anchorY,
-    }));
+    cardViews[slide.id] = matching.map((card) => {
+      const title = locale === "en" && card.title.en.trim() !== "" ? card.title.en : card.title.th;
+      /* ภาพของการ์ด: ตัดสินที่ `campaignCardImage()` จุดเดียว — พาธว่าง = ไม่มีคีย์ `image` (ไม่เรนเดอร์ภาพ) */
+      const image = campaignCardImage(card, locale, title);
+
+      return {
+        id: card.id,
+        title,
+        body: locale === "en" && card.body.en.trim() !== "" ? card.body.en : card.body.th,
+        ctaLabel: locale === "en" && card.ctaLabel.en.trim() !== "" ? card.ctaLabel.en : card.ctaLabel.th,
+        ctaHref: card.ctaHref,
+        /* ตำแหน่งสำเร็จรูป (สำหรับสไตล์สำรอง) — จุดยึดจริงส่งแยกไปแล้ว */
+        position: anchorPresetOf(card.anchorX, card.anchorY) ?? "center",
+        ...(image === null ? {} : { image }),
+        anchorX: card.anchorX,
+        anchorY: card.anchorY,
+      };
+    });
   }
 
   return (

@@ -19,6 +19,40 @@ const ROOT = join(import.meta.dirname, "..");
 
 const file = (id: string, name: string, sql: string): MigrationFile => ({ id, name, sql });
 
+/**
+ * migration ไฟล์นี้ "กันรันซ้ำ" ไหม — กลไกที่ยอมรับ
+ * · DDL ที่มี `if not exists` / `create or replace`
+ * · **`drop … if exists`** (ถอดของ · รอบที่ 194) — รันซ้ำไม่มีผล
+ * · `on conflict …` (upsert)
+ * · คอมเมนต์ `idempotent: conditional-update` + ต้องมี `where` (migration ซ่อมข้อมูล)
+ */
+function hasIdempotencyGuard(sql: string): boolean {
+  return (
+    sql.includes("if not exists") ||
+    sql.includes("add column if not exists") ||
+    sql.includes("create or replace") ||
+    sql.includes("on conflict") ||
+    /drop\s+(table|index|view)\s+if\s+exists/i.test(sql) ||
+    (sql.includes("idempotent: conditional-update") && sql.includes("where"))
+  );
+}
+
+test("hasIdempotencyGuard: รู้จักกลไกกันรันซ้ำทุกแบบ (รวม `drop … if exists` ของรอบที่ 194)", () => {
+  assert.equal(hasIdempotencyGuard("create table if not exists t (id text);"), true);
+  assert.equal(hasIdempotencyGuard("alter table t add column if not exists x text;"), true);
+  assert.equal(hasIdempotencyGuard("create or replace function f() returns int language sql as $$ select 1 $$;"), true);
+  assert.equal(hasIdempotencyGuard("insert into t (id) values ('a') on conflict (id) do nothing;"), true);
+  assert.equal(hasIdempotencyGuard("/* idempotent: conditional-update */ update t set x = 1 where x is null;"), true);
+  assert.equal(hasIdempotencyGuard("drop table if exists hero_slide_card;"), true, "ถอดตารางแบบมี if exists = รันซ้ำได้");
+  assert.equal(hasIdempotencyGuard("drop index if exists some_idx;"), true);
+
+  /* edge case: ของที่รันซ้ำแล้วพัง ต้องไม่ถูกนับว่ามี guard */
+  assert.equal(hasIdempotencyGuard("drop table hero_slide_card;"), false, "drop ไม่มี if exists = ครั้งที่สองพัง");
+  assert.equal(hasIdempotencyGuard("alter table t add column x text;"), false);
+  assert.equal(hasIdempotencyGuard("update t set x = 1;"), false, "ไม่มี where = ไม่ใช่ conditional-update");
+  assert.equal(hasIdempotencyGuard("select 1;"), false);
+});
+
 test("parseMigrationFileName: อ่านรหัส/ชื่อได้ และปฏิเสธชื่อที่ไม่ตรงรูปแบบ", () => {
   assert.deepEqual(parseMigrationFileName("0001-init.sql"), { id: "0001", name: "init" });
   assert.deepEqual(parseMigrationFileName("0012-chrome_navbar.sql"), { id: "0012", name: "chrome_navbar" });
@@ -119,23 +153,11 @@ test("ไฟล์ migration จริงในโปรเจกต์: ชื�
   assert.deepEqual(numbers, [...numbers].sort((left, right) => left - right));
   assert.equal(new Set(numbers).size, numbers.length);
 
-  /* ทุกไฟล์ต้อง idempotent (กันรันซ้ำแล้วพัง) */
+  /* ทุกไฟล์ต้อง idempotent (กันรันซ้ำแล้วพัง) — กติกากลางอยู่ที่ `hasIdempotencyGuard()` ข้างบน */
   for (const entry of parsed) {
-    const usesGuard =
-      entry.sql.includes("if not exists") ||
-      entry.sql.includes("add column if not exists") ||
-      entry.sql.includes("create or replace") ||
-      /* insert ที่รันซ้ำได้ (รอบที่ 102): `on conflict … do nothing/update` = กลไก idempotent ของการเพิ่มข้อมูล */
-      entry.sql.includes("on conflict") ||
-      /*
-        migration ที่ "ซ่อมข้อมูล" (รอบที่ 106): ไม่มี DDL ให้ใช้ guard ⇒ ต้องประกาศกลไกไว้ชัด ๆ ด้วยคอมเมนต์
-        `idempotent: conditional-update` **และ** ต้องมีการจำกัดแถวด้วย `where`
-        (เงื่อนไข: แก้เฉพาะแถวที่ยังเป็นค่าผิด ⇒ รันซ้ำไม่มีผล และไม่ทับค่าที่มีคนแก้แล้ว)
-      */
-      (entry.sql.includes("idempotent: conditional-update") && entry.sql.includes("where"));
     assert.ok(
-      usesGuard,
-      `${entry.id}-${entry.name} ต้องกันรันซ้ำ (if not exists / on conflict / create or replace / idempotent: conditional-update)`,
+      hasIdempotencyGuard(entry.sql),
+      `${entry.id}-${entry.name} ต้องกันรันซ้ำ (if not exists / on conflict / create or replace / drop … if exists / idempotent: conditional-update)`,
     );
   }
 });
