@@ -10,6 +10,7 @@
 
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
+import { frameOf, type PrCardFrame } from "@/lib/hero/pr-card-frame";
 import {
   DEFAULT_HERO_SETTING,
   parseHeroSetting,
@@ -187,17 +188,37 @@ export async function trashHeroPageSlide(id: string, actor: string): Promise<boo
 export async function loadHeroSetting(): Promise<HeroSetting> {
   if (!isDatabaseConfigured()) return DEFAULT_HERO_SETTING;
   try {
-    const result = await readQuery<{ effect: string; interval_ms: number }>(
-      "select effect, interval_ms from hero_setting where id = 'default'",
+    const result = await readQuery<{ effect: string; interval_ms: number; pr_card_frame: string }>(
+      "select effect, interval_ms, pr_card_frame from hero_setting where id = 'default'",
     );
     const row = result.rows[0];
-    return row === undefined ? DEFAULT_HERO_SETTING : parseHeroSetting(row);
+    /* กรอบการ์ด PR (รอบที่ 208) — เก็บที่ตารางเดียวกับเอฟเฟคสไลด์ */
+    return row === undefined
+      ? DEFAULT_HERO_SETTING
+      : { ...parseHeroSetting(row), prCardFrame: frameOf(row.pr_card_frame) };
   } catch {
     return DEFAULT_HERO_SETTING;
   }
 }
 
 /** บันทึกค่าตั้งค่า (หลังบ้าน) — บีบช่วงค่าที่ชั้นข้อมูลอีกชั้นก่อนเขียน */
+/**
+ * บันทึก **เฉพาะ "กรอบภาพการ์ด PR"** (รอบที่ 208) — ไม่แตะเอฟเฟค/ความเร็วของสไลด์
+ * ประตูอยู่ที่ SQL: `update … where id = 'default'` (แถวเดียวของฮีโร่)
+ */
+export async function saveHeroCardFrame(frame: PrCardFrame, actor: string): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  try {
+    const result = await getPool().query(
+      `update hero_setting set pr_card_frame = $1, updated_at = now(), updated_by = $2 where id = 'default'`,
+      [frame, actor],
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function saveHeroSetting(setting: HeroSetting, actor: string): Promise<boolean> {
   const safe = parseHeroSetting(setting);
   const result = await getPool().query(

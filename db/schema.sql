@@ -169,6 +169,8 @@ create table if not exists hero_setting (
   id text primary key,
   effect text not null default 'fade' check (effect in ('fade', 'slide', 'zoom', 'none')),
   interval_ms integer not null default 5000 check (interval_ms between 2000 and 15000),
+  -- รอบที่ 208: กรอบภาพของการ์ด PR ('auto' = ยืดหดตามภาพ · หรือ '1:1' / '4:5' / '3:4' / '16:9')
+  pr_card_frame text not null default 'auto',
   updated_at timestamptz not null default now(),
   updated_by text not null default ''
 );

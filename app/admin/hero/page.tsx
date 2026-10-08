@@ -110,7 +110,7 @@ export default async function AdminHeroPage({
         ⇒ แก้ข้อความสั้น + อัปโหลดภาพได้ที่นี่ ไม่ต้องออกจากหน้านี้
       */}
       <section className="flex flex-col gap-2">
-        <HeroPrCardEditor card={prCardDraft} strings={s} />
+        <HeroPrCardEditor card={prCardDraft} frame={setting.prCardFrame} strings={s} />
         <p className="text-fg-muted text-[11px]">
           {s.wiggleCardHint} · {wiggleCard.title}
         </p>

@@ -4,6 +4,15 @@ import { test } from "node:test";
 
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { heroCardContentOf, heroCardDefaults, heroCardDraftOf, parseHeroCardInput } from "@/lib/content/home-card";
+import {
+  AUTO_FRAME_RATIO_BOUNDS,
+  PR_CARD_FRAMES,
+  cardRatioOf,
+  clampAutoRatio,
+  frameOf,
+  frameRatioOf,
+  previewAspectOf,
+} from "@/lib/hero/pr-card-frame";
 import type { PageContent } from "@/lib/content/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -132,7 +141,7 @@ test("★ home card: หน้าเว็บอ่านค่าจากห�
 
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
   assert.ok(
-    page.includes("heroCard={heroCardContentOf(await loadHomeContentSafely(), messages, lang)}"),
+    page.includes("const cardContent = heroCardContentOf(homeContent, messages, lang)") && page.includes("heroCard={heroCard}"),
     "หน้าแรกต้องส่งเนื้อหาการ์ดจากที่เก็บจริงเข้า Hero",
   );
 
@@ -206,7 +215,7 @@ test("★ home card: ตรวจค่าฟอร์มการ์ด (ตร
 
 test("★ home card: จอแคมเปญมีตัวแก้ของการ์ดนี้เอง (ฟอร์มเดียว + อัปโหลดภาพ) — รอบที่ 203", () => {
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(page.includes("<HeroPrCardEditor card={prCardDraft} strings={s} />"), "หน้าแคมเปญต้องมีตัวแก้การ์ด PR");
+  assert.ok(page.includes("<HeroPrCardEditor card={prCardDraft} frame={setting.prCardFrame} strings={s} />"), "หน้าแคมเปญต้องมีตัวแก้การ์ด PR (พร้อมกรอบที่เลือก)")
   assert.ok(page.includes("heroCardDraftOf(homeContent)"), "ค่าตั้งต้นต้องมาจากค่าที่บันทึกจริง");
   assert.ok(!page.includes('href="/admin/content/home#item-hero-card"'), "ไม่ต้องพาไปหน้าเนื้อหารวมอีก");
   assert.ok(page.includes('"card-saved": s.feedbackCardSaved'), "ต้องมีข้อความยืนยันผลการบันทึก");
@@ -235,5 +244,74 @@ test("★ home card: จอแคมเปญมีตัวแก้ของ�
   assert.ok(action.includes("loaded.unknownKeys.length > 0"), "fail-closed เมื่อโครงเนื้อหาไม่ตรง (ไม่ทับข้อมูลส่วนอื่น)");
   for (const code of ["hero-card-save", 'refreshPublicSite("page")', 'saved=card-saved']) {
     assert.ok(action.includes(code), `action ต้องมี: ${code}`);
+  }
+});
+
+
+/**
+ * ★ รอบที่ 208 — "กรอบภาพการ์ดยืดหดตามสเกลภาพ" และเลือกเพดานสัดส่วนได้
+ * คำเจ้าของ: *"เป็นไปได้ไหมที่หน้าต่างของแคมเปญจะยืดหดตามสเกลภาพที่ใส่ไป แต่ไม่ใช่ขนาดภาพ … แบบเลือกเพดานสัดส่วนได้ดีกว่าครับ"*
+ */
+test("★ pr card frame: กรอบตามภาพ/กรอบคงที่ + เพดานสัดส่วน (ตรรกะล้วน)", () => {
+  /* 'auto' = ปล่อยให้ภาพกำหนด (หน้าต่างยืดหด) · ค่าอื่น = อัตราส่วนคงที่ */
+  assert.equal(frameRatioOf("auto"), null);
+  assert.equal(previewAspectOf("auto"), null);
+  assert.equal(frameRatioOf("4:5"), 4 / 5);
+  assert.equal(frameRatioOf("16:9"), 16 / 9);
+  assert.equal(previewAspectOf("1:1"), 1);
+
+  /* ค่าเพี้ยน/ว่าง = ค่าเริ่มต้น (auto) ไม่ throw */
+  for (const bad of ["", "  ", "9:16", "huge", "AUTO"]) {
+    assert.equal(frameOf(bad), "auto", `ค่า "${bad}" ต้องถอยไป auto`);
+  }
+  assert.equal(frameOf("3:4"), "3:4");
+  assert.equal(frameOf(null), "auto");
+  assert.deepEqual([...PR_CARD_FRAMES], ["auto", "1:1", "4:5", "3:4", "16:9"]);
+
+  /* เพดานเมื่อ "ตามภาพ": ภาพสูงมาก → ไม่สูงกว่า 4:5 · ภาพกว้างมาก → ไม่กว้างกว่า 16:9 */
+  assert.equal(clampAutoRatio(0.2), AUTO_FRAME_RATIO_BOUNDS.min);
+  assert.equal(clampAutoRatio(5), AUTO_FRAME_RATIO_BOUNDS.max);
+  assert.equal(clampAutoRatio(1), 1, "ภาพจัตุรัสอยู่ในเพดาน = คงเดิม");
+  assert.equal(clampAutoRatio(Number.NaN), 4 / 5, "ค่าเสีย = ถอยไป 4:5");
+
+  /* สัดส่วนที่การ์ดบนเว็บใช้จริง */
+  assert.equal(cardRatioOf("1:1", { width: 3000, height: 500 }), 1, "เลือกกรอบไว้ = ใช้กรอบนั้น (ไม่สนใจภาพ)");
+  assert.equal(cardRatioOf("auto", { width: 1407, height: 1759 }), 4 / 5, "auto + ภาพสูง → ชนเพดาน");
+  assert.equal(cardRatioOf("auto", { width: 1000, height: 1000 }), 1);
+  assert.equal(cardRatioOf("auto", undefined), 4 / 5, "ไม่รู้ขนาดภาพ = ค่าเดิม (4:5)");
+  assert.equal(cardRatioOf("auto", { width: 0, height: 0 }), 4 / 5);
+});
+
+test("★ pr card frame: ต่อสายจริง — จอเลือกได้ · บันทึกลง hero_setting · การ์ดบนเว็บใช้สัดส่วน", () => {
+  const editor = readFileSync("features/admin/ui/hero-pr-card-editor.tsx", "utf8");
+  assert.ok(editor.includes('name="imageFrame"'), "จอต้องมีช่องเลือกกรอบภาพ");
+  assert.ok(editor.includes("PR_CARD_FRAMES.map"), "ตัวเลือกต้องมาจากทะเบียนกลาง (ไม่พิมพ์ซ้ำ)");
+  assert.ok(editor.includes("previewAspect={previewAspectOf(frame)}"), "พรีวิวต้องเปลี่ยนตามกรอบที่เลือก");
+
+  const drop = readFileSync("features/admin/ui/image-drop.tsx", "utf8");
+  assert.ok(drop.includes("previewAspect"), "ImageDrop ต้องรับสัดส่วนกรอบพรีวิว");
+  assert.ok(drop.includes("max-h-[32rem] object-contain"), "โหมดตามภาพต้องเห็นเต็มใบ + มีเพดานความสูง");
+  assert.ok(drop.includes("aspectRatio"), "โหมดเลือกกรอบต้องใช้ aspect-ratio จริง");
+
+  const action = readFileSync("app/admin/hero/pr-card-actions.ts", "utf8");
+  assert.ok(action.includes("saveHeroCardFrame(frame, user.email)"), "action ต้องบันทึกกรอบที่เลือก");
+  assert.ok(action.includes('formData.get("imageFrame")'), "ต้องอ่านกรอบจากฟอร์ม");
+  assert.ok(action.includes("hero-card-save:${frame}"), "audit ต้องบอกกรอบที่ใช้");
+
+  const repo = readFileSync("lib/hero/repository.ts", "utf8");
+  assert.ok(repo.includes("pr_card_frame"), "ชั้นข้อมูลต้องอ่าน/เขียนคอลัมน์ pr_card_frame");
+
+  const card = readFileSync("features/home/ui/hero-card.tsx", "utf8");
+  assert.ok(card.includes("aspectRatio: `${ratio}`"), "กล่องการ์ดบนเว็บต้องยืดหดตามสัดส่วน");
+  assert.ok(card.includes('className="object-contain"'), "ภาพการ์ดต้องเห็นเต็มใบ (ไม่ตัดขอบ)");
+
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("cardRatioOf(heroSetting.prCardFrame") && page.includes("loadMediaSizes"), "หน้าแรกต้องคิดสัดส่วนจากกรอบ + ขนาดภาพจริง");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
+    for (const key of ["prCardFieldFrame", "prCardFrameLabels"]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
   }
 });

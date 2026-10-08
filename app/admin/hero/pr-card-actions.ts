@@ -6,6 +6,8 @@ import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { parseHeroCardInput } from "@/lib/content/home-card";
+import { frameOf } from "@/lib/hero/pr-card-frame";
+import { saveHeroCardFrame } from "@/lib/hero/repository";
 import { addItem, setItemMedia, setItemText, toContent, toDraft } from "@/lib/content/draft";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { isDatabaseConfigured, loadPageContent, savePageContent } from "@/lib/content/repository";
@@ -61,11 +63,16 @@ export async function saveHeroCardAction(formData: FormData): Promise<void> {
   });
 
   await savePageContent(HOME_PAGE_SPEC, toContent(draft), user.email);
+
+  /* กรอบภาพการ์ด (รอบที่ 208) — เก็บที่ hero_setting (ไม่แตะโครงเนื้อหา EAV) */
+  const frame = frameOf(typeof formData.get("imageFrame") === "string" ? String(formData.get("imageFrame")) : "");
+  const frameSaved = await saveHeroCardFrame(frame, user.email);
+  if (!frameSaved) redirect("/admin/hero?error=save-failed");
   await recordAudit({
     action: "hero-save",
     actorEmail: user.email,
     target: "home:hero-card",
-    detail: "hero-card-save",
+    detail: `hero-card-save:${frame}`,
   });
   await refreshPublicSite("page");
   redirect("/admin/hero?tab=campaigns&saved=card-saved");

@@ -56,9 +56,19 @@ type HeroCardProps = {
    * ไม่ส่งมา = ใช้ค่าคงที่ในโค้ด (`HERO_CARD_IMAGE`) เหมือนเดิมเป๊ะ
    */
   readonly image?: { readonly src: string; readonly alt: string };
+  /**
+   * สัดส่วนกรอบภาพ (กว้าง ÷ สูง) — รอบที่ 208 · มาจากกรอบที่เลือก + ขนาดจริงของภาพ
+   * ไม่ส่งมา = 4:5 (พฤติกรรมเดิม)
+   */
+  readonly ratio?: number;
 };
 
-export function HeroCard({ href, labels, image = { src: HERO_CARD_IMAGE.src, alt: labels.alt } }: HeroCardProps) {
+export function HeroCard({
+  href,
+  labels,
+  image = { src: HERO_CARD_IMAGE.src, alt: labels.alt },
+  ratio = 4 / 5,
+}: HeroCardProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [muteToday, setMuteToday] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -115,14 +125,17 @@ export function HeroCard({ href, labels, image = { src: HERO_CARD_IMAGE.src, alt
             กล่อง `relative` + `fill` (รอบที่ 200): ทำให้ภาพจากหลังบ้าน (พาธใดก็ได้) แสดงได้เสมอ
             โดยไม่ต้องรู้ขนาดจริง — คลาสเดิมยังคุมสัดส่วน/มุมโค้งไว้เหมือนก่อน
           */}
-          <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl lg:h-auto lg:w-full lg:aspect-4/5">
+          <span
+            style={{ aspectRatio: `${ratio}` }}
+            className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl lg:h-auto lg:w-full"
+          >
             <Image
               src={image.src}
               alt={image.alt}
               fill
               sizes="(min-width: 1024px) 208px, 80px"
               loading="lazy"
-              className="object-cover"
+              className="object-contain"
             />
           </span>
 

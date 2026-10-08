@@ -196,9 +196,17 @@ test("hero module: หลังบ้าน — เมนูในไซด์�
 });
 
 test("hero module (เอฟเฟค): อ่านค่าตั้งค่าจากฐานข้อมูล/ฟอร์ม — บีบช่วงค่า ไม่โยน error", () => {
-  assert.deepEqual(parseHeroSetting({ effect: "slide", intervalMs: 8000 }), { effect: "slide", intervalMs: 8000 });
-  assert.deepEqual(parseHeroSetting({ effect: "zoom", interval_ms: 3000 }), { effect: "zoom", intervalMs: 3000 }, "รองรับชื่อคอลัมน์แบบ DB");
-  assert.deepEqual(parseHeroSetting({ effect: "ไม่รู้จัก", intervalMs: 999999 }), { effect: "fade", intervalMs: HERO_INTERVAL_MAX_MS }, "ค่าเพี้ยน = ค่าเริ่มต้น + บีบเพดาน");
+  assert.deepEqual(parseHeroSetting({ effect: "slide", intervalMs: 8000 }), { effect: "slide", intervalMs: 8000, prCardFrame: "auto" });
+  assert.deepEqual(parseHeroSetting({ effect: "zoom", interval_ms: 3000 }), { effect: "zoom", intervalMs: 3000, prCardFrame: "auto" }, "รองรับชื่อคอลัมน์แบบ DB");
+  assert.deepEqual(
+    parseHeroSetting({ effect: "ไม่รู้จัก", intervalMs: 999999 }),
+    { effect: "fade", intervalMs: HERO_INTERVAL_MAX_MS, prCardFrame: "auto" },
+    "ค่าเพี้ยน = ค่าเริ่มต้น + บีบเพดาน",
+  );
+  /* กรอบการ์ด PR (รอบที่ 208) — อ่านจากทั้งชื่อ camelCase และชื่อคอลัมน์ DB */
+  assert.equal(parseHeroSetting({ pr_card_frame: "16:9" }).prCardFrame, "16:9");
+  assert.equal(parseHeroSetting({ imageFrame: "1:1" }).prCardFrame, "1:1");
+  assert.equal(parseHeroSetting({ pr_card_frame: "9:16" }).prCardFrame, "auto", "ค่าเพี้ยน = auto");
   assert.deepEqual(parseHeroSetting(undefined), DEFAULT_HERO_SETTING);
   assert.equal(clampIntervalMs(500), HERO_INTERVAL_MIN_MS, "เร็วเกินถูกบีบ");
   assert.equal(clampIntervalMs("abc"), DEFAULT_HERO_SETTING.intervalMs);

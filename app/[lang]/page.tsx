@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { Hero } from "@/features/home/ui/hero";
-import { heroCardContentOf } from "@/lib/content/home-card";
+import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
+import { cardRatioOf } from "@/lib/hero/pr-card-frame";
+import { loadMediaSizes } from "@/lib/media/repository";
 import { loadHomeContentSafely } from "@/lib/content/repository";
 import { managedHeroSlideViews } from "@/features/home/slides";
 import { NewsList } from "@/features/home/ui/news-list";
@@ -70,6 +72,23 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const messages = await getMessages(lang);
 
   /*
+    การ์ด PR ที่ขยับ (รอบที่ 208) — รวม 3 อย่าง:
+    1) ข้อความ/ภาพ = ค่าที่ตั้งในหลังบ้าน (ทับพจนานุกรม)
+    2) กรอบที่เลือก = ตาราง `hero_setting.pr_card_frame` ('auto' = ยืดหดตามภาพ)
+    3) สัดส่วนจริง = ขนาดภาพในตาราง `media` (มีเฉพาะภาพที่อยู่ในคลัง ⇒ ไฟล์ในโปรเจกต์ถอยไป 4:5)
+  */
+  const homeContent = await loadHomeContentSafely();
+  const heroSetting = await loadHeroSetting();
+  const cardContent = heroCardContentOf(homeContent, messages, lang);
+  const cardMediaId = cardContent.image.src.startsWith("/media/") ? cardContent.image.src.slice("/media/".length) : "";
+  const cardSizes = cardMediaId === "" ? null : await loadMediaSizes([cardMediaId]);
+  const heroCard: HeroCardContent = {
+    ...cardContent,
+    frame: heroSetting.prCardFrame,
+    imageRatio: cardRatioOf(heroSetting.prCardFrame, cardSizes?.get(cardMediaId)),
+  };
+
+  /*
     ── เนื้อหาหน้าแรกมาจากไหน (เซสชั่น S1) ──────────────────────────────────────
     1. ถ้าหลังบ้าน **กดเผยแพร่ + เปิดสวิตช์ "ใช้กับหน้าเว็บจริง"** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
        (ใช้ตัวเรนเดอร์ตัวเดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
@@ -109,9 +128,9 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
         locale={lang}
         messages={messages}
         dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
-        heroSetting={await loadHeroSetting()}
+        heroSetting={heroSetting}
         /* การ์ดประกาศที่ขยับ: ค่าจากหลังบ้าน (ถ้ามี) ทับพจนานุกรม — รอบที่ 200 */
-        heroCard={heroCardContentOf(await loadHomeContentSafely(), messages, lang)}
+        heroCard={heroCard}
       />
       <ProductsShowcase
         locale={lang}

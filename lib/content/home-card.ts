@@ -1,5 +1,6 @@
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import type { PageContent } from "@/lib/content/types";
+import type { PrCardFrame } from "@/lib/hero/pr-card-frame";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -21,6 +22,10 @@ export type HeroCardContent = {
   readonly linkLabel: string;
   readonly href: string;
   readonly image: { readonly src: string; readonly alt: string };
+  /** กรอบภาพที่เลือกไว้ (รอบที่ 208) — ไม่ระบุ = `auto` (ยืดหดตามภาพ) */
+  readonly frame?: PrCardFrame;
+  /** สัดส่วนจริงที่การ์ดบนเว็บใช้ (คำนวณจากกรอบ + ขนาดภาพ) — ไม่ระบุ = 4:5 */
+  readonly imageRatio?: number;
 };
 
 /** ค่าเริ่มต้น = พฤติกรรมเดิมเป๊ะ (พจนานุกรม + ค่าคงที่ในโค้ด) — ใช้เมื่อหลังบ้านยังไม่ได้ตั้งค่า */

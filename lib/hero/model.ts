@@ -156,6 +156,8 @@ function axisValue(token: string, fallback: number): number {
    ⚠️ ที่นี่เป็นแค่ค่าที่อนุญาต/การบีบช่วง — การแสดงผลจริงอยู่ที่ CSS (`[data-effect=…]`)
 */
 
+import { DEFAULT_PR_CARD_FRAME, frameOf, type PrCardFrame } from "@/lib/hero/pr-card-frame";
+
 export const HERO_EFFECTS = ["fade", "slide", "zoom", "none"] as const;
 export type HeroEffect = (typeof HERO_EFFECTS)[number];
 
@@ -168,9 +170,11 @@ export const HERO_INTERVAL_MAX_MS = 15000;
 export type HeroSetting = {
   readonly effect: HeroEffect;
   readonly intervalMs: number;
+  /** กรอบภาพของการ์ด PR (รอบที่ 208) — 'auto' = ยืดหดตามสเกลภาพ */
+  readonly prCardFrame: PrCardFrame;
 };
 
-export const DEFAULT_HERO_SETTING: HeroSetting = { effect: "fade", intervalMs: 5000 };
+export const DEFAULT_HERO_SETTING: HeroSetting = { effect: "fade", intervalMs: 5000, prCardFrame: DEFAULT_PR_CARD_FRAME };
 
 export function isHeroEffect(value: string): value is HeroEffect {
   return (HERO_EFFECTS as readonly string[]).includes(value);
@@ -187,8 +191,10 @@ export function parseHeroSetting(raw: unknown): HeroSetting {
   const record = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
   const effect = typeof record["effect"] === "string" ? record["effect"] : "";
   const interval = record["intervalMs"] ?? record["interval_ms"];
+  const frame = record["prCardFrame"] ?? record["pr_card_frame"] ?? record["imageFrame"];
   return {
     effect: isHeroEffect(effect) ? effect : DEFAULT_HERO_SETTING.effect,
     intervalMs: clampIntervalMs(typeof interval === "string" ? Number(interval) : interval),
+    prCardFrame: frameOf(typeof frame === "string" ? frame : ""),
   };
 }

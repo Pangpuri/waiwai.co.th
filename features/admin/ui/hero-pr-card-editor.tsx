@@ -5,6 +5,7 @@ import { useState } from "react";
 import { saveHeroCardAction } from "@/app/admin/hero/pr-card-actions";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import type { HeroCardInput } from "@/lib/content/home-card";
+import { PR_CARD_FRAMES, frameOf, previewAspectOf, type PrCardFrame } from "@/lib/hero/pr-card-frame";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -24,9 +25,11 @@ import type { Messages } from "@/lib/i18n/messages/th";
  */
 export function HeroPrCardEditor({
   card,
+  frame: cardFrame,
   strings,
 }: {
   readonly card: HeroCardInput;
+  readonly frame: PrCardFrame;
   readonly strings: Messages["admin"];
 }) {
   /* ค่าภาพ = state ฝั่งจอ (อัปโหลด/เลือกจากคลังแล้วส่งค่าล่าสุดตอนกดบันทึก) */
@@ -36,6 +39,9 @@ export function HeroPrCardEditor({
     altEn: card.imageAltEn,
     hasWatermark: false,
   });
+
+  /* กรอบภาพ (รอบที่ 208) — เลือกได้ว่า "ยืดหดตามภาพ" หรือกรอบคงที่ · พรีวิวเปลี่ยนตามทันที */
+  const [frame, setFrame] = useState<PrCardFrame>(cardFrame);
 
   const field = "border-line text-fg w-full rounded-md border px-2 py-1 text-sm";
 
@@ -65,6 +71,7 @@ export function HeroPrCardEditor({
             frameAspect={4 / 5}
             frameHint={strings.prCardImageHint}
             previewFit="contain"
+            previewAspect={previewAspectOf(frame)}
             showWatermark={false}
           />
         </div>
@@ -95,6 +102,21 @@ export function HeroPrCardEditor({
             <label className="text-fg-muted flex flex-col gap-1 text-[11px]">
               {strings.prCardFieldLinkLabelEn}
               <input type="text" name="linkLabelEn" maxLength={30} defaultValue={card.linkLabelEn} className={field} />
+            </label>
+            <label className="text-fg-muted flex flex-col gap-1 text-[11px] sm:col-span-2">
+              {strings.prCardFieldFrame}
+              <select
+                name="imageFrame"
+                value={frame}
+                onChange={(event) => setFrame(frameOf(event.target.value))}
+                className={field}
+              >
+                {PR_CARD_FRAMES.map((option) => (
+                  <option key={option} value={option}>
+                    {strings.prCardFrameLabels[option]}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="text-fg-muted flex flex-col gap-1 text-[11px] sm:col-span-2">
               {strings.prCardFieldHref}

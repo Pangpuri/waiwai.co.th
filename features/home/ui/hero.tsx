@@ -96,6 +96,7 @@ export function Hero({
             <HeroCard
               href={localePath(locale, card.href)}
               image={card.image}
+              ratio={card.imageRatio ?? 4 / 5}
               labels={{
                 title: card.title,
                 body: card.body,

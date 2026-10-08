@@ -58,6 +58,12 @@ type Props = {
    * · `"contain"` = **เห็นภาพเต็มใบ** (ไม่ตัด) — เจ้าของขอสำหรับการ์ด PR จะได้ตรวจภาพก่อนโพสต์
    */
   readonly previewFit?: "cover" | "contain";
+  /**
+   * สัดส่วนกรอบพรีวิว (กว้าง ÷ สูง) — ใช้คู่กับ `previewFit="contain"` (รอบที่ 208)
+   * · ใส่มาเป็นตัวเลข = กรอบคงที่ตามที่เลือก (ภาพย่อเห็นเต็มใบ)
+   * · `null` = **ให้ภาพกำหนดความสูงเอง** (หน้าต่างยืดหดตามสเกลภาพ) — คุมด้วยเพดานความสูง
+   */
+  readonly previewAspect?: number | null;
   /** ข้อความชวนวางภาพ (ค่าเริ่มต้น = imageDropHint) */
   readonly dropPrompt?: string;
   /**
@@ -111,6 +117,7 @@ export function ImageDrop({
   frameAspect,
   frameHint,
   previewFit = "cover",
+  previewAspect,
   dropPrompt,
   cropAspect,
   showWatermark = true,
@@ -297,8 +304,17 @@ export function ImageDrop({
             <img
               src={current.path}
               alt={current.altTh}
+              /*
+                (รอบที่ 208) `contain` + `previewAspect`:
+                · ตัวเลข = กรอบคงที่ตามสัดส่วนที่เลือก · `null` = ให้ภาพกำหนดความสูงเอง (ยืดหดตามสเกลภาพ)
+              */
+              style={previewFit === "contain" && typeof previewAspect === "number" ? { aspectRatio: `${previewAspect}` } : undefined}
               className={`bg-bg-subtle w-full rounded-lg ${
-                previewFit === "contain" ? "h-72 object-contain" : `object-cover ${compact ? "h-24" : "h-40"}`
+                previewFit === "contain"
+                  ? typeof previewAspect === "number"
+                    ? "object-contain"
+                    : "max-h-[32rem] object-contain"
+                  : `object-cover ${compact ? "h-24" : "h-40"}`
               }`}
             />
           )}
