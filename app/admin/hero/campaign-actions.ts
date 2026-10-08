@@ -8,6 +8,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { CAMPAIGN_ANCHOR_PRESETS, MAX_CAMPAIGNS, isCampaignStatus, parseCampaignInput } from "@/lib/campaigns/model";
 import { countCampaigns, createCampaign, setCampaignStatus, trashCampaign, updateCampaign } from "@/lib/campaigns/repository";
+import { invalidCampaignHref } from "@/lib/hero/feedback";
 
 /**
  * Server Action ของ "แคมเปญ" (รอบที่ 190)
@@ -64,8 +65,8 @@ export async function saveCampaignAction(formData: FormData): Promise<void> {
     isActive: formData.get("isActive") === "on",
     slideIds,
   });
-  /* ค่าไม่ผ่าน = ไม่บันทึก (ไม่เดาแทนผู้ใช้) — หน้าจอจะรีเฟรชกลับไปค่าที่ถูกต้อง */
-  if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid");
+  /* ค่าไม่ผ่าน = ไม่บันทึก (ไม่เดาแทนผู้ใช้) — หน้าจอจะรีเฟรชกลับไปค่าที่ถูกต้อง + บอกว่าช่องไหนไม่ผ่าน */
+  if (!parsed.ok) redirect(invalidCampaignHref(parsed.problems));
 
   const ok = await updateCampaign(id, parsed.value, user.email);
   if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
@@ -95,7 +96,7 @@ export async function setCampaignStatusAction(formData: FormData): Promise<void>
       anchorY: Number(formData.get("anchorY")),
       slideIds: formData.getAll("slideIds"),
     });
-    if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid");
+    if (!parsed.ok) redirect(invalidCampaignHref(parsed.problems));
   }
 
   const ok = await setCampaignStatus(id, status, user.email);

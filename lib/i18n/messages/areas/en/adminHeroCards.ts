@@ -55,7 +55,13 @@ export const adminHeroCards = {
   feedbackCampaignSaved: "Campaign saved",
   feedbackCampaignStatus: "Campaign status changed",
   feedbackCampaignTrashed: "Campaign moved to trash",
-  feedbackErrorInvalid: "Could not save — missing or invalid data (check the Thai title and the time window)",
+  feedbackErrorInvalid: "Could not save — missing or invalid data (see the fields below)",
   feedbackErrorSaveFailed: "Could not save — the database is unavailable, please try again",
+  /* Round 195: name the field that failed (the generic message made it look like nothing was missing) */
+  feedbackFieldTitleTh: "Field “Title (TH)” — required",
+  feedbackFieldCtaHref: "Field “Button link” — must be an in-site path (starting with /) or http(s):// · may be empty",
+  feedbackFieldImagePath: "Image field — the path must be an in-site path (starting with /), never a full URL",
+  feedbackFieldImageAltTh: "Field “Image description (Thai)” — required once an image is set (helps screen readers)",
+  feedbackFieldEndsAt: "Field “Show until” — must be after “Show from”",
   campaignImage: "Campaign card image",
 };

@@ -144,6 +144,49 @@ export function campaignCardImage(
   return { path, alt };
 }
 
+/** สถานะภาพของการ์ดที่ **หน้าจอ** ถืออยู่ก่อนกดบันทึก (คนละเรื่องกับ `CampaignCardImage`) */
+export type CampaignImageDraft = { readonly path: string; readonly altTh: string; readonly altEn: string };
+
+/** ค่าเริ่มต้นของภาพการ์ดในหน้าจอ (ใช้ร่วมกันหลายที่ — ห้ามพิมพ์ซ้ำ) */
+export const EMPTY_CAMPAIGN_IMAGE_DRAFT: CampaignImageDraft = { path: "", altTh: "", altEn: "" };
+
+/**
+ * รวม "patch" จากช่องภาพ (`ImageDrop`) เข้ากับค่าที่มีอยู่ — **ฟิลด์ที่ไม่ส่งมา = คงค่าเดิมไว้**
+ *
+ * ⚠️ บทเรียนรอบที่ 195 (บั๊กจริงที่เจ้าของเจอ): ช่องภาพส่งค่าเป็น **patch บางส่วน**
+ *    (พิมพ์คำอธิบายภาพ → `{ altTh }` · กดใช้ภาพจากคลัง → `{ path, altTh, altEn }`)
+ *    ถ้าอ่านแบบเป็น "ค่าเต็ม" (`patch.path ?? ""`) ⇒ **พาธถูกล้างทันทีที่แก้คำอธิบายภาพ ⇒ ภาพหาย**
+ *    ⇒ ต้องรวมผ่านฟังก์ชันนี้เท่านั้น (การ "ลบภาพ" ส่งมาครบทั้งสามฟิลด์เป็นค่าว่าง จึงยังลบได้)
+ */
+export function mergeCampaignImage(current: CampaignImageDraft, patch: Partial<CampaignImageDraft>): CampaignImageDraft {
+  return {
+    path: patch.path ?? current.path,
+    altTh: patch.altTh ?? current.altTh,
+    altEn: patch.altEn ?? current.altEn,
+  };
+}
+
+/**
+ * ฟิลด์ที่ `parseCampaignInput` ปฏิเสธได้ — ใช้บอกผู้ใช้ว่า "ต้องแก้ช่องไหน" (รอบที่ 195)
+ * ⚠️ ลำดับในรายการนี้ = ลำดับที่หน้าจอใช้แสดง (ค่าคงที่ ไม่สลับตามลำดับที่ validator ฟ้อง)
+ */
+export const CAMPAIGN_FIELD_CODES = ["titleTh", "ctaHref", "imagePath", "imageAltTh", "endsAt"] as const;
+export type CampaignFieldCode = (typeof CAMPAIGN_FIELD_CODES)[number];
+
+/**
+ * แปลงรายการปัญหา (ข้อความจาก `parseCampaignInput` รูปแบบ `ชื่อฟิลด์: คำอธิบาย`) → รหัสฟิลด์
+ * · ไม่รู้จัก/ซ้ำ = ตัดทิ้ง (ข้อความเพี้ยนไม่ทำให้หน้าจอพัง)
+ */
+export function campaignProblemFields(problems: readonly string[]): readonly CampaignFieldCode[] {
+  const found = new Set<CampaignFieldCode>();
+  for (const problem of problems) {
+    const raw = problem.split(":")[0]?.trim() ?? "";
+    const code = raw === "title.th" ? "titleTh" : raw;
+    if ((CAMPAIGN_FIELD_CODES as readonly string[]).includes(code)) found.add(code as CampaignFieldCode);
+  }
+  return CAMPAIGN_FIELD_CODES.filter((code) => found.has(code));
+}
+
 /** ลิงก์ที่ปลอดภัย — พาธในเว็บ หรือปลายทางที่ระบุโปรโตคอลชัดเจน */
 export function isSafeCampaignHref(value: string): boolean {
   const href = value.trim();

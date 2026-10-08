@@ -14,6 +14,7 @@ import {
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
 import { listCampaignsForAdmin } from "@/lib/campaigns/repository";
+import { type CampaignFieldCode } from "@/lib/campaigns/model";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { listMedia } from "@/lib/media/repository";
@@ -32,7 +33,11 @@ import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
  */
 /** ป้ายของเอฟเฟคแต่ละแบบ (ข้อความจากพจนานุกรม — ไม่พิมพ์ไทยในไฟล์นี้) */
 
-export default async function AdminHeroPage({ searchParams }: { searchParams: Promise<{ readonly tab?: string; readonly saved?: string; readonly error?: string }> }) {
+export default async function AdminHeroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ readonly tab?: string; readonly saved?: string; readonly error?: string; readonly fields?: string }>;
+}) {
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const s = messages.admin;
@@ -41,7 +46,7 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
   const tab = query.tab === "campaigns" ? "campaigns" : "slides";
 
   /* ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07) */
-  const feedback = feedbackOf({ saved: query.saved, error: query.error });
+  const feedback = feedbackOf({ saved: query.saved, error: query.error, fields: query.fields });
   const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
     "slide-added": s.feedbackSlideAdded,
     "slide-removed": s.feedbackSlideRemoved,
@@ -59,6 +64,14 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
   const errorMessages: Readonly<Record<HeroErrorCode, string>> = {
     invalid: s.feedbackErrorInvalid,
     "save-failed": s.feedbackErrorSaveFailed,
+  };
+  /* ข้อความต่อ "ช่องที่ทำให้ไม่ผ่าน" (รอบที่ 195) — TS บังคับว่าต้องมีครบทุกช่องในทะเบียนกลาง */
+  const fieldMessages: Readonly<Record<CampaignFieldCode, string>> = {
+    titleTh: s.feedbackFieldTitleTh,
+    ctaHref: s.feedbackFieldCtaHref,
+    imagePath: s.feedbackFieldImagePath,
+    imageAltTh: s.feedbackFieldImageAltTh,
+    endsAt: s.feedbackFieldEndsAt,
   };
 
   /* คลังภาพสำหรับช่องเลือกภาพ — ส่งให้เฉพาะผู้มีสิทธิ์ media (แบบเดียวกับตัวสร้างหน้า · รอบที่ 93) */
@@ -97,7 +110,15 @@ export default async function AdminHeroPage({ searchParams }: { searchParams: Pr
 
       {feedback === null ? null : (
         <div role="status" className="border-line bg-surface text-fg rounded-xl border px-3 py-2 text-sm">
-          {feedback.kind === "saved" ? "✓ " + savedMessages[feedback.code] : "⚠ " + errorMessages[feedback.code]}
+          <p>{feedback.kind === "saved" ? "✓ " + savedMessages[feedback.code] : "⚠ " + errorMessages[feedback.code]}</p>
+          {/* บอกให้ตรงช่อง — เดิมบอกกว้าง ๆ ว่า "ข้อมูลไม่ครบ" ⇒ เจ้าของเห็นว่าใส่ครบแล้วแต่ไม่ผ่าน (รอบที่ 195) */}
+          {feedback.kind === "error" && feedback.fields.length > 0 ? (
+            <ul className="text-fg-muted mt-1 list-disc pl-5 text-xs">
+              {feedback.fields.map((code) => (
+                <li key={code}>{fieldMessages[code]}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
 

@@ -59,6 +59,11 @@ type Props = {
    * ก่อนอัปโหลด (รอบที่ 168 · ใช้กับป้ายประกาศ = 3) · ไม่ใส่ = พฤติกรรมเดิมเป๊ะ (ย่ออย่างเดียว)
    */
   readonly cropAspect?: number;
+  /**
+   * แสดงช่อง "ลายน้ำ" ไหม (ค่าเริ่มต้น = แสดง)
+   * · ปลายทางที่ไม่รองรับลายน้ำ (เช่น การ์ดแคมเปญ) ส่ง `false` ⇒ ไม่มีช่องที่กดแล้วไม่มีผล (รอบที่ 195)
+   */
+  readonly showWatermark?: boolean;
 };
 
 function failureMessage(strings: Messages["admin"], reason: UploadFailure): string {
@@ -101,6 +106,7 @@ export function ImageDrop({
   frameHint,
   dropPrompt,
   cropAspect,
+  showWatermark = true,
 }: Props) {
   const [state, action] = useActionState<UploadState, FormData>(uploadImageAction, INITIAL_UPLOAD_STATE);
   /* คลังภาพในบริบทนี้ (ว่าง = ไม่มีคลัง ⇒ ซ่อนปุ่ม "เลือกจากคลัง" ไม่ทำให้ช่องภาพพัง) */
@@ -414,15 +420,17 @@ export function ImageDrop({
               className={fieldClass}
             />
           </div>
-          <label className="text-fg-muted flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={current.hasWatermark}
-              onChange={(event) => onChange({ hasWatermark: event.target.checked })}
-              className="border-line accent-brand-red size-4 rounded border"
-            />
-            {strings.imageWatermarkLabel}
-          </label>
+          {showWatermark ? (
+            <label className="text-fg-muted flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={current.hasWatermark}
+                onChange={(event) => onChange({ hasWatermark: event.target.checked })}
+                className="border-line accent-brand-red size-4 rounded border"
+              />
+              {strings.imageWatermarkLabel}
+            </label>
+          ) : null}
 
           <button
             type="button"

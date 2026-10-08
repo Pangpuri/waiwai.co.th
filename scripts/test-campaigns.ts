@@ -5,17 +5,22 @@ import { test } from "node:test";
 import {
   CAMPAIGN_ANCHOR_PRESETS,
   CAMPAIGN_STATUSES,
+  EMPTY_CAMPAIGN_IMAGE_DRAFT,
   MAX_CAMPAIGNS,
   anchorPresetOf,
   campaignCardImage,
+  campaignProblemFields,
   campaignReadiness,
   campaignWindowState,
   clampAnchor,
   isCampaignLiveNow,
+  mergeCampaignImage,
   normalizeMoment,
   parseCampaignInput,
   toDateTimeLocalValue,
+  type CampaignImageDraft,
 } from "@/lib/campaigns/model";
+import { feedbackOf, invalidCampaignHref } from "@/lib/hero/feedback";
 
 /** รอบที่ 190 — แคมเปญเป็นเอนทิตีของตัวเอง (มติเจ้าของ: ตัด 1:1 กับสไลด์ออก) */
 
@@ -205,7 +210,10 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
   const campaignActions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
   assert.ok(campaignActions.includes("?tab=campaigns&saved=${flag}"), "แคมเปญต้องกลับไปแท็บเดิมพร้อมรหัสผลลัพธ์");
   assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 4, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
-  assert.ok(campaignActions.includes('error=invalid'), "ข้อมูลไม่ผ่านต้องบอกว่าไม่สำเร็จ");
+  assert.ok(
+    campaignActions.includes("redirect(invalidCampaignHref(parsed.problems))"),
+    "ข้อมูลไม่ผ่านต้องบอกว่าไม่สำเร็จ **และบอกช่องที่ต้องแก้** (รอบที่ 195)",
+  );
 
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(page.includes("feedbackOf(") && page.includes("savedMessages[feedback.code]"), "หน้าจอต้องแสดงข้อความจากรหัส");
@@ -318,5 +326,90 @@ test("★ ปิดหนี้รอบ 194: 'การ์ดผูกสไล
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
     for (const key of deadKeys) assert.ok(!area.includes(key), `คีย์ ${key} ต้องถูกถอดออกจากพื้นที่ ${locale}`);
+  }
+});
+
+/**
+ * ★ รอบที่ 195 — บั๊กจริงที่เจ้าของเจอ 2 ข้อ
+ *   1. "กดใช้ภาพ แล้วแก้ชื่อภาพ ⇒ ภาพหาย" = ช่องภาพส่ง **patch บางส่วน** แต่จออ่านเป็น "ค่าเต็ม"
+ *   2. "บันทึกไม่สำเร็จทั้งที่ใส่หมด" = ข้อความไม่บอกว่า **ช่องไหน** ไม่ผ่าน
+ */
+test("★ campaigns: ช่องภาพส่ง patch — แก้คำอธิบายภาพแล้วพาธต้องไม่หาย (บั๊กจริงรอบที่ 195)", () => {
+  const picked: CampaignImageDraft = { path: "/media/abc", altTh: "คำอธิบายเดิม", altEn: "" };
+
+  /* พิมพ์คำอธิบายภาพ (patch มีแค่ช่องเดียว) ⇒ พาธต้องอยู่ครบ */
+  assert.deepEqual(
+    mergeCampaignImage(picked, { altTh: "คำอธิบายใหม่" }),
+    { path: "/media/abc", altTh: "คำอธิบายใหม่", altEn: "" },
+    "แก้คำอธิบายภาพไทย = พาธไม่หาย",
+  );
+  assert.deepEqual(
+    mergeCampaignImage(picked, { altEn: "caption" }),
+    { path: "/media/abc", altTh: "คำอธิบายเดิม", altEn: "caption" },
+    "แก้คำอธิบายภาพอังกฤษ = พาธไม่หาย",
+  );
+
+  /* กดใช้ภาพจากคลัง = ส่งพาธ + คำอธิบายของภาพนั้น (ทับได้ตามตั้งใจ) */
+  assert.deepEqual(mergeCampaignImage(picked, { path: "/media/xyz", altTh: "", altEn: "" }), {
+    path: "/media/xyz",
+    altTh: "",
+    altEn: "",
+  });
+
+  /* patch ว่าง = คงค่าเดิมทั้งสามช่อง */
+  assert.deepEqual(mergeCampaignImage(picked, {}), picked);
+
+  /* ปุ่ม "ลบภาพ" ส่งมาครบทั้งสามช่องเป็นค่าว่าง ⇒ ต้องลบได้จริง */
+  assert.deepEqual(mergeCampaignImage(picked, { path: "", altTh: "", altEn: "" }), EMPTY_CAMPAIGN_IMAGE_DRAFT);
+
+  /* กันถอยหลัง: จอต้องรวมผ่านตัวช่วยกลาง ไม่ใช่ `patch.path ?? ""` */
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("mergeCampaignImage("), "จอแคมเปญต้องรวม patch ผ่านตัวช่วยกลาง (mergeCampaignImage)");
+  assert.ok(!manager.includes('next.path ?? ""'), "ห้ามอ่าน patch เป็นค่าเต็ม (พาธจะถูกล้างทั้งที่ผู้ใช้แค่แก้คำอธิบายภาพ)");
+  assert.ok(manager.includes("showWatermark={false}"), "การ์ดแคมเปญไม่มีลายน้ำ ⇒ ไม่ต้องมีช่องนั้นให้สับสน");
+});
+
+test("★ campaigns: บอก “ช่องที่ต้องแก้” เมื่อบันทึกไม่ผ่าน (รอบที่ 195)", () => {
+  const problems = [
+    "title.th: ต้องมีหัวข้อภาษาไทย",
+    "ctaHref: ต้องเป็นพาธในเว็บ หรือ http(s)/mailto/tel",
+    "imageAltTh: มีภาพแล้วต้องมีคำอธิบายภาพภาษาไทย",
+  ];
+  assert.deepEqual(campaignProblemFields(problems), ["titleTh", "ctaHref", "imageAltTh"], "แปลงชื่อฟิลด์จากข้อความ validator");
+  assert.deepEqual(campaignProblemFields(["endsAt: ต้องอยู่หลังเวลาเริ่ม", "imagePath: ต้องเป็นพาธในเว็บ"]), ["imagePath", "endsAt"], "เรียงตามทะเบียนกลาง ไม่ใช่ลำดับที่ฟ้อง");
+  assert.deepEqual(campaignProblemFields(["อะไรก็ไม่รู้", "title.th: ซ้ำ", "title.th: ซ้ำอีก"]), ["titleTh"], "ไม่รู้จัก/ซ้ำ = ตัดทิ้ง");
+  assert.deepEqual(campaignProblemFields([]), []);
+
+  assert.equal(
+    invalidCampaignHref(problems),
+    "/admin/hero?tab=campaigns&error=invalid&fields=titleTh,ctaHref,imageAltTh",
+    "ปลายทางกลับต้องบอกช่องที่ผิด",
+  );
+  assert.equal(invalidCampaignHref(["ไม่รู้จัก"]), "/admin/hero?tab=campaigns&error=invalid", "ไม่มีช่องที่รู้จัก = ไม่ต้องมี fields");
+
+  assert.deepEqual(
+    feedbackOf({ error: "invalid", fields: "ctaHref,bogus,titleTh,ctaHref" }),
+    { kind: "error", code: "invalid", fields: ["titleTh", "ctaHref"] },
+    "อ่าน fields กลับจาก query (ตัดค่าที่ไม่รู้จัก/ซ้ำ)",
+  );
+  assert.deepEqual(feedbackOf({ saved: "campaign-saved", fields: "titleTh" }), { kind: "saved", code: "campaign-saved" }, "ความสำเร็จไม่ต้องมี fields");
+  assert.equal(feedbackOf({ error: "อะไรก็ได้", fields: "titleTh" }), null, "รหัสเพี้ยน = ไม่แสดงแบนเนอร์");
+});
+
+test("★ campaigns: action + หน้าจอ ต่อสาย “ช่องที่ต้องแก้” ครบ (รอบที่ 195)", () => {
+  const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  assert.equal((actions.match(/invalidCampaignHref\(/g) ?? []).length, 2, "ทั้ง \"บันทึก\" และ \"เผยแพร่\" ต้องบอกช่องที่ผิด");
+  assert.ok(!actions.includes('error=invalid"'), "ห้าม redirect แบบไม่บอกสาเหตุอีก");
+
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("fieldMessages[code]"), "หน้าจอต้องแสดงข้อความของช่องที่ผิด");
+  assert.ok(page.includes("fields: query.fields"), "หน้าจอต้องส่ง fields เข้า feedbackOf");
+
+  /* ทุกช่องในทะเบียนกลางต้องมีข้อความทั้งสองภาษา (TS บังคับที่หน้าจอ — กันลืมในพจนานุกรมด้วย) */
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of ["feedbackFieldTitleTh", "feedbackFieldCtaHref", "feedbackFieldImagePath", "feedbackFieldImageAltTh", "feedbackFieldEndsAt"]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
   }
 });

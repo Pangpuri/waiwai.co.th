@@ -8,13 +8,16 @@ import {
 } from "@/app/admin/hero/campaign-actions";
 import {
   CAMPAIGN_ANCHOR_PRESETS,
+  EMPTY_CAMPAIGN_IMAGE_DRAFT,
   MAX_CAMPAIGNS,
   anchorPresetOf,
   campaignReadiness,
   campaignWindowState,
+  mergeCampaignImage,
   toDateTimeLocalValue,
   type Campaign,
   type CampaignAnchorPreset,
+  type CampaignImageDraft,
 } from "@/lib/campaigns/model";
 import { useState } from "react";
 
@@ -52,13 +55,22 @@ export function CampaignManager({
     Object.fromEntries(campaigns.map((campaign) => [campaign.id, { x: campaign.anchorX, y: campaign.anchorY }])),
   );
   const anchorOf = (id: string, fallbackX: number, fallbackY: number) => anchors[id] ?? { x: fallbackX, y: fallbackY };
-  /* ภาพของการ์ด (รอบที่ 193): เลือกจากคลัง/อัปโหลดในหน้าจอ แล้วกดบันทึกจึงเขียนฐานข้อมูล */
-  const [images, setImages] = useState<Record<string, { path: string; altTh: string; altEn: string }>>(() =>
-    Object.fromEntries(campaigns.map((campaign) => [campaign.id, { path: campaign.imagePath, altTh: campaign.imageAltTh, altEn: campaign.imageAltEn }])),
+  /*
+    ภาพของการ์ด (รอบที่ 193): เลือกจากคลัง/อัปโหลดในหน้าจอ แล้วกดบันทึกจึงเขียนฐานข้อมูล
+    ⚠️ รอบที่ 195: ช่องภาพส่งค่าเป็น **patch บางส่วน** ⇒ ต้องรวมผ่าน `mergeCampaignImage()` เท่านั้น
+       (เดิมอ่านเป็นค่าเต็ม ⇒ แก้คำอธิบายภาพแล้วพาธถูกล้าง = ภาพหาย — บั๊กจริงที่เจ้าของเจอ)
+  */
+  const [images, setImages] = useState<Record<string, CampaignImageDraft>>(() =>
+    Object.fromEntries(
+      campaigns.map((campaign) => [
+        campaign.id,
+        { path: campaign.imagePath, altTh: campaign.imageAltTh, altEn: campaign.imageAltEn } satisfies CampaignImageDraft,
+      ]),
+    ),
   );
-  const imageOf = (id: string) => images[id] ?? { path: "", altTh: "", altEn: "" };
-  function patchImage(id: string, patch: Partial<{ path: string; altTh: string; altEn: string }>): void {
-    setImages((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { path: "", altTh: "", altEn: "" }), ...patch } }));
+  const imageOf = (id: string): CampaignImageDraft => images[id] ?? EMPTY_CAMPAIGN_IMAGE_DRAFT;
+  function patchImage(id: string, patch: Partial<CampaignImageDraft>): void {
+    setImages((prev) => ({ ...prev, [id]: mergeCampaignImage(prev[id] ?? EMPTY_CAMPAIGN_IMAGE_DRAFT, patch) }));
   }
   function setAnchor(id: string, x: number, y: number): void {
     setAnchors((prev) => ({ ...prev, [id]: { x: Math.min(100, Math.max(0, Math.round(x))), y: Math.min(100, Math.max(0, Math.round(y))) } }));
@@ -94,7 +106,16 @@ export function CampaignManager({
         <ul className="grid gap-4 xl:grid-cols-2">
           {campaigns.map((campaign) => {
             const state = campaignWindowState(campaign, now);
-            const warnings = campaignReadiness(campaign);
+            /*
+              ความพร้อมคำนวณจาก **ค่าที่แก้ค้างในฟอร์มด้วย** (ภาพ/คำอธิบายภาพ)
+              ⇒ เลือกภาพแล้วยังไม่ใส่คำอธิบายภาพ = ขึ้น "ยังไม่พร้อม" ทันที ก่อนกดบันทึก (รอบที่ 195)
+              ⚠️ ช่องข้อความ (ชื่อ/หัวข้อ/ลิงก์) ยังเป็น `defaultValue` ⇒ คำเตือนของช่องนั้นอัปเดตหลังบันทึก
+            */
+            const warnings = campaignReadiness({
+              ...campaign,
+              imagePath: imageOf(campaign.id).path,
+              imageAltTh: imageOf(campaign.id).altTh,
+            });
             const preset = anchorPresetOf(campaign.anchorX, campaign.anchorY);
             return (
               <li key={campaign.id} className="border-line bg-surface flex flex-col gap-3 rounded-xl border p-3">
@@ -133,18 +154,14 @@ export function CampaignManager({
                   strings={strings}
                   compact
                   label={strings.campaignImage}
+                  /* การ์ดแคมเปญไม่มีแนวคิด "ลายน้ำ" ⇒ ไม่ต้องมีช่องนั้นให้สับสน (รอบที่ 195) */
+                  showWatermark={false}
                   value={
                     imageOf(campaign.id).path.trim() === ""
                       ? null
                       : { path: imageOf(campaign.id).path, altTh: imageOf(campaign.id).altTh, altEn: imageOf(campaign.id).altEn, hasWatermark: false }
                   }
-                  onChange={(next) =>
-                    patchImage(campaign.id, {
-                      path: next.path ?? "",
-                      altTh: next.altTh ?? imageOf(campaign.id).altTh,
-                      altEn: next.altEn ?? imageOf(campaign.id).altEn,
-                    })
-                  }
+                  onChange={(patch) => patchImage(campaign.id, patch)}
                 />
                 <form action={saveCampaignAction} className="flex flex-col gap-2">
                   <input type="hidden" name="id" value={campaign.id} />
