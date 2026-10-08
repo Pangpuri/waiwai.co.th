@@ -352,7 +352,6 @@ async function main(): Promise<void> {
 
   /* 36) ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177 — ปิดหนี้รอบ 176) */
   await checkContentTrashGuard();
-await checkCampaignModule();
 
   await closePool();
 
@@ -3957,82 +3956,3 @@ async function checkContentTrashGuard(): Promise<void> {
   }
 }
 
-/*
-  วงจรที่ 37 (รอบที่ 190) — โมดูล "สไลด์ & แคมเปญ": แคมเปญเป็นเอนทิตีของตัวเอง
-  พิสูจน์ว่า: ฉบับร่างไม่ขึ้นเว็บ · เผยแพร่แล้วขึ้น · เลือกสไลด์ได้ (ไม่เลือก = ทุกสไลด์) ·
-  ช่วงเวลาหมดแล้ว/ยังไม่เริ่ม = ไม่ขึ้น · ย้ายเข้าถังขยะ = หายจากทั้งสองฝั่ง · และเก็บกวาดครบ
-*/
-async function checkCampaignModule(): Promise<void> {
-  console.log("\n— วงจรที่ 37: แคมเปญ (สถานะ/ช่วงเวลา/เลือกสไลด์) —");
-  let campaignId = "";
-  try {
-    const { createCampaign, listCampaignsForAdmin, listLiveCampaigns, setCampaignStatus, trashCampaign, updateCampaign } =
-      await import("@/lib/campaigns/repository");
-
-    campaignId = (await createCampaign("check-db")) ?? "";
-    assert.ok(campaignId !== "", "สร้างแคมเปญได้");
-
-    const before = (await listLiveCampaigns()).filter((row) => row.id === campaignId).length;
-    assert.equal(before, 0, "ฉบับร่างต้องไม่ขึ้นหน้าเว็บ");
-
-    const input = {
-      name: "ตรวจวงจร 37",
-      title: { th: "แคมเปญตรวจ", en: "" },
-      body: { th: "", en: "" },
-      ctaLabel: { th: "", en: "" },
-      ctaHref: "/products",
-      imagePath: "",
-      imageAltTh: "",
-      imageAltEn: "",
-      anchorX: 33,
-      anchorY: 22,
-      startsAt: null,
-      endsAt: null,
-      isActive: true,
-      slideIds: [] as readonly string[],
-    };
-    assert.ok(await updateCampaign(campaignId, input, "check-db"), "บันทึกแคมเปญได้");
-
-    assert.ok(await setCampaignStatus(campaignId, "published", "check-db"), "เผยแพร่ได้");
-    const live = (await listLiveCampaigns()).find((row) => row.id === campaignId);
-    assert.ok(live !== undefined, "เผยแพร่แล้วต้องขึ้นหน้าเว็บ");
-    assert.deepEqual(live?.slideIds ?? ["x"], [], "ไม่เลือกสไลด์ = ไม่มีรายการผูก (แสดงทุกสไลด์)");
-    assert.equal(live?.anchorX, 33, "จุดยึด X ถูกบันทึก");
-    assert.equal(live?.anchorY, 22, "จุดยึด Y ถูกบันทึก");
-
-    /* เลือกสไลด์จริง 1 ใบ */
-    const slide = (await getPool().query<{ id: string }>("select id from hero_slide where deleted_at is null order by sort_order asc limit 1")).rows[0]?.id ?? "";
-    assert.ok(slide !== "", "มีสไลด์ให้ผูก");
-    assert.ok(await updateCampaign(campaignId, { ...input, slideIds: [slide] }, "check-db"), "ผูกสไลด์ได้");
-    const linked = (await listLiveCampaigns()).find((row) => row.id === campaignId);
-    assert.deepEqual(linked?.slideIds ?? [], [slide], "อ่านสไลด์ที่ผูกกลับมาได้");
-
-    /* ช่วงเวลา: ยังไม่เริ่ม / หมดแล้ว = ไม่ขึ้น */
-    const now = Date.now();
-    await updateCampaign(campaignId, { ...input, slideIds: [slide], startsAt: new Date(now + 86_400_000).toISOString() }, "check-db");
-    assert.equal((await listLiveCampaigns()).filter((row) => row.id === campaignId).length, 0, "ยังไม่ถึงเวลาเริ่ม = ไม่ขึ้น");
-    await updateCampaign(campaignId, { ...input, slideIds: [slide], endsAt: new Date(now - 3_600_000).toISOString() }, "check-db");
-    assert.equal((await listLiveCampaigns()).filter((row) => row.id === campaignId).length, 0, "หมดเวลาแล้ว = ไม่ขึ้น");
-    assert.equal((await listCampaignsForAdmin()).filter((row) => row.id === campaignId).length, 1, "หลังบ้านยังเห็น (จัดการได้)");
-
-    /* ปิดใช้งาน = ไม่ขึ้น แม้ช่วงเวลาเปิดอยู่ */
-    await updateCampaign(campaignId, { ...input, slideIds: [slide], isActive: false }, "check-db");
-    assert.equal((await listLiveCampaigns()).filter((row) => row.id === campaignId).length, 0, "ปิดใช้งาน = ไม่ขึ้น");
-
-    /* ถอนกลับเป็นร่าง + ย้ายเข้าถัง */
-    await updateCampaign(campaignId, { ...input, slideIds: [slide] }, "check-db");
-    assert.ok(await setCampaignStatus(campaignId, "draft", "check-db"), "ถอนกลับเป็นร่างได้");
-    assert.equal((await listLiveCampaigns()).filter((row) => row.id === campaignId).length, 0, "ฉบับร่างไม่ขึ้นเว็บ");
-    assert.ok(await trashCampaign(campaignId, "check-db"), "ย้ายเข้าถังขยะได้");
-    assert.equal((await listCampaignsForAdmin()).filter((row) => row.id === campaignId).length, 0, "ในถัง = ไม่โผล่ในรายการหลังบ้าน");
-    assert.equal((await listLiveCampaigns()).filter((row) => row.id === campaignId).length, 0, "ในถัง = ไม่ขึ้นเว็บ");
-
-    done(
-      "แคมเปญ (สถานะ/ช่วงเวลา/เลือกสไลด์)",
-      "ร่างไม่ขึ้น · เผยแพร่ขึ้น · ผูกสไลด์อ่านกลับได้ · ยังไม่เริ่ม/หมดเวลา/ปิดใช้ = ไม่ขึ้น · ถังขยะหายทั้งสองฝั่ง",
-    );
-  } finally {
-    if (campaignId !== "") await getPool().query("delete from campaign where id = $1", [campaignId]);
-    assert.equal(await countWhere("campaign where id like 'c%' and name = $1", ["ตรวจวงจร 37"]), 0, "ต้องไม่เหลือแคมเปญทดสอบ");
-  }
-}

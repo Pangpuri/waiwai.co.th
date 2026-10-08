@@ -18,7 +18,6 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
-import { listLiveCampaigns } from "@/lib/campaigns/repository";
 import { listHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -111,7 +110,6 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
         messages={messages}
         dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
         heroSetting={await loadHeroSetting()}
-        campaigns={await listLiveCampaigns()}
         /* การ์ดประกาศที่ขยับ: ค่าจากหลังบ้าน (ถ้ามี) ทับพจนานุกรม — รอบที่ 200 */
         heroCard={heroCardContentOf(await loadHomeContentSafely(), messages, lang)}
       />

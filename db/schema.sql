@@ -1,3 +1,5 @@
+-- ⚠️ ตารางของโมดูล "แคมเปญ/การ์ดบนสไลด์" (campaign · campaign_slide · campaign_placement) ถูก **ถอดทั้งสาย** แล้ว
+--    ใน migration 0035 (รอบที่ 205) — ไม่มีในสคีมานี้อีกต่อไป
 -- ─────────────────────────────────────────────────────────────────────────────
 -- waiwai.com — สคีมาเนื้อหาสำหรับหลังบ้าน (เอกสารอ้างอิง)
 --
@@ -160,7 +162,7 @@ create index if not exists page_document_revision_page_idx on page_document_revi
    โมดูล "สไลด์ & แคมเปญ" — แยกจากบล็อก hero เพราะเป็นของระดับเว็บและมีการตั้งเวลา
    ⚠️ แหล่งความจริงของสคีมาคือ db/migrations/*.sql (ไฟล์นี้เป็นเอกสารอ้างอิง)
    ⚠️ รอบที่ 194: ตาราง "การ์ดผูกสไลด์ 1:1" (`hero_slide_card` · migration 0029–0030)
-      ถูก **ถอดออกแล้ว** (migration 0033) หลังย้ายข้อมูลไป `campaign`/`campaign_slide` — ไม่มีในไฟล์นี้โดยตั้งใจ */
+      ถูก **ถอดออกแล้ว** (migration 0033) — ไม่มีในไฟล์นี้โดยตั้งใจ */
 
 /* ── ตั้งค่าเอฟเฟค/ความเร็วของสไลด์หน้าแรก (migration 0028 · รอบที่ 185) ── */
 create table if not exists hero_setting (
@@ -494,30 +496,3 @@ create index if not exists entity_revision_lookup_idx on entity_revision (kind, 
    แคมเปญเป็น "ของของตัวเอง" — เลือกได้ว่าจะแสดงบนสไลด์ไหน (ไม่ผูก 1:1)
    · ไม่ผูกสไลด์เลย = แสดงทุกสไลด์
 */
-create table if not exists campaign (
-  id text primary key,
-  name text not null default '',
-  title_th text not null default '', title_en text not null default '',
-  body_th text not null default '', body_en text not null default '',
-  cta_label_th text not null default '', cta_label_en text not null default '',
-  cta_href text not null default '',
-  anchor_x integer not null default 8, anchor_y integer not null default 50,
-  starts_at timestamptz, ends_at timestamptz,
-  is_active boolean not null default true,
-  status text not null default 'draft' check (status in ('draft', 'published')),
-  sort_order integer not null default 0,
-  deleted_at timestamptz, deleted_by text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by text not null default '',
-  constraint campaign_anchor_x_check check (anchor_x between 0 and 100),
-  constraint campaign_anchor_y_check check (anchor_y between 0 and 100),
-  constraint campaign_window_check check (ends_at is null or starts_at is null or ends_at > starts_at)
-);
-
-create table if not exists campaign_slide (
-  campaign_id text not null references campaign (id) on delete cascade,
-  slide_id text not null references hero_slide (id) on delete cascade,
-  sort_order integer not null default 0,
-  primary key (campaign_id, slide_id)
-);

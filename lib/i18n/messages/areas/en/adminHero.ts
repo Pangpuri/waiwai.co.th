@@ -50,6 +50,7 @@ export const adminHero = {
   heroPurge: "Delete forever",
   heroPurgeConfirm: "Confirm permanent delete (cannot be undone)",
   heroTrashNote: "Slides in the trash are permanently removed after {days} days (or delete forever yourself)",
+  wiggleCardHint: "This is the PR card that wiggles at the bottom-right of the home hero — edit its text, image and link right here",
   prCardTitle: "Campaign PR card (the wiggling card on the home page)",
   prCardHint: "Edit the short text and upload the image for this card here — it links to the destination you set (default: the news page)",
   prCardFieldTitleTh: "Title (Thai) *",
@@ -64,9 +65,6 @@ export const adminHero = {
   prCardSave: "Save this card",
   prCardSaveHint: "Saving updates the site immediately",
   feedbackCardSaved: "PR card saved — the site is updated",
-  wiggleCardTitle: "The wiggling announcement card on the home page",
-  wiggleCardHint: "This is the PR card that wiggles at the bottom-right of the home hero — edit its text, image and link right here",
-  wiggleCardEdit: "Edit this card",
   heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",
 };

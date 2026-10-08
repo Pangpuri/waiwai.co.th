@@ -16,7 +16,6 @@ import {
   saveHeroSettingAction,
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
-import { type CampaignFieldCode } from "@/lib/campaigns/model";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { listMedia } from "@/lib/media/repository";
@@ -51,7 +50,7 @@ export default async function AdminHeroPage({
   const query = await searchParams;
 
   /* ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07) */
-  const feedback = feedbackOf({ saved: query.saved, error: query.error, fields: query.fields });
+  const feedback = feedbackOf({ saved: query.saved, error: query.error });
   const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
     "slide-added": s.feedbackSlideAdded,
     "slide-removed": s.feedbackSlideRemoved,
@@ -61,23 +60,11 @@ export default async function AdminHeroPage({
     "effect-saved": s.feedbackEffectSaved,
     "slide-restored": s.feedbackSlideRestored,
     "slide-purged": s.feedbackSlidePurged,
-    "campaign-added": s.feedbackCampaignAdded,
-    "campaign-saved": s.feedbackCampaignSaved,
-    "campaign-status": s.feedbackCampaignStatus,
-    "campaign-trashed": s.feedbackCampaignTrashed,
     "card-saved": s.feedbackCardSaved,
   };
   const errorMessages: Readonly<Record<HeroErrorCode, string>> = {
     invalid: s.feedbackErrorInvalid,
     "save-failed": s.feedbackErrorSaveFailed,
-  };
-  /* ข้อความต่อ "ช่องที่ทำให้ไม่ผ่าน" (รอบที่ 195) — TS บังคับว่าต้องมีครบทุกช่องในทะเบียนกลาง */
-  const fieldMessages: Readonly<Record<CampaignFieldCode, string>> = {
-    titleTh: s.feedbackFieldTitleTh,
-    ctaHref: s.feedbackFieldCtaHref,
-    imagePath: s.feedbackFieldImagePath,
-    imageAltTh: s.feedbackFieldImageAltTh,
-    endsAt: s.feedbackFieldEndsAt,
   };
 
   /* คลังภาพสำหรับช่องเลือกภาพ — ส่งให้เฉพาะผู้มีสิทธิ์ media (แบบเดียวกับตัวสร้างหน้า · รอบที่ 93) */
@@ -113,14 +100,6 @@ export default async function AdminHeroPage({
       {feedback === null ? null : (
         <div role="status" className="border-line bg-surface text-fg rounded-xl border px-3 py-2 text-sm">
           <p>{feedback.kind === "saved" ? "✓ " + savedMessages[feedback.code] : "⚠ " + errorMessages[feedback.code]}</p>
-          {/* บอกให้ตรงช่อง — เดิมบอกกว้าง ๆ ว่า "ข้อมูลไม่ครบ" ⇒ เจ้าของเห็นว่าใส่ครบแล้วแต่ไม่ผ่าน (รอบที่ 195) */}
-          {feedback.kind === "error" && feedback.fields.length > 0 ? (
-            <ul className="text-fg-muted mt-1 list-disc pl-5 text-xs">
-              {feedback.fields.map((code) => (
-                <li key={code}>{fieldMessages[code]}</li>
-              ))}
-            </ul>
-          ) : null}
         </div>
       )}
 

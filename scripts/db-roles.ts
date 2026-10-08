@@ -44,10 +44,7 @@ export const PUBLIC_READ_TABLES: readonly string[] = [
   "recipe",
   "news",
   "hero_slide",
-  "campaign",
-  "campaign_slide",
   /* รอบที่ 198 — ตำแหน่งการ์ดต่อหน้า (หน้าข่าวสารอ่านผ่านประตูอ่านอย่างเดียว) */
-  "campaign_placement",
   "hero_setting",
 ];
 

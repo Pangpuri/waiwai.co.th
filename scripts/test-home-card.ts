@@ -150,7 +150,8 @@ test("★ home card: หน้าเว็บอ่านค่าจากห�
 
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
-    for (const key of ["wiggleCardTitle", "wiggleCardHint", "wiggleCardEdit"]) {
+    /* รอบที่ 205: คีย์ที่ยังใช้จริงคือ hint ใต้ตัวแก้ + ชุดคีย์ของตัวแก้ (prCard…) */
+    for (const key of ["wiggleCardHint", "prCardTitle", "prCardSave"]) {
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
   }

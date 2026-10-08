@@ -37,7 +37,6 @@ export const recipesPage = {
 };
 
 export const newsPage = {
-  campaignStageLabel: "Campaign card from the admin",
     meta: {
       title: "News & Activities",
       description:

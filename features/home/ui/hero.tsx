@@ -4,11 +4,7 @@ import { SectionCurve } from "@/features/shell/ui/section-curve";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
-import { campaignCardView } from "@/lib/campaigns/card-view";
 import { heroCardDefaults, type HeroCardContent } from "@/lib/content/home-card";
-import { anchorPresetOf } from "@/lib/campaigns/model";
-import type { Campaign as CampaignData } from "@/lib/campaigns/model";
-import type { HeroCardView } from "./hero-slider";
 import { DEFAULT_HERO_SETTING, type HeroSetting } from "@/lib/hero/model";
 import { HERO_SLIDES, type HeroSlideView } from "../slides";
 import { HeroCard } from "./hero-card";
@@ -25,8 +21,6 @@ type HeroProps = {
   /** เอฟเฟค + ความเร็วจากหลังบ้าน (รอบที่ 185) — ไม่ส่ง = ค่าเริ่มต้น (จาง 5 วิ) */
   readonly heroSetting?: HeroSetting;
   /** การ์ดแคมเปญจากหลังบ้าน (คีย์ = id สไลด์) — รอบที่ 188 */
-  /** แคมเปญจากหลังบ้าน (รอบที่ 190) — เลือกสไลด์ที่แสดงได้ · ไม่เลือก = ทุกสไลด์ */
-  readonly campaigns?: readonly CampaignData[];
   /**
    * เนื้อหา "การ์ดประกาศที่ขยับ" (รอบที่ 200) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม
    * ไม่ส่งมา = พจนานุกรมล้วน (พฤติกรรมเดิมเป๊ะ)
@@ -54,7 +48,6 @@ export function Hero({
   messages,
   dbSlides = [],
   heroSetting = DEFAULT_HERO_SETTING,
-  campaigns = [],
   heroCard,
 }: HeroProps) {
   const m = messages.hero;
@@ -69,19 +62,6 @@ export function Hero({
   /* หลังบ้านมีสไลด์ ⇒ ใช้ของหลังบ้าน · ไม่มี/อ่านไม่ได้ ⇒ เทมเพลตเดิม (พฤติกรรมเดิมเป๊ะ) */
   const slides: readonly HeroSlideView[] = dbSlides.length > 0 ? dbSlides : templateSlides;
 
-  /* จับคู่แคมเปญกับสไลด์ + แปลงข้อความตามภาษา (ไทยหลัก · อังกฤษว่าง = ถอยไปใช้ไทย) */
-  const cardViews: Record<string, readonly HeroCardView[]> = {};
-  for (const slide of slides) {
-    const matching = campaigns.filter((campaign) => campaign.slideIds.length === 0 || campaign.slideIds.includes(slide.id));
-    if (matching.length === 0) continue;
-    cardViews[slide.id] = matching.map((card) => ({
-      /* กติกาภาษา/ภาพ อยู่ที่ `campaignCardView()` ที่เดียว — ใช้ร่วมกับหน้าอื่น (รอบที่ 198) */
-      ...campaignCardView(card, locale, { x: card.anchorX, y: card.anchorY }),
-      /* ตำแหน่งสำเร็จรูป (สำหรับสไตล์สำรอง) — จุดยึดจริงส่งแยกไปแล้ว */
-      position: anchorPresetOf(card.anchorX, card.anchorY) ?? "center",
-    }));
-  }
-
   return (
     <section className="relative isolate bg-bg">
       {/*
@@ -95,7 +75,6 @@ export function Hero({
           slides={slides}
           effect={heroSetting.effect}
           intervalMs={heroSetting.intervalMs}
-          heroCardViews={cardViews}
           labels={{
             gallery: m.galleryLabel,
             gotoSlide: m.gotoSlide,

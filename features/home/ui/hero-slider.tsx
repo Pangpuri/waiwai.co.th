@@ -1,11 +1,9 @@
 "use client";
 
-import type { CampaignCardImage } from "@/lib/campaigns/model";
 import type { HeroEffect } from "@/lib/hero/model";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-import { CampaignCard, campaignAnchorStyle, campaignCardBoxClass } from "@/features/campaigns/ui/campaign-card";
 
 import { HERO_SLIDE_INTERVAL_MS, advanceIndex, hasSlideControls } from "@/lib/slideshow";
 
@@ -43,20 +41,6 @@ type HeroSliderLabels = {
   readonly watermarkBadge: string;
 };
 
-/** วิวการ์ดแคมเปญที่แปลภาษาแล้ว (ส่งจาก hero.tsx) — รอบที่ 188 */
-export type HeroCardView = {
-  readonly id: string;
-  readonly title: string;
-  readonly body: string;
-  readonly ctaLabel: string;
-  readonly ctaHref: string;
-  readonly position: "left" | "center" | "right";
-  /** จุดยึดเป็นเปอร์เซ็นต์ของพื้นที่สไลด์ (รอบที่ 190) — ตรงกับที่ลากในหลังบ้าน */
-  readonly anchorX?: number;
-  /** ภาพของการ์ด — **ตัดสินมาแล้ว** ว่ามี/ไม่มี (ไม่มีคีย์ = ไม่มีภาพ ⇒ ไม่เรนเดอร์องค์ประกอบภาพเลย) */
-  readonly image?: CampaignCardImage;
-  readonly anchorY?: number;
-};
 
 type HeroSliderProps = {
   readonly slides: readonly HeroSlideView[];
@@ -66,10 +50,9 @@ type HeroSliderProps = {
   /** เวลาต่อภาพ (มิลลิวินาที) — ค่ามาจากหลังบ้าน */
   readonly intervalMs?: number;
   /** การ์ดแคมเปญของแต่ละสไลด์ (คีย์ = id สไลด์ · ข้อความแปลภาษาแล้ว) — รอบที่ 188 */
-  readonly heroCardViews?: Readonly<Record<string, readonly HeroCardView[]>>;
 };
 
-export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_SLIDE_INTERVAL_MS, heroCardViews = {} }: HeroSliderProps) {
+export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_SLIDE_INTERVAL_MS, }: HeroSliderProps) {
   const total = slides.length;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -87,10 +70,6 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
 
     return () => window.clearInterval(timer);
   }, [paused, total, intervalMs]);
-
-  /* การ์ดของสไลด์ที่กำลังแสดง (ถ้ามี) */
-  const activeSlideId = slides[index]?.id ?? "";
-  const activeCards = heroCardViews[activeSlideId] ?? [];
 
   function goTo(next: number) {
     setIndex(advanceIndex(next, total));
@@ -138,20 +117,6 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
         })}
       </div>
 
-        {/* การ์ดแคมเปญของสไลด์ที่กำลังแสดง (รอบที่ 188) — ตำแหน่งตามที่ตั้งในหลังบ้าน */}
-        {activeCards.length > 0 ? (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            <div
-              /* ตำแหน่งการ์ด: สูตรอยู่ที่ `campaignAnchorStyle()` ที่เดียว (ใช้ร่วมกับหน้าอื่น — รอบที่ 198) */
-              style={campaignAnchorStyle(activeCards[0]?.anchorX ?? 8, activeCards[0]?.anchorY ?? 50)}
-              className={campaignCardBoxClass()}
-            >
-              {activeCards.map((card) => (
-                <CampaignCard key={card.id} card={card} />
-              ))}
-            </div>
-          </div>
-        ) : null}
       {hasSlideControls(total) ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-8 z-20">
           <div className="container-site flex flex-wrap items-center justify-center gap-3">
