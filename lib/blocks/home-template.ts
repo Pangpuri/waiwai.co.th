@@ -84,6 +84,21 @@ export function buildHomeTemplate(): BlockDocument {
       */
       id: "block-3",
       version: BLOCK_SCHEMA_VERSION,
+      type: "newsShowcase",
+      style: style(),
+      heading: { th: th.news.title, en: en.news.title },
+      body: { th: th.news.body, en: en.news.body },
+      ctaLabel: { th: th.actions.viewAllNews, en: en.actions.viewAllNews },
+      ctaHref: "/news",
+      columns: 3,
+      limit: 3,
+      showDates: true,
+      showExcerpts: true,
+    },
+    {
+      /* บล็อกไดนามิก "ข่าวล่าสุด" (รอบที่ 223) — การ์ดพาไปหน้าข่าวชิ้นนั้น /news/<id> */
+      id: "block-4",
+      version: BLOCK_SCHEMA_VERSION,
       type: "cards",
       style: style({ background: "subtle" }),
       heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },

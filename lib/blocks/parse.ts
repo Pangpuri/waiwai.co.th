@@ -50,6 +50,7 @@ import {
 } from "@/lib/blocks/types";
 import { showcaseOptionsFromUnknown } from "@/lib/blocks/product-showcase";
 import { recipeShowcaseOptionsFromUnknown } from "@/lib/blocks/recipe-showcase";
+import { newsShowcaseOptionsFromUnknown } from "@/lib/blocks/news-showcase";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
 import type { LocalizedValue } from "@/lib/content/types";
 
@@ -828,6 +829,19 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
       return {
         ...base,
         type: "recipeShowcase",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+        ctaLabel: readText(entry, "ctaLabel", `${path}.ctaLabel`, problems),
+        ctaHref: readString(entry, "ctaHref", `${path}.ctaHref`, problems),
+        ...options,
+      };
+    }
+    case "newsShowcase": {
+      /* บล็อกไดนามิก (รอบที่ 223) — อ่านเฉพาะ "ตัวเลือก" (ข่าวจริงมาจากฐานข้อมูล) */
+      const options = newsShowcaseOptionsFromUnknown(entry);
+      return {
+        ...base,
+        type: "newsShowcase",
         heading: readText(entry, "heading", `${path}.heading`, problems),
         body: readText(entry, "body", `${path}.body`, problems),
         ctaLabel: readText(entry, "ctaLabel", `${path}.ctaLabel`, problems),

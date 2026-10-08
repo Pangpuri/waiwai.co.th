@@ -39,6 +39,7 @@ import {
   type PageLayout,
 } from "@/lib/blocks/types";
 import { clampRecipeShowcaseOptions, type RecipeShowcaseOptions } from "@/lib/blocks/recipe-showcase";
+import { clampNewsShowcaseOptions, type NewsShowcaseOptions } from "@/lib/blocks/news-showcase";
 import { clampShowcaseOptions, type ProductShowcaseOptions } from "@/lib/blocks/product-showcase";
 
 /**
@@ -993,6 +994,22 @@ export function setRecipeShowcaseOptions(
     block.columns = next.columns;
     block.limit = next.limit;
     block.showDates = next.showDates;
+  });
+}
+
+/** แก้ตัวเลือกของบล็อก "ข่าวล่าสุด" (รอบที่ 223) — บีบค่าทุกครั้ง */
+export function setNewsShowcaseOptions(
+  document: BlockDocument,
+  id: string,
+  patch: Partial<NewsShowcaseOptions>,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "newsShowcase") return;
+    const next = clampNewsShowcaseOptions({ ...block, ...patch });
+    block.columns = next.columns;
+    block.limit = next.limit;
+    block.showDates = next.showDates;
+    block.showExcerpts = next.showExcerpts;
   });
 }
 

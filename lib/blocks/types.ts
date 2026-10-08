@@ -37,6 +37,7 @@ export const BLOCK_TYPES = [
   /* รอบที่ 212 — บล็อกไดนามิก: ดึงข้อมูลจริงจากฐานข้อมูลตอนเรนเดอร์ */
   "productShowcase",
   "recipeShowcase",
+  "newsShowcase",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -447,6 +448,19 @@ export type RecipeShowcaseBlock = BlockBase & {
   readonly ctaHref: string;
 };
 
+/** บล็อก "ข่าวล่าสุด" (ไดนามิก) — เก็บแค่ตัวเลือก ดึงข่าวจริงตอนเรนเดอร์ (รอบที่ 223) */
+export type NewsShowcaseBlock = BlockBase & {
+  readonly type: "newsShowcase";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly columns: 1 | 2 | 3;
+  readonly limit: number;
+  readonly showDates: boolean;
+  readonly showExcerpts: boolean;
+  readonly ctaLabel: LocalizedValue;
+  readonly ctaHref: string;
+};
+
 export type RecipeCardsBlock = BlockBase & {
   readonly type: "recipeCards";
   readonly heading: LocalizedValue;
@@ -492,7 +506,8 @@ export type Block =
   | RosterTextBlock
   | RecipeCardsBlock
   | ProductShowcaseBlock
-  | RecipeShowcaseBlock;
+  | RecipeShowcaseBlock
+  | NewsShowcaseBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -554,6 +569,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
+  { type: "newsShowcase", label: "ข่าวล่าสุด", hint: "ดึงข่าว/กิจกรรมล่าสุดจากฐานข้อมูล (ภาพ/วันที่/คำโปรย) — เลือกจำนวนได้" },
   { type: "recipeShowcase", label: "เมนูล่าสุด", hint: "ดึงเมนูล่าสุดจากฐานข้อมูล (ภาพ/ชื่อ/วันที่) — เลือกจำนวนได้" },
   {
     type: "productShowcase",
@@ -667,6 +683,8 @@ export function createBlock(type: BlockType, id: string): Block {
     case "recipeCards":
       /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
+    case "newsShowcase":
+      return { ...base, type: "newsShowcase", heading: emptyText(), body: emptyText(), columns: 3, limit: 3, showDates: true, showExcerpts: true, ctaLabel: emptyText(), ctaHref: "" };
     case "recipeShowcase":
       return { ...base, type: "recipeShowcase", heading: emptyText(), body: emptyText(), columns: 3, limit: 3, showDates: true, ctaLabel: emptyText(), ctaHref: "" };
     case "productShowcase":

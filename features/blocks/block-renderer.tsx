@@ -6,6 +6,8 @@ import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { recipeShowcaseView } from "@/lib/blocks/recipe-showcase";
 import type { RecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
+import { newsShowcaseView } from "@/lib/blocks/news-showcase";
+import type { NewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 
 import { blockRenderStringsFor, type BlockRenderStrings } from "@/features/blocks/render-strings";
 import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
@@ -167,6 +169,7 @@ function BlockView({
   nested = false,
   productData = null,
   recipeData = null,
+  newsData = null,
 }: {
   readonly block: Block;
   readonly language: Language;
@@ -183,6 +186,8 @@ function BlockView({
   readonly productData?: ProductShowcaseData | null;
   /** ข้อมูลจริงของบล็อก "เมนูล่าสุด" (รอบที่ 222) */
   readonly recipeData?: RecipeShowcaseData | null;
+  /** ข้อมูลจริงของบล็อก "ข่าวล่าสุด" (รอบที่ 223) */
+  readonly newsData?: NewsShowcaseData | null;
 }) {
   const shell = shellClass(block.style);
   const container = containerClass(block.style, nested);
@@ -726,6 +731,47 @@ function BlockView({
           </div>
         );
       }
+      case "newsShowcase": {
+        /* บล็อกไดนามิก "ข่าวล่าสุด" (รอบที่ 223) · ไม่มีข้อมูล = ไม่เรนเดอร์ · ลิงก์ไปหน้าข่าวรายชิ้น */
+        if (newsData === null) return null;
+        const newsView = newsShowcaseView(newsData.news, block, language);
+        if (newsView.isEmpty) return null;
+        const newsGrid =
+          block.columns === 1
+            ? "grid gap-5"
+            : block.columns === 2
+              ? "grid gap-5 sm:grid-cols-2"
+              : "grid gap-5 sm:grid-cols-2 lg:grid-cols-3";
+        return (
+          <div className={`${container} flex flex-col gap-6`}>
+            <div className={`flex flex-col gap-2 ${align}`}>
+              {block.heading[language].trim() === "" ? null : (
+                <h2 className="text-fg text-2xl font-semibold">{block.heading[language]}</h2>
+              )}
+              {block.body[language].trim() === "" ? null : <p className="text-fg-muted text-sm">{block.body[language]}</p>}
+            </div>
+            <ul className={newsGrid}>
+              {newsView.items.map((item) => (
+                <li key={item.id} className="border-line bg-surface rounded-xl border p-3">
+                  <a href={localizedBlockHref(item.href, language)} className="flex flex-col gap-2">
+                    {item.image === null ? null : (
+                      <Image src={item.image} alt={item.title} width={640} height={360} sizes="(max-width: 640px) 100vw, 400px" className="h-auto w-full rounded-lg object-cover" />
+                    )}
+                    {item.dateLabel === "" ? null : <span className="text-fg-muted text-xs">{item.dateLabel}</span>}
+                    <span className="text-fg text-sm font-semibold">{item.title}</span>
+                    {item.excerpt === "" ? null : <span className="text-fg-muted text-xs">{item.excerpt}</span>}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {block.ctaLabel[language].trim() === "" || block.ctaHref.trim() === "" ? null : (
+              <a href={localizedBlockHref(block.ctaHref, language)} className="border-line-strong text-fg hover:bg-bg-subtle inline-flex w-fit items-center gap-2 rounded-full border-2 px-5 py-3 text-sm font-bold">
+                {block.ctaLabel[language]}
+              </a>
+            )}
+          </div>
+        );
+      }
       case "recipeShowcase": {
         /* บล็อกไดนามิก "เมนูล่าสุด" (รอบที่ 222) · ไม่มีข้อมูล = ไม่เรนเดอร์ · ไม่เล่นวิดีโอในบล็อก (มติ D20) */
         if (recipeData === null) return null;
@@ -868,6 +914,7 @@ function BlockView({
                     selectedBlockId={selectedBlockId}
         productData={productData}
         recipeData={recipeData}
+        newsData={newsData}
                     strings={strings}
                     nested
                   />
@@ -910,6 +957,7 @@ export function BlockDocumentView({
   heading = "",
   productData,
   recipeData,
+  newsData,
 }: {
   readonly document: BlockDocument;
   readonly language?: Language;
@@ -921,6 +969,7 @@ export function BlockDocumentView({
   /** ข้อมูลจริงของบล็อกไดนามิก (รอบที่ 213) — ผู้เรียก (หน้าเว็บ/พรีวิว) เป็นคนโหลดให้ */
   readonly productData?: ProductShowcaseData | null;
   readonly recipeData?: RecipeShowcaseData | null;
+  readonly newsData?: NewsShowcaseData | null;
 }) {
   if (document.blocks.length === 0) return null;
 
@@ -938,6 +987,7 @@ export function BlockDocumentView({
         selectedBlockId={selectedBlockId}
         productData={productData}
         recipeData={recipeData}
+        newsData={newsData}
         strings={strings}
       />
     ));

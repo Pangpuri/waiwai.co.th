@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { loadRecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
+import { loadNewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 import { Hero } from "@/features/home/ui/hero";
 import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
 import { whereToBuyViewOf } from "@/lib/content/home-section";
@@ -125,6 +126,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
           heading={messages.meta.homeTitle}
           productData={await loadProductShowcaseData(liveDocument)}
         recipeData={await loadRecipeShowcaseData(liveDocument)}
+        newsData={await loadNewsShowcaseData(liveDocument)}
         />
       </>
     );

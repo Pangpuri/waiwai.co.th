@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PreviewFrame } from "@/features/blocks/ui/preview-frame";
 import { loadProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { loadRecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
+import { loadNewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 import { InlineScript } from "@/features/shell/ui/inline-script";
 import { SiteFooterLive } from "@/features/shell/ui/site-footer-live";
 import { SiteHeaderLive } from "@/features/shell/ui/site-header-live";
@@ -154,7 +155,7 @@ export default async function PreviewPage({
         {document.blocks.length === 0 ? (
           <p className="text-fg-muted px-4 py-20 text-center text-sm">{messages.admin.previewNoBlocks}</p>
         ) : (
-          <PreviewFrame initialDocument={document} language={lang} productData={await loadProductShowcaseData(document)} recipeData={await loadRecipeShowcaseData(document)} />
+          <PreviewFrame initialDocument={document} language={lang} productData={await loadProductShowcaseData(document)} recipeData={await loadRecipeShowcaseData(document)} newsData={await loadNewsShowcaseData(document)} />
         )}
       </div>
     </div>

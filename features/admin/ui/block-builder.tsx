@@ -79,6 +79,7 @@ import {
   setJobBoardGrouping,
   setProductShowcaseOptions,
   setRecipeShowcaseOptions,
+  setNewsShowcaseOptions,
   setJobItemOpenings,
   setJobItemText,
   setPageLayout,
@@ -1227,6 +1228,29 @@ export function BlockBuilder({
                 </ul>
                 <p className="text-fg-muted text-xs">{strings.pickCardHint}</p>
               </div>
+            </>
+          );
+        case "newsShowcase":
+          /* บล็อกไดนามิก (รอบที่ 223) — ไม่มีเนื้อหาในเอกสาร ⇒ แก้เฉพาะหัวข้อ/คำโปรย/ตัวเลือก/ปุ่ม */
+          return (
+            <>
+              <TextPair idBase={`${base}-heading`} label="heading" value={block.heading} onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))} />
+              <TextPair idBase={`${base}-body`} label={`body (${strings.optionalHint})`} value={block.body} onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))} />
+              <SelectField idBase={`${base}-columns`} label={strings.blockShowcaseColumns} value={block.columns} options={[{ value: 1, label: "1" }, { value: 2, label: "2" }, { value: 3, label: "3" }]} onChange={(next) => update(setNewsShowcaseOptions(document, block.id, { columns: Number(next) === 1 ? 1 : Number(next) === 2 ? 2 : 3 }))} />
+              <SelectField idBase={`${base}-limit`} label={strings.blockNewsLimit} value={block.limit} options={[{ value: 3, label: "3" }, { value: 6, label: "6" }, { value: 9, label: "9" }, { value: 12, label: "12" }]} onChange={(next) => update(setNewsShowcaseOptions(document, block.id, { limit: Number(next) }))} />
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={block.showDates} onChange={(event) => update(setNewsShowcaseOptions(document, block.id, { showDates: event.target.checked }))} className="border-line accent-brand-red size-4 rounded border" />
+                {strings.blockNewsDates}
+              </label>
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={block.showExcerpts} onChange={(event) => update(setNewsShowcaseOptions(document, block.id, { showExcerpts: event.target.checked }))} className="border-line accent-brand-red size-4 rounded border" />
+                {strings.blockNewsExcerpts}
+              </label>
+              <label className="text-fg-muted flex flex-col gap-1 text-xs">
+                {strings.blockShowcaseCtaHref}
+                <input type="text" value={block.ctaHref} onChange={(event) => update(setBlockString(document, block.id, "ctaHref", event.target.value))} className="border-line bg-surface text-fg rounded-lg border px-2 py-1 text-sm" />
+              </label>
+              <p className="text-fg-muted text-xs">{strings.blockNewsHint}</p>
             </>
           );
         case "recipeShowcase":

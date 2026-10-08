@@ -262,8 +262,33 @@ test("★ recipe showcase: ลงทะเบียนครบ + ตัวเ�
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
   assert.ok(page.includes("loadRecipeShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดเมนูให้");
   const template = buildHomeTemplate();
-  assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "cards"]);
+  assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "newsShowcase", "cards"]);
   const block = template.blocks[1];
   assert.equal(block?.type, "recipeShowcase");
   if (block?.type === "recipeShowcase") assert.equal(block.ctaHref, "/recipes", "ปุ่มต้องพาไปหน้าเมนูอาหาร");
+});
+
+/** ★ รอบที่ 223 (คิวข้อ 4) — บล็อก "ข่าวล่าสุด": ลงทะเบียน + เรนเดอร์ + ส่งข้อมูล + แผง */
+test("★ news showcase: บล็อกข่าวล่าสุดครบวงจร (ไม่แตะฐานข้อมูลในตัวเรนเดอร์)", () => {
+  const types = readFileSync("lib/blocks/types.ts", "utf8");
+  assert.ok(types.includes('"newsShowcase"') && types.includes("ข่าวล่าสุด"), "ต้องลงทะเบียน + มีป้ายในแคตตาล็อก");
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes('case "newsShowcase": {'), "ต้องมีกรณีเรนเดอร์");
+  assert.ok(renderer.includes("newsShowcaseView(newsData.news, block, language)"), "ใช้ชั้นข้อมูลบริสุทธิ์");
+  assert.ok(renderer.includes("localizedBlockHref(item.href, language)"), "ลิงก์ต้องพาไปหน้าข่าวชิ้นนั้น (เติม /<ภาษา>)");
+  assert.ok(!renderer.includes("@/lib/news/repository"), "ห้ามตัวเรนเดอร์แตะชั้นฐานข้อมูล");
+  assert.equal(renderer.split("newsData={newsData}").length - 1, 2, "ต้องส่งข้อมูลให้ BlockView ทั้งสองจุด (รวมที่ซ้อนในแถว)");
+  const panel = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  for (const needle of ["setNewsShowcaseOptions", "blockNewsLimit", "blockNewsDates", "blockNewsExcerpts", "blockNewsHint"]) {
+    assert.ok(panel.includes(needle), `แผงต้องมี: ${needle}`);
+  }
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("loadNewsShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดข่าวให้");
+  const template = buildHomeTemplate();
+  const block = template.blocks.find((row) => row.type === "newsShowcase");
+  assert.equal(block?.type, "newsShowcase");
+  if (block?.type === "newsShowcase") {
+    assert.equal(block.ctaHref, "/news", "ปุ่มต้องพาไปหน้าข่าวสาร");
+    assert.equal(block.showExcerpts, true);
+  }
 });

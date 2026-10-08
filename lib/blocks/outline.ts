@@ -56,6 +56,7 @@ function headingTextOf(block: Block): LocalizedValue | null {
     case "recipeCards":
     case "productShowcase":
     case "recipeShowcase":
+    case "newsShowcase":
     case "form":
       return block.heading;
     case "quote":
