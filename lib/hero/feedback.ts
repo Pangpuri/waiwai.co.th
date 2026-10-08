@@ -27,6 +27,8 @@ export const HERO_SAVED_CODES = [
   "campaign-saved",
   "campaign-status",
   "campaign-trashed",
+  /* รอบที่ 203 — บันทึกการ์ด PR (การ์ดที่ขยับบนหน้าแรก) จากหน้าแคมเปญ */
+  "card-saved",
 ] as const;
 export type HeroSavedCode = (typeof HERO_SAVED_CODES)[number];
 

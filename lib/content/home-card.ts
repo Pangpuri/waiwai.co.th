@@ -81,3 +81,87 @@ export function heroCardContentOf(
         },
   };
 }
+
+/* ── ฟอร์มแก้การ์ดในหน้าแคมเปญ (รอบที่ 203) ───────────────────────────────────── */
+
+/** ช่องที่ทำให้บันทึกไม่ผ่าน (ใช้บอกผู้ใช้ทีละช่อง — เหมือนกติกาของแคมเปญ) */
+export const HERO_CARD_FIELD_CODES = ["titleTh", "bodyTh", "href", "imagePath", "imageAltTh"] as const;
+export type HeroCardFieldCode = (typeof HERO_CARD_FIELD_CODES)[number];
+
+export type HeroCardInput = {
+  readonly titleTh: string;
+  readonly titleEn: string;
+  readonly bodyTh: string;
+  readonly bodyEn: string;
+  readonly linkLabelTh: string;
+  readonly linkLabelEn: string;
+  readonly href: string;
+  readonly imagePath: string;
+  readonly imageAltTh: string;
+  readonly imageAltEn: string;
+};
+
+export type HeroCardParseResult =
+  | { readonly ok: true; readonly value: HeroCardInput }
+  | { readonly ok: false; readonly problems: readonly HeroCardFieldCode[] };
+
+/** พาธในเว็บ (`/…` ไม่ใช่ `//…`) หรือลิงก์ภายนอก http(s) — ห้าม URL เต็มของภาพ (มติ D9) */
+function isInSitePath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !value.includes(" ");
+}
+
+function text(raw: unknown, max: number): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().slice(0, max);
+}
+
+/**
+ * ตรวจค่าที่ส่งมาจากฟอร์มการ์ด (ตรรกะล้วน · ทดสอบได้)
+ * กติกา: หัวข้อไทย + ข้อความไทย **ต้องมี** (การ์ดเปล่าไม่ควรขึ้นเว็บ) · มีภาพแล้วต้องมีคำอธิบายภาพ (a11y)
+ * · ลิงก์/พาธต้องอยู่ในเว็บหรือ http(s) · ภาษาอังกฤษไม่บังคับ (ว่าง = ถอยไปใช้ไทย)
+ */
+export function parseHeroCardInput(form: { get(key: string): unknown }): HeroCardParseResult {
+  const value: HeroCardInput = {
+    titleTh: text(form.get("titleTh"), 80),
+    titleEn: text(form.get("titleEn"), 80),
+    bodyTh: text(form.get("bodyTh"), 200),
+    bodyEn: text(form.get("bodyEn"), 200),
+    linkLabelTh: text(form.get("linkLabelTh"), 30),
+    linkLabelEn: text(form.get("linkLabelEn"), 30),
+    href: text(form.get("href"), 300),
+    imagePath: text(form.get("imagePath"), 300),
+    imageAltTh: text(form.get("imageAltTh"), 200),
+    imageAltEn: text(form.get("imageAltEn"), 200),
+  };
+
+  const problems: HeroCardFieldCode[] = [];
+  if (value.titleTh === "") problems.push("titleTh");
+  if (value.bodyTh === "") problems.push("bodyTh");
+  /* เว้นว่าง = ไปหน้าข่าวสาร (ค่าเริ่มต้นเดิม) · กรอกมา = ต้องเป็นพาธในเว็บหรือ http(s) */
+  const href = value.href === "" ? HERO_CARD_HREF : value.href;
+  if (value.href !== "" && !isInSitePath(value.href) && !/^https?:\/\//.test(value.href)) problems.push("href");
+  if (value.imagePath !== "" && !isInSitePath(value.imagePath)) problems.push("imagePath");
+  if (value.imagePath !== "" && value.imageAltTh === "") problems.push("imageAltTh");
+
+  if (problems.length > 0) return { ok: false, problems };
+  return { ok: true, value: { ...value, href } };
+}
+
+/** ค่าตั้งต้นของฟอร์มแก้การ์ด = ค่าที่ **บันทึกไว้จริง** (ว่าง = ว่าง) ไม่ใช่ค่าที่ merge กับพจนานุกรมแล้ว */
+export function heroCardDraftOf(content: PageContent | null): HeroCardInput {
+  const item = content?.sections["hero"]?.items["card"]?.[0];
+  const raw = (field: string, language: "th" | "en"): string => item?.fields[field]?.[language] ?? "";
+  const image = item?.media["image"];
+  return {
+    titleTh: raw("title", "th"),
+    titleEn: raw("title", "en"),
+    bodyTh: raw("body", "th"),
+    bodyEn: raw("body", "en"),
+    linkLabelTh: raw("linkLabel", "th"),
+    linkLabelEn: raw("linkLabel", "en"),
+    href: raw("href", "th") === "" ? HERO_CARD_HREF : raw("href", "th"),
+    imagePath: image?.path ?? "",
+    imageAltTh: image?.altTh ?? "",
+    imageAltEn: image?.altEn ?? "",
+  };
+}

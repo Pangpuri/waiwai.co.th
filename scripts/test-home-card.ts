@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
-import { heroCardContentOf, heroCardDefaults } from "@/lib/content/home-card";
+import { heroCardContentOf, heroCardDefaults, heroCardDraftOf, parseHeroCardInput } from "@/lib/content/home-card";
 import type { PageContent } from "@/lib/content/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -17,6 +17,33 @@ import { th } from "@/lib/i18n/messages/th";
  *
  * เทสต์นี้รันได้โดยไม่ต้องมี DB (ตรรกะล้วน + สแกนซอร์ส)
  */
+/**
+ * ความลึกสูงสุดของฟอร์มที่ซ้อนกัน (1 = ไม่ซ้อน)
+ * ⚠️ สแกนด้วย "สตริงล้วน" ไม่ใช้ regex — บทเรียนรอบ 203: regex ที่เขียนผ่านสคริปต์หลายชั้น
+ * ทำให้ escaping เพี้ยน (``, `\/`) แล้วเทสต์ให้ผลผิดโดยไม่มีใครรู้
+ */
+function maxFormDepth(source: string): number {
+  const open = "<form";
+  const close = "</form>";
+  let depth = 0;
+  let max = 0;
+  let cursor = 0;
+  while (cursor < source.length) {
+    const nextOpen = source.indexOf(open, cursor);
+    const nextClose = source.indexOf(close, cursor);
+    if (nextOpen < 0 && nextClose < 0) break;
+    if (nextOpen >= 0 && (nextClose < 0 || nextOpen < nextClose)) {
+      depth += 1;
+      max = Math.max(max, depth);
+      cursor = nextOpen + open.length;
+    } else {
+      depth = Math.max(0, depth - 1);
+      cursor = nextClose + close.length;
+    }
+  }
+  return max;
+}
+
 function contentWithCard(overrides: {
   readonly title?: { th: string; en: string };
   readonly media?: { path: string; altTh: string; altEn: string };
@@ -113,17 +140,99 @@ test("★ home card: หน้าเว็บอ่านค่าจากห�
   assert.ok(cardUi.includes("image = { src: HERO_CARD_IMAGE.src"), "ค่าเริ่มต้นของภาพยังเป็นค่าคงที่เดิม");
   assert.ok(!cardUi.includes("src={HERO_CARD_IMAGE.src}"), "ภาพต้องมาจาก props (แก้จากหลังบ้านได้)");
 
-  /* ทางไปแก้: แผงใน /admin/hero → ตัวแก้เนื้อหาที่ช่องการ์ด */
+  /*
+    ทางไปแก้ (รอบ 200 → 203): เดิมเป็นแผงบอกทางไปหน้าจอ "เนื้อหาแบบมีโครง"
+    รอบ 203 เจ้าของสั่งให้ **ย้ายมาเป็นส่วนของตัวเองในหน้าแคมเปญ** ⇒ ตรวจว่ามีตัวแก้จริงที่นั่น (ดูเทสต์รอบ 203)
+  */
   const adminHero = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(adminHero.includes('href="/admin/content/home#item-hero-card"'), "ต้องมีปุ่มพาไปแก้การ์ดนี้");
+  assert.ok(adminHero.includes("HeroPrCardEditor"), "หน้าแคมเปญต้องมีตัวแก้การ์ด PR ของตัวเอง");
   assert.ok(adminHero.includes("s.wiggleCardHint"), "ต้องบอกว่าการ์ดนี้ไม่ใช่แคมเปญ");
-  const editor = readFileSync("features/admin/ui/home-editor.tsx", "utf8");
-  assert.ok(editor.includes("id={`item-${sectionKey}-${group.key}`}"), "ตัวแก้เนื้อหาต้องมีปลายทางให้ลิงก์กระโดดถึง");
 
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
     for (const key of ["wiggleCardTitle", "wiggleCardHint", "wiggleCardEdit"]) {
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
+  }
+});
+
+/**
+ * ★ รอบที่ 203 — การ์ด PR แคมเปญต้องแก้ได้ **จากหน้าแคมเปญ** (ไม่ต้องเด้งไปหน้าเนื้อหารวม)
+ * คำเจ้าของ: *"ย้ายมันไปไว้ส่วนแคมเปญ สามารถอัปโหลดรูปได้ เปลี่ยนข้อความสั้น ๆ ได้ เอามาเป็นส่วนของตัวเอง"*
+ */
+test("★ home card: ตรวจค่าฟอร์มการ์ด (ตรรกะล้วน) — หัวข้อ/ข้อความต้องมี · มีภาพต้องมีคำอธิบาย · ลิงก์ต้องถูก", () => {
+  const form = (values: Record<string, string>) => ({ get: (key: string) => values[key] ?? null });
+  const base = { titleTh: "แคมเปญจากไวไว", bodyTh: "รวมแคมเปญและข่าวสารล่าสุด", href: "", imagePath: "", imageAltTh: "" };
+
+  /* happy path: เว้นลิงก์ว่าง = ไปหน้าข่าวสาร (ค่าเริ่มต้นเดิม) */
+  const ok = parseHeroCardInput(form(base));
+  assert.equal(ok.ok, true);
+  if (ok.ok) {
+    assert.equal(ok.value.href, HERO_CARD_HREF);
+    assert.equal(ok.value.titleEn, "", "อังกฤษว่างได้ (ถอยไปใช้ไทย)");
+  }
+
+  /* ต้องมีหัวข้อไทย + ข้อความไทย (การ์ดเปล่าไม่ควรขึ้นเว็บ) */
+  const noTitle = parseHeroCardInput(form({ ...base, titleTh: "   " }));
+  assert.equal(noTitle.ok, false);
+  if (!noTitle.ok) assert.deepEqual([...noTitle.problems], ["titleTh"]);
+  const noBody = parseHeroCardInput(form({ ...base, bodyTh: "" }));
+  assert.equal(noBody.ok, false);
+  if (!noBody.ok) assert.deepEqual([...noBody.problems], ["bodyTh"]);
+
+  /* มีภาพ = ต้องมีคำอธิบายภาพ (a11y) · พาธเต็ม URL ใช้ไม่ได้ (มติ D9) */
+  const imgNoAlt = parseHeroCardInput(form({ ...base, imagePath: "/media/abc" }));
+  assert.equal(imgNoAlt.ok, false);
+  if (!imgNoAlt.ok) assert.deepEqual([...imgNoAlt.problems], ["imageAltTh"]);
+  const badPath = parseHeroCardInput(form({ ...base, imagePath: "https://cdn.example.com/x.jpg", imageAltTh: "ภาพ" }));
+  assert.equal(badPath.ok, false);
+  if (!badPath.ok) assert.deepEqual([...badPath.problems], ["imagePath"]);
+  const badHref = parseHeroCardInput(form({ ...base, href: "javascript:alert(1)" }));
+  assert.equal(badHref.ok, false);
+  if (!badHref.ok) assert.deepEqual([...badHref.problems], ["href"]);
+  const external = parseHeroCardInput(form({ ...base, href: "https://example.com/promo" }));
+  assert.equal(external.ok, true, "ลิงก์ภายนอก http(s) ใช้ได้");
+  const tooLong = parseHeroCardInput(form({ ...base, titleTh: "ก".repeat(120) }));
+  assert.equal(tooLong.ok, true);
+  if (tooLong.ok) assert.equal(tooLong.value.titleTh.length, 80, "ตัดที่เพดานความยาว");
+
+  /* ค่าตั้งต้นของฟอร์ม = ค่าที่บันทึกจริง (ว่าง = ว่าง ไม่ยัดค่าพจนานุกรมทับ) */
+  const draft = heroCardDraftOf(null);
+  assert.equal(draft.titleTh, "");
+  assert.equal(draft.href, HERO_CARD_HREF, "ยังไม่มีค่า = ชี้หน้าข่าวสาร (ค่าเริ่มต้นเดิม)");
+  assert.equal(heroCardDraftOf(contentWithCard({ title: { th: "เก็บไว้", en: "Stored" } })).titleEn, "Stored");
+});
+
+test("★ home card: จอแคมเปญมีตัวแก้ของการ์ดนี้เอง (ฟอร์มเดียว + อัปโหลดภาพ) — รอบที่ 203", () => {
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("<HeroPrCardEditor card={prCardDraft} strings={s} />"), "หน้าแคมเปญต้องมีตัวแก้การ์ด PR");
+  assert.ok(page.includes("heroCardDraftOf(homeContent)"), "ค่าตั้งต้นต้องมาจากค่าที่บันทึกจริง");
+  assert.ok(!page.includes('href="/admin/content/home#item-hero-card"'), "ไม่ต้องพาไปหน้าเนื้อหารวมอีก");
+  assert.ok(page.includes('"card-saved": s.feedbackCardSaved'), "ต้องมีข้อความยืนยันผลการบันทึก");
+
+  const editor = readFileSync("features/admin/ui/hero-pr-card-editor.tsx", "utf8");
+  assert.ok(editor.includes("saveHeroCardAction"), "ฟอร์มต้องเรียก action ที่บันทึกการ์ด");
+  assert.ok(editor.includes("<ImageDrop"), "ต้องอัปโหลด/เลือกภาพได้จากที่นี่");
+  for (const name of ["titleTh", "bodyTh", "linkLabelTh", "href", "imagePath", "imageAltTh"]) {
+    assert.ok(editor.includes(`name="${name}"`), `ฟอร์มต้องมีช่อง ${name}`);
+  }
+  /*
+    ⚠️ ต้องนับ "ความลึก" ของฟอร์ม ไม่ใช่จำนวน (บทเรียนจริงรอบ 203):
+    เทสต์รอบแรกนับ `<form` เจอ 2 เพราะ **คอมเมนต์** มีคำว่า `<form>` · พอแก้เป็นนับจริงกลับเจอ
+    **ฟอร์มซ้อนฟอร์มจริง** (ImageDrop มี `<form>` ของตัวเองอยู่ข้างใน) ซึ่ง React ฟ้อง hydration error
+    และเบราว์เซอร์ตัดฟอร์มชั้นในทิ้ง ⇒ ปุ่มอัปโหลดพัง
+  */
+  assert.equal(maxFormDepth(editor), 1, "ห้ามมีฟอร์มซ้อนฟอร์ม (ImageDrop ต้องอยู่นอกฟอร์มบันทึก)");
+  assert.ok(
+    editor.indexOf("<ImageDrop") > editor.indexOf("</form>"),
+    "ImageDrop (มีฟอร์มอัปโหลดของตัวเอง) ต้องถูกวาง **หลัง** ปิดฟอร์มบันทึก",
+  );
+
+  const action = readFileSync("app/admin/hero/pr-card-actions.ts", "utf8");
+  assert.ok(action.includes("parseHeroCardInput(formData)"), "ต้องตรวจค่าด้วยตรรกะล้วน");
+  assert.ok(action.includes("savePageContent(HOME_PAGE_SPEC"), "บันทึกผ่านเส้นทางเดิมของหน้าเว็บ");
+  assert.ok(action.includes("loaded.unknownKeys.length > 0"), "fail-closed เมื่อโครงเนื้อหาไม่ตรง (ไม่ทับข้อมูลส่วนอื่น)");
+  for (const code of ["hero-card-save", 'refreshPublicSite("page")', 'saved=card-saved']) {
+    assert.ok(action.includes(code), `action ต้องมี: ${code}`);
   }
 });

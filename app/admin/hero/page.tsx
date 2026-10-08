@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import Image from "next/image";
 
 import { CampaignManager, type CampaignSlideOption } from "@/features/admin/ui/campaign-manager";
+import { HeroPrCardEditor } from "@/features/admin/ui/hero-pr-card-editor";
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
 import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
-import { heroCardContentOf } from "@/lib/content/home-card";
+import { heroCardContentOf, heroCardDraftOf } from "@/lib/content/home-card";
 import { loadHomeContentSafely } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import {
@@ -45,8 +45,10 @@ export default async function AdminHeroPage({
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const s = messages.admin;
-  /* การ์ดประกาศที่ "ขยับ" บนหน้าแรก (รอบที่ 200) — ค่าที่หน้าเว็บใช้จริง (หลังบ้านทับพจนานุกรม) */
-  const wiggleCard = heroCardContentOf(await loadHomeContentSafely(), messages, "th");
+  /* การ์ด PR แคมเปญ (การ์ดที่ขยับบนหน้าแรก) — รอบที่ 200 อ่านค่าจริง · รอบที่ 203 แก้ได้จากที่นี่ */
+  const homeContent = await loadHomeContentSafely();
+  const prCardDraft = heroCardDraftOf(homeContent);
+  const wiggleCard = heroCardContentOf(homeContent, messages, "th");
   /* แท็บในหน้าเดียว (มติเจ้าของ): สไลด์ | แคมเปญ — จำแท็บใน URL */
   const query = await searchParams;
   const tab = query.tab === "campaigns" ? "campaigns" : "slides";
@@ -66,6 +68,7 @@ export default async function AdminHeroPage({
     "campaign-saved": s.feedbackCampaignSaved,
     "campaign-status": s.feedbackCampaignStatus,
     "campaign-trashed": s.feedbackCampaignTrashed,
+    "card-saved": s.feedbackCardSaved,
   };
   const errorMessages: Readonly<Record<HeroErrorCode, string>> = {
     invalid: s.feedbackErrorInvalid,
@@ -133,27 +136,15 @@ export default async function AdminHeroPage({
 
       {/* แท็บ: สไลด์ | แคมเปญ (รอบที่ 190) */}
       {/*
-        ★ รอบที่ 200 — เจ้าของเข้าใจว่า "การ์ดที่ขยับบนหน้าแรก" ต้องเพิ่มเป็นแคมเปญ
-        ⇒ วางแผงนี้ไว้บนสุด: บอกว่าการ์ดนี้แก้ที่ไหน + โชว์ค่าที่แสดงจริง + ปุ่มพาไปถึงช่องนั้น
+        ★ รอบที่ 200 → 203 — "การ์ด PR แคมเปญ" (การ์ดที่ขยับมุมขวาล่างของหน้าแรก)
+        เดิมมีแผงบอกทางไปแก้ที่หน้าจอ "เนื้อหาแบบมีโครง" · เจ้าของสั่งย้ายมาเป็น **ส่วนของตัวเองในหน้าแคมเปญ**
+        ⇒ แก้ข้อความสั้น + อัปโหลดภาพได้ที่นี่ ไม่ต้องออกจากหน้านี้
       */}
-      <section className="border-line bg-surface flex flex-col gap-2 rounded-xl border p-3">
-        <p className="text-fg text-sm font-semibold">{s.wiggleCardTitle}</p>
-        <p className="text-fg-muted text-xs">{s.wiggleCardHint}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="bg-bg-subtle relative h-16 w-16 shrink-0 overflow-hidden rounded-lg">
-            <Image src={wiggleCard.image.src} alt="" fill sizes="64px" className="object-cover" />
-          </span>
-          <span className="text-fg flex min-w-0 flex-col text-xs">
-            <span className="font-semibold">{wiggleCard.title}</span>
-            <span className="text-fg-muted">{wiggleCard.body}</span>
-          </span>
-          <Link
-            href="/admin/content/home#item-hero-card"
-            className="border-line text-fg ml-auto rounded-md border px-3 py-1.5 text-xs font-semibold"
-          >
-            {s.wiggleCardEdit}
-          </Link>
-        </div>
+      <section className="flex flex-col gap-2">
+        <HeroPrCardEditor card={prCardDraft} strings={s} />
+        <p className="text-fg-muted text-[11px]">
+          {s.wiggleCardHint} · {wiggleCard.title}
+        </p>
       </section>
 
       <nav className="border-line flex gap-2 border-b pb-2">
