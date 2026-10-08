@@ -8,7 +8,8 @@ import {
   clampShowcaseOptions,
   productShowcaseView,
 } from "@/lib/blocks/product-showcase";
-import { isBlockType } from "@/lib/blocks/types";
+import { createBlock, isBlockType } from "@/lib/blocks/types";
+import { setProductShowcaseOptions } from "@/lib/blocks/edit";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { collectShowcaseBlocks } from "@/lib/blocks/product-showcase-data";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
@@ -176,4 +177,37 @@ test("★ product showcase: ตัวเรนเดอร์ + การส่�
   const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
   assert.ok(frame.includes("productData={productData}"), "PreviewFrame ต้องส่งต่อให้ BlockDocumentView");
   assert.ok(!frame.includes("repository"), "พรีวิว (client) ห้ามแตะฐานข้อมูล");
+});
+
+test("★ product showcase: แผงแก้ในตัวสร้าง — แก้ตัวเลือกแล้วถูกบีบค่าทุกครั้ง (รอบที่ 215)", () => {
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  assert.ok(builder.includes('case "productShowcase":'), "ตัวสร้างต้องมีแผงของบล็อกนี้");
+  for (const needle of [
+    "setProductShowcaseOptions",
+    "blockShowcaseColumns",
+    "blockShowcaseCount",
+    "blockShowcaseFeatured",
+    "blockShowcaseFeaturedCount",
+    "blockShowcaseHint",
+  ]) {
+    assert.ok(builder.includes(needle), `แผงต้องมี: ${needle}`);
+  }
+  /* บล็อกไดนามิกไม่มีรายการให้แก้ในเอกสาร — แผงต้องไม่แตะ items */
+  const panel = builder.slice(builder.indexOf('case "productShowcase":'), builder.indexOf('case "recipeCards": {'));
+  assert.ok(!panel.includes("setRecipeCards"), "แผงนี้ต้องไม่ยุ่งกับรายการเมนู");
+
+  const edit = readFileSync("lib/blocks/edit.ts", "utf8");
+  assert.ok(edit.includes("clampShowcaseOptions({ ...block, ...patch })"), "ต้องบีบค่าทุกครั้งที่แก้จากแผง");
+
+  /* พฤติกรรมจริงของ setter */
+  const doc = { page: "home" as const, blocks: [createBlock("productShowcase", "b1")] };
+  const fixed = setProductShowcaseOptions(doc, "b1", { featuredPerCategory: 99, showFeatured: false, showCount: false });
+  const block = fixed.blocks[0];
+  assert.equal(block?.type, "productShowcase");
+  if (block?.type !== "productShowcase") return;
+  assert.equal(block.featuredPerCategory, 3, "เกินเพดานถูกบีบ");
+  assert.equal(block.showFeatured, false, "ปิดสินค้าแนะนำได้");
+  assert.equal(block.showCount, false, "ปิดจำนวนสินค้าได้");
+  const one = setProductShowcaseOptions(doc, "b1", { featuredPerCategory: 0 });
+  assert.equal(one.blocks[0]?.type === "productShowcase" ? one.blocks[0].featuredPerCategory : -1, 1, "ต่ำกว่า 1 ถูกบีบ");
 });

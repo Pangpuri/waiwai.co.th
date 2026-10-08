@@ -38,6 +38,11 @@ export const adminBlockTypes = {
   blockJobOpenings: "Openings (0 = not specified)",
   blockJobQualifications: "Qualifications",
   blockJobExperience: "Experience (optional)",
+  blockShowcaseColumns: "Columns",
+  blockShowcaseCount: "Show product count on category cards",
+  blockShowcaseFeatured: "Show featured products",
+  blockShowcaseFeaturedCount: "Featured products per category",
+  blockShowcaseHint: "This block pulls live data from the database (category name, description, image, count, featured product) — nothing to type in",
   blockJobGrouping: "Group by department",
   /* Management roster (round 88) */
   blockRosterMembers: "People ({n}/{max})",

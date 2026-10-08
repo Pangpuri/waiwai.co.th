@@ -39,6 +39,11 @@ export const adminBlockTypes = {
   blockJobOpenings: "จำนวนอัตรา (0 = ไม่ระบุ)",
   blockJobQualifications: "คุณสมบัติ",
   blockJobExperience: "ประสบการณ์ (ไม่บังคับ)",
+  blockShowcaseColumns: "จำนวนคอลัมน์",
+  blockShowcaseCount: "แสดงจำนวนสินค้าบนการ์ดหมวด",
+  blockShowcaseFeatured: "แสดงสินค้าแนะนำ",
+  blockShowcaseFeaturedCount: "สินค้าแนะนำกี่ตัวต่อหมวด",
+  blockShowcaseHint: "บล็อกนี้ดึงข้อมูลจริงจากฐานข้อมูล (ชื่อหมวด · คำอธิบาย · ภาพ · จำนวน · สินค้าแนะนำ) — ไม่ต้องคีย์เอง",
   blockJobGrouping: "จัดกลุ่มตามฝ่าย",
   /* รายชื่อคณะผู้บริหาร (รอบที่ 88) */
   blockRosterMembers: "รายชื่อ ({n}/{max})",

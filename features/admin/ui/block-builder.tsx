@@ -77,6 +77,7 @@ import {
   setGalleryItemCaption,
   setGalleryItemImage,
   setJobBoardGrouping,
+  setProductShowcaseOptions,
   setJobItemOpenings,
   setJobItemText,
   setPageLayout,
@@ -1227,7 +1228,71 @@ export function BlockBuilder({
               </div>
             </>
           );
-        case "recipeCards":
+        case "productShowcase":
+          /*
+            บล็อกไดนามิก (รอบที่ 215) — บล็อกนี้ **ไม่มีเนื้อหาในเอกสาร** (ข้อมูลจริงมาจากฐานข้อมูล)
+            ⇒ แผงนี้แก้เฉพาะ "ตัวเลือก": คอลัมน์ · แสดงจำนวน · แสดงสินค้าแนะนำ + จำนวนต่อหมวด
+          */
+          return (
+            <>
+              <TextPair
+                idBase={`${base}-heading`}
+                label="heading"
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-body`}
+                label={`body (${strings.optionalHint})`}
+                value={block.body}
+                onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
+              />
+              <SelectField
+                idBase={`${base}-columns`}
+                label={strings.blockShowcaseColumns}
+                value={block.columns}
+                options={[
+                  { value: 1, label: "1" },
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                ]}
+                onChange={(next) =>
+                  update(setProductShowcaseOptions(document, block.id, { columns: Number(next) === 1 ? 1 : Number(next) === 2 ? 2 : 3 }))
+                }
+              />
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={block.showCount}
+                  onChange={(event) => update(setProductShowcaseOptions(document, block.id, { showCount: event.target.checked }))}
+                  className="border-line accent-brand-red size-4 rounded border"
+                />
+                {strings.blockShowcaseCount}
+              </label>
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={block.showFeatured}
+                  onChange={(event) => update(setProductShowcaseOptions(document, block.id, { showFeatured: event.target.checked }))}
+                  className="border-line accent-brand-red size-4 rounded border"
+                />
+                {strings.blockShowcaseFeatured}
+              </label>
+              <SelectField
+                idBase={`${base}-featured`}
+                label={strings.blockShowcaseFeaturedCount}
+                value={block.featuredPerCategory}
+                options={[
+                  { value: 1, label: "1" },
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                ]}
+                onChange={(next) => update(setProductShowcaseOptions(document, block.id, { featuredPerCategory: Number(next) }))}
+              />
+              <p className="text-fg-muted text-xs">{strings.blockShowcaseHint}</p>
+            </>
+          );
+                case "recipeCards":
           /*
             เลือกเมนูใบไหน → แก้เฉพาะใบนั้น
             ใช้ `selectedCard` ชุดเดียวกับบล็อกการ์ด ⇒ คลิกการ์ดเมนูในพรีวิวแล้วเปิดช่องแก้ให้ทันที

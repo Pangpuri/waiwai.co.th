@@ -38,6 +38,7 @@ import {
   type HeroSlideItem,
   type PageLayout,
 } from "@/lib/blocks/types";
+import { clampShowcaseOptions, type ProductShowcaseOptions } from "@/lib/blocks/product-showcase";
 
 /**
  * การแก้เอกสารบล็อก (เพิ่ม/ลบ/สลับ/ทำซ้ำ/แก้ข้อความ/วางในคอลัมน์) — ตรรกะล้วน ทดสอบได้โดยไม่ต้องมี React
@@ -954,6 +955,28 @@ export function setJobItemOpenings(document: BlockDocument, id: string, index: n
 export function setJobBoardGrouping(document: BlockDocument, id: string, value: boolean): BlockDocument {
   return withBlock(document, id, (block) => {
     if (block.type === "jobBoard") block.groupByDepartment = value;
+  });
+}
+
+/* ── บล็อกไดนามิก "หมวดสินค้า + สินค้าแนะนำ" (รอบที่ 215) ─────────────────── */
+
+/**
+ * แก้ตัวเลือกของบล็อกไดนามิก — **บีบค่าทุกครั้ง** ด้วย `clampShowcaseOptions()`
+ * (ค่าที่ผู้ใช้กรอก/ลากต้องไม่หลุดช่วง: 1–3 คอลัมน์ · 1–3 สินค้าแนะนำต่อหมวด)
+ */
+export function setProductShowcaseOptions(
+  document: BlockDocument,
+  id: string,
+  patch: Partial<ProductShowcaseOptions>,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "productShowcase") return;
+    const next = clampShowcaseOptions({ ...block, ...patch });
+    block.columns = next.columns;
+    block.showFeatured = next.showFeatured;
+    block.featuredPerCategory = next.featuredPerCategory;
+    block.categoryIds = [...next.categoryIds];
+    block.showCount = next.showCount;
   });
 }
 
