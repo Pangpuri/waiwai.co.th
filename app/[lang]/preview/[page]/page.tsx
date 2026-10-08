@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { fillTemplate } from "@/lib/i18n/template";
 import { notFound } from "next/navigation";
 
 import { PreviewFrame } from "@/features/blocks/ui/preview-frame";
@@ -72,6 +73,17 @@ export default async function PreviewPage({
   */
   const partsQuery = (query.parts ?? "").trim();
   const requestedParts = isPreviewPart(partsQuery) ? partsQuery : null;
+
+  /*
+    ป้ายบอกโหมดพรีวิว (รอบที่ 218) — ทุกโหมดต้องมีคำแปล (เทสต์บังคับให้ตรงกับ `PREVIEW_PARTS`)
+    ⚠️ โหมดที่ไม่รู้จัก = ถอยไปใช้ "พรีวิวทั้งหน้า" (ไม่ทำให้หน้าพัง)
+  */
+  const previewPartLabels: Readonly<Record<string, string>> = {
+    content: messages.admin.previewPartsContent,
+    nav: messages.admin.previewPartsNav,
+    footer: messages.admin.previewPartsFooter,
+    notice: messages.admin.previewPartsNotice,
+  };
   /* หัวเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ด้วย postMessage) */
   const navbarConfig = await loadNavbarConfig(lang);
   /* ท้ายเว็บฉบับเผยแพร่ = ค่าเริ่มต้นในพรีวิว (จากนั้นอัปเดตสด ๆ ผ่าน postMessage) */
@@ -113,6 +125,23 @@ export default async function PreviewPage({
         <SiteHeaderLive locale={lang} messages={messages} initial={navbarConfig} />
       ) : null}
       {requestedParts === "footer" ? <SiteFooterLive locale={lang} messages={messages} initial={footerConfig} /> : null}
+
+      {/*
+        รอบที่ 218 (เจ้าของขอ "ก"): **แถบบอกว่ากำลังดูโหมดไหน** — กันเข้าใจผิดว่าพรีวิวไม่ตรงหน้าเว็บ
+        (พรีวิวโหมดเนื้อหาหลัก **ไม่รวม** แถบเมนู/ท้ายเว็บ/ป้ายประกาศ ตามที่ผู้ใช้สั่งไว้รอบ 178–182)
+        ⚠️ ถ้าเพิ่มโหมดพรีวิวใหม่ ต้องเพิ่มคำแปลให้ครบ — `satisfies Record<PreviewPart, string>` บังคับให้ TS ฟ้อง
+      */}
+      <p
+        className="bg-surface-raised border-line text-fg-muted border-b px-4 py-2 text-center text-xs"
+        data-preview-parts-bar=""
+      >
+        {fillTemplate(messages.admin.previewPartsBarTitle, {
+          label:
+            requestedParts === null
+              ? messages.admin.previewPartsFull
+              : (previewPartLabels[requestedParts] ?? messages.admin.previewPartsFull),
+        })}
+      </p>
 
       {status === "draft" ? (
         <p className="bg-surface-raised border-line text-fg-muted border-b px-4 py-2 text-center text-xs" data-preview-notice="draft">

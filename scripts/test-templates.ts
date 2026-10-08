@@ -366,3 +366,24 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   assert.ok(blockPath.includes("<Hero"), "โหมดบล็อกต้องเรนเดอร์ hero จริง");
   assert.ok(blockPath.includes("heroCard={heroCard}"), "hero ต้องใช้การ์ด PR จากที่เก็บจริง");
 });
+
+/** ★ รอบที่ 218 — แถบบอกโหมดพรีวิว (เจ้าของขอ "ก": กันเข้าใจผิดว่าพรีวิวไม่ตรงหน้าเว็บ) */
+test("★ preview: ทุกโหมดพรีวิวมีป้ายบอกและมีคำแปลครบทั้งสองภาษา", () => {
+  const route = readFileSync("app/[lang]/preview/[page]/page.tsx", "utf8");
+  assert.ok(route.includes('data-preview-parts-bar=""'), "หน้าพรีวิวต้องมีแถบบอกโหมด");
+  assert.ok(route.includes("messages.admin.previewPartsBarTitle"), "ต้องใช้คำแปลจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
+
+  /* โหมดที่ระบบรู้จัก (ต้องตรงกับ PREVIEW_PARTS ของ lib/chrome/workspace-url.ts) */
+  for (const part of ["content", "nav", "footer", "notice"]) {
+    assert.ok(route.includes(`"${part}"`) || route.includes(`${part}:`), `แถบต้องรู้จักโหมด ${part}`);
+    for (const lang of ["th", "en"]) {
+      const dict = readFileSync(`lib/i18n/messages/areas/${lang}/adminTemplate.ts`, "utf8");
+      const key = `previewParts${part[0]?.toUpperCase()}${part.slice(1)}`;
+      assert.ok(dict.includes(key), `พจนานุกรม ${lang} ต้องมีคีย์ ${key}`);
+    }
+  }
+  for (const lang of ["th", "en"]) {
+    const dict = readFileSync(`lib/i18n/messages/areas/${lang}/adminTemplate.ts`, "utf8");
+    assert.ok(dict.includes("previewPartsFull"), `${lang} ต้องมีป้ายโหมดทั้งหน้า`);
+  }
+});

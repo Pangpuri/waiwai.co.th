@@ -1,4 +1,3 @@
-import { HERO_SLIDES } from "@/features/home/slides";
 import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockCard, type BlockDocument } from "@/lib/blocks/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -29,9 +28,6 @@ function style(overrides: Partial<typeof DEFAULT_BLOCK_STYLE> = {}): typeof DEFA
 }
 
 /* พจนานุกรมของหมวดสินค้า/ช่องทาง — เปิดแบบกว้าง (คีย์มาจากทะเบียนกลาง ไม่ใช่พิมพ์เอง) */
-/* alt ของสไลด์ชุดเดียวกับหน้าเว็บ — อยู่ในพื้นที่ hero ของพจนานุกรม */
-const slideAltTh = (th.hero.slides ?? {}) as Readonly<Record<string, { alt: string } | undefined>>;
-const slideAltEn = (en.hero.slides ?? {}) as Readonly<Record<string, { alt: string } | undefined>>;
 const marketplaceTh = th.whereToBuy.marketplaces as Readonly<Record<string, string>>;
 const marketplaceEn = en.whereToBuy.marketplaces as Readonly<Record<string, string>>;
 

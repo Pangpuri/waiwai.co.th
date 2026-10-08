@@ -4,6 +4,12 @@
  * Split out per the check:i18n rule ("admin area hit the cap ⇒ split a sub-area, do not raise the cap").
  */
 export const adminTemplate = {
+  previewPartsBarTitle: "Viewing: {label}",
+  previewPartsFull: "Full page preview (header nav · footer included)",
+  previewPartsContent: "Main content only (no header nav · footer · notice)",
+  previewPartsNav: "Header nav only",
+  previewPartsFooter: "Footer only",
+  previewPartsNotice: "Announcement notice only",
   startFromTemplate: "Start from the current content",
   startFromTemplateHint: "Pulls the same copy the live site uses as a starting point — then edit freely.",
   templateMissingBody: "This page has no block template yet — keep editing it with the field-based content screen for now.",
