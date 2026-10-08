@@ -127,7 +127,8 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
   assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
   assert.deepEqual(
     [...blockCoverageGaps("home")],
-    ["form", "sampleData"],
+    [],
+    /* รอบที่ 224: หน้าแรกครอบคลุมครบ (hero มาจาก /admin/hero ไม่นับเป็นช่องว่าง) */
     "รอบ 210: หน้าแรกต้องเตือนว่ายังมีฟอร์ม + ส่วนข้อมูลจริงที่เทมเพลตยังไม่ครอบคลุม",
   );
 
@@ -347,7 +348,7 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   const doc = buildHomeTemplate();
   assert.deepEqual(
     doc.blocks.map((block) => block.type),
-    ["productShowcase", "recipeShowcase", "newsShowcase", "cards"],
+    ["productShowcase", "recipeShowcase", "newsShowcase", "form", "cards"],
     "เทมเพลตหน้าแรก = 4 บล็อก (หมวดสินค้า · เมนูล่าสุด · ข่าวล่าสุด · ที่ซื้อสินค้า)",
   );
   assert.ok(!doc.blocks.some((block) => block.type === "hero"), "ห้ามมีบล็อก hero ในเทมเพลตหน้าแรก");
@@ -386,4 +387,15 @@ test("★ preview: ทุกโหมดพรีวิวมีป้ายบ�
     const dict = readFileSync(`lib/i18n/messages/areas/${lang}/adminTemplate.ts`, "utf8");
     assert.ok(dict.includes("previewPartsFull"), `${lang} ต้องมีป้ายโหมดทั้งหน้า`);
   }
+});
+
+/** ★ รอบที่ 224 (คิวข้อ 5) — จดหมายข่าวใช้ฟอร์มจริง + หน้าแรกไม่เหลือช่องว่าง */
+test("★ templates: จดหมายข่าวใช้บล็อกฟอร์มจริง และหน้าแรกครอบคลุมครบ", () => {
+  const doc = buildHomeTemplate();
+  const form = doc.blocks.find((block) => block.type === "form");
+  assert.equal(form?.type, "form");
+  if (form?.type !== "form") return;
+  assert.equal(form.kind, "newsletter", "ต้องใช้ฟอร์มจดหมายข่าวจริง (ไม่สร้างฟอร์มใหม่)");
+  assert.ok(form.heading.th !== "" && form.heading.en !== "", "หัวข้อส่วนจดหมายข่าวต้องมาจากพจนานุกรม");
+  assert.deepEqual([...blockCoverageGaps("home")], [], "หน้าแรกต้องไม่เหลือช่องว่างที่ยังไม่ครอบคลุม");
 });

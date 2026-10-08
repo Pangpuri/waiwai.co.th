@@ -96,8 +96,21 @@ export function buildHomeTemplate(): BlockDocument {
       showExcerpts: true,
     },
     {
-      /* บล็อกไดนามิก "ข่าวล่าสุด" (รอบที่ 223) — การ์ดพาไปหน้าข่าวชิ้นนั้น /news/<id> */
+      /*
+        จดหมายข่าว (รอบที่ 224 · คิวข้อ 5) — ใช้ของจริง: `richText` เป็นหัวข้อ/คำโปรย แล้วต่อด้วย
+        บล็อก `form` ชนิด `newsletter` ซึ่งฝัง **ฟอร์มจริง + Server Action + consent** (ไม่สร้างใหม่)
+      */
       id: "block-4",
+      version: BLOCK_SCHEMA_VERSION,
+      type: "form",
+      style: style(),
+      kind: "newsletter",
+      /* หัวข้อ/คำโปรยของส่วนจดหมายข่าว (รอบที่ 224 · คิวข้อ 5) — ฟอร์มจริง + consent มาจาก `SubmitForm` เดิม */
+      heading: { th: th.newsletter.title, en: en.newsletter.title },
+      body: { th: th.newsletter.body, en: en.newsletter.body },
+    },
+    {
+      id: "block-5",
       version: BLOCK_SCHEMA_VERSION,
       type: "cards",
       style: style({ background: "subtle" }),
