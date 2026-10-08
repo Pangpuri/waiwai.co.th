@@ -211,3 +211,16 @@ test("★ product showcase: แผงแก้ในตัวสร้าง —
   const one = setProductShowcaseOptions(doc, "b1", { featuredPerCategory: 0 });
   assert.equal(one.blocks[0]?.type === "productShowcase" ? one.blocks[0].featuredPerCategory : -1, 1, "ต่ำกว่า 1 ถูกบีบ");
 });
+
+/** ★ รอบที่ 219 — "สินค้าแนะนำ" ต้องแสดงจริง (เจ้าของชี้ว่าบล็อกยังมาไม่ครบ) */
+test("★ product showcase: แสดงสินค้าแนะนำ + หัวข้อจากพจนานุกรมชุดเดียวกับหน้าเว็บ", () => {
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes("showcase.featured.map"), "ต้องเรนเดอร์รายการสินค้าแนะนำ");
+  assert.ok(renderer.includes("block.showFeatured"), "ต้องเคารพสวิตช์ 'แสดงสินค้าแนะนำ'");
+  assert.ok(renderer.includes("strings.showcase.featuredTitle"), "หัวข้อต้องมาจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
+  assert.ok(renderer.includes('from "next/image"'), "ภาพสินค้าต้องใช้ next/image (alt บังคับ)");
+
+  const strings = readFileSync("features/blocks/render-strings.ts", "utf8");
+  assert.equal(strings.split("showcase: { featuredTitle:").length - 1, 2, "ต้องมีข้อความทั้ง th และ en");
+  assert.ok(strings.includes("productsTh.featuredTitle") && strings.includes("productsEn.featuredTitle"), "ดึงจากพจนานุกรม products ชุดเดียวกับหน้าเว็บ");
+});

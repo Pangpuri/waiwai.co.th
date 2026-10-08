@@ -2,12 +2,12 @@ import type { CareerFieldStrings, ContactFieldStrings } from "@/features/forms/u
 import type { SubmitFormStrings } from "@/features/forms/ui/submit-form";
 import type { NewsletterFormLabels } from "@/features/home/ui/newsletter-form";
 import { actions as coreTh } from "@/lib/i18n/messages/areas/th/core";
-import { newsletter as newsletterTh } from "@/lib/i18n/messages/areas/th/home";
+import { newsletter as newsletterTh, products as productsTh } from "@/lib/i18n/messages/areas/th/home";
 import { contactPage as contactTh } from "@/lib/i18n/messages/areas/th/contact";
 import { careersPage as careersTh } from "@/lib/i18n/messages/areas/th/careers";
 import { blocks as blocksTh } from "@/lib/i18n/messages/areas/th/blocks";
 import { actions as coreEn } from "@/lib/i18n/messages/areas/en/core";
-import { newsletter as newsletterEn } from "@/lib/i18n/messages/areas/en/home";
+import { newsletter as newsletterEn, products as productsEn } from "@/lib/i18n/messages/areas/en/home";
 import { contactPage as contactEn } from "@/lib/i18n/messages/areas/en/contact";
 import { careersPage as careersEn } from "@/lib/i18n/messages/areas/en/careers";
 import { blocks as blocksEn } from "@/lib/i18n/messages/areas/en/blocks";
@@ -24,6 +24,11 @@ import { blocks as blocksEn } from "@/lib/i18n/messages/areas/en/blocks";
  *
  * ⚠️ ไฟล์นี้เป็น **ข้อมูลล้วน** (ไม่แตะ DOM/DB/Next) ⇒ ปลอดภัยทั้งสองฝั่ง และทดสอบได้ด้วย `node --test`
  */
+
+/** ข้อความของบล็อกไดนามิก "หมวดสินค้า + สินค้าแนะนำ" (รอบที่ 219) */
+export type ShowcaseStrings = {
+  readonly featuredTitle: string;
+};
 
 export type GalleryStrings = {
   readonly open: string;
@@ -67,6 +72,7 @@ export type RecipeStrings = {
 
 export type BlockRenderStrings = {
   readonly gallery: GalleryStrings;
+  readonly showcase: ShowcaseStrings;
   readonly form: FormBlockStrings;
   readonly jobBoard: JobBoardStrings;
   readonly recipe: RecipeStrings;
@@ -180,6 +186,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
   if (language === "en") {
     return {
       gallery: galleryStringsOf(blocksEn),
+      showcase: { featuredTitle: productsEn.featuredTitle },
       jobBoard: jobBoardStringsOf(careersEn),
       recipe: recipeStringsOf(blocksEn),
       layout: { tocLabel: blocksEn.layoutTocLabel },
@@ -193,6 +200,7 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
 
   return {
     gallery: galleryStringsOf(blocksTh),
+showcase: { featuredTitle: productsTh.featuredTitle },
     jobBoard: jobBoardStringsOf(careersTh),
     recipe: recipeStringsOf(blocksTh),
     layout: { tocLabel: blocksTh.layoutTocLabel },

@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+import Image from "next/image";
+
 import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 
@@ -683,6 +685,29 @@ function BlockView({
                 </li>
               ))}
             </ul>
+            {!block.showFeatured || showcase.featured.length === 0 ? null : (
+              <>
+                {/* สินค้าแนะนำ (รอบที่ 219) — เด่น 1 ตัวต่อหมวดตามจำนวนที่ตั้งไว้ · ลิงก์ไปหมวดของสินค้านั้น */}
+                <h3 className="text-fg text-xl font-semibold">{strings.showcase.featuredTitle}</h3>
+                <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
+                  {showcase.featured.map((product) => (
+                    <li key={product.id}>
+                      <a href={product.href} className="group block">
+                        {product.image === null ? null : (
+                          <span className="bg-bg-subtle flex h-36 items-center justify-center rounded-xl p-3">
+                            <Image src={product.image} alt={product.title} width={160} height={160} sizes="160px" className="h-auto max-h-32 w-auto object-contain" />
+                          </span>
+                        )}
+                        <span className="text-fg-muted mt-3 block text-xs font-semibold tracking-wide uppercase">
+                          {showcase.categories.find((category) => category.id === product.categoryId)?.title ?? ""}
+                        </span>
+                        <span className="text-fg mt-1 block text-sm font-semibold">{product.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         );
       }
