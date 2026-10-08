@@ -1,14 +1,24 @@
+import { HERO_SLIDES } from "@/features/home/slides";
+import { CATALOG_ITEMS } from "@/features/products/catalog";
+import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockCard, type BlockDocument } from "@/lib/blocks/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
-import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockCard, type BlockDocument } from "@/lib/blocks/types";
+import { SITE } from "@/lib/site";
 
 /**
  * เทมเพลตตั้งต้นของหน้าแรก (ใช้ตอนกด "เริ่มจากเนื้อหาปัจจุบัน")
  *
- * ที่มา: ข้อความชุดเดียวกับหน้าเว็บที่ใช้งานอยู่ (พจนานุกรม TH/EN) ⇒ การตลาดเปิดมาแล้วเห็นของจริงทันที
- * ไม่ต้องเริ่มจากหน้าว่าง และไม่ต้องคัดลอกข้อความด้วยมือ
+ * **รอบที่ 210 (ขั้น 1 ของการรื้อให้ตรงกับหน้าแรกจริง)** — เจ้าของกำหนดทิศทาง:
+ * *"เราจะทำใหม่ให้เข้ากับข้อมูลจริงทั้งโครงสร้าง … ทีละขั้น"* (กำหนดทิศทางกันที่ `/admin/builder/home`)
  *
- * ⚠️ ตั้งใจทำเป็น "จุดเริ่มต้น" เท่านั้น — ยังไม่ครบทุกส่วนของหน้าแรกเดิม (ส่วนที่เหลือเพิ่มด้วยปุ่ม "เพิ่มบล็อก")
+ * กติกา
+ * - **ใช้ข้อมูลจริงเท่าที่มีในโค้ด**: ชื่อ/ลิงก์/ภาพหมวดจาก `CATALOG_ITEMS` (แหล่งความจริงเดียวกับหน้าเว็บ)
+ *   · ลิงก์ร้านจาก `SITE.marketplaces` · สไลด์ตั้งต้นจาก `HERO_SLIDES` · ข้อความชุดเดียวกับพจนานุกรมของหน้าเว็บ
+ * - **ไม่ใส่ของปลอม**: การ์ดหมวดเดิมเคยใส่คำบรรยายจากพจนานุกรมที่เป็น "ข้อมูลทดสอบ" ⇒ รอบนี้ **ไม่ใส่มัน**
+ * - ส่วนที่ต้องดึง **ข้อมูลจริงจากฐานข้อมูล** (จำนวนสินค้า/สินค้าแนะนำ · เมนูล่าสุด · ข่าวล่าสุด · ฟอร์มจดหมายข่าว)
+ *   ยังทำในเทมเพลตไม่ได้ เพราะ "บล็อก" เป็นเนื้อหานิ่งที่พิมพ์เก็บในเอกสาร
+ *   ⇒ ประกาศเป็น **ช่องที่ยังไม่ครอบคลุม** (`blockCoverageGaps("home")`) เพื่อให้หน้าจอเตือนก่อนกด "ใช้กับหน้าเว็บจริง"
+ *   · ขั้นถัดไป = บล็อกไดนามิก (อ่านฐานข้อมูลตอนเรนเดอร์)
  */
 
 function style(overrides: Partial<typeof DEFAULT_BLOCK_STYLE> = {}): typeof DEFAULT_BLOCK_STYLE {
@@ -17,15 +27,40 @@ function style(overrides: Partial<typeof DEFAULT_BLOCK_STYLE> = {}): typeof DEFA
 
 type DictCard = { readonly name: string; readonly description: string };
 
-/** จับคู่การ์ด TH/EN ด้วย "คีย์เดียวกัน" (ไม่ใช่ลำดับ) — ถ้าคำแปลหาย การ์ดไทยยังอยู่ครบ */
-function cardsFrom(
-  thMap: Readonly<Record<string, DictCard>>,
-  enMap: Readonly<Record<string, DictCard>>,
-): readonly BlockCard[] {
-  return Object.entries(thMap).map(([key, item]) => ({
-    title: { th: item.name, en: enMap[key]?.name ?? "" },
-    body: { th: item.description, en: enMap[key]?.description ?? "" },
-    href: "",
+/* พจนานุกรมของหมวดสินค้า/ช่องทาง — เปิดแบบกว้าง (คีย์มาจากทะเบียนกลาง ไม่ใช่พิมพ์เอง) */
+/* ชื่อหมวด: พจนานุกรมชุดเดียวกับหน้า /products (คีย์ = CatalogItemId เดียวกับ CATALOG_ITEMS) */
+type CatalogDict = { readonly name?: string; readonly imageAlt?: string };
+const catalogTh = th.productsPage.items as Readonly<Record<string, CatalogDict | undefined>>;
+const catalogEn = en.productsPage.items as Readonly<Record<string, CatalogDict | undefined>>;
+/* alt ของสไลด์ชุดเดียวกับหน้าเว็บ — อยู่ในพื้นที่ hero ของพจนานุกรม */
+const slideAltTh = (th.hero.slides ?? {}) as Readonly<Record<string, { alt: string } | undefined>>;
+const slideAltEn = (en.hero.slides ?? {}) as Readonly<Record<string, { alt: string } | undefined>>;
+const marketplaceTh = th.whereToBuy.marketplaces as Readonly<Record<string, string>>;
+const marketplaceEn = en.whereToBuy.marketplaces as Readonly<Record<string, string>>;
+
+/** การ์ดหมวดสินค้า = ชื่อ (พจนานุกรม) + ลิงก์จริง + ภาพจริง · คำบรรยายปล่อยว่าง (ของจริงมาจากฐานข้อมูล) */
+function categoryCards(): readonly BlockCard[] {
+  return CATALOG_ITEMS.map((item) => ({
+    title: { th: catalogTh[item.id]?.name ?? item.slug, en: catalogEn[item.id]?.name ?? "" },
+    body: { th: "", en: "" },
+    href: `/products/${item.slug}`,
+    /* ภาพเป็น "พาธในโปรเจกต์" (มติ D9) · alt ใช้ชื่อหมวดไปก่อน (แก้ในตัวสร้างได้) */
+    image: {
+      path: item.image.src,
+      /* ภาพต้องมีคำอธิบาย (มติ D7) — ใช้คำบรรยายภาพของหมวดก่อน แล้วถอยไปใช้ชื่อหมวด */
+      altTh: catalogTh[item.id]?.imageAlt ?? catalogTh[item.id]?.name ?? item.slug,
+      altEn: catalogEn[item.id]?.imageAlt ?? catalogEn[item.id]?.name ?? "",
+      hasWatermark: false,
+    },
+  }));
+}
+
+/** การ์ดช่องทางจำหน่าย = ชื่อ (พจนานุกรม) + ลิงก์จริงจาก `SITE` */
+function marketplaceCards(): readonly BlockCard[] {
+  return SITE.marketplaces.map((marketplace) => ({
+    title: { th: marketplaceTh[marketplace.id] ?? marketplace.id, en: marketplaceEn[marketplace.id] ?? "" },
+    body: { th: "", en: "" },
+    href: marketplace.href,
     image: null,
   }));
 }
@@ -43,47 +78,40 @@ export function buildHomeTemplate(): BlockDocument {
       image: null,
       ctaLabel: { th: "", en: "" },
       ctaHref: "",
+      /* สไลด์ตั้งต้นชุดเดียวกับหน้าเว็บ (จากโค้ด) */
+      slides: HERO_SLIDES.map((slide, index) => ({
+        id: `slide-${index + 1}`,
+        image: {
+          path: slide.src,
+          /* alt ชุดเดียวกับหน้าเว็บ (พจนานุกรม) — ไม่ปล่อยว่าง */
+          altTh: slideAltTh[slide.id]?.alt ?? "",
+          altEn: slideAltEn[slide.id]?.alt ?? "",
+          hasWatermark: false,
+        },
+        focusX: 50,
+        focusY: 50,
+        zoom: 1,
+      })),
     },
     {
       id: "block-2",
       version: BLOCK_SCHEMA_VERSION,
-      type: "richText",
-      style: style({ background: "cream" }),
-      heading: { th: th.products.title, en: en.products.title },
+      type: "cards",
+      style: style(),
+      heading: { th: th.products.categoriesTitle, en: en.products.categoriesTitle },
       body: { th: th.products.body, en: en.products.body },
-      ctaLabel: { th: "", en: "" },
-      ctaHref: "",
+      columns: 3,
+      items: categoryCards(),
     },
     {
       id: "block-3",
       version: BLOCK_SCHEMA_VERSION,
       type: "cards",
-      style: style(),
-      heading: { th: th.products.categoriesTitle, en: en.products.categoriesTitle },
-      body: { th: "", en: "" },
-      columns: 3,
-      items: cardsFrom(th.products.categories, en.products.categories),
-    },
-    {
-      id: "block-4",
-      version: BLOCK_SCHEMA_VERSION,
-      type: "cards",
       style: style({ background: "subtle" }),
-      heading: { th: th.recipes.title, en: en.recipes.title },
-      body: { th: th.recipes.body, en: en.recipes.body },
+      heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },
+      body: { th: th.whereToBuy.body, en: en.whereToBuy.body },
       columns: 3,
-      items: cardsFrom(th.recipes.items, en.recipes.items),
-    },
-    {
-      id: "block-5",
-      version: BLOCK_SCHEMA_VERSION,
-      type: "cta",
-      style: style(),
-      heading: { th: th.newsletter.title, en: en.newsletter.title },
-      body: { th: th.newsletter.body, en: en.newsletter.body },
-      label: { th: th.newsletter.eyebrow, en: en.newsletter.eyebrow },
-      href: "/contact",
-      tone: "brand",
+      items: marketplaceCards(),
     },
   ];
 

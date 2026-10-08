@@ -88,7 +88,13 @@ export const BLOCK_COVERAGE_PART_IDS = [
 export type BlockCoveragePartId = (typeof BLOCK_COVERAGE_PART_IDS)[number];
 
 const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartId[]>> = {
-  home: [],
+  /*
+    หน้าแรก (รอบที่ 210 · ขั้น 1): ยัง **ไม่ครบ** ตามที่หน้าเว็บจริงมี
+    - `form` = ฟอร์มจดหมายข่าวจริง (จะเพิ่มบล็อกฟอร์มในขั้นถัดไป)
+    - `sampleData` = ส่วนที่ต้องดึงข้อมูลจริงจากฐานข้อมูล (จำนวนสินค้า/สินค้าแนะนำ · เมนูล่าสุด · ข่าวล่าสุด)
+      เทมเพลตใส่ได้แค่ชื่อ/ลิงก์/ภาพหมวด + ลิงก์ร้านที่มีในโค้ด ⇒ ต้องรอ "บล็อกไดนามิก"
+  */
+  home: ["form", "sampleData"],
   /* หน้าข้อความล้วน — ไม่มีแกลเลอรีในเลย์เอาต์เดิม (เผื่อไว้ถ้าเจ้าของเพิ่มภาพชุดภายหลัง) */
   about: ["gallery"],
   /* รอบที่ 88: บล็อก `jobBoard` (ตำแหน่งจริงจาก `JOBS`) ⇒ ครอบคลุมครบ */

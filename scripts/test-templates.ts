@@ -124,7 +124,11 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
   );
   assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
   assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
-  assert.deepEqual([...blockCoverageGaps("home")], [], "หน้าแรกครอบคลุมครบ");
+  assert.deepEqual(
+    [...blockCoverageGaps("home")],
+    ["form", "sampleData"],
+    "รอบ 210: หน้าแรกต้องเตือนว่ายังมีฟอร์ม + ส่วนข้อมูลจริงที่เทมเพลตยังไม่ครอบคลุม",
+  );
 
   /* ทุกรหัสต้องมีคำแปลสองภาษา (belongs to admin area) และหน้าจอต้องมี case ครบ */
   for (const part of BLOCK_COVERAGE_PART_IDS) {
