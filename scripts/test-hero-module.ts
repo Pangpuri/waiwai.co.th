@@ -230,6 +230,18 @@ test("hero module (ถังขยะ): ประตูอยู่ใน SQL + 
   assert.ok(/deleteHeroPageSlideForever[\s\S]{0,200}delete from hero_slide where id = \$1 and deleted_at is not null/.test(repo), "ลบถาวรต้องมีประตูใน SQL");
   assert.ok(repo.includes("listTrashedHeroPageSlides"), "ต้องมีตัวอ่านถังขยะสำหรับหลังบ้าน");
 
+  /*
+    ★ รอบที่ 197 — บั๊กจริง: `timestamptz` ของ Postgres กลับมาเป็น **Date** แต่ชั้นข้อมูลประกาศชนิดเป็น `string`
+    ⇒ หน้าจอ `/admin/hero` พังทั้งหน้า (`iso.slice is not a function`) ⇒ ล็อกกติกาไว้ที่นี่
+  */
+  assert.ok(repo.includes("toIsoStamp(row.deleted_at)"), "ต้องแปลง deleted_at เป็น ISO string ที่ชั้นข้อมูล");
+  assert.ok(!repo.includes("row.deleted_at ??") && !repo.includes("deletedAt: row.deleted_at"), "ห้ามส่งค่า deleted_at ดิบ (Date) ขึ้นหน้าจอ");
+  assert.ok(repo.includes("readonly deleted_at: Date | string | null"), "ชนิดของแถวต้องบอกความจริงว่าเป็น Date ได้");
+  assert.ok(
+    /function toIsoStamp\(value: Date \| string \| null\)[\s\S]{0,220}Number\.isFinite\(ms\)/.test(repo),
+    "ตัวแปลงต้องกันค่าวันที่เพี้ยน (คืนสตริงว่าง ไม่โยน error)",
+  );
+
   const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
   assert.ok(actions.includes("restoreHeroSlideAction") && actions.includes("deleteHeroSlideForeverAction"), "ต้องมี action กู้คืน/ลบถาวร");
   assert.ok(/deleteHeroSlideForeverAction[\s\S]{0,600}formData\.get\("confirm"\) !== "yes"/.test(actions), "ลบถาวรต้องบังคับยืนยันที่ฝั่งเซิร์ฟเวอร์");

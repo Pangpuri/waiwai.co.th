@@ -215,7 +215,20 @@ export async function saveHeroSetting(setting: HeroSetting, actor: string): Prom
    ⇒ ยิงคำสั่งผิดพลาดใส่ของที่ยังใช้งานอยู่ = ไม่มีผล (fail-closed · พิสูจน์ได้ในเทสต์/check:db)
 */
 
-type TrashedHeroSlideRow = HeroSlideRow & { readonly deleted_at: string | null };
+/*
+  ⚠️ บทเรียนรอบที่ 197 (บั๊กจริงจากเจ้าของ: "ทดสอบลบภาพสไลด์" → หน้า `/admin/hero` 500 `iso.slice is not a function`)
+  `timestamptz` ของ Postgres กลับมาเป็น **`Date`** ไม่ใช่สตริง (เหมือน `numeric` ที่กลับมาเป็นสตริง)
+  เดิมประกาศชนิดเป็น `string` ⇒ ชนิดข้อมูล "โกหก" ⇒ หลุดถึงหน้าจอแล้วพังตอนจัดรูปแบบ
+  ⇒ กติกา: **`Date` ต้องถูกแปลงเป็น ISO string ที่ชั้นข้อมูลเสมอ** ด้วย `toIsoStamp()`
+*/
+type TrashedHeroSlideRow = HeroSlideRow & { readonly deleted_at: Date | string | null };
+
+/** `timestamptz` จาก DB (Date หรือสตริง) → ISO string · ค่าที่อ่านไม่ได้ = `""` (หน้าจอไม่พัง) */
+function toIsoStamp(value: Date | string | null): string {
+  if (value === null) return "";
+  const ms = value instanceof Date ? value.getTime() : Date.parse(String(value));
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : "";
+}
 
 /** สไลด์ที่อยู่ในถัง (ใหม่สุดก่อน) — สำหรับหน้าจอหลังบ้านเท่านั้น */
 export async function listTrashedHeroPageSlides(): Promise<readonly { slide: HeroPageSlide; deletedAt: string }[]> {
@@ -228,7 +241,7 @@ export async function listTrashedHeroPageSlides(): Promise<readonly { slide: Her
   );
   return result.rows.map((row) => ({
     slide: toSlide(row),
-    deletedAt: row.deleted_at ?? "",
+    deletedAt: toIsoStamp(row.deleted_at),
   }));
 }
 

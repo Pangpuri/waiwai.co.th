@@ -96,6 +96,14 @@ test("audit: รหัสเหตุการณ์ของบัญชีข�
   }
 });
 
-test("audit: auditStamp ตัดถึงนาทีและอ่านได้", () => {
+test("audit: auditStamp ตัดถึงนาทีและอ่านได้ (สตริงเหมือนเดิม · รับ Date ได้ · ห้ามพัง) — รอบที่ 197", () => {
   assert.equal(auditStamp("2026-10-03T07:45:12.345Z"), "2026-10-03 07:45");
+  assert.equal(auditStamp("2026-10-03T07:45:12Z"), "2026-10-03 07:45", "ไม่มีมิลลิวินาทีก็ได้");
+
+  /* ★ บั๊กจริงรอบที่ 197: Postgres คืน `timestamptz` เป็น **Date** ⇒ เดิมหน้าจอ 500 ทั้งหน้า (`iso.slice is not a function`) */
+  assert.equal(auditStamp(new Date("2026-10-03T07:45:12.345Z")), "2026-10-03 07:45", "Date ต้องแปลงได้");
+  assert.equal(auditStamp(new Date(Number.NaN)), "", "Date เพี้ยน = ค่าว่าง (ไม่โยน error)");
+  assert.equal(auditStamp(null), "");
+  assert.equal(auditStamp(undefined), "");
+  assert.equal(auditStamp(""), "");
 });

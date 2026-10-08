@@ -17,9 +17,17 @@ export const ACCOUNT_AUDIT_PREFIX = "admin-user-";
 /**
  * เวลาของร่องรอย (ISO จาก DB) → ข้อความสั้นที่อ่านได้
  * ⚠️ ตั้งใจแสดงเป็น UTC แบบตัดวินาที: หน้าภาพรวมหลังบ้านเดิมใช้แบบนี้ และไม่ต้องพึ่ง locale/timezone ของเซิร์ฟเวอร์
+ *
+ * ⚠️ รอบที่ 197 (บั๊กจริง): ฟังก์ชันนี้เคยรับแค่ `string` ⇒ พอชั้นข้อมูลส่ง `Date` (สิ่งที่ Postgres คืนให้จริง
+ *    สำหรับ `timestamptz`) มา หน้าจอพังทั้งหน้า (`iso.slice is not a function`) ⇒ ตอนนี้ **รับ `Date` ได้**
+ *    และ **ห้ามโยน error ทุกกรณี** (ไม่มีค่า = คืนสตริงว่าง) — สตริงยังตัด 16 ตัวอักษรเหมือนเดิมเป๊ะ
  */
-export function auditStamp(iso: string): string {
-  return iso.slice(0, 16).replace("T", " ");
+export function auditStamp(value: string | Date | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.toISOString().slice(0, 16).replace("T", " ") : "";
+  }
+  return value.slice(0, 16).replace("T", " ");
 }
 
 export function auditActionLabel(strings: Messages["admin"], action: string): string {
