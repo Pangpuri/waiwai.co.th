@@ -28,18 +28,6 @@ function style(overrides: Partial<typeof DEFAULT_BLOCK_STYLE> = {}): typeof DEFA
 }
 
 /* พจนานุกรมของหมวดสินค้า/ช่องทาง — เปิดแบบกว้าง (คีย์มาจากทะเบียนกลาง ไม่ใช่พิมพ์เอง) */
-const marketplaceTh = th.whereToBuy.marketplaces as Readonly<Record<string, string>>;
-const marketplaceEn = en.whereToBuy.marketplaces as Readonly<Record<string, string>>;
-
-/** การ์ดช่องทางจำหน่าย = ชื่อ (พจนานุกรม) + ลิงก์จริงจาก `SITE` */
-function marketplaceCards(): readonly BlockCard[] {
-  return SITE.marketplaces.map((marketplace) => ({
-    title: { th: marketplaceTh[marketplace.id] ?? marketplace.id, en: marketplaceEn[marketplace.id] ?? "" },
-    body: { th: "", en: "" },
-    href: marketplace.href,
-    image: null,
-  }));
-}
 
 export function buildHomeTemplate(): BlockDocument {
   const blocks: Block[] = [
@@ -108,16 +96,6 @@ export function buildHomeTemplate(): BlockDocument {
       /* หัวข้อ/คำโปรยของส่วนจดหมายข่าว (รอบที่ 224 · คิวข้อ 5) — ฟอร์มจริง + consent มาจาก `SubmitForm` เดิม */
       heading: { th: th.newsletter.title, en: en.newsletter.title },
       body: { th: th.newsletter.body, en: en.newsletter.body },
-    },
-    {
-      id: "block-5",
-      version: BLOCK_SCHEMA_VERSION,
-      type: "cards",
-      style: style({ background: "subtle" }),
-      heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },
-      body: { th: th.whereToBuy.body, en: en.whereToBuy.body },
-      columns: 3,
-      items: marketplaceCards(),
     },
   ];
 

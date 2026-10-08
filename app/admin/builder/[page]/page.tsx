@@ -58,6 +58,8 @@ function coveragePartLabel(
       return strings.coverageMap;
     case "jobBoard":
       return strings.coverageJobBoard;
+    case "whereToBuy":
+      return strings.coverageWhereToBuy;
     case "sampleData":
       return strings.coverageSampleData;
     case "rosterText":

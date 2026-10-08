@@ -262,7 +262,7 @@ test("★ recipe showcase: ลงทะเบียนครบ + ตัวเ�
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
   assert.ok(page.includes("loadRecipeShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดเมนูให้");
   const template = buildHomeTemplate();
-  assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "newsShowcase", "form", "cards"]);
+  assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "newsShowcase", "form"]);
   const block = template.blocks[1];
   assert.equal(block?.type, "recipeShowcase");
   if (block?.type === "recipeShowcase") assert.equal(block.ctaHref, "/recipes", "ปุ่มต้องพาไปหน้าเมนูอาหาร");

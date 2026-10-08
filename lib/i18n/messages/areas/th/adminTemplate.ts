@@ -27,6 +27,7 @@ export const adminTemplate = {
   coverageForm: "แบบฟอร์ม (ติดต่อ/สมัครงาน)",
   coverageMap: "แผนที่ที่ตั้ง",
   coverageJobBoard: "ตารางตำแหน่งงานที่เปิดรับ",
+  coverageWhereToBuy: "ส่วน \"ที่ซื้อสินค้า\" (แก้ที่หน้าจอเนื้อหาหน้าแรก)",
   coverageSampleData: "การ์ดข้อมูลตัวอย่าง (mockup)",
   coverageRosterText: "รายชื่อ/ตำแหน่งรายบุคคล (ตอนนี้อยู่ในภาพ)",
 };

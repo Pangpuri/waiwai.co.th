@@ -76,6 +76,8 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, () => BlockDocumen
  *    ผู้ใช้ต้องเห็นคำเตือนนี้ **ก่อน** กดสวิตช์ ไม่ใช่รู้ทีหลัง
  */
 export const BLOCK_COVERAGE_PART_IDS = [
+  /* รอบที่ 228: ส่วน "ที่ซื้อสินค้า" มีเจ้าของคือหน้าจอเนื้อหาหน้าแรก (ไม่ใช่บล็อก) */
+  "whereToBuy",
   "gallery",
   "lightbox",
   "form",
@@ -94,7 +96,7 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
               เมนูล่าสุด (ไดนามิก) · ข่าวล่าสุด (ไดนามิก) · ช่องทางจำหน่าย (ลิงก์จริง)
     ⚠️ hero **ไม่นับเป็นช่องว่าง** — หน้าแรกเรนเดอร์ hero จริงจาก `/admin/hero` (สไลด์ + การ์ด PR) แหล่งเดียว (รอบที่ 217)
   */
-  home: [],
+  home: ["whereToBuy"],
   /* หน้าข้อความล้วน — ไม่มีแกลเลอรีในเลย์เอาต์เดิม (เผื่อไว้ถ้าเจ้าของเพิ่มภาพชุดภายหลัง) */
   about: ["gallery"],
   /* รอบที่ 88: บล็อก `jobBoard` (ตำแหน่งจริงจาก `JOBS`) ⇒ ครอบคลุมครบ */
