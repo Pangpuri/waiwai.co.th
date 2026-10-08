@@ -916,10 +916,14 @@ export function BlockBuilder({
     target.postMessage({ type: NAVBAR_MESSAGE, config: liveNavbar.value }, window.location.origin);
   }, [liveNavbar, frameKey, previewMode]);
 
-  /* คลิกถูกป้ายประกาศในพรีวิว → เลื่อนแผงขวาไปที่เมนูป้ายให้เห็นทันที */
-  useEffect(() => {
-    noticePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  /*
+    ⚠️ รอบที่ 235 — **ลบ effect ที่เลื่อนไปแผงป้ายประกาศทิ้ง** (บั๊กจริงที่เจ้าของเจอ: "รีเฟรชแล้วเด้งลงล่างสุดทันที")
+    เดิมเขียนไว้แบบนี้:
+      useEffect(() => { noticePanelRef.current?.scrollIntoView(...); }, []);
+    ⇒ deps ว่าง ⇒ ทำงาน **ตอนโหลดหน้า** ⇒ เด้งไปที่แผงป้ายประกาศ (อยู่ท้ายหน้า) ทันที
+    ⇒ และมันไม่เคยทำงานตามเจตนา (ตอนคลิกป้ายในพรีวิว โค้ดเลือกป้ายจะ `return` ออกก่อนถึงบรรทัดนั้น)
+    ถ้าต้องการ "คลิกป้ายในพรีวิว → เลื่อนแผงขวาไปหา" จริง ๆ ต้องมีตัวนับ/สถานะจากข้อความของพรีวิว (งานถัดไป)
+  */
 
   /* กด Esc ออกจากโหมดเต็มหน้าจอ */
   useEffect(() => {
