@@ -463,7 +463,8 @@ test("★ builder: เลือกบล็อก ⇒ พรีวิวเล�
 
   const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
   assert.ok(builder.includes("selectTick"), "ฝั่งหลังบ้านต้องมีตัวนับการเลือก");
-  assert.ok(builder.includes("setSelectTick((previous) => previous + 1)"), "คลิกเลือกต้องเพิ่มตัวนับทุกครั้ง");
+  assert.ok(builder.includes("const nextTick = selectTick + 1;"), "คลิกเลือกต้องเพิ่มตัวนับทุกครั้ง");
+  assert.ok(builder.includes("previewWindow.postMessage("), "รอบที่ 232: ส่งข้อความเข้าพรีวิวทันที (ไม่รอ debounce)");
   assert.ok(builder.includes("[document, selectedId, selectTick]"), "ส่งข้อความเข้าพรีวิวเมื่อตัวนับเปลี่ยนด้วย");
 });
 
@@ -475,5 +476,7 @@ test("★ builder: เลื่อนไปหาบล็อกผ่านข�
   const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
   assert.ok(builder.includes("function scrollToBlock(fraction: number)"), "ตรรกะเลื่อนต้องอยู่ใน effect");
   assert.ok(!builder.includes("scrollPreviewTo"), "ห้ามอ้าง useCallback ใน deps (React ฟ้อง 'deps เปลี่ยนขนาด')");
-  assert.ok(builder.includes("window.scrollTo({ top: Math.max(0, top), behavior: \"smooth\" })"), "ต้องเลื่อนหน้าจอหลังบ้านจริง");
+  assert.ok(builder.includes("scrollTargetFor("), "ต้องคำนวณตำแหน่งจากความสูงที่เรนเดอร์จริง (ทนต่อ scale)");
+  assert.ok(builder.includes("scrollableAncestorOf("), "รอบที่ 232: ต้องหาคอนเทนเนอร์ที่เลื่อนได้จริงก่อน (ไม่ใช่ window อย่างเดียว)");
+  assert.ok(builder.includes("function onMessage(event: MessageEvent) {"), "ห้ามทำข้อความจากพรีวิวเสียหาย (บทเรียนรอบ 232)");
 });

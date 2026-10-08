@@ -22,6 +22,7 @@ import {
   PREVIEW_SCROLL_MESSAGE,
   SELECT_MESSAGE,
 } from "@/features/blocks/ui/preview-frame";
+import { scrollTargetFor, scrollableAncestorOf } from "@/features/admin/ui/preview-scroll";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
 import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
@@ -626,8 +627,24 @@ export function BlockBuilder({
       const frame = frameRef.current;
       if (frame === null) return;
       const rect = frame.getBoundingClientRect();
-      const top = rect.top + window.scrollY + fraction * rect.height - window.innerHeight / 3;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      /* รอบที่ 232: หาคอนเทนเนอร์ที่เลื่อนได้จริงก่อน (พรีวิวอาจอยู่ในกล่อง overflow-auto ไม่ใช่ window) */
+      const container = scrollableAncestorOf(frame, (node) => window.getComputedStyle(node));
+      if (container === null) {
+        window.scrollTo({
+          top: scrollTargetFor({ frameHeight: rect.height, frameTop: rect.top + window.scrollY, fraction, scrollTop: window.scrollY }),
+          behavior: "smooth",
+        });
+        return;
+      }
+      container.scrollTo({
+        top: scrollTargetFor({
+          frameHeight: rect.height,
+          frameTop: rect.top - container.getBoundingClientRect().top,
+          fraction,
+          scrollTop: container.scrollTop,
+        }),
+        behavior: "smooth",
+      });
     }
 
     function onMessage(event: MessageEvent) {
@@ -2326,8 +2343,19 @@ export function BlockBuilder({
             onSelect={(blockId) => {
               setSelectedId(blockId);
               setSelectedCard(null);
-              /* เลือกซ้ำบล็อกเดิม = ต้องเลื่อนพรีวิวไปหาอีกครั้ง (รอบที่ 230) */
-              setSelectTick((previous) => previous + 1);
+              /*
+                รอบที่ 230/232: เลือกซ้ำบล็อกเดิมก็ต้องเลื่อนไปหาใหม่ + ส่ง **ทันที** ไม่รอ debounce 250ms
+                (ตัวจับเวลาถูกยกเลิกได้ถ้ามีการอัปเดตอื่นแทรก ⇒ เจ้าของเจออาการ "คลิกในรายการแล้วไม่วิ่งตาม")
+              */
+              const nextTick = selectTick + 1;
+              setSelectTick(nextTick);
+              const previewWindow = frameRef.current?.contentWindow;
+              if (previewWindow !== null && previewWindow !== undefined) {
+                previewWindow.postMessage(
+                  { type: PREVIEW_MESSAGE, document, selectedId: blockId, selectTick: nextTick },
+                  window.location.origin,
+                );
+              }
             }}
             onMove={(blockId, delta) => update(moveBlock(document, blockId, delta))}
             onDuplicate={(blockId) => update(duplicateBlock(document, blockId))}
