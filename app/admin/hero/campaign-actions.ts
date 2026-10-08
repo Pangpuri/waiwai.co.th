@@ -15,6 +15,8 @@ import {
 import {
   countCampaigns,
   createCampaign,
+  deleteCampaignForever,
+  purgeCampaignTrash,
   restoreCampaign,
   saveCampaignPlacement,
   setCampaignStatus,
@@ -159,4 +161,34 @@ export async function restoreCampaignAction(formData: FormData): Promise<void> {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-restore" });
     await refreshAfterCampaignChange("campaign-restored");
   }
+}
+
+/**
+ * ลบการ์ดในถัง **ถาวร** (รอบที่ 202) — บังคับยืนยันที่ฝั่งเซิร์ฟเวอร์ (`confirm=yes`)
+ * ประตู "ต้องอยู่ในถังก่อน" อยู่ที่ SQL (`delete from campaign where … and deleted_at is not null`)
+ */
+export async function deleteCampaignForeverAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
+  /* ไม่ติ๊กยืนยัน = ไม่ทำอะไร (ไม่พึ่ง JS/`confirm()` ของเบราว์เซอร์) */
+  if (id === "" || formData.get("confirm") !== "yes") return;
+  const ok = await deleteCampaignForever(id);
+  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-purge" });
+  await refreshAfterCampaignChange("campaign-purged");
+}
+
+/** ลบถาวรทั้งถัง (เก็บกวาดการ์ดทดสอบ) — ต้องติ๊กยืนยันเช่นกัน */
+export async function purgeCampaignTrashAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  if (formData.get("confirm") !== "yes") return;
+  const removed = await purgeCampaignTrash();
+  if (removed === 0) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  await recordAudit({
+    action: "hero-save",
+    actorEmail: user.email,
+    target: "campaign:trash",
+    detail: `campaign-purge-all:${removed}`,
+  });
+  await refreshAfterCampaignChange("campaign-purged");
 }

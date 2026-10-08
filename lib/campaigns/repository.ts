@@ -357,6 +357,22 @@ export async function listTrashedCampaigns(): Promise<readonly Campaign[]> {
   return result.rows.map((row) => toCampaign(row, links[row.id] ?? []));
 }
 
+/**
+ * ลบถาวร — ทำได้เฉพาะแถวที่ **อยู่ในถังเท่านั้น** (ประตู fail-closed อยู่ที่ SQL)
+ * ⚠️ รอบที่ 202 (เจ้าของทัก): ก่อนหน้านี้ถังขยะแคมเปญมีแต่ "กู้คืน" ไม่มีทางลบถาวรจากจอเลย
+ * ลูกที่ผูกอยู่ (`campaign_slide`, `campaign_placement`) ถูกลบตามด้วย `on delete cascade`
+ */
+export async function deleteCampaignForever(id: string): Promise<boolean> {
+  const result = await getPool().query("delete from campaign where id = $1 and deleted_at is not null", [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** ลบถาวร **ทั้งถัง** (ใช้เก็บกวาดการ์ดทดสอบ) — คืนจำนวนที่ลบจริง */
+export async function purgeCampaignTrash(): Promise<number> {
+  const result = await getPool().query("delete from campaign where deleted_at is not null");
+  return result.rowCount ?? 0;
+}
+
 /** กู้คืนจากถัง — ทำได้เฉพาะแถวที่อยู่ในถัง (ประตูอยู่ที่ SQL · fail-closed) */
 export async function restoreCampaign(id: string): Promise<boolean> {
   const result = await getPool().query(

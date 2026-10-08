@@ -2,6 +2,8 @@
 
 import {
   addCampaignAction,
+  deleteCampaignForeverAction,
+  purgeCampaignTrashAction,
   removeCampaignAction,
   restoreCampaignAction,
   saveCampaignAction,
@@ -470,15 +472,43 @@ export function CampaignManager({
                   <span className="text-fg text-xs">
                     {campaign.name.trim() === "" ? campaign.title.th : campaign.name}
                   </span>
-                  <form action={restoreCampaignAction}>
-                    <input type="hidden" name="id" value={campaign.id} />
-                    <button type="submit" className="border-line text-fg rounded-md border px-2 py-1 text-xs font-semibold">
-                      {strings.campaignRestore}
-                    </button>
-                  </form>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <form action={restoreCampaignAction}>
+                      <input type="hidden" name="id" value={campaign.id} />
+                      <button type="submit" className="border-line text-fg rounded-md border px-2 py-1 text-xs font-semibold">
+                        {strings.campaignRestore}
+                      </button>
+                    </form>
+                    {/*
+                      ★ รอบที่ 202 — เจ้าของทักว่าถังขยะแคมเปญ "มีแต่กู้คืน ไม่มีลบถาวร"
+                      ⇒ เพิ่มปุ่มลบถาวร **บังคับติ๊กยืนยัน** (ตรวจที่ฝั่งเซิร์ฟเวอร์ ไม่พึ่ง JS)
+                    */}
+                    <form action={deleteCampaignForeverAction} className="flex items-center gap-1">
+                      <input type="hidden" name="id" value={campaign.id} />
+                      <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+                        <input type="checkbox" name="confirm" value="yes" className="accent-brand-red" />
+                        {strings.campaignPurgeConfirm}
+                      </label>
+                      <button type="submit" className="border-line text-fg-muted rounded-md border px-2 py-1 text-xs">
+                        {strings.campaignPurge}
+                      </button>
+                    </form>
+                  </span>
                 </li>
               ))}
             </ul>
+          )}
+          {trashedCampaigns.length === 0 ? null : (
+            <form action={purgeCampaignTrashAction} className="border-line flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2">
+              <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+                <input type="checkbox" name="confirm" value="yes" className="accent-brand-red" />
+                {strings.campaignPurgeConfirm}
+              </label>
+              <button type="submit" className="border-line text-fg-muted rounded-md border px-2 py-1 text-xs font-semibold">
+                {strings.campaignPurgeAll}
+              </button>
+              <span className="text-fg-muted text-[11px]">{strings.campaignPurgeWarning}</span>
+            </form>
           )}
         </div>
       </details>

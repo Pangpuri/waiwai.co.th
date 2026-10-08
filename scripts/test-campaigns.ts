@@ -31,6 +31,22 @@ import {
 import { feedbackOf, invalidCampaignHref } from "@/lib/hero/feedback";
 import { PUBLIC_READ_TABLES } from "./db-roles.ts";
 
+/** ความลึกสูงสุดของ `<form>` ที่ซ้อนกัน (1 = ไม่ซ้อน) — นับจริงด้วยการเปิด/ปิดแท็ก */
+function maxFormDepth(source: string): number {
+  let depth = 0;
+  let max = 0;
+  /* จับแท็กเปิด `<form …>` และแท็กปิด `</form>` ตามลำดับที่ปรากฏ แล้วดูความลึกสูงสุด */
+  for (const token of source.matchAll(/<form\b|<\/form>/g)) {
+    if (token[0] === "</form>") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    depth += 1;
+    max = Math.max(max, depth);
+  }
+  return max;
+}
+
 /** รอบที่ 190 — แคมเปญเป็นเอนทิตีของตัวเอง (มติเจ้าของ: ตัด 1:1 กับสไลด์ออก) */
 
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
@@ -123,11 +139,19 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
     ⚠️ `setCampaignStatusAction` ถูก **รวมเข้า saveCampaignAction** — เพราะฟอร์มแยกส่งสำเนาค่าเก่า
     ⇒ เจ้าของพิมพ์หัวข้อใหม่แล้วกดเผยแพร่ ระบบยังเห็นหัวข้อว่าง (บั๊กจริงรอบ 199)
   */
-  for (const fn of ["addCampaignAction", "saveCampaignAction", "removeCampaignAction", "restoreCampaignAction"]) {
+  for (const fn of [
+    "addCampaignAction",
+    "saveCampaignAction",
+    "removeCampaignAction",
+    "restoreCampaignAction",
+    /* รอบที่ 202 — ลบถาวร (ต่อใบ + ทั้งถัง) */
+    "deleteCampaignForeverAction",
+    "purgeCampaignTrashAction",
+  ]) {
     assert.ok(actions.includes(`export async function ${fn}`), `ต้องมี ${fn}`);
   }
   assert.ok(!actions.includes("setCampaignStatusAction"), "ห้ามมี action สถานะแยกอีก (ต้นเหตุบั๊กค่าเก่า)");
-  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 4, "ทุก action ต้องตรวจสิทธิ์");
+  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 6, "ทุก action ต้องตรวจสิทธิ์");
   assert.ok(actions.includes("MAX_CAMPAIGNS"), "ต้องมีเพดานกันสร้างมั่ว");
   assert.ok(actions.includes("campaign-publish"), "ต้องมี audit ตอนเผยแพร่");
 
@@ -138,7 +162,11 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
   assert.ok(manager.includes("campaignReadiness"), "ต้องแสดงคำเตือนความพร้อม");
   assert.ok(manager.includes("name=\"slideIds\""), "ต้องเลือกสไลด์ที่จะแสดงได้");
-  assert.ok(!/<form[^>]*>[\s\S]{0,400}<form/.test(manager.replace(/\/\*[\s\S]*?\*\//g, "")), "ห้าม <form> ซ้อน <form>");
+  /*
+    ⚠️ รอบที่ 202: เดิมเทสต์นี้ใช้ heuristic "เจอ `<form` อีกตัวภายใน 400 ตัวอักษร = ซ้อน"
+    ⇒ **ฟ้องผิด** เมื่อมีฟอร์มสองอันวางติดกัน (พี่น้องกัน ไม่ได้ซ้อน) → เปลี่ยนมานับ "ความลึก" จริง
+  */
+  assert.equal(maxFormDepth(manager.replace(/\/\*[\s\S]*?\*\//g, "")), 1, "ห้าม <form> ซ้อน <form>");
   assert.ok(MAX_CAMPAIGNS >= 1 && Object.keys(CAMPAIGN_ANCHOR_PRESETS).length === 3);
 });
 
@@ -234,10 +262,10 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
   assert.ok(campaignActions.includes("?tab=campaigns&saved=${flag}"), "แคมเปญต้องกลับไปแท็บเดิมพร้อมรหัสผลลัพธ์");
   /* 4 ทาง: เพิ่ม · บันทึก(หรือบันทึก+เผยแพร่) · ย้ายเข้าถัง · กู้คืน (รอบที่ 199) — ทุกทางต้องมีรหัสผลลัพธ์ */
   /*
-    5 จุดในไฟล์ (รอบที่ 199): เพิ่ม · บันทึก · บันทึก+เผยแพร่/ถอน · ย้ายเข้าถัง · กู้คืน
-    ⚠️ ปุ่มเผยแพร่เดิมเป็น "action แยก" (1 จุด) — รวมเข้า action บันทึกแล้ว ⇒ จำนวนจึงเท่าเดิม
+    7 จุดในไฟล์: เพิ่ม · บันทึก · บันทึก+เผยแพร่/ถอน · ย้ายเข้าถัง · กู้คืน · ลบถาวร · ลบทั้งถัง (รอบที่ 202)
+    ⚠️ ปุ่มเผยแพร่เดิมเป็น "action แยก" (1 จุด) — รวมเข้า action บันทึกแล้ว
   */
-  assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 5, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
+  assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 7, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
   assert.ok(campaignActions.includes('refreshAfterCampaignChange("campaign-status")'), "เผยแพร่/ถอนต้องมีรหัสผลลัพธ์ของตัวเอง");
   assert.ok(
     campaignActions.includes("redirect(invalidCampaignHref(parsed.problems))"),
@@ -679,4 +707,48 @@ test("★ campaigns: “บันทึก + เผยแพร่” ต้อ�
   const updateAt = actions.indexOf("await updateCampaign(");
   const statusAt = actions.indexOf("await setCampaignStatus(id, nextStatus");
   assert.ok(parsedAt > 0 && updateAt > parsedAt && statusAt > updateAt, "ต้องเรียง ตรวจ → บันทึก → เผยแพร่");
+});
+
+/**
+ * ★ รอบที่ 202 — ถังขยะแคมเปญต้อง **ลบถาวรได้** (เจ้าของทัก: "มีแต่กู้คืน")
+ * กติกาเดียวกับถังขยะชนิดอื่นในโปรเจกต์: ประตู "ต้องอยู่ในถังก่อน" อยู่ที่ SQL + บังคับติ๊กยืนยันที่ฝั่งเซิร์ฟเวอร์
+ */
+test("★ campaigns: ถังขยะลบถาวรได้ (ต่อใบ + ทั้งถัง) — ประตูที่ SQL + บังคับยืนยัน (รอบที่ 202)", () => {
+  const repo = readFileSync("lib/campaigns/repository.ts", "utf8");
+  assert.ok(
+    /deleteCampaignForever[\s\S]{0,300}delete from campaign where id = \$1 and deleted_at is not null/.test(repo),
+    "ลบถาวรต่อใบต้องมีประตู `deleted_at is not null` ที่ SQL (fail-closed)",
+  );
+  assert.ok(
+    /purgeCampaignTrash[\s\S]{0,300}delete from campaign where deleted_at is not null/.test(repo),
+    "ลบทั้งถังต้องลบเฉพาะของที่อยู่ในถัง",
+  );
+
+  const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  for (const fn of ["deleteCampaignForeverAction", "purgeCampaignTrashAction"]) {
+    /* ตัดเฉพาะท่อนของฟังก์ชันนี้แล้วเทียบสตริงตรง ๆ (เลี่ยง escaping ของ regex/template literal) */
+    const start = actions.indexOf(`export async function ${fn}`);
+    assert.ok(start > 0, `ต้องมี ${fn}`);
+    const body = actions.slice(start, start + 700);
+    assert.ok(body.includes('formData.get("confirm") !== "yes"'), `${fn} ต้องบังคับยืนยันที่ฝั่งเซิร์ฟเวอร์`);
+  }
+  assert.ok(actions.includes('detail: "campaign-purge"'), "ลบต่อใบต้องมี audit");
+  assert.ok(actions.includes("campaign-purge-all:"), "ลบทั้งถังต้องมี audit พร้อมจำนวนที่ลบ");
+
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("deleteCampaignForeverAction"), "จอต้องมีปุ่มลบถาวรต่อใบ");
+  assert.ok(manager.includes("purgeCampaignTrashAction"), "จอต้องมีปุ่มลบถาวรทั้งถัง");
+  assert.equal(
+    (manager.match(/name="confirm" value="yes"/g) ?? []).length,
+    2,
+    "ทั้งลบต่อใบและลบทั้งถังต้องมีช่องยืนยัน",
+  );
+  assert.ok(manager.includes("strings.campaignPurgeWarning"), "ต้องมีคำเตือนว่ากู้คืนไม่ได้");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of ["campaignPurge", "campaignPurgeConfirm", "campaignPurgeAll", "campaignPurgeWarning"]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
+  }
 });
