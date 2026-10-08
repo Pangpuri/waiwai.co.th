@@ -76,6 +76,11 @@ export function PreviewFrame({
   const [document, setDocument] = useState<BlockDocument>(initialDocument);
   /** บล็อกที่กำลังเลือกในหลังบ้าน (ส่งมาจากตัวสร้าง) — ใช้ตีกรอบทึบในพรีวิว */
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  /*
+    รอบที่ 230: ตัวนับการเลือก — หลังบ้านส่ง "เลือกบล็อกเดิมซ้ำ" มา ค่า id ไม่เปลี่ยน
+    ⇒ React ไม่ re-render ⇒ ผู้ใช้รู้สึกว่า "คลิกไม่ติด" ⇒ ใช้ตัวนับบังคับให้ effect ทำงานทุกครั้ง
+  */
+  const [selectionNonce, setSelectionNonce] = useState(0);
 
   /* รับฉบับร่างจากหน้าจอหลังบ้าน (แก้ปุ๊บเห็นปุ๊บ ยังไม่ต้องบันทึก) */
   useEffect(() => {
@@ -92,11 +97,23 @@ export function PreviewFrame({
 
       /* บอกว่ากำลังเลือกบล็อกไหนอยู่ → ตัวเรนเดอร์ตีกรอบทึบให้ (L1) */
       setSelectedBlockId(typeof data["selectedId"] === "string" ? data["selectedId"] : null);
+      setSelectionNonce((previous) => previous + 1);
     }
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [initialDocument.page]);
+
+  /*
+    รอบที่ 230 (บั๊กจริงที่เจ้าของเจอ): คลิกบล็อกในรายการด้านซ้าย ⇒ พรีวิวต้อง **เลื่อนไปหาบล็อกนั้น**
+    เดิมมีแค่ตีกรอบ ⇒ บล็อกที่อยู่นอกจอเหมือน "คลิกไม่ติด" · บล็อกที่ไม่เรนเดอร์ (ไม่มีข้อมูล) ก็ไม่มีอะไรให้เลื่อน
+  */
+  useEffect(() => {
+    if (selectedBlockId === null) return;
+    /* ⚠️ `document` ในไฟล์นี้คือเอกสารบล็อก (state) ⇒ ต้องใช้ `window.document` ของพรีวิว */
+    const target = window.document.querySelector(`[data-block-id="${selectedBlockId}"]`);
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [selectedBlockId, selectionNonce]);
 
   /* ลากไฟล์ภาพมาวางในพรีวิว → หาว่าปล่อยบนส่วนไหน แล้วส่งไฟล์กลับไปให้หน้าจอ */
   useEffect(() => {

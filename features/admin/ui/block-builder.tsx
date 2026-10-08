@@ -500,6 +500,11 @@ export function BlockBuilder({
 }: Props) {
   const [document, setDocument] = useState<BlockDocument>(initialDraft);
   const [selectedId, setSelectedId] = useState<string>(initialDraft.blocks[0]?.id ?? "");
+  /*
+    รอบที่ 230: ตัวนับการเลือก — คลิกบล็อกเดิมซ้ำต้องส่งข้อความใหม่เข้าพรีวิว เพื่อให้เลื่อนไปหาอีกครั้ง
+    (เดิม deps = [document, selectedId] ⇒ ค่าไม่เปลี่ยน = ไม่ส่งอะไร ⇒ ผู้ใช้รู้สึกว่า "คลิกไม่ติด")
+  */
+  const [selectTick, setSelectTick] = useState(0);
   /** การ์ดที่กำลังแก้ (ลำดับในบล็อก) — null = ดูภาพรวมของบล็อก */
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   /** ช่องที่เพิ่งถูกคลิกจากพรีวิว → โฟกัสให้ทันที (ผู้ใช้ไม่ต้องหาเอง) */
@@ -588,10 +593,10 @@ export function BlockBuilder({
     const target = frameRef.current?.contentWindow;
     if (target === null || target === undefined) return;
     target.postMessage(
-      { type: PREVIEW_MESSAGE, document, selectedId },
+      { type: PREVIEW_MESSAGE, document, selectedId, selectTick },
       window.location.origin,
     );
-  }, [document, selectedId]);
+  }, [document, selectedId, selectTick]);
 
   /* หน่วง 250ms กันการส่งถี่เกินไปตอนพิมพ์รัว ๆ */
   useEffect(() => {
@@ -2293,6 +2298,8 @@ export function BlockBuilder({
             onSelect={(blockId) => {
               setSelectedId(blockId);
               setSelectedCard(null);
+              /* เลือกซ้ำบล็อกเดิม = ต้องเลื่อนพรีวิวไปหาอีกครั้ง (รอบที่ 230) */
+              setSelectTick((previous) => previous + 1);
             }}
             onMove={(blockId, delta) => update(moveBlock(document, blockId, delta))}
             onDuplicate={(blockId) => update(duplicateBlock(document, blockId))}

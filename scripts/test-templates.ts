@@ -452,3 +452,17 @@ test("★ content: ทุกส่วนของหน้าแรกเป็�
   assert.ok(editor.includes("ownerOfSection(section.key)"), "ต้องใช้ทะเบียนกลาง");
   assert.ok(editor.includes("strings.sectionManagedElsewhere"), "ข้อความต้องมาจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
 });
+
+/** ★ รอบที่ 230 (บั๊กจริงที่เจ้าของเจอ) — คลิกบล็อกในรายการแล้วต้องเลื่อนพรีวิวไปหา (คลิกซ้ำก็ต้องได้) */
+test("★ builder: เลือกบล็อก ⇒ พรีวิวเลื่อนไปหาทุกครั้ง แม้คลิกบล็อกเดิมซ้ำ", () => {
+  const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
+  assert.ok(frame.includes("scrollIntoView"), "พรีวิวต้องเลื่อนไปหาบล็อกที่เลือก");
+  assert.ok(frame.includes('data-block-id='), "ต้องหาบล็อกจากป้ายจริงของตัวเรนเดอร์");
+  assert.ok(frame.includes("selectionNonce"), "ต้องมีตัวนับ ไม่งั้นคลิกซ้ำจะไม่ทำงาน");
+  assert.ok(frame.includes("window.document.querySelector"), "ห้ามใช้ `document` (ชนชื่อ state เอกสารบล็อก)");
+
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  assert.ok(builder.includes("selectTick"), "ฝั่งหลังบ้านต้องมีตัวนับการเลือก");
+  assert.ok(builder.includes("setSelectTick((previous) => previous + 1)"), "คลิกเลือกต้องเพิ่มตัวนับทุกครั้ง");
+  assert.ok(builder.includes("[document, selectedId, selectTick]"), "ส่งข้อความเข้าพรีวิวเมื่อตัวนับเปลี่ยนด้วย");
+});
