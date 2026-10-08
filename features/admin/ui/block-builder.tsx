@@ -13,7 +13,15 @@ import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
-import { DROP_IMAGE_MESSAGE, NAVBAR_MESSAGE, NAVBAR_SELECT_ID, NOTICE_SELECT_ID, PREVIEW_MESSAGE, SELECT_MESSAGE } from "@/features/blocks/ui/preview-frame";
+import {
+  DROP_IMAGE_MESSAGE,
+  NAVBAR_MESSAGE,
+  NAVBAR_SELECT_ID,
+  NOTICE_SELECT_ID,
+  PREVIEW_MESSAGE,
+  PREVIEW_SCROLL_MESSAGE,
+  SELECT_MESSAGE,
+} from "@/features/blocks/ui/preview-frame";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
 import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
@@ -598,6 +606,20 @@ export function BlockBuilder({
     );
   }, [document, selectedId, selectTick]);
 
+  /*
+    รอบที่ 231 (บั๊กจริง: "คลิกได้ 2–3 ครั้งแล้วหยุด"): พรีวิวเต็มความสูง + ย่อด้วย scale
+    ⇒ เลื่อนใน iframe ไม่ช่วย ⇒ รับ "สัดส่วนตำแหน่ง" จากพรีวิว แล้วเลื่อนหน้าจอหลังบ้านไปหา
+    (ใช้สัดส่วน ⇒ ไม่ต้องรู้ค่า scale · ใช้ความสูงจริงของกรอบ iframe)
+  */
+  const scrollPreviewTo = useCallback((fraction: number) => {
+    if (!Number.isFinite(fraction)) return;
+    const frame = frameRef.current;
+    if (frame === null) return;
+    const rect = frame.getBoundingClientRect();
+    const top = rect.top + window.scrollY + fraction * rect.height - window.innerHeight / 3;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, []);
+
   /* หน่วง 250ms กันการส่งถี่เกินไปตอนพิมพ์รัว ๆ */
   useEffect(() => {
     if (previewMode !== "draft") return undefined;
@@ -612,6 +634,11 @@ export function BlockBuilder({
       const data: unknown = event.data;
       if (typeof data !== "object" || data === null) return;
       const candidate = data as { type?: unknown; blockId?: unknown; field?: unknown; cardIndex?: unknown };
+      /* พรีวิวบอกให้เลื่อนหน้าจอไปหาบล็อกที่เลือก (รอบที่ 231) */
+      if (candidate.type === PREVIEW_SCROLL_MESSAGE) {
+        scrollPreviewTo(typeof (data as { fraction?: unknown }).fraction === "number" ? (data as { fraction: number }).fraction : Number.NaN);
+        return;
+      }
       /* ค่าตั้ง navbar สด ๆ จากแผงขวา (ยังไม่บันทึก) → เก็บไว้ส่งต่อเข้า iframe */
       if (candidate.type === NAVBAR_MESSAGE) {
         setLiveNavbar({ sent: true, value: (data as { config?: unknown }).config ?? null });
@@ -641,7 +668,7 @@ export function BlockBuilder({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [scrollPreviewTo]);
 
   /* โฟกัส + เลื่อนไปยังช่องที่เพิ่งคลิกในพรีวิว (ให้พิมพ์ต่อได้เลย ไม่ต้องหาเอง) */
   useEffect(() => {

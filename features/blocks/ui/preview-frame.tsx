@@ -23,6 +23,9 @@ import type { BlockDocument } from "@/lib/blocks/types";
  */
 
 export const PREVIEW_MESSAGE = "waiwai:preview";
+
+/** รอบที่ 231: พรีวิวแจ้งหลังบ้านให้ "เลื่อนหน้าจอ" ไปหาบล็อกที่เลือก (พรีวิวเต็มความสูง — เลื่อนใน iframe ไม่ช่วย) */
+export const PREVIEW_SCROLL_MESSAGE = "waiwai:preview-scroll";
 export const SELECT_MESSAGE = "waiwai:select";
 
 /**
@@ -112,7 +115,20 @@ export function PreviewFrame({
     if (selectedBlockId === null) return;
     /* ⚠️ `document` ในไฟล์นี้คือเอกสารบล็อก (state) ⇒ ต้องใช้ `window.document` ของพรีวิว */
     const target = window.document.querySelector(`[data-block-id="${selectedBlockId}"]`);
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (target === null) return;
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+    /*
+      พรีวิวถูกเรนเดอร์เต็มความสูงแล้วย่อด้วย `transform: scale()` (บทเรียนรอบ 33)
+      ⇒ การเลื่อน "ใน" iframe มักไม่ช่วย เพราะที่เลื่อนจริงคือหน้าหลังบ้าน
+      ⇒ ส่ง **สัดส่วนตำแหน่ง** (ไม่ใช่พิกเซล — กันเรื่องสเกล) ให้หลังบ้านเลื่อนหน้าจอไปหา
+    */
+    const rect = target.getBoundingClientRect();
+    const total = window.document.documentElement.scrollHeight;
+    if (total <= 0) return;
+    window.parent.postMessage(
+      { type: PREVIEW_SCROLL_MESSAGE, fraction: rect.top / total },
+      window.location.origin,
+    );
   }, [selectedBlockId, selectionNonce]);
 
   /* ลากไฟล์ภาพมาวางในพรีวิว → หาว่าปล่อยบนส่วนไหน แล้วส่งไฟล์กลับไปให้หน้าจอ */
