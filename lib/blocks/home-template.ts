@@ -14,6 +14,10 @@ import { SITE } from "@/lib/site";
  * - **ใช้ข้อมูลจริงเท่าที่มีในโค้ด**: ชื่อ/ลิงก์/ภาพหมวดจาก `CATALOG_ITEMS` (แหล่งความจริงเดียวกับหน้าเว็บ)
  *   · ลิงก์ร้านจาก `SITE.marketplaces` · สไลด์ตั้งต้นจาก `HERO_SLIDES` · ข้อความชุดเดียวกับพจนานุกรมของหน้าเว็บ
  * - **ไม่ใส่ของปลอม**: การ์ดหมวดเดิมเคยใส่คำบรรยายจากพจนานุกรมที่เป็น "ข้อมูลทดสอบ" ⇒ รอบนี้ **ไม่ใส่มัน**
+ * ⚠️ **รอบที่ 217 — ไม่มี "บล็อกแบนเนอร์" ในเทมเพลตนี้โดยตั้งใจ**
+ *   หน้าแรกใช้ **hero จากเมนู "สไลด์ & แคมเปญ" (`/admin/hero`)** เป็นแหล่งเดียว
+ *   (สไลด์จริงจากฐานข้อมูล + การ์ด PR) · ถ้าใส่บล็อก hero ด้วย จะกลายเป็น **แก้ได้สองที่** ⇒ สับสนแน่นอน
+ *   ⇒ หน้าเว็บเรนเดอร์ hero จริงให้เสมอ **ทั้งสองโหมด** (บล็อก/เลย์เอาต์ในโค้ด) แล้วต่อด้วยบล็อกที่เหลือ
  * - ส่วนที่ต้องดึง **ข้อมูลจริงจากฐานข้อมูล** (จำนวนสินค้า/สินค้าแนะนำ · เมนูล่าสุด · ข่าวล่าสุด · ฟอร์มจดหมายข่าว)
  *   ยังทำในเทมเพลตไม่ได้ เพราะ "บล็อก" เป็นเนื้อหานิ่งที่พิมพ์เก็บในเอกสาร
  *   ⇒ ประกาศเป็น **ช่องที่ยังไม่ครอบคลุม** (`blockCoverageGaps("home")`) เพื่อให้หน้าจอเตือนก่อนกด "ใช้กับหน้าเว็บจริง"
@@ -44,38 +48,12 @@ function marketplaceCards(): readonly BlockCard[] {
 export function buildHomeTemplate(): BlockDocument {
   const blocks: Block[] = [
     {
-      id: "block-1",
-      version: BLOCK_SCHEMA_VERSION,
-      type: "hero",
-      style: style({ size: "lg", width: "full", align: "left" }),
-      title: { th: th.hero.title, en: en.hero.title },
-      subtitle: { th: th.hero.body, en: en.hero.body },
-      note: { th: th.hero.note, en: en.hero.note },
-      image: null,
-      ctaLabel: { th: "", en: "" },
-      ctaHref: "",
-      /* สไลด์ตั้งต้นชุดเดียวกับหน้าเว็บ (จากโค้ด) */
-      slides: HERO_SLIDES.map((slide, index) => ({
-        id: `slide-${index + 1}`,
-        image: {
-          path: slide.src,
-          /* alt ชุดเดียวกับหน้าเว็บ (พจนานุกรม) — ไม่ปล่อยว่าง */
-          altTh: slideAltTh[slide.id]?.alt ?? "",
-          altEn: slideAltEn[slide.id]?.alt ?? "",
-          hasWatermark: false,
-        },
-        focusX: 50,
-        focusY: 50,
-        zoom: 1,
-      })),
-    },
-    {
       /*
         บล็อกไดนามิก (รอบที่ 214): ดึง **ข้อมูลจริงจากฐานข้อมูล** ตอนเรนเดอร์
         (ชื่อหมวด/คำอธิบาย/ภาพ/จำนวนสินค้า + สินค้าแนะนำ) ⇒ ไม่มีข้อมูลปลอมค้างในเอกสาร
         ตัวเลือกเก็บในเอกสาร: คอลัมน์ · แสดงจำนวน · แสดงสินค้าแนะนำ — เลือกหมวดได้ (ว่าง = ทุกหมวด)
       */
-      id: "block-2",
+      id: "block-1",
       version: BLOCK_SCHEMA_VERSION,
       type: "productShowcase",
       style: style(),
@@ -88,7 +66,7 @@ export function buildHomeTemplate(): BlockDocument {
       showCount: true,
     },
     {
-      id: "block-3",
+      id: "block-2",
       version: BLOCK_SCHEMA_VERSION,
       type: "cards",
       style: style({ background: "subtle" }),

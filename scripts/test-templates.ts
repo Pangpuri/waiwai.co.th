@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 import {
   BLOCK_COVERAGE_PART_IDS,
@@ -336,4 +337,32 @@ test("templates: พรีวิวโหมด 'หน้าเว็บจร�
   const page = sourceOf("app/admin/builder/[page]/page.tsx");
   assert.ok(page.includes("previewLiveSrc={localePath("), "หน้าจอต้องส่งที่อยู่จริงของหน้านั้น");
   assert.ok(page.includes("pathForPage("), "ที่อยู่ต้องมาจากแหล่งกลาง (PAGE_PATHS)");
+});
+
+/**
+ * ★ รอบที่ 217 — "หน้าแรกห้ามมีบล็อกแบนเนอร์" (เจ้าของทัก: hero ซ้ำซ้อนกับสไลด์/แคมเปญ)
+ * hero จริงมีแหล่งเดียวที่ `/admin/hero` ⇒ โหมดบล็อกต้องเรนเดอร์ hero จริงก่อน แล้วต่อด้วยบล็อก
+ */
+test("★ templates: หน้าแรกไม่มีบล็อก hero — โหมดบล็อกเรนเดอร์ hero จริงจาก /admin/hero (กันแก้สองที่)", () => {
+  const doc = buildHomeTemplate();
+  assert.deepEqual(
+    doc.blocks.map((block) => block.type),
+    ["productShowcase", "cards"],
+    "เทมเพลตหน้าแรก = 2 บล็อก (หมวดสินค้า · ที่ซื้อสินค้า)",
+  );
+  assert.ok(!doc.blocks.some((block) => block.type === "hero"), "ห้ามมีบล็อก hero ในเทมเพลตหน้าแรก");
+  assert.ok(!JSON.stringify(doc).includes("ข้อมูลทดสอบ"), "ห้ามมีข้อมูลทดสอบ");
+
+  /* หน้าอื่นยังใช้บล็อก hero ได้ปกติ (ไม่กระทบ) */
+  for (const page of ["about", "contact", "careers"]) {
+    const other = buildBlockTemplate(page as never);
+    assert.ok(JSON.stringify(other).includes('"hero"'), `${page} ยังต้องมีบล็อก hero`);
+  }
+
+  /* โหมด "ใช้กับหน้าเว็บจริง": hero จริงต้องถูกเรนเดอร์ (ไม่ปล่อยให้หาย) */
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  const start = page.indexOf("if (liveDocument !== null) {");
+  const blockPath = page.slice(start, page.indexOf("<BlockDocumentView", start));
+  assert.ok(blockPath.includes("<Hero"), "โหมดบล็อกต้องเรนเดอร์ hero จริง");
+  assert.ok(blockPath.includes("heroCard={heroCard}"), "hero ต้องใช้การ์ด PR จากที่เก็บจริง");
 });

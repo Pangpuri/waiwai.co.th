@@ -104,14 +104,27 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const liveDocument = await loadLiveBlockDocument("home");
   if (liveDocument !== null) {
     /* ส่งชื่อหน้าไปให้ตัวเรนเดอร์ออก <h1> (a11y · รอบที่ 149) — หน้าแรกจากบล็อกไม่มี h1 เลย */
-    /* บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query) */
+    /*
+      ⚠️ รอบที่ 217 — hero ของหน้าแรก **ไม่ใช่บล็อก** (แหล่งเดียวคือ `/admin/hero`)
+      ⇒ โหมดบล็อกต้องเรนเดอร์ hero จริงก่อน แล้วต่อด้วยบล็อกที่เหลือ (กัน "แก้ได้สองที่")
+    */
     return (
-      <BlockDocumentView
-        document={liveDocument}
-        language={lang}
-        heading={messages.meta.homeTitle}
-        productData={await loadProductShowcaseData(liveDocument)}
-      />
+      <>
+        <Hero
+          locale={lang}
+          messages={messages}
+          dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
+          heroSetting={await loadHeroSetting()}
+          heroCard={heroCard}
+        />
+        {/* บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query) */}
+        <BlockDocumentView
+          document={liveDocument}
+          language={lang}
+          heading={messages.meta.homeTitle}
+          productData={await loadProductShowcaseData(liveDocument)}
+        />
+      </>
     );
   }
 
