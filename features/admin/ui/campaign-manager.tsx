@@ -9,6 +9,7 @@ import {
 } from "@/app/admin/hero/campaign-actions";
 import {
   CAMPAIGN_ANCHOR_PRESETS,
+  DEFAULT_PLACEMENT_ANCHOR,
   EMPTY_CAMPAIGN_IMAGE_DRAFT,
   MAX_CAMPAIGNS,
   anchorPresetOf,
@@ -20,6 +21,7 @@ import {
   type Campaign,
   type CampaignAnchorPreset,
   type CampaignImageDraft,
+  type CampaignPlacement,
 } from "@/lib/campaigns/model";
 import { useState } from "react";
 
@@ -43,12 +45,15 @@ export type CampaignSlideOption = { readonly id: string; readonly label: string;
 export function CampaignManager({
   campaigns,
   trashedCampaigns,
+  newsPlacements,
   slideOptions,
   strings,
   nowIso,
 }: {
   readonly campaigns: readonly Campaign[];
   readonly trashedCampaigns: readonly Campaign[];
+  /* ตำแหน่งการ์ดบนหน้าเว็บอื่น (รอบที่ 198) — คีย์ = campaignId */
+  readonly newsPlacements: Readonly<Record<string, CampaignPlacement>>;
   readonly slideOptions: readonly CampaignSlideOption[];
   readonly strings: Messages["admin"];
   readonly nowIso: string;
@@ -62,6 +67,23 @@ export function CampaignManager({
     Object.fromEntries(campaigns.map((campaign) => [campaign.id, { x: campaign.anchorX, y: campaign.anchorY }])),
   );
   const anchorOf = (id: string, fallbackX: number, fallbackY: number) => anchors[id] ?? { x: fallbackX, y: fallbackY };
+  /*
+    จุดยึดของ "หน้าข่าวสาร" (รอบที่ 198) — แยกจากของหน้าแรกโดยสิ้นเชิง
+    ค่าเริ่มต้นมาจากตาราง `campaign_placement` (ไม่มีแถว = ปิดไว้ + ตำแหน่งซ้ายกลาง)
+  */
+  const [newsAnchors, setNewsAnchors] = useState<Record<string, { x: number; y: number }>>(() =>
+    Object.fromEntries(
+      campaigns.map((campaign) => {
+        const placement = newsPlacements[campaign.id];
+        return [
+          campaign.id,
+          placement === undefined ? { x: DEFAULT_PLACEMENT_ANCHOR.x, y: DEFAULT_PLACEMENT_ANCHOR.y } : { x: placement.anchorX, y: placement.anchorY },
+        ];
+      }),
+    ),
+  );
+  const newsAnchorOf = (id: string) => newsAnchors[id] ?? { x: DEFAULT_PLACEMENT_ANCHOR.x, y: DEFAULT_PLACEMENT_ANCHOR.y };
+  const setNewsAnchor = (id: string, x: number, y: number) => setNewsAnchors((current) => ({ ...current, [id]: { x, y } }));
   /*
     ภาพของการ์ด (รอบที่ 193): เลือกจากคลัง/อัปโหลดในหน้าจอ แล้วกดบันทึกจึงเขียนฐานข้อมูล
     ⚠️ รอบที่ 195: ช่องภาพส่งค่าเป็น **patch บางส่วน** ⇒ ต้องรวมผ่าน `mergeCampaignImage()` เท่านั้น
@@ -287,6 +309,73 @@ export function CampaignManager({
                       <button type="submit" name="preset" value="right" className="border-line text-fg rounded-md border px-2 py-1 text-[11px]">
                         {presetLabel.right}
                       </button>
+                    </div>
+                  </fieldset>
+
+                  {/*
+                    ── การ์ดบนหน้าอื่น: หน้าข่าวสาร (รอบที่ 198 · migration 0034) ─────────────────
+                    ทำไมต้องมี: เจ้าของสั่ง *"รวมแคมเปญและข่าวสารล่าสุดไว้ที่หน้าข่าวสาร"*
+                    ⇒ การ์ดใบเดิมโชว์ได้หลายหน้า และ **แต่ละหน้ามีจุดยึดของตัวเอง**
+                    · เวทีในพรีวิวเป็นกล่องเปล่า (หน้าข่าวสารไม่มีภาพสไลด์) ⇒ `imagePath=""`
+                    · ไม่มี `<form>` ซ้อน (พรีวิวไม่เรนเดอร์ฟอร์ม) — มีเทสต์กันไว้ตั้งแต่รอบที่ 129
+                  */}
+                  <fieldset className="border-line flex flex-col gap-2 rounded-lg border p-2">
+                    <legend className="text-fg-muted px-1 text-[11px]">{strings.campaignNewsPlacement}</legend>
+                    <label className="text-fg flex items-center gap-2 text-xs font-semibold">
+                      <input
+                        type="checkbox"
+                        name="showOnNews"
+                        defaultChecked={newsPlacements[campaign.id]?.isEnabled === true}
+                      />
+                      {strings.campaignShowOnNews}
+                    </label>
+                    <p className="text-fg-muted text-[11px]">{strings.campaignShowOnNewsHint}</p>
+                    <CampaignAnchorPreview
+                      imagePath=""
+                      imageAltFallback={campaign.title.th}
+                      title={campaign.title.th}
+                      body={campaign.body.th}
+                      ctaLabel={campaign.ctaLabel.th}
+                      anchorX={newsAnchorOf(campaign.id).x}
+                      anchorY={newsAnchorOf(campaign.id).y}
+                      onAnchorChange={(x, y) => setNewsAnchor(campaign.id, x, y)}
+                      strings={strings}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+                        X%
+                        <input
+                          type="number"
+                          name="newsAnchorX"
+                          min={0}
+                          max={100}
+                          value={newsAnchorOf(campaign.id).x}
+                          onChange={(event) => setNewsAnchor(campaign.id, Number(event.target.value), newsAnchorOf(campaign.id).y)}
+                          className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs"
+                        />
+                      </label>
+                      <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+                        Y%
+                        <input
+                          type="number"
+                          name="newsAnchorY"
+                          min={0}
+                          max={100}
+                          value={newsAnchorOf(campaign.id).y}
+                          onChange={(event) => setNewsAnchor(campaign.id, newsAnchorOf(campaign.id).x, Number(event.target.value))}
+                          className="border-line text-fg w-16 rounded-md border px-2 py-1 text-xs"
+                        />
+                      </label>
+                      {CAMPAIGN_PRESET_BUTTONS.map((presetKey) => (
+                        <button
+                          key={presetKey}
+                          type="button"
+                          onClick={() => setNewsAnchor(campaign.id, CAMPAIGN_ANCHOR_PRESETS[presetKey].x, CAMPAIGN_ANCHOR_PRESETS[presetKey].y)}
+                          className="border-line text-fg rounded-md border px-2 py-1 text-[11px]"
+                        >
+                          {presetLabel[presetKey]}
+                        </button>
+                      ))}
                     </div>
                   </fieldset>
 

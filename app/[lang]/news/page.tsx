@@ -4,12 +4,15 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
+import { CampaignCard, campaignAnchorStyle, campaignCardBoxClass } from "@/features/campaigns/ui/campaign-card";
 import { NewsList, NewsListHeader, NewsPagination, newsListStringsOf } from "@/features/news/ui/news-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
+import { campaignCardView } from "@/lib/campaigns/card-view";
+import { listLiveCampaignsOnPage } from "@/lib/campaigns/repository";
 import { countNews, listNews, NEWS_PER_PAGE } from "@/lib/news/repository";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
@@ -74,11 +77,37 @@ export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
     หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลด/ตัวอ่านคืน null/0/[] ให้เอง
     ⚠️ เทมเพลตยังไม่ครอบคลุมทุกส่วน (ดู `blockCoverageGaps`) — หลังบ้านจะเตือนก่อนเปิดสวิตช์
   */
-  const [liveDocument, total, items] = await Promise.all([
+  const [liveDocument, total, items, placedCards] = await Promise.all([
     loadLiveBlockDocument("news"),
     countNews(),
     listNews(NEWS_PER_PAGE, 0),
+    /* การ์ดแคมเปญที่ตั้งไว้ให้ขึ้น "บนหน้านี้" (รอบที่ 198) — จุดยึดเป็นของหน้านี้โดยเฉพาะ */
+    listLiveCampaignsOnPage("news"),
   ]);
+
+  /*
+    ── เวทีการ์ดแคมเปญ (รอบที่ 198) ───────────────────────────────────────────────
+    การ์ดที่หลังบ้านเปิด "แสดงบนหน้าข่าวสาร" จะลอยอยู่บนเวทีนี้ ตามจุดยึดของ **หน้านี้**
+    · ไม่มีการ์ด = ไม่เรนเดอร์เวทีเลย (หน้าเว็บเหมือนเดิมเป๊ะ)
+    · ใช้ตัวเรนเดอร์การ์ดตัวเดียวกับสไลด์หน้าแรก (`CampaignCard`) ⇒ หน้าตาไม่เพี้ยนจากกัน
+  */
+  const campaignStage =
+    placedCards.length === 0 ? null : (
+      <section className="container-site pt-6" aria-label={m.campaignStageLabel}>
+        <div className="bg-bg-subtle relative min-h-[16rem] w-full overflow-hidden rounded-2xl">
+          {placedCards.map((placed) => {
+            const card = campaignCardView(placed.campaign, lang, { x: placed.anchorX, y: placed.anchorY });
+            return (
+              <div key={placed.campaign.id} className="pointer-events-none absolute inset-0 z-10">
+                <div style={campaignAnchorStyle(card.anchorX, card.anchorY)} className={campaignCardBoxClass()}>
+                  <CampaignCard card={card} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
 
   const listStrings = newsListStringsOf(m);
   const pageCount = Math.max(1, Math.ceil(total / NEWS_PER_PAGE));
@@ -97,6 +126,7 @@ export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
   if (liveDocument !== null) {
     return (
       <>
+        {campaignStage}
         <BlockDocumentView document={liveDocument} language={lang} />
         {listSection}
       </>
@@ -136,6 +166,7 @@ export default async function NewsPage({ params }: PageProps<"/[lang]/news">) {
         มีข่าวจริงในฐานข้อมูลแล้ว (รอบที่ 105) ⇒ แสดงของจริงแทนการ์ดทดสอบ
         ⚠️ ถ้าฐานข้อมูลว่าง/ล่ม ⇒ ยังเห็นการ์ดทดสอบเหมือนเดิม (ไม่ทำให้หน้าเว็บพัง)
       */}
+      {campaignStage}
       {listSection ?? (
         <section className="container-site py-16 lg:py-24">
           <MockCardGrid

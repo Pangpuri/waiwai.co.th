@@ -22,7 +22,14 @@ import {
   type Campaign,
   type CampaignImageDraft,
 } from "@/lib/campaigns/model";
+import { campaignCardView } from "@/lib/campaigns/card-view";
+import {
+  PUBLIC_CAMPAIGN_CONDITION,
+  prefixedPublicCampaignCondition,
+  publicCampaignConditions,
+} from "@/lib/campaigns/repository";
 import { feedbackOf, invalidCampaignHref } from "@/lib/hero/feedback";
+import { PUBLIC_READ_TABLES } from "./db-roles.ts";
 
 /** รอบที่ 190 — แคมเปญเป็นเอนทิตีของตัวเอง (มติเจ้าของ: ตัด 1:1 กับสไลด์ออก) */
 
@@ -104,8 +111,8 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   const repo = readFileSync("lib/campaigns/repository.ts", "utf8");
   assert.ok(repo.includes("PUBLIC_CAMPAIGN_CONDITION"), "ต้องมีเงื่อนไขกลาง");
   assert.ok(
-    repo.includes("status = 'published'") && repo.includes("ends_at is null or ends_at > now()"),
-    "ต้องกรองสถานะ/ช่วงเวลาที่ SQL",
+    repo.includes("publicCampaignConditions") && repo.includes("status = 'published'") && repo.includes("ends_at > now()"),
+    "ต้องกรองสถานะ/ช่วงเวลาที่ SQL (สร้างจากชิ้นเดียวกันทั้งแบบตารางเดียว/แบบ join — รอบที่ 198)",
   );
   assert.ok(repo.includes("await readQuery<"), "ฝั่งเว็บต้องอ่านผ่านประตูอ่านอย่างเดียว");
   assert.ok(/catch \{[\s\S]{0,160}return \[\];/.test(repo), "อ่านพังต้องคืนค่าว่าง");
@@ -162,14 +169,22 @@ test("campaigns: หน้าเว็บจับคู่แคมเปญก
     hero.includes("campaign.slideIds.length === 0 || campaign.slideIds.includes(slide.id)"),
     "ไม่เลือกสไลด์ = ทุกสไลด์ · เลือกไว้ = เฉพาะสไลด์นั้น",
   );
-  assert.ok(hero.includes("anchorX: card.anchorX") && hero.includes("anchorY: card.anchorY"), "ต้องส่งจุดยึดเข้าไปด้วย");
+  assert.ok(
+    hero.includes("campaignCardView(card, locale, { x: card.anchorX, y: card.anchorY })"),
+    "ต้องส่งจุดยึดเข้าไปด้วย (ผ่านตัวแปลงการ์ดกลาง — รอบที่ 198)",
+  );
 
   const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
   assert.ok(
-    slider.includes('left: (activeCards[0]?.anchorX ?? 8) + "%"') && slider.includes('top: (activeCards[0]?.anchorY ?? 50) + "%"'),
-    "การ์ดบนหน้าเว็บต้องวางด้วย left/top เป็นเปอร์เซ็นต์",
+    slider.includes("campaignAnchorStyle(activeCards[0]?.anchorX ?? 8, activeCards[0]?.anchorY ?? 50)"),
+    "การ์ดบนหน้าเว็บต้องวางด้วยจุดยึด (เรียกสูตรกลาง)",
   );
-  assert.ok(slider.includes('"translate(-"'), "ต้องเลื่อนกลับครึ่งหนึ่งของตัวเอง (สูตรเดียวกับพรีวิวหลังบ้าน)");
+  /* สูตร left/top % + เลื่อนกลับครึ่งตัวเอง ย้ายไปอยู่ที่ตัวกลาง (ใช้ร่วมทุกหน้า — รอบที่ 198) */
+  const cardUi = readFileSync("features/campaigns/ui/campaign-card.tsx", "utf8");
+  assert.ok(
+    cardUi.includes('"translate(-"') && cardUi.includes("left: anchorX") && cardUi.includes("top: anchorY"),
+    "สูตรวางการ์ดต้องอยู่ที่ `campaignAnchorStyle()` ที่เดียว (พรีวิว/หน้าเว็บ/หน้าอื่นใช้ร่วม)",
+  );
 
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
   assert.ok(page.includes("campaigns={await listLiveCampaigns()}"), "หน้าแรกต้องอ่านแคมเปญที่ยังไม่หมดเวลา");
@@ -283,7 +298,7 @@ test("★ campaign image: หน้าเว็บไปทาง `next/image` �
   );
 
   const hero = readFileSync("features/home/ui/hero.tsx", "utf8");
-  assert.ok(hero.includes("campaignCardImage(card"), "hero ต้องใช้ตัวตัดสินกลาง (ไม่เช็คพาธเองซ้ำที่อื่น)");
+  assert.ok(hero.includes("campaignCardView(card"), "hero ต้องใช้ตัวตัดสินกลาง (ไม่เช็คพาธเองซ้ำที่อื่น)");
   assert.ok(!hero.includes("imagePath:"), "ห้ามส่งพาธดิบเข้าวิว");
 });
 
@@ -532,6 +547,91 @@ test("★ campaigns: ถังขยะแคมเปญ — ดูได้ + 
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
     for (const key of ["campaignTrashTitle", "campaignTrashHint", "campaignTrashEmpty", "campaignRestore"]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
+  }
+});
+
+/**
+ * ★ รอบที่ 198 (ข) — การ์ดแคมเปญแสดงได้หลายหน้า โดย **จุดยึดแยกต่อหน้า**
+ * พร้อมล็อกบั๊กที่เจอตอนพิสูจน์จริง: ตัวสร้างเงื่อนไขแบบมี prefix เคยได้ `c.(…)` = SQL พัง
+ * แล้วถูก `try/catch` กลืนเป็น `[]` (หน้าเว็บเงียบ ๆ ไม่มีการ์ด) + ตารางใหม่ตกหล่นจากสิทธิ์ role อ่าน
+ */
+test("★ campaigns: การ์ดหลายหน้า — จุดยึดต่อหน้า · เงื่อนไข join ต้องไม่พัง · สิทธิ์ role อ่าน (รอบที่ 198)", () => {
+  /* 1) เงื่อนไขกลาง: สร้างจากชิ้นเดียวกันทั้งแบบมี/ไม่มี prefix */
+  assert.equal(publicCampaignConditions().join(" and "), PUBLIC_CAMPAIGN_CONDITION, "แบบไม่มี prefix ต้องไม่เปลี่ยนจากเดิม");
+  const prefixed = prefixedPublicCampaignCondition("c.");
+  assert.ok(!prefixed.includes("c.("), "ห้ามเติม prefix หน้าวงเล็บ ⇒ SQL พัง (`c.(…)`)");
+  for (const part of [
+    "c.deleted_at is null",
+    "c.is_active",
+    "c.status = 'published'",
+    "(c.starts_at is null or c.starts_at <= now())",
+    "(c.ends_at is null or c.ends_at <= now())".replace("<=", ">"),
+  ]) {
+    assert.ok(prefixed.includes(part), `เงื่อนไขแบบ join ต้องมี: ${part}`);
+  }
+
+  /* 2) ตารางใหม่ต้องอยู่ในทะเบียนตารางสาธารณะ (ไม่งั้น role อ่านไม่มีสิทธิ์ ⇒ คำสั่งล้มแล้วกลืนเป็น []) */
+  assert.ok(PUBLIC_READ_TABLES.includes("campaign_placement"), "role อ่านต้องมีสิทธิ์ `campaign_placement`");
+
+  /* 3) ตัวแปลงการ์ดกลาง: กติกาภาษา/ภาพ ใช้ร่วมทุกหน้า */
+  const sample: Campaign = {
+    id: "c1",
+    name: "ทดสอบ",
+    title: { th: "ไทย", en: "English" },
+    body: { th: "เนื้อไทย", en: "" },
+    ctaLabel: { th: "กด", en: "" },
+    ctaHref: "/products",
+    imagePath: "/media/abc",
+    imageAltTh: "ไทย",
+    imageAltEn: "English alt",
+    anchorX: 8,
+    anchorY: 50,
+    startsAt: null,
+    endsAt: null,
+    isActive: true,
+    status: "published",
+    sortOrder: 10,
+    slideIds: [],
+  };
+  const en = campaignCardView(sample, "en", { x: 70, y: 25 });
+  assert.equal(en.title, "English");
+  assert.equal(en.body, "เนื้อไทย", "EN ว่าง = ถอยไปใช้ไทย");
+  assert.equal(en.anchorX, 70, "จุดยึดใช้ค่าของหน้านั้น");
+  assert.equal(en.anchorY, 25);
+  assert.equal(en.image?.path, "/media/abc");
+  assert.equal(en.image?.alt, "English alt", "คำอธิบายภาพเลือกตามภาษา");
+  const noImage = campaignCardView({ ...sample, imagePath: "" }, "th", { x: 8, y: 50 });
+  assert.equal(noImage.image, undefined, "ไม่มีพาธ = ไม่มีคีย์ image (ไม่เรนเดอร์ภาพ)");
+
+  /* 4) ต่อสายครบ: หน้าข่าวสาร · จอหลังบ้าน · action · repository */
+  const news = readFileSync("app/[lang]/news/page.tsx", "utf8");
+  assert.ok(news.includes('listLiveCampaignsOnPage("news")'), "หน้าข่าวสารต้องอ่านการ์ดของหน้านี้");
+  assert.ok(news.includes("campaignStage") && news.includes("<CampaignCard card={card} />"), "ต้องมีเวทีการ์ดที่ใช้ตัวเรนเดอร์กลาง");
+  assert.ok(news.includes("campaignCardView(placed.campaign"), "ต้องใช้ตัวแปลงการ์ดกลาง (ไม่แปลงเอง)");
+
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes('name="showOnNews"'), "จอหลังบ้านต้องมีสวิตช์ “แสดงบนหน้าข่าวสาร”");
+  assert.ok(manager.includes('name="newsAnchorX"') && manager.includes('name="newsAnchorY"'), "ต้องมีช่องจุดยึดของหน้านั้น");
+  assert.ok(manager.includes("setNewsAnchor"), "ลาก/แก้ตัวเลขต้องอัปเดตจุดยึดของหน้าข่าวสาร");
+  assert.ok(!manager.includes("imagePath={newsAnchorOf"), "พรีวิวหน้าข่าวสารต้องไม่ยืมพาธสไลด์ (เวทีเปล่า)");
+
+  const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  assert.ok(actions.includes("saveCampaignPlacement("), "action บันทึกต้องเซฟ placement");
+  assert.ok(
+    actions.includes('formData.get("newsAnchorX") !== null'),
+    "ฟอร์มเก่า/ยิงตรงที่ไม่ส่งช่องนี้ = ต้องไม่แตะ placement เดิม (กันล้างค่าด้วย 0)",
+  );
+
+  const repo = readFileSync("lib/campaigns/repository.ts", "utf8");
+  assert.ok(repo.includes("columnsOf("), "คำสั่ง join ต้องระบุชื่อตารางนำหน้าคอลัมน์ (กัน ambiguous)");
+  assert.ok(/campaign_placement[\s\S]{0,200}on conflict \(campaign_id, page\)/.test(repo), "บันทึกตำแหน่งต้องเป็น upsert");
+  assert.ok(/delete from campaign_placement/.test(repo), "ปิดสวิตช์ = ลบแถวทิ้ง");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of ["campaignShowOnNews", "campaignShowOnNewsHint", "campaignNewsPlacement"]) {
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
   }

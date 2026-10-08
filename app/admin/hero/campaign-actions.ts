@@ -6,11 +6,18 @@ import { redirect } from "next/navigation";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
-import { CAMPAIGN_ANCHOR_PRESETS, MAX_CAMPAIGNS, isCampaignStatus, parseCampaignInput } from "@/lib/campaigns/model";
+import {
+  CAMPAIGN_ANCHOR_PRESETS,
+  DEFAULT_PLACEMENT_ANCHOR,
+  MAX_CAMPAIGNS,
+  isCampaignStatus,
+  parseCampaignInput,
+} from "@/lib/campaigns/model";
 import {
   countCampaigns,
   createCampaign,
   restoreCampaign,
+  saveCampaignPlacement,
   setCampaignStatus,
   trashCampaign,
   updateCampaign,
@@ -77,6 +84,27 @@ export async function saveCampaignAction(formData: FormData): Promise<void> {
 
   const ok = await updateCampaign(id, parsed.value, user.email);
   if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
+
+  /*
+    ── การ์ดบนหน้าข่าวสาร (รอบที่ 198 · migration 0034) ───────────────────────────
+    ช่องนี้ **ไม่มีในฟอร์มเก่า/ฟอร์มที่ยิงตรง ๆ** ⇒ ถ้าไม่ส่งมา (null) = ไม่แตะ placement เดิมเลย
+    (กันการเผลอล้างค่าด้วยค่า 0 ที่เกิดจาก `Number(null)`) ⇒ fail-safe ไม่ใช่ fail-destructive
+  */
+  if (formData.get("newsAnchorX") !== null && formData.get("newsAnchorY") !== null) {
+    const newsX = Number(formData.get("newsAnchorX"));
+    const newsY = Number(formData.get("newsAnchorY"));
+    await saveCampaignPlacement(
+      id,
+      "news",
+      {
+        anchorX: Number.isFinite(newsX) ? newsX : DEFAULT_PLACEMENT_ANCHOR.x,
+        anchorY: Number.isFinite(newsY) ? newsY : DEFAULT_PLACEMENT_ANCHOR.y,
+        isEnabled: formData.get("showOnNews") === "on",
+      },
+      user.email,
+    );
+  }
+
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-save" });
     await refreshAfterCampaignChange("campaign-saved");

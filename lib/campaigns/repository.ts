@@ -10,11 +10,31 @@
 
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
-import type { Campaign, CampaignInput, CampaignStatus, CampaignText } from "@/lib/campaigns/model";
+import {
+  clampAnchor,
+  type Campaign,
+  type CampaignExtraPage,
+  type CampaignInput,
+  type CampaignPlacement,
+  type CampaignStatus,
+  type CampaignText,
+} from "@/lib/campaigns/model";
 
-/** เงื่อนไขกลางของ "แคมเปญที่หน้าเว็บควรเห็น" — ที่เดียว (ห้ามพิมพ์ซ้ำ) */
-export const PUBLIC_CAMPAIGN_CONDITION =
-  "deleted_at is null and is_active and status = 'published' and (starts_at is null or starts_at <= now()) and (ends_at is null or ends_at > now())";
+/**
+ * เงื่อนไขกลางของ "แคมเปญที่หน้าเว็บควรเห็น" — **แยกเป็นชิ้น** เพื่อสร้างได้ทั้งแบบมี/ไม่มีชื่อตารางนำหน้า
+ * (ห้ามพิมพ์ซ้ำ: ถ้าแก้กติกาที่นี่ ทั้งหน้าเว็บและหน้าที่ join จะเปลี่ยนพร้อมกัน)
+ */
+export function publicCampaignConditions(prefix = ""): readonly string[] {
+  return [
+    `${prefix}deleted_at is null`,
+    `${prefix}is_active`,
+    `${prefix}status = 'published'`,
+    `(${prefix}starts_at is null or ${prefix}starts_at <= now())`,
+    `(${prefix}ends_at is null or ${prefix}ends_at > now())`,
+  ];
+}
+
+export const PUBLIC_CAMPAIGN_CONDITION = publicCampaignConditions().join(" and ");
 
 type CampaignRow = {
   readonly id: string;
@@ -38,8 +58,32 @@ type CampaignRow = {
   readonly sort_order: number;
 };
 
-const COLUMNS = `id, name, title_th, title_en, body_th, body_en, cta_label_th, cta_label_en, cta_href,
-       image_path, image_alt_th, image_alt_en, anchor_x, anchor_y, starts_at, ends_at, is_active, status, sort_order`;
+const CAMPAIGN_COLUMNS: readonly string[] = [
+  "id", "name", "title_th", "title_en", "body_th", "body_en",
+  "cta_label_th", "cta_label_en", "cta_href",
+  "image_path", "image_alt_th", "image_alt_en",
+  "anchor_x", "anchor_y", "starts_at", "ends_at", "is_active", "status", "sort_order",
+];
+
+const COLUMNS = CAMPAIGN_COLUMNS.join(", ");
+
+/**
+ * ชื่อคอลัมน์แบบระบุตาราง (`c.id, c.name, …`)
+ * ⚠️ จำเป็นเมื่อ **join**: `campaign_placement` มี `anchor_x`/`anchor_y` เหมือนกัน
+ *    ⇒ เขียนชื่อลอย ๆ จะได้ `column reference "anchor_x" is ambiguous` (บทเรียนรอบที่ 103)
+ */
+function columnsOf(prefix: string): string {
+  return CAMPAIGN_COLUMNS.map((column) => `${prefix}${column}`).join(", ");
+}
+
+/**
+ * เงื่อนไขกลางแบบระบุตาราง (`c.deleted_at is null and …`) — ใช้ตอน join กับ `campaign_placement`
+ * ⚠️ บทเรียนรอบที่ 198: เคย "เติม prefix ทุกท่อน" ด้วยการ split ⇒ ได้ `c.(starts_at is null …)` = **SQL พัง**
+ *    แล้วถูก `try/catch` กลืนเป็น `[]` (หน้าเว็บเงียบ ๆ ไม่มีการ์ด) ⇒ สร้างจากชิ้นเดียวกันแทน + มีเทสต์กัน
+ */
+export function prefixedPublicCampaignCondition(prefix: string): string {
+  return publicCampaignConditions(prefix).join(" and ");
+}
 
 function toIso(value: Date | string | null): string | null {
   if (value === null) return null;
@@ -214,6 +258,89 @@ export async function setCampaignStatus(id: string, status: CampaignStatus, acto
 }
 
 /** ลบแคมเปญ = ย้ายเข้าถังขยะ (คู่ `deleted_at`/`deleted_by`) */
+/* ── ตำแหน่งการ์ดต่อหน้า (รอบที่ 198 · migration 0034) ─────────────────────────── */
+
+export type PlacedCampaign = { readonly campaign: Campaign; readonly anchorX: number; readonly anchorY: number };
+
+/** ตำแหน่งการ์ดของแต่ละแคมเปญบนหน้านั้น (หลังบ้าน) — คีย์ = campaignId */
+export async function listCampaignPlacements(
+  page: CampaignExtraPage,
+): Promise<Record<string, CampaignPlacement>> {
+  if (!isDatabaseConfigured()) return {};
+  const result = await getPool().query<{
+    readonly campaign_id: string;
+    readonly anchor_x: number;
+    readonly anchor_y: number;
+    readonly is_enabled: boolean;
+  }>(
+    `select campaign_id, anchor_x, anchor_y, is_enabled
+       from campaign_placement
+      where page = $1`,
+    [page],
+  );
+  return Object.fromEntries(
+    result.rows.map((row) => [
+      row.campaign_id,
+      { anchorX: row.anchor_x, anchorY: row.anchor_y, isEnabled: row.is_enabled },
+    ]),
+  );
+}
+
+/**
+ * บันทึกตำแหน่งการ์ดบนหน้านั้น (upsert) · ปิดสวิตช์ = **ลบแถวทิ้ง** (ไม่เก็บของที่ไม่ใช้)
+ * จุดยึดถูกบีบให้อยู่ใน 0–100 ด้วยค่ากลาง (`clampAnchor`) — ตรงกับที่ DB บังคับด้วย check
+ */
+export async function saveCampaignPlacement(
+  campaignId: string,
+  page: CampaignExtraPage,
+  placement: { readonly anchorX: number; readonly anchorY: number; readonly isEnabled: boolean },
+  actor: string,
+): Promise<boolean> {
+  if (!placement.isEnabled) {
+    await getPool().query("delete from campaign_placement where campaign_id = $1 and page = $2", [campaignId, page]);
+    return true;
+  }
+  const x = clampAnchor(placement.anchorX);
+  const y = clampAnchor(placement.anchorY);
+  const result = await getPool().query(
+    `insert into campaign_placement (campaign_id, page, anchor_x, anchor_y, is_enabled, updated_by)
+     values ($1, $2, $3, $4, true, $5)
+     on conflict (campaign_id, page) do update
+       set anchor_x = excluded.anchor_x,
+           anchor_y = excluded.anchor_y,
+           is_enabled = true,
+           updated_at = now(),
+           updated_by = excluded.updated_by`,
+    [campaignId, page, x, y, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * แคมเปญที่ขึ้น **บนหน้านั้น** (หน้าเว็บสาธารณะ) — อ่านผ่านประตูอ่านอย่างเดียว
+ * ไม่มี DB/ตารางหาย/อ่านไม่สำเร็จ = คืน `[]` (หน้าเว็บไม่พัง — เหมือน `listLiveCampaigns()`)
+ */
+export async function listLiveCampaignsOnPage(page: CampaignExtraPage): Promise<readonly PlacedCampaign[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await readQuery<CampaignRow & { readonly placement_anchor_x: number; readonly placement_anchor_y: number }>(
+      `select ${columnsOf("c.")}, p.anchor_x as placement_anchor_x, p.anchor_y as placement_anchor_y
+         from campaign_placement p
+         join campaign c on c.id = p.campaign_id
+        where p.page = $1 and p.is_enabled and ${prefixedPublicCampaignCondition("c.")}
+        order by c.sort_order asc, c.id asc`,
+      [page],
+    );
+    return result.rows.map((row) => ({
+      campaign: toCampaign(row, []),
+      anchorX: row.placement_anchor_x,
+      anchorY: row.placement_anchor_y,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * แคมเปญที่อยู่ในถัง (ใหม่สุดก่อน) — จอหลังบ้าน (รอบที่ 198)
  *

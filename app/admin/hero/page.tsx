@@ -13,7 +13,7 @@ import {
   saveHeroSettingAction,
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
-import { listCampaignsForAdmin, listTrashedCampaigns } from "@/lib/campaigns/repository";
+import { listCampaignPlacements, listCampaignsForAdmin, listTrashedCampaigns } from "@/lib/campaigns/repository";
 import { type CampaignFieldCode } from "@/lib/campaigns/model";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
@@ -91,6 +91,8 @@ export default async function AdminHeroPage({
   const nowIso = new Date().toISOString();
   const campaigns = await listCampaignsForAdmin();
   const trashedCampaigns = await listTrashedCampaigns();
+  /* ตำแหน่งการ์ดบนหน้าข่าวสาร (รอบที่ 198) — หน้าละจุดยึด (หน้าแรกยังใช้ campaign.anchor_x/y เดิม) */
+  const newsPlacements = await listCampaignPlacements("news");
   const slideOptions: readonly CampaignSlideOption[] = slides.map((slide) => ({ id: slide.id, label: slide.id, mediaPath: slide.mediaPath }));
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
@@ -233,6 +235,7 @@ export default async function AdminHeroPage({
         <CampaignManager
           campaigns={campaigns}
           trashedCampaigns={trashedCampaigns}
+          newsPlacements={newsPlacements}
           slideOptions={slideOptions}
           strings={s}
           nowIso={nowIso}

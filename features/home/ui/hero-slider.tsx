@@ -5,6 +5,8 @@ import type { HeroEffect } from "@/lib/hero/model";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import { CampaignCard, campaignAnchorStyle, campaignCardBoxClass } from "@/features/campaigns/ui/campaign-card";
+
 import { HERO_SLIDE_INTERVAL_MS, advanceIndex, hasSlideControls } from "@/lib/slideshow";
 
 import type { HeroSlideView } from "../slides";
@@ -138,36 +140,14 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
 
         {/* การ์ดแคมเปญของสไลด์ที่กำลังแสดง (รอบที่ 188) — ตำแหน่งตามที่ตั้งในหลังบ้าน */}
         {activeCards.length > 0 ? (
-                    <div className="pointer-events-none absolute inset-0 z-10">
+          <div className="pointer-events-none absolute inset-0 z-10">
             <div
-              /* ตำแหน่งการ์ด: left/top เป็นเปอร์เซ็นต์ + เลื่อนกลับครึ่งหนึ่งของตัวเอง (สูตรเดียวกับพรีวิวหลังบ้าน) */
-              style={{
-                left: (activeCards[0]?.anchorX ?? 8) + "%",
-                top: (activeCards[0]?.anchorY ?? 50) + "%",
-                transform: "translate(-" + (activeCards[0]?.anchorX ?? 8) + "%, -" + (activeCards[0]?.anchorY ?? 50) + "%)",
-              }}
-              className="pointer-events-auto absolute flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 rounded-2xl bg-surface/95 p-4 text-fg shadow-lg sm:max-w-md"
+              /* ตำแหน่งการ์ด: สูตรอยู่ที่ `campaignAnchorStyle()` ที่เดียว (ใช้ร่วมกับหน้าอื่น — รอบที่ 198) */
+              style={campaignAnchorStyle(activeCards[0]?.anchorX ?? 8, activeCards[0]?.anchorY ?? 50)}
+              className={campaignCardBoxClass()}
             >
               {activeCards.map((card) => (
-                <div key={card.id} className="flex flex-col gap-1">
-                  {/*
-                    ภาพของการ์ด (รอบที่ 193 · ทบทวนรอบที่ 194)
-                    · ไม่มีภาพ = ไม่มีคีย์ `image` ⇒ **ไม่เรนเดอร์องค์ประกอบภาพเลย** (ไม่ปล่อย src ว่าง)
-                    · ใช้ `next/image` แบบ `fill` ⇒ ต้องมีกล่อง `relative` ครอบ (และได้ย่อขนาด/WebP ให้ด้วย)
-                  */}
-                  {card.image === undefined ? null : (
-                    <span className="relative mb-1 block h-24 w-full overflow-hidden rounded-lg sm:h-28">
-                      <Image src={card.image.path} alt={card.image.alt} fill sizes="(min-width: 640px) 448px, 100vw" className="object-cover" />
-                    </span>
-                  )}
-                  <p className="text-fg text-base font-bold sm:text-lg">{card.title}</p>
-                  {card.body.trim() === "" ? null : <p className="text-fg-muted text-xs sm:text-sm">{card.body}</p>}
-                  {card.ctaLabel.trim() === "" || card.ctaHref.trim() === "" ? null : (
-                    <a href={card.ctaHref} className="text-brand-red text-sm font-semibold underline underline-offset-2">
-                      {card.ctaLabel}
-                    </a>
-                  )}
-                </div>
+                <CampaignCard key={card.id} card={card} />
               ))}
             </div>
           </div>

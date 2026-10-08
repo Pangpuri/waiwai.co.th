@@ -36,6 +36,7 @@ export const recipesPage = {
 };
 
 export const newsPage = {
+  campaignStageLabel: "การ์ดแคมเปญจากหลังบ้าน",
     meta: {
       title: "ข่าวสาร & กิจกรรม",
       description:

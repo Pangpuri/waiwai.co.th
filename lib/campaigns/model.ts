@@ -227,6 +227,35 @@ export function isCampaignLiveNow(
 }
 
 /**
+ * หน้าที่ "การ์ดแคมเปญ" แสดงได้ **นอกเหนือจากหน้าแรก** (รอบที่ 198 · migration 0034)
+ *
+ * ⚠️ หน้าแรกยังใช้ `campaign.anchorX/anchorY` เดิม (ไม่ย้ายข้อมูล · ไม่แตะการ์ดที่ขึ้นอยู่จริง)
+ * หน้าที่เพิ่มต้องมี "ตำแหน่งของตัวเอง" ⇒ เก็บที่ตาราง `campaign_placement`
+ * ➕ เพิ่มหน้าใหม่ = เพิ่มค่าในลิสต์นี้ + หน้าจอ/ตัวเรนเดอร์ของหน้านั้น (ที่เดียว)
+ */
+export const CAMPAIGN_EXTRA_PAGES = ["news"] as const;
+export type CampaignExtraPage = (typeof CAMPAIGN_EXTRA_PAGES)[number];
+
+export function isCampaignExtraPage(value: string): value is CampaignExtraPage {
+  return (CAMPAIGN_EXTRA_PAGES as readonly string[]).includes(value);
+}
+
+/** ตำแหน่งการ์ดของแคมเปญบนหน้าเพิ่มเติม (ค่าเริ่มต้น = ซ้ายกลาง เหมือนของหน้าแรก) */
+export const DEFAULT_PLACEMENT_ANCHOR = { x: 8, y: 50 } as const;
+
+export type CampaignPlacement = {
+  readonly anchorX: number;
+  readonly anchorY: number;
+  readonly isEnabled: boolean;
+};
+
+export const EMPTY_PLACEMENT: CampaignPlacement = {
+  anchorX: DEFAULT_PLACEMENT_ANCHOR.x,
+  anchorY: DEFAULT_PLACEMENT_ANCHOR.y,
+  isEnabled: false,
+};
+
+/**
  * แคมเปญที่ **ขึ้นเว็บอยู่จริงตอนนี้** (เรียงตามลำดับที่แสดง)
  *
  * ใช้ที่จอหลังบ้าน (รอบที่ 198): เจ้าของบ่นว่า *"กดเพิ่มแล้วได้การ์ดใหม่ ไม่ได้แก้การ์ดที่ขยับอยู่"*
