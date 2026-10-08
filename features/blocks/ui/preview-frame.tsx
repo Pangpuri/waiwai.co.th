@@ -118,17 +118,12 @@ export function PreviewFrame({
     if (target === null) return;
     target.scrollIntoView({ block: "center", behavior: "smooth" });
     /*
-      พรีวิวถูกเรนเดอร์เต็มความสูงแล้วย่อด้วย `transform: scale()` (บทเรียนรอบ 33)
-      ⇒ การเลื่อน "ใน" iframe มักไม่ช่วย เพราะที่เลื่อนจริงคือหน้าหลังบ้าน
-      ⇒ ส่ง **สัดส่วนตำแหน่ง** (ไม่ใช่พิกเซล — กันเรื่องสเกล) ให้หลังบ้านเลื่อนหน้าจอไปหา
+      ⚠️ รอบที่ 234 — **ถอดการแจ้ง "สัดส่วนตำแหน่ง" กลับไปให้หลังบ้านออก**
+      เพราะพรีวิวไม่มีการเลื่อนภายใน (iframe สูงเท่าเนื้อหา) ⇒ `scrollHeight` เชื่อถือไม่ได้
+      ⇒ หลังบ้านคำนวณตำแหน่งผิด ⇒ เด้งไปล่างสุดทุกครั้ง (บั๊กที่เจ้าของเจอ)
+      ⇒ เหลือเฉพาะ `scrollIntoView` ข้างบน (ใช้ได้เมื่อ iframe เลื่อนได้เอง เช่นพรีวิวเดี่ยว)
+      การเลื่อนหน้าจอหลังบ้านจะทำจากฝั่งหลังบ้านโดยอ่าน DOM ของ iframe โดยตรง (งานถัดไป)
     */
-    const rect = target.getBoundingClientRect();
-    const total = window.document.documentElement.scrollHeight;
-    if (total <= 0) return;
-    window.parent.postMessage(
-      { type: PREVIEW_SCROLL_MESSAGE, fraction: rect.top / total },
-      window.location.origin,
-    );
   }, [selectedBlockId, selectionNonce]);
 
   /* ลากไฟล์ภาพมาวางในพรีวิว → หาว่าปล่อยบนส่วนไหน แล้วส่งไฟล์กลับไปให้หน้าจอ */

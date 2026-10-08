@@ -472,7 +472,11 @@ test("★ builder: เลือกบล็อก ⇒ พรีวิวเล�
 test("★ builder: เลื่อนไปหาบล็อกผ่านข้อความสัดส่วน และ effect มี deps คงที่", () => {
   const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
   assert.ok(frame.includes("PREVIEW_SCROLL_MESSAGE"), "พรีวิวต้องส่งข้อความขอให้เลื่อน");
-  assert.ok(frame.includes("fraction: rect.top / total"), "ส่งสัดส่วน (ไม่ใช่พิกเซล — กันเรื่อง scale)");
+  assert.ok(frame.includes("target.scrollIntoView("), "พรีวิวต้องเลื่อนไปหาบล็อกในเอกสารตัวเอง");
+  assert.ok(
+    !frame.includes("fraction: rect.top / total"),
+    "รอบที่ 234: ห้ามส่งสัดส่วนกลับให้หลังบ้าน (พรีวิวไม่มีการเลื่อนภายใน ⇒ ค่าผิด ⇒ เด้งไปล่างสุด)",
+  );
   const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
   assert.ok(builder.includes("function scrollToBlock(fraction: number)"), "ตรรกะเลื่อนต้องอยู่ใน effect");
   assert.ok(!builder.includes("scrollPreviewTo"), "ห้ามอ้าง useCallback ใน deps (React ฟ้อง 'deps เปลี่ยนขนาด')");
