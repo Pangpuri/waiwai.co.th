@@ -25,8 +25,6 @@ function style(overrides: Partial<typeof DEFAULT_BLOCK_STYLE> = {}): typeof DEFA
   return { ...DEFAULT_BLOCK_STYLE, ...overrides };
 }
 
-type DictCard = { readonly name: string; readonly description: string };
-
 /* พจนานุกรมของหมวดสินค้า/ช่องทาง — เปิดแบบกว้าง (คีย์มาจากทะเบียนกลาง ไม่ใช่พิมพ์เอง) */
 /* ชื่อหมวด: พจนานุกรมชุดเดียวกับหน้า /products (คีย์ = CatalogItemId เดียวกับ CATALOG_ITEMS) */
 type CatalogDict = { readonly name?: string; readonly imageAlt?: string };

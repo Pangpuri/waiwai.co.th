@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
+import { loadProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { Hero } from "@/features/home/ui/hero";
 import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
 import { whereToBuyViewOf } from "@/lib/content/home-section";
@@ -103,7 +104,15 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const liveDocument = await loadLiveBlockDocument("home");
   if (liveDocument !== null) {
     /* ส่งชื่อหน้าไปให้ตัวเรนเดอร์ออก <h1> (a11y · รอบที่ 149) — หน้าแรกจากบล็อกไม่มี h1 เลย */
-    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.meta.homeTitle} />;
+    /* บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query) */
+    return (
+      <BlockDocumentView
+        document={liveDocument}
+        language={lang}
+        heading={messages.meta.homeTitle}
+        productData={await loadProductShowcaseData(liveDocument)}
+      />
+    );
   }
 
   /*

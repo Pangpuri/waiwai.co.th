@@ -152,7 +152,28 @@ test("★ product showcase: ตัวโหลดข้อมูลจริง�
   assert.deepEqual(found.map((block) => block.id), ["a", "b"], "ต้องเจอบล็อกที่ซ้อนในแถวด้วย");
 
   /* ไม่มีเอกสาร/ไม่มีบล็อกชนิดนี้ = ไม่ยิงฐานข้อมูล (คืน map ว่าง) */
-  const { loadProductShowcasesFor } = await import("@/lib/blocks/product-showcase-data");
-  assert.deepEqual(await loadProductShowcasesFor(null, "th"), {});
-  assert.deepEqual(await loadProductShowcasesFor({ page: "home", blocks: [] }, "th"), {});
+  const { loadProductShowcaseData } = await import("@/lib/blocks/product-showcase-data");
+  assert.equal(await loadProductShowcaseData(null), null, "ไม่มีเอกสาร = ไม่ยิงฐานข้อมูล");
+  assert.equal(await loadProductShowcaseData({ page: "home", blocks: [] }), null, "ไม่มีบล็อกชนิดนี้ = ไม่ยิงฐานข้อมูล");
+});
+
+test("★ product showcase: ตัวเรนเดอร์ + การส่งข้อมูล (ห้ามตัวเรนเดอร์ยิงฐานข้อมูลเอง)", () => {
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes('case "productShowcase": {'), "ต้องมีกรณีเรนเดอร์ของบล็อกนี้");
+  assert.ok(renderer.includes("if (productData === null) return null"), "ไม่มีข้อมูล = ไม่เรนเดอร์ (ห้ามกล่องเปล่า)");
+  assert.ok(renderer.includes("showcase.isEmpty"), "ไม่มีหมวดจริง = ไม่เรนเดอร์");
+  assert.ok(renderer.includes("productData={productData}"), "BlockDocumentView ต้องส่งข้อมูลต่อให้ BlockView");
+
+  /* ⚠️ กฎสำคัญ: ตัวเรนเดอร์ถูกใช้ใน "พรีวิวที่แก้ได้" (client) ⇒ ห้ามยิงฐานข้อมูลเอง */
+  assert.ok(!renderer.includes("listProductCategoryCards"), "ห้ามตัวเรนเดอร์เรียกตัวอ่านฐานข้อมูล");
+  assert.ok(!renderer.includes("@/lib/products/repository"), "ห้าม import ชั้นฐานข้อมูลในตัวเรนเดอร์");
+
+  /* ผู้เรียก (เซิร์ฟเวอร์) เป็นคนโหลด: หน้าเว็บจริง + พรีวิว */
+  const home = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(home.includes("productData={await loadProductShowcaseData(liveDocument)}"), "หน้าเว็บจริงต้องโหลดข้อมูลให้");
+  const preview = readFileSync("app/[lang]/preview/[page]/page.tsx", "utf8");
+  assert.ok(preview.includes("productData={await loadProductShowcaseData(document)}"), "พรีวิวต้องโหลดข้อมูลให้");
+  const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
+  assert.ok(frame.includes("productData={productData}"), "PreviewFrame ต้องส่งต่อให้ BlockDocumentView");
+  assert.ok(!frame.includes("repository"), "พรีวิว (client) ห้ามแตะฐานข้อมูล");
 });

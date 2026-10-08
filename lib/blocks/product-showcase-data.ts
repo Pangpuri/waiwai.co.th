@@ -1,7 +1,5 @@
 import type { Block, BlockDocument } from "@/lib/blocks/types";
-import { productShowcaseView, type ProductShowcaseView } from "@/lib/blocks/product-showcase";
-import { listProductCategoryCards, listProductHighlights } from "@/lib/products/repository";
-import type { Language } from "@/lib/content/home-section";
+import { listProductCategoryCards, listProductHighlights, type ProductCategoryCardRecord, type ProductHighlightRecord } from "@/lib/products/repository";
 
 /**
  * โหลดข้อมูลจริงให้ **บล็อกไดนามิก "หมวดสินค้า + สินค้าแนะนำ"** — รอบที่ 212 (ขั้น 2 ส่วน ข)
@@ -12,23 +10,23 @@ import type { Language } from "@/lib/content/home-section";
  *
  * กติกา: ไม่มี DB/อ่านพัง = คืน map ว่าง ⇒ บล็อกไดนามิกจะไม่เรนเดอร์ (หน้าเว็บไม่พัง)
  */
-export async function loadProductShowcasesFor(
-  document: BlockDocument | null,
-  language: Language,
-): Promise<Readonly<Record<string, ProductShowcaseView>>> {
-  const blocks = collectShowcaseBlocks(document?.blocks ?? []);
-  if (blocks.length === 0) return {};
+/** ข้อมูลจริงที่บล็อกไดนามิกต้องใช้ (โหลดครั้งเดียวต่อการเรนเดอร์หนึ่งครั้ง) */
+export type ProductShowcaseData = {
+  readonly categories: readonly ProductCategoryCardRecord[];
+  readonly highlights: readonly ProductHighlightRecord[];
+};
 
+/**
+ * โหลดข้อมูลจริงสำหรับบล็อกไดนามิก — **ไม่ยิงฐานข้อมูลเลยถ้าเอกสารไม่มีบล็อกชนิดนั้น**
+ * (ประหยัด query) · ไม่มี DB/อ่านพัง = `null` ⇒ บล็อกไดนามิกไม่เรนเดอร์ (หน้าเว็บไม่พัง)
+ */
+export async function loadProductShowcaseData(document: BlockDocument | null): Promise<ProductShowcaseData | null> {
+  if (collectShowcaseBlocks(document?.blocks ?? []).length === 0) return null;
   try {
     const [categories, highlights] = await Promise.all([listProductCategoryCards(), listProductHighlights()]);
-    const views: Record<string, ProductShowcaseView> = {};
-    for (const block of blocks) {
-      if (block.type !== "productShowcase") continue;
-      views[block.id] = productShowcaseView(categories, highlights, block, language);
-    }
-    return views;
+    return { categories, highlights };
   } catch {
-    return {};
+    return null;
   }
 }
 
