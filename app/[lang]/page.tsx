@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { Hero } from "@/features/home/ui/hero";
+import { heroCardContentOf } from "@/lib/content/home-card";
+import { loadHomeContentSafely } from "@/lib/content/repository";
 import { managedHeroSlideViews } from "@/features/home/slides";
 import { NewsList } from "@/features/home/ui/news-list";
 import { Newsletter } from "@/features/home/ui/newsletter";
@@ -110,6 +112,8 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
         dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
         heroSetting={await loadHeroSetting()}
         campaigns={await listLiveCampaigns()}
+        /* การ์ดประกาศที่ขยับ: ค่าจากหลังบ้าน (ถ้ามี) ทับพจนานุกรม — รอบที่ 200 */
+        heroCard={heroCardContentOf(await loadHomeContentSafely(), messages, lang)}
       />
       <ProductsShowcase
         locale={lang}

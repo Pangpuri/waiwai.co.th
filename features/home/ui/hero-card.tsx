@@ -51,9 +51,14 @@ type HeroCardLabels = {
 type HeroCardProps = {
   readonly href: string;
   readonly labels: HeroCardLabels;
+  /**
+   * ภาพการ์ด (รอบที่ 200) — หลังบ้านตั้งได้ที่ `/admin/content/home` → "การ์ดประกาศมุมขวาล่าง"
+   * ไม่ส่งมา = ใช้ค่าคงที่ในโค้ด (`HERO_CARD_IMAGE`) เหมือนเดิมเป๊ะ
+   */
+  readonly image?: { readonly src: string; readonly alt: string };
 };
 
-export function HeroCard({ href, labels }: HeroCardProps) {
+export function HeroCard({ href, labels, image = { src: HERO_CARD_IMAGE.src, alt: labels.alt } }: HeroCardProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [muteToday, setMuteToday] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -106,15 +111,20 @@ export function HeroCard({ href, labels }: HeroCardProps) {
         className="relative flex max-w-sm flex-col gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-2xl backdrop-blur-sm lg:w-56 lg:max-w-none lg:gap-0 lg:p-3.5"
       >
         <div className="flex items-center gap-3 lg:flex-col lg:items-stretch lg:gap-0">
-          <Image
-            src={HERO_CARD_IMAGE.src}
-            alt={labels.alt}
-            width={HERO_CARD_IMAGE.width}
-            height={HERO_CARD_IMAGE.height}
-            sizes="(min-width: 1024px) 208px, 80px"
-            loading="lazy"
-            className="h-20 w-20 shrink-0 rounded-xl object-cover lg:h-auto lg:w-full lg:aspect-4/5"
-          />
+          {/*
+            กล่อง `relative` + `fill` (รอบที่ 200): ทำให้ภาพจากหลังบ้าน (พาธใดก็ได้) แสดงได้เสมอ
+            โดยไม่ต้องรู้ขนาดจริง — คลาสเดิมยังคุมสัดส่วน/มุมโค้งไว้เหมือนก่อน
+          */}
+          <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl lg:h-auto lg:w-full lg:aspect-4/5">
+            <Image
+              src={image.src}
+              alt={image.alt}
+              fill
+              sizes="(min-width: 1024px) 208px, 80px"
+              loading="lazy"
+              className="object-cover"
+            />
+          </span>
 
           <div className="min-w-0 lg:mt-3">
             <p className="font-display text-sm leading-snug font-extrabold text-fg">

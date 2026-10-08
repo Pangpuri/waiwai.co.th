@@ -284,7 +284,11 @@ export function HomeEditor({ spec, initialDraft, strings }: Props) {
     const list = draft.sections[sectionKey]?.items[group.key] ?? [];
 
     return (
-      <div className="border-line flex flex-col gap-3 rounded-xl border p-4">
+      /* ⚠️ id นี้ถูกใช้เป็น "ปลายทางลิงก์" จากจออื่น (เช่น การ์ดขยับใน /admin/hero → /admin/content/home#item-hero-card) — อย่าลบ */
+      <div
+        id={`item-${sectionKey}-${group.key}`}
+        className="border-line flex scroll-mt-24 flex-col gap-3 rounded-xl border p-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col">
             <p className="text-fg text-sm font-semibold">{group.label}</p>

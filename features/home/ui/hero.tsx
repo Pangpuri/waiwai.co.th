@@ -4,8 +4,8 @@ import { SectionCurve } from "@/features/shell/ui/section-curve";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
-import { HERO_CARD_HREF } from "../hero-card";
 import { campaignCardView } from "@/lib/campaigns/card-view";
+import { heroCardDefaults, type HeroCardContent } from "@/lib/content/home-card";
 import { anchorPresetOf } from "@/lib/campaigns/model";
 import type { Campaign as CampaignData } from "@/lib/campaigns/model";
 import type { HeroCardView } from "./hero-slider";
@@ -27,6 +27,11 @@ type HeroProps = {
   /** การ์ดแคมเปญจากหลังบ้าน (คีย์ = id สไลด์) — รอบที่ 188 */
   /** แคมเปญจากหลังบ้าน (รอบที่ 190) — เลือกสไลด์ที่แสดงได้ · ไม่เลือก = ทุกสไลด์ */
   readonly campaigns?: readonly CampaignData[];
+  /**
+   * เนื้อหา "การ์ดประกาศที่ขยับ" (รอบที่ 200) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม
+   * ไม่ส่งมา = พจนานุกรมล้วน (พฤติกรรมเดิมเป๊ะ)
+   */
+  readonly heroCard?: HeroCardContent;
 };
 
 /**
@@ -44,8 +49,17 @@ type HeroProps = {
  *
  * เป็น Server Component: ประกอบข้อความ alt จากพจนานุกรมแล้วส่งข้อมูลธรรมดาเข้า Client Component
  */
-export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HERO_SETTING, campaigns = [] }: HeroProps) {
+export function Hero({
+  locale,
+  messages,
+  dbSlides = [],
+  heroSetting = DEFAULT_HERO_SETTING,
+  campaigns = [],
+  heroCard,
+}: HeroProps) {
   const m = messages.hero;
+  /* เนื้อหาการ์ด: ค่าที่ส่งมา (จากหลังบ้าน) หรือค่าเริ่มต้นจากพจนานุกรม */
+  const card = heroCard ?? heroCardDefaults(messages);
 
   const templateSlides: readonly HeroSlideView[] = HERO_SLIDES.map((slide) => ({
     ...slide,
@@ -101,14 +115,15 @@ export function Hero({ locale, messages, dbSlides = [], heroSetting = DEFAULT_HE
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 sm:bottom-20 lg:bottom-10">
           <div className="container-site relative">
             <HeroCard
-              href={localePath(locale, HERO_CARD_HREF)}
+              href={localePath(locale, card.href)}
+              image={card.image}
               labels={{
-                title: m.card.title,
-                body: m.card.body,
-                link: m.card.link,
+                title: card.title,
+                body: card.body,
+                link: card.linkLabel,
                 close: m.card.close,
                 muteToday: m.card.muteToday,
-                alt: m.card.alt,
+                alt: card.image.alt,
               }}
             />
           </div>

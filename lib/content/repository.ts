@@ -1,6 +1,7 @@
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import { assemblePageContent, planOrphanKeys, type ContentRow } from "@/lib/content/rows";
 import { SEED_ACTOR, buildUpsertStatements, countRows, type SqlParam } from "@/lib/content/sql";
+import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import type { PageContent, PageSpec } from "@/lib/content/types";
 
 /**
@@ -65,6 +66,20 @@ export async function loadPageContent(spec: PageSpec): Promise<LoadedPage> {
     unknownKeys: assembled.unknownKeys,
     isEmpty: result.rows.length === 0,
   };
+}
+
+/**
+ * อ่านเนื้อหาหน้าแรกแบบ **ไม่พัง** (รอบที่ 200)
+ * ไม่มี `DATABASE_URL` / ยังไม่ migrate / อ่านไม่สำเร็จ = คืน `null` ⇒ ผู้เรียกถอยไปใช้ค่าเริ่มต้น
+ * (หน้าเว็บต้องไม่ขึ้น 500 เพราะหลังบ้าน/ฐานข้อมูล — กติกาเดิมของโปรเจกต์)
+ */
+export async function loadHomeContentSafely(): Promise<PageContent | null> {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    return (await loadPageContent(HOME_PAGE_SPEC)).content;
+  } catch {
+    return null;
+  }
 }
 
 async function existingKeys(page: string): Promise<readonly string[]> {

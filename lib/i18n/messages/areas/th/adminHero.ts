@@ -50,6 +50,9 @@ export const adminHero = {
   heroPurge: "ลบถาวร",
   heroPurgeConfirm: "ยืนยันลบถาวร (ย้อนกลับไม่ได้)",
   heroTrashNote: "สไลด์ในถังเกิน {days} วันจะถูกลบถาวรอัตโนมัติ (หรือกดลบถาวรเองได้เลย)",
+  wiggleCardTitle: "การ์ดประกาศที่ “ขยับ” บนหน้าแรก",
+  wiggleCardHint: "การ์ดนี้ไม่ใช่แคมเปญ — ข้อความ/ภาพ/ลิงก์ แก้ได้ที่หน้าจอ “เนื้อหาแบบมีโครง” (ไม่ต้องกด “เพิ่มแคมเปญ”)",
+  wiggleCardEdit: "แก้ไขการ์ดนี้",
   heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
   heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
 };

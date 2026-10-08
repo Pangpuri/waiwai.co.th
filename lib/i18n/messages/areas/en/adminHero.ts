@@ -50,6 +50,9 @@ export const adminHero = {
   heroPurge: "Delete forever",
   heroPurgeConfirm: "Confirm permanent delete (cannot be undone)",
   heroTrashNote: "Slides in the trash are permanently removed after {days} days (or delete forever yourself)",
+  wiggleCardTitle: "The wiggling announcement card on the home page",
+  wiggleCardHint: "This card is not a campaign — edit its text/image/link in the structured content screen (no need to press “add campaign”)",
+  wiggleCardEdit: "Edit this card",
   heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",
 };
