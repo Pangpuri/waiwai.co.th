@@ -480,3 +480,13 @@ test("★ builder: เลื่อนไปหาบล็อกผ่านข�
   assert.ok(builder.includes("scrollableAncestorOf("), "รอบที่ 232: ต้องหาคอนเทนเนอร์ที่เลื่อนได้จริงก่อน (ไม่ใช่ window อย่างเดียว)");
   assert.ok(builder.includes("function onMessage(event: MessageEvent) {"), "ห้ามทำข้อความจากพรีวิวเสียหาย (บทเรียนรอบ 232)");
 });
+
+/** ★ รอบที่ 233 — ห้ามเลือกบล็อกอัตโนมัติตอนเปิดหน้า (ทำให้พรีวิวเลื่อนผิดที่ตอนวัดตำแหน่งไม่ได้) */
+test("★ builder: เปิดหน้าแล้วต้องไม่เลือกบล็อกอัตโนมัติ (เลื่อนเฉพาะตอนผู้ใช้คลิก)", () => {
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  assert.ok(
+    !builder.includes('useState<string>(initialDraft.blocks[0]?.id ?? "")'),
+    "ห้ามเลือกบล็อกแรกอัตโนมัติ (เจ้าของเจอ: รีเฟรชแล้วเลื่อนไปล่างสุด)",
+  );
+  assert.ok(builder.includes('const [selectedId, setSelectedId] = useState<string>("");'), "ต้องเริ่มด้วยไม่เลือกอะไร");
+});

@@ -508,7 +508,12 @@ export function BlockBuilder({
   strings,
 }: Props) {
   const [document, setDocument] = useState<BlockDocument>(initialDraft);
-  const [selectedId, setSelectedId] = useState<string>(initialDraft.blocks[0]?.id ?? "");
+  /*
+    รอบที่ 233 (บั๊กที่เจ้าของเจอ): เดิม "เลือกบล็อกแรกอัตโนมัติ" ตอนเปิดหน้า
+    ⇒ พรีวิวสั่งเลื่อนไปหาบล็อกนั้นตั้งแต่ยังเรนเดอร์ไม่ครบ ⇒ วัดตำแหน่งไม่ได้ ⇒ เด้งไปล่างสุด และดูเหมือนคลิกบล็อกอื่นไม่ทำงาน
+    ⇒ เริ่มด้วย "ไม่เลือกอะไร" (ผู้ใช้กดเลือกเองเมื่อต้องการ) — เลื่อนจะเกิดเฉพาะตอนคลิกเท่านั้น
+  */
+  const [selectedId, setSelectedId] = useState<string>("");
   /*
     รอบที่ 230: ตัวนับการเลือก — คลิกบล็อกเดิมซ้ำต้องส่งข้อความใหม่เข้าพรีวิว เพื่อให้เลื่อนไปหาอีกครั้ง
     (เดิม deps = [document, selectedId] ⇒ ค่าไม่เปลี่ยน = ไม่ส่งอะไร ⇒ ผู้ใช้รู้สึกว่า "คลิกไม่ติด")
