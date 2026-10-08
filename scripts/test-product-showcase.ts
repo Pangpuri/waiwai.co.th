@@ -8,6 +8,9 @@ import {
   clampShowcaseOptions,
   productShowcaseView,
 } from "@/lib/blocks/product-showcase";
+import { isBlockType } from "@/lib/blocks/types";
+import { parseBlockDocument } from "@/lib/blocks/parse";
+import { collectShowcaseBlocks } from "@/lib/blocks/product-showcase-data";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
 
 /**
@@ -101,4 +104,55 @@ test("★ product showcase: ชื่อหมวดมาจากพจนา�
   assert.ok(helper.includes("catalogTh[key]?.name ?? id"), "ชื่อหมวดมาจากพจนานุกรม แล้วถอยไปใช้ id");
   assert.ok(helper.includes("english.trim() !== \"\" ? english : thai"), "EN ว่าง = ถอยไทย");
   assert.ok(helper.includes("`/products/${row.id}`"), "ลิงก์หมวดต้องเป็นพาธกลางจาก id จริง");
+});
+
+test("★ product showcase: ลงทะเบียนเป็นชนิดบล็อกของจริง (parse/บีบค่าจากเอกสาร)", () => {
+  const raw = {
+    page: "home",
+    blocks: [
+      {
+        id: "block-dyn-1",
+        version: 1,
+        type: "productShowcase",
+        style: {},
+        heading: { th: "หมวดสินค้า", en: "Products" },
+        body: { th: "", en: "" },
+        columns: 9,
+        showFeatured: "yes",
+        featuredPerCategory: 99,
+        categoryIds: ["serda", 7, "serda"],
+        showCount: "no",
+      },
+    ],
+  };
+  const parsed = parseBlockDocument("home", raw);
+  assert.ok(parsed.ok, `เอกสารต้องผ่าน parser (${parsed.ok ? "" : parsed.problems.join(", ")})`);
+  if (!parsed.ok) return;
+  const block = parsed.document.blocks[0];
+  assert.equal(block?.type, "productShowcase");
+  if (block?.type !== "productShowcase") return;
+  /* ค่าที่เพี้ยนจากเอกสารถูกบีบ ไม่ทำให้พัง (เอกสารไม่เชื่อถือได้) */
+  assert.equal(block.columns, 3);
+  assert.equal(block.showFeatured, true, "ค่าไม่ใช่ boolean = ใช้ค่าเริ่มต้น");
+  assert.equal(block.featuredPerCategory, MAX_FEATURED_PER_CATEGORY);
+  assert.deepEqual([...block.categoryIds], ["serda"]);
+  assert.equal(block.showCount, true, "ค่าไม่ใช่ boolean = ใช้ค่าเริ่มต้น");
+  assert.equal(block.heading.th, "หมวดสินค้า");
+  /* ชนิดใหม่ต้องอยู่ในทะเบียนกลาง (ป้าย/ตัวเลือกในตัวสร้างอ่านจากทะเบียน) */
+  assert.ok(isBlockType("productShowcase"), "ต้องอยู่ใน BLOCK_TYPES");
+});
+
+test("★ product showcase: ตัวโหลดข้อมูลจริงเก็บบล็อกได้ครบ (รวมที่ซ้อนในแถว)", async () => {
+  const blocks = [
+    { id: "a", type: "productShowcase" },
+    { id: "row-1", type: "row", columns: [{ blocks: [{ id: "b", type: "productShowcase" }] }, { blocks: [] }] },
+    { id: "c", type: "cards" },
+  ] as unknown as readonly { readonly id: string; readonly type: string }[];
+  const found = collectShowcaseBlocks(blocks as never);
+  assert.deepEqual(found.map((block) => block.id), ["a", "b"], "ต้องเจอบล็อกที่ซ้อนในแถวด้วย");
+
+  /* ไม่มีเอกสาร/ไม่มีบล็อกชนิดนี้ = ไม่ยิงฐานข้อมูล (คืน map ว่าง) */
+  const { loadProductShowcasesFor } = await import("@/lib/blocks/product-showcase-data");
+  assert.deepEqual(await loadProductShowcasesFor(null, "th"), {});
+  assert.deepEqual(await loadProductShowcasesFor({ page: "home", blocks: [] }, "th"), {});
 });

@@ -48,6 +48,7 @@ import {
   type RecipeCardItem,
   type RosterMember,
 } from "@/lib/blocks/types";
+import { showcaseOptionsFromUnknown } from "@/lib/blocks/product-showcase";
 import { migrateDocumentValue } from "@/lib/blocks/migrate";
 import type { LocalizedValue } from "@/lib/content/types";
 
@@ -807,6 +808,17 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         columns: readRecipeColumns(entry, `${path}.columns`, problems),
         items: readRecipeItems(entry, path, problems),
       };
+    case "productShowcase": {
+      /* บล็อกไดนามิก — อ่านเฉพาะ "ตัวเลือก" (ข้อมูลจริงมาจากฐานข้อมูล) */
+      const options = showcaseOptionsFromUnknown(entry);
+      return {
+        ...base,
+        type: "productShowcase",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+        ...options,
+      };
+    }
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };
   }

@@ -34,6 +34,8 @@ export const BLOCK_TYPES = [
   "jobBoard",
   "rosterText",
   "recipeCards",
+  /* รอบที่ 212 — บล็อกไดนามิก: ดึงข้อมูลจริงจากฐานข้อมูลตอนเรนเดอร์ */
+  "productShowcase",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -417,6 +419,18 @@ export type RecipeCardItem = {
  * (หน้าเมนูอาหารไม่มีหน้ารายละเอียดแยก — ตกลงกับเจ้าของรอบที่ 101)
  * ⚠️ EN ไม่บังคับสำหรับเนื้อหาที่การตลาดเพิ่มเอง (มติ D3) — ตัวตรวจจะเตือนอย่างเดียว
  */
+/** บล็อก "หมวดสินค้า + สินค้าแนะนำ" (ไดนามิก) — เก็บแค่ตัวเลือก แล้วดึงข้อมูลจริงตอนเรนเดอร์ (รอบที่ 212) */
+export type ProductShowcaseBlock = BlockBase & {
+  readonly type: "productShowcase";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly columns: 1 | 2 | 3;
+  readonly showFeatured: boolean;
+  readonly featuredPerCategory: number;
+  readonly categoryIds: readonly string[];
+  readonly showCount: boolean;
+};
+
 export type RecipeCardsBlock = BlockBase & {
   readonly type: "recipeCards";
   readonly heading: LocalizedValue;
@@ -460,7 +474,8 @@ export type Block =
   | GalleryBlock
   | JobBoardBlock
   | RosterTextBlock
-  | RecipeCardsBlock;
+  | RecipeCardsBlock
+  | ProductShowcaseBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -522,6 +537,11 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
+  {
+    type: "productShowcase",
+    label: "หมวดสินค้า + สินค้าแนะนำ",
+    hint: "ดึงข้อมูลจริงจากฐานข้อมูล (ภาพ/จำนวนสินค้า) — เลือกหมวดและจำนวนได้",
+  },
 ];
 
 export const DEFAULT_BLOCK_STYLE: BlockStyle = {
@@ -629,6 +649,19 @@ export function createBlock(type: BlockType, id: string): Block {
     case "recipeCards":
       /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
+    case "productShowcase":
+      /* บล็อกไดนามิก — ไม่มีรายการในเอกสาร (ข้อมูลมาจากฐานข้อมูล) */
+      return {
+        ...base,
+        type: "productShowcase",
+        heading: emptyText(),
+        body: emptyText(),
+        columns: 3,
+        showFeatured: true,
+        featuredPerCategory: 1,
+        categoryIds: [],
+        showCount: true,
+      };
   }
 }
 

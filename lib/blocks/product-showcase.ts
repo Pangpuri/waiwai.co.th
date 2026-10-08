@@ -145,3 +145,31 @@ export function productShowcaseView(
 
   return { categories: views, featured: featuredViews, isEmpty: views.length === 0 };
 }
+
+/* ── ส่วนเชื่อมกับ "เอกสารบล็อก" (รอบที่ 212 · ขั้น 2 ส่วน ข) ───────────────────────── */
+
+/**
+ * อ่านตัวเลือกจากก้อนข้อมูลดิบ (JSONB) แล้วบีบให้อยู่ในช่วงที่ใช้ได้
+ * — เอกสารในฐานข้อมูล/ไฟล์ที่ผู้ใช้อัปโหลด **ไม่เชื่อถือได้** (ค่าผิดชนิด/นอกช่วงต้องไม่ทำให้พัง)
+ */
+export function showcaseOptionsFromUnknown(raw: Readonly<Record<string, unknown>>): ProductShowcaseOptions {
+  const columns = raw["columns"];
+  const per = raw["featuredPerCategory"];
+  const ids = raw["categoryIds"];
+  return clampShowcaseOptions({
+    columns: columns === 1 || columns === 2 || columns === 3 ? columns : undefined,
+    showFeatured: typeof raw["showFeatured"] === "boolean" ? raw["showFeatured"] : undefined,
+    featuredPerCategory: typeof per === "number" ? per : undefined,
+    categoryIds: Array.isArray(ids) ? ids.filter((value): value is string => typeof value === "string") : undefined,
+    showCount: typeof raw["showCount"] === "boolean" ? raw["showCount"] : undefined,
+  });
+}
+
+/** ตัวเลือกเริ่มต้นของบล็อก (ใช้ตอนเพิ่มบล็อกใหม่/เทมเพลต) */
+export const PRODUCT_SHOWCASE_BLOCK_DEFAULTS = {
+  columns: DEFAULT_PRODUCT_SHOWCASE.columns,
+  showFeatured: DEFAULT_PRODUCT_SHOWCASE.showFeatured,
+  featuredPerCategory: DEFAULT_PRODUCT_SHOWCASE.featuredPerCategory,
+  categoryIds: DEFAULT_PRODUCT_SHOWCASE.categoryIds,
+  showCount: DEFAULT_PRODUCT_SHOWCASE.showCount,
+} as const;
