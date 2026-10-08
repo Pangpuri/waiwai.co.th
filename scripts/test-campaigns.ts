@@ -155,9 +155,15 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   assert.ok(actions.includes("MAX_CAMPAIGNS"), "ต้องมีเพดานกันสร้างมั่ว");
   assert.ok(actions.includes("campaign-publish"), "ต้องมี audit ตอนเผยแพร่");
 
+  /*
+    รอบที่ 204 — เจ้าของสั่งถอดแท็บ "แคมเปญ" ออกจากหน้า hero
+    (การ์ด PR ที่ขยับ ควบคุมจากส่วนของตัวเองบนหน้าเดียวกันได้แล้ว ⇒ ไม่ต้องมีจอจัดการแคมเปญ)
+    ⚠️ โค้ด/ตารางของโมดูลแคมเปญยังอยู่ (ยังไม่มี migration ถอด) — ดูหนี้ใน PRODUCT_ROADMAP § 10
+  */
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(page.includes("campaignTabCampaigns") && page.includes('tab=campaigns'), "หน้าจอต้องมีแท็บแคมเปญ (จำใน URL)");
-  assert.ok(page.includes("CampaignManager"), "แท็บแคมเปญต้องใช้ตัวจัดการแคมเปญ");
+  assert.ok(!page.includes("CampaignManager"), "ต้องไม่เหลือจอจัดการแคมเปญในหน้า hero");
+  assert.ok(!page.includes("campaignTabCampaigns"), "ต้องไม่มีปุ่มแท็บแคมเปญ");
+  assert.ok(page.includes("HeroPrCardEditor"), "การ์ด PR (ที่ขยับ) ต้องยังแก้ได้จากหน้านี้");
 
   const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
   assert.ok(manager.includes("campaignReadiness"), "ต้องแสดงคำเตือนความพร้อม");
@@ -185,8 +191,10 @@ test("campaigns: พรีวิวลากกำหนดจุดยึด �
   assert.ok(manager.includes("value={anchorOf(") && manager.includes("setAnchor("), "ช่องตัวเลขต้องผูกกับค่าที่ลาก (controlled)");
   assert.ok(manager.includes('name="anchorX"') && manager.includes('name="anchorY"'), "ค่าที่ลากต้องถูกส่งไปกับฟอร์มบันทึก");
 
+  /* รอบ 204: หน้า hero ไม่ส่งรายการสไลด์ให้พรีวิวของแคมเปญแล้ว (ถอดแท็บแคมเปญ)
+     — ตัวพรีวิว/สูตรลากยังอยู่ครบในไฟล์ของมัน (มีเทสต์ด้านบนคุมไว้) */
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(page.includes("mediaPath: slide.mediaPath"), "หน้าจอต้องส่งภาพของสไลด์มาให้พรีวิว");
+  assert.ok(!page.includes("slideOptions"), "ไม่ต้องส่ง slideOptions อีก (ไม่มีจอแคมเปญแล้ว)");
 });
 
 test("campaigns: หน้าเว็บจับคู่แคมเปญกับสไลด์ + วางตามจุดยึดที่ลากไว้", () => {
@@ -573,9 +581,13 @@ test("★ campaigns: ถังขยะแคมเปญ — ดูได้ + 
   assert.ok(manager.includes("strings.campaignTrashTitle"), "จอต้องมีหัวข้อถังขยะแคมเปญ");
   assert.ok(manager.includes("trashedCampaigns.length"), "จอต้องโชว์จำนวนของในถัง");
 
+  /*
+    รอบ 204: ถอดแท็บแคมเปญออกจากจอ ⇒ ตัวอ่านถังขยะ/ปุ่มกู้คืนไม่ถูกเรียกจากหน้า hero แล้ว
+    แต่ **ชั้นข้อมูล + action ยังอยู่ครบ** (กู้คืนได้ด้วยคำสั่ง/เมื่อมีจออีกครั้ง) — เทสต์ด้านบนคุมตัวไฟล์ไว้แล้ว
+  */
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
-  assert.ok(page.includes("listTrashedCampaigns()"), "หน้าจอต้องอ่านถังขยะแคมเปญ");
-  assert.ok(page.includes("trashedCampaigns={trashedCampaigns}"), "หน้าจอต้องส่งรายการถังขยะเข้าไป");
+  assert.ok(!page.includes("listTrashedCampaigns()"), "จอ hero ไม่เรียกตัวอ่านถังขยะแคมเปญแล้ว (รอบ 204)");
+  assert.ok(actions.includes("restoreCampaignAction"), "action กู้คืนยังอยู่ (ไม่ถอดโค้ด)");
 
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");

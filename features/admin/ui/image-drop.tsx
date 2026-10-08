@@ -52,6 +52,12 @@ type Props = {
   readonly frameAspect?: number;
   /** ข้อความในกรอบว่าง เช่น ขนาดภาพที่แนะนำ */
   readonly frameHint?: string;
+  /**
+   * วิธีแสดง "ภาพตัวอย่าง" (รอบที่ 204):
+   * · `"cover"` (ค่าเริ่มต้น) = เต็มกรอบ ตัดขอบบางส่วน — เหมาะกับภาพที่รู้สัดส่วนอยู่แล้ว (สไลด์/การ์ดแคมเปญ)
+   * · `"contain"` = **เห็นภาพเต็มใบ** (ไม่ตัด) — เจ้าของขอสำหรับการ์ด PR จะได้ตรวจภาพก่อนโพสต์
+   */
+  readonly previewFit?: "cover" | "contain";
   /** ข้อความชวนวางภาพ (ค่าเริ่มต้น = imageDropHint) */
   readonly dropPrompt?: string;
   /**
@@ -104,6 +110,7 @@ export function ImageDrop({
   compact = false,
   frameAspect,
   frameHint,
+  previewFit = "cover",
   dropPrompt,
   cropAspect,
   showWatermark = true,
@@ -290,7 +297,9 @@ export function ImageDrop({
             <img
               src={current.path}
               alt={current.altTh}
-              className={`bg-bg-subtle w-full rounded-lg object-cover ${compact ? "h-24" : "h-40"}`}
+              className={`bg-bg-subtle w-full rounded-lg ${
+                previewFit === "contain" ? "h-72 object-contain" : `object-cover ${compact ? "h-24" : "h-40"}`
+              }`}
             />
           )}
         </div>

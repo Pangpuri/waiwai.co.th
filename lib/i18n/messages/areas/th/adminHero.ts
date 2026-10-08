@@ -65,7 +65,7 @@ export const adminHero = {
   prCardSaveHint: "บันทึกแล้วหน้าเว็บอัปเดตทันที",
   feedbackCardSaved: "บันทึกการ์ด PR แคมเปญแล้ว — หน้าเว็บอัปเดตทันที",
   wiggleCardTitle: "การ์ดประกาศที่ “ขยับ” บนหน้าแรก",
-  wiggleCardHint: "การ์ดนี้ไม่ใช่แคมเปญ — ข้อความ/ภาพ/ลิงก์ แก้ได้ที่หน้าจอ “เนื้อหาแบบมีโครง” (ไม่ต้องกด “เพิ่มแคมเปญ”)",
+  wiggleCardHint: "การ์ดนี้คือการ์ด PR ที่ขยับอยู่มุมขวาล่างของหน้าแรก — แก้ข้อความ/ภาพ/ลิงก์ได้จากส่วนนี้เลย",
   wiggleCardEdit: "แก้ไขการ์ดนี้",
   heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
   heroAdminImagePlaceholder: "/media/... หรือ /slide/...",

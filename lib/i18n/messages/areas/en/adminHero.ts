@@ -65,7 +65,7 @@ export const adminHero = {
   prCardSaveHint: "Saving updates the site immediately",
   feedbackCardSaved: "PR card saved — the site is updated",
   wiggleCardTitle: "The wiggling announcement card on the home page",
-  wiggleCardHint: "This card is not a campaign — edit its text/image/link in the structured content screen (no need to press “add campaign”)",
+  wiggleCardHint: "This is the PR card that wiggles at the bottom-right of the home hero — edit its text, image and link right here",
   wiggleCardEdit: "Edit this card",
   heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",

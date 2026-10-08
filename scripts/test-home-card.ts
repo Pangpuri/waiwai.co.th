@@ -223,10 +223,10 @@ test("★ home card: จอแคมเปญมีตัวแก้ของ�
     และเบราว์เซอร์ตัดฟอร์มชั้นในทิ้ง ⇒ ปุ่มอัปโหลดพัง
   */
   assert.equal(maxFormDepth(editor), 1, "ห้ามมีฟอร์มซ้อนฟอร์ม (ImageDrop ต้องอยู่นอกฟอร์มบันทึก)");
-  assert.ok(
-    editor.indexOf("<ImageDrop") > editor.indexOf("</form>"),
-    "ImageDrop (มีฟอร์มอัปโหลดของตัวเอง) ต้องถูกวาง **หลัง** ปิดฟอร์มบันทึก",
-  );
+  /* รอบ 204: ผังใหม่ = ภาพซ้าย · ข้อความขวา ⇒ ImageDrop อยู่ "ก่อน" ฟอร์ม (แต่ยังนอกฟอร์มเสมอ)
+     ตัวคุมจริงคือความลึกของฟอร์มด้านบน (depth = 1) */
+  assert.ok(editor.includes("previewFit=\"contain\""), "ภาพตัวอย่างต้องแสดงเต็มใบ (contain) ไม่ตัดขอบ");
+  assert.ok(editor.includes("lg:grid-cols-2"), "ผังต้องเป็น 2 คอลัมน์ (ภาพซ้าย · ข้อความขวา)");
 
   const action = readFileSync("app/admin/hero/pr-card-actions.ts", "utf8");
   assert.ok(action.includes("parseHeroCardInput(formData)"), "ต้องตรวจค่าด้วยตรรกะล้วน");
