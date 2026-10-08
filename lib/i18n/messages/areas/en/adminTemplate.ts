@@ -11,6 +11,9 @@ export const adminTemplate = {
   previewPartsFooter: "Footer only",
   previewPartsNotice: "Announcement notice only",
   startFromTemplate: "Start from the current content",
+  startFromTemplateReplace: "Start over from the current content (replaces the draft)",
+  startFromTemplateOverwrite: "Tick to confirm replacing the current draft",
+  startFromTemplateNeedsConfirm: "Not applied — you did not tick the confirmation. Your draft is unchanged",
   startFromTemplateHint: "Pulls the same copy the live site uses as a starting point — then edit freely.",
   templateMissingBody: "This page has no block template yet — keep editing it with the field-based content screen for now.",
   templateMissingList:

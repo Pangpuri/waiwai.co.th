@@ -146,36 +146,50 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
       </div>
 
 
-      {draftRow === null ? (
+      {/*
+        รอบที่ 225 (เคลียร์หนี้ UX): แผง "เริ่มจากเนื้อหาปัจจุบัน" แสดง**เสมอ** สำหรับหน้าที่มีเทมเพลต
+        · ยังไม่มีฉบับร่าง ⇒ กดได้เลย · มีฉบับร่างแล้ว ⇒ ต้องติ๊กยืนยันก่อนทับ
+        · ด่านจริงอยู่ที่ Server Action (`decideTemplateApply` — ไม่ติ๊ก = ไม่ทำอะไรเลย)
+      */}
+      {hasBlockTemplate(page) ? (
+        <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
+          <h2 className="text-fg text-lg font-semibold">
+            {draftRow === null ? strings.emptyPage : strings.startFromTemplateReplace}
+          </h2>
+          <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
+          <TemplateCoverageNote {...coverage} />
+          <form action={startFromTemplateAction} className="flex flex-col gap-3" data-template-form="">
+            <input type="hidden" name="page" value={page} />
+            {draftRow === null ? null : (
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  name="confirm"
+                  value="overwrite"
+                  required
+                  className="border-line accent-brand-red size-4 rounded border"
+                />
+                {strings.startFromTemplateOverwrite}
+              </label>
+            )}
+            <button
+              type="submit"
+              className="bg-brand-red text-on-brand focus-visible:ring-ring w-fit rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              {strings.startFromTemplate}
+            </button>
+          </form>
+        </section>
+      ) : draftRow === null ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
           <h2 className="text-fg text-lg font-semibold">{strings.emptyPage}</h2>
-          {/*
-            S2 (รอบที่ 82): ปุ่มเทมเพลตแสดงเฉพาะหน้าที่มีเทมเพลตจริง (ทะเบียนกลาง `lib/blocks/templates.ts`)
-            หน้าที่ไม่มี = บอกตรง ๆ ว่ายังไม่มีเทมเพลต + ให้ใช้หน้าจอเนื้อหาแบบฟิลด์เดิม (ไม่ปล่อยให้กดแล้วเงียบ)
-          */}
-          {hasBlockTemplate(page) ? (
-            <>
-              <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
-              <TemplateCoverageNote {...coverage} />
-              <form action={startFromTemplateAction}>
-                <input type="hidden" name="page" value={page} />
-                <button
-                  type="submit"
-                  className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                >
-                  {strings.startFromTemplate}
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <p className="text-fg-muted text-sm">{strings.templateMissingBody}</p>
-              <p className="text-fg-muted text-xs">{strings.templateMissingList}</p>
-            </>
-          )}
+          <p className="text-fg-muted text-sm">{strings.templateMissingBody}</p>
+          <p className="text-fg-muted text-xs">{strings.templateMissingList}</p>
         </section>
-      ) : (
-        /* คลังภาพส่งผ่าน context ครั้งเดียว (รอบที่ 93) — ช่องภาพทุกช่องในตัวสร้างใช้ได้ทันที */
+      ) : null}
+
+      {draftRow === null ? null : (
+
         <ImageLibraryProvider items={imageLibrary}>
           <BlockBuilder
             presets={presets}

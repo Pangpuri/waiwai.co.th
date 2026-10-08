@@ -9,6 +9,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { documentDiff } from "@/lib/blocks/diff";
 import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { parseScheduleEpoch } from "@/lib/blocks/schedule";
 import {
   isPageLive,
@@ -308,6 +309,17 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   const page = String(formData.get("page") ?? "").trim();
 
   if (!hasBlockTemplate(page)) redirect(pathOf(page));
+
+  /*
+    รอบที่ 225 (เคลียร์หนี้ UX): มีฉบับร่างอยู่ ⇒ **ต้องติ๊กยืนยัน** ก่อนทับ (fail-closed)
+    ไม่งั้นแอดมินอาจกดทับงานที่แก้ไว้โดยไม่ตั้งใจ · ไม่มีฉบับร่าง = ไม่ต้องยืนยัน
+  */
+  const existingDraft = await loadDocumentRow(page, "draft").catch(() => null);
+  const decision = decideTemplateApply({
+    hasDraft: existingDraft !== null,
+    confirmValue: String(formData.get("confirm") ?? ""),
+  });
+  if (!decision.allowed) redirect(`${pathOf(page)}?template=confirm`);
 
   const template = buildBlockTemplate(page);
   if (template === null) redirect(pathOf(page));

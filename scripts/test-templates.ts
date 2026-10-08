@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
+import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 import {
   BLOCK_COVERAGE_PART_IDS,
@@ -398,4 +399,26 @@ test("★ templates: จดหมายข่าวใช้บล็อกฟ�
   assert.equal(form.kind, "newsletter", "ต้องใช้ฟอร์มจดหมายข่าวจริง (ไม่สร้างฟอร์มใหม่)");
   assert.ok(form.heading.th !== "" && form.heading.en !== "", "หัวข้อส่วนจดหมายข่าวต้องมาจากพจนานุกรม");
   assert.deepEqual([...blockCoverageGaps("home")], [], "หน้าแรกต้องไม่เหลือช่องว่างที่ยังไม่ครอบคลุม");
+});
+
+/** ★ รอบที่ 225 (เคลียร์หนี้ UX) — ปุ่มเทมเพลตต้องเห็นเสมอ + มีฉบับร่างต้องยืนยันก่อนทับ */
+test("★ templates: ใช้เทมเพลตทับฉบับร่างต้องยืนยัน (fail-closed ทั้ง UI และเซิร์ฟเวอร์)", () => {
+  /* ตรรกะจริง */
+  assert.deepEqual(decideTemplateApply({ hasDraft: false, confirmValue: "" }), { allowed: true }, "ยังไม่มีฉบับร่าง = ไม่ต้องยืนยัน");
+  assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: "" }), { allowed: false, reason: "needs-confirm" });
+  assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: "nope" }), { allowed: false, reason: "needs-confirm" });
+  assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: "overwrite" }), { allowed: true }, "ติ๊กถูก = ผ่าน");
+  assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: " overwrite " }), { allowed: true }, "ตัดช่องว่างให้");
+
+  /* ด่านบนเซิร์ฟเวอร์ (ห้ามเชื่อ UI อย่างเดียว) */
+  const action = readFileSync("app/admin/builder/actions.ts", "utf8");
+  assert.ok(action.includes("decideTemplateApply({"), "action ต้องเรียกตรรกะกลาง");
+  assert.ok(action.includes('formData.get("confirm")'), "action ต้องอ่านค่ายีดยืนยันจากฟอร์ม");
+
+  /* UI: แผงต้องแสดงเสมอ + มี checkbox ยืนยัน (required) เมื่อมีฉบับร่าง */
+  const page = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(page.includes("data-template-form="), "ต้องมีฟอร์มเทมเพลตในหน้าตัวสร้าง");
+  assert.ok(page.includes('name="confirm"') && page.includes("required"), "ต้องมี checkbox ยืนยันแบบ required");
+  assert.ok(page.includes("startFromTemplateReplace"), "มีฉบับร่างแล้วต้องบอกว่า 'ทับฉบับร่าง'");
+  assert.ok(!page.includes("{draftRow === null ? (\n        <section"), "แผงต้องไม่อยู่ในเงื่อนไข 'ไม่มีฉบับร่าง' อีกต่อไป");
 });
