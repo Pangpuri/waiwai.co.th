@@ -5,7 +5,6 @@ import {
   removeCampaignAction,
   restoreCampaignAction,
   saveCampaignAction,
-  setCampaignStatusAction,
 } from "@/app/admin/hero/campaign-actions";
 import {
   CAMPAIGN_ANCHOR_PRESETS,
@@ -408,29 +407,36 @@ export function CampaignManager({
                     <input type="checkbox" name="isActive" defaultChecked={campaign.isActive} />
                     {strings.heroAdminToggle}
                   </label>
-                  <button type="submit" className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-xs font-semibold">
-                    {strings.heroCardSave}
-                  </button>
-                </form>
-
-                {/* สถานะร่าง/เผยแพร่ — ฟอร์มแยก (ส่งค่าที่จำเป็นไปตรวจก่อนเผยแพร่) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <form action={setCampaignStatusAction} className="flex flex-wrap items-end gap-2">
-                    <input type="hidden" name="id" value={campaign.id} />
-                    <input type="hidden" name="status" value={campaign.status === "published" ? "draft" : "published"} />
-                    <input type="hidden" name="name" value={campaign.name} />
-                    <input type="hidden" name="titleTh" value={campaign.title.th} />
-                    <input type="hidden" name="titleEn" value={campaign.title.en} />
-                    <input type="hidden" name="ctaHref" value={campaign.ctaHref} />
-                    <input type="hidden" name="anchorX" value={campaign.anchorX} />
-                    <input type="hidden" name="anchorY" value={campaign.anchorY} />
-                    {campaign.slideIds.map((slideId) => (
-                      <input key={slideId} type="hidden" name="slideIds" value={slideId} />
-                    ))}
-                    <button type="submit" className="border-line text-fg rounded-md border px-3 py-1.5 text-xs font-semibold">
+                  {/*
+                    ★ รอบที่ 199 (บั๊กจริงจากเจ้าของ): ปุ่ม "เผยแพร่" เคยอยู่ **ฟอร์มแยก** ที่ส่งสำเนาค่าจาก
+                    ฐานข้อมูล (ไม่ใช่ค่าที่พิมพ์บนจอ) ⇒ พิมพ์หัวข้อใหม่แล้วกดเผยแพร่ = ระบบยังเห็นหัวข้อเก่า (ว่าง)
+                    ⇒ "ช่องหัวข้อ (TH) — ต้องกรอก" ทั้งที่กล่องมีข้อความ ⇒ รวมเป็นฟอร์มเดียว: ตรวจค่าที่พิมพ์ → บันทึก → เปลี่ยนสถานะ
+                  */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="submit"
+                      name="intent"
+                      value="save"
+                      className="border-line text-fg rounded-md border px-3 py-1.5 text-xs font-semibold"
+                    >
+                      {strings.heroCardSave}
+                    </button>
+                    <button
+                      type="submit"
+                      name="intent"
+                      value={campaign.status === "published" ? "unpublish" : "publish"}
+                      className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-xs font-semibold"
+                    >
                       {campaign.status === "published" ? strings.campaignUnpublish : strings.campaignPublish}
                     </button>
-                  </form>
+                  </div>
+                </form>
+
+                {/*
+                  ⚠️ ฟอร์มแยกที่เหลือ = การย้ายเข้าถังเท่านั้น
+                  ห้ามใส่สำเนาค่าของการ์ดไว้ในฟอร์มอื่นอีก — จะกลับไปเป็นบั๊กเดิม (ค่าเก่า/ค่าว่างหลอกผู้ใช้)
+                */}
+                <div className="flex flex-wrap items-center gap-2">
                   <form action={removeCampaignAction}>
                     <input type="hidden" name="id" value={campaign.id} />
                     <button type="submit" className="border-line text-fg-muted rounded-md border px-2 py-1 text-xs">

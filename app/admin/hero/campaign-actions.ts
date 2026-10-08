@@ -10,7 +10,6 @@ import {
   CAMPAIGN_ANCHOR_PRESETS,
   DEFAULT_PLACEMENT_ANCHOR,
   MAX_CAMPAIGNS,
-  isCampaignStatus,
   parseCampaignInput,
 } from "@/lib/campaigns/model";
 import {
@@ -105,46 +104,33 @@ export async function saveCampaignAction(formData: FormData): Promise<void> {
     );
   }
 
-  if (ok) {
-    await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-save" });
-    await refreshAfterCampaignChange("campaign-saved");
-  }
-}
+  if (!ok) return;
 
-/** เผยแพร่ / ถอนแคมเปญ (intent เดียว) */
-export async function setCampaignStatusAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser("content");
-  const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
-  const status = typeof formData.get("status") === "string" ? String(formData.get("status")) : "";
-  if (id === "" || !isCampaignStatus(status)) return;
+  await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-save" });
 
-  /* ⚠️ กันแคมเปญเปล่าขึ้นเว็บ: ก่อนเผยแพร่ต้องผ่านการตรวจค่า (หัวข้อไทยบังคับ) */
-  if (status === "published") {
-    const parsed = parseCampaignInput({
-      name: formData.get("name"),
-      title: { th: formData.get("titleTh"), en: formData.get("titleEn") },
-      ctaHref: formData.get("ctaHref"),
-    imagePath: formData.get("imagePath"),
-    imageAltTh: formData.get("imageAltTh"),
-    imageAltEn: formData.get("imageAltEn"),
-      anchorX: Number(formData.get("anchorX")),
-      anchorY: Number(formData.get("anchorY")),
-      slideIds: formData.getAll("slideIds"),
-    });
-    if (!parsed.ok) redirect(invalidCampaignHref(parsed.problems));
-  }
-
-  const ok = await setCampaignStatus(id, status, user.email);
-  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
-  if (ok) {
+  /*
+    ── "บันทึก + เผยแพร่" ในฟอร์มเดียว (รอบที่ 199 · บั๊กจริงจากเจ้าของ) ──────────────
+    เดิมปุ่มเผยแพร่เป็น **ฟอร์มแยก** ที่ส่งสำเนาค่าจาก *ฐานข้อมูล* (ไม่ใช่ค่าที่พิมพ์บนจอ)
+    ⇒ เจ้าของพิมพ์หัวข้อใหม่แล้วกดเผยแพร่ ⇒ ระบบยังเห็นหัวข้อเก่า (ว่าง) ⇒ "ช่องหัวข้อ (TH) — ต้องกรอก"
+    แม้กล่องบนจอจะมีข้อความ ⇒ รวมเป็นฟอร์มเดียว: **ตรวจค่าที่พิมพ์ → บันทึก → เปลี่ยนสถานะ**
+    (ปุ่มเลือกด้วย `name="intent"` — ทำงานได้โดยไม่ต้องมี JS)
+  */
+  const intent = typeof formData.get("intent") === "string" ? String(formData.get("intent")) : "save";
+  if (intent === "publish" || intent === "unpublish") {
+    const nextStatus = intent === "publish" ? "published" : "draft";
+    const changed = await setCampaignStatus(id, nextStatus, user.email);
+    if (!changed) redirect("/admin/hero?tab=campaigns&error=save-failed");
     await recordAudit({
       action: "hero-save",
       actorEmail: user.email,
       target: `campaign:${id}`,
-      detail: status === "published" ? "campaign-publish" : "campaign-unpublish",
+      detail: intent === "publish" ? "campaign-publish" : "campaign-unpublish",
     });
     await refreshAfterCampaignChange("campaign-status");
+    return;
   }
+
+  await refreshAfterCampaignChange("campaign-saved");
 }
 
 export async function removeCampaignAction(formData: FormData): Promise<void> {

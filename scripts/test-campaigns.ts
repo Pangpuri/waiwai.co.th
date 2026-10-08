@@ -118,17 +118,16 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   assert.ok(/catch \{[\s\S]{0,160}return \[\];/.test(repo), "อ่านพังต้องคืนค่าว่าง");
 
   const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
-  /* 5 action: เพิ่ม · บันทึก · เผยแพร่/ถอน · ย้ายเข้าถัง · กู้คืน (รอบที่ 198 เพิ่มตัวสุดท้าย) */
-  for (const fn of [
-    "addCampaignAction",
-    "saveCampaignAction",
-    "setCampaignStatusAction",
-    "removeCampaignAction",
-    "restoreCampaignAction",
-  ]) {
+  /*
+    4 action (รอบที่ 199): เพิ่ม · บันทึก(+เผยแพร่/ถอน) · ย้ายเข้าถัง · กู้คืน
+    ⚠️ `setCampaignStatusAction` ถูก **รวมเข้า saveCampaignAction** — เพราะฟอร์มแยกส่งสำเนาค่าเก่า
+    ⇒ เจ้าของพิมพ์หัวข้อใหม่แล้วกดเผยแพร่ ระบบยังเห็นหัวข้อว่าง (บั๊กจริงรอบ 199)
+  */
+  for (const fn of ["addCampaignAction", "saveCampaignAction", "removeCampaignAction", "restoreCampaignAction"]) {
     assert.ok(actions.includes(`export async function ${fn}`), `ต้องมี ${fn}`);
   }
-  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 5, "ทุก action ต้องตรวจสิทธิ์");
+  assert.ok(!actions.includes("setCampaignStatusAction"), "ห้ามมี action สถานะแยกอีก (ต้นเหตุบั๊กค่าเก่า)");
+  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 4, "ทุก action ต้องตรวจสิทธิ์");
   assert.ok(actions.includes("MAX_CAMPAIGNS"), "ต้องมีเพดานกันสร้างมั่ว");
   assert.ok(actions.includes("campaign-publish"), "ต้องมี audit ตอนเผยแพร่");
 
@@ -233,8 +232,13 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
 
   const campaignActions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
   assert.ok(campaignActions.includes("?tab=campaigns&saved=${flag}"), "แคมเปญต้องกลับไปแท็บเดิมพร้อมรหัสผลลัพธ์");
-  /* 5 ทาง: เพิ่ม · บันทึก · สถานะ · ย้ายเข้าถัง · กู้คืน (รอบที่ 198) — ทุกทางต้องมีรหัสผลลัพธ์ */
+  /* 4 ทาง: เพิ่ม · บันทึก(หรือบันทึก+เผยแพร่) · ย้ายเข้าถัง · กู้คืน (รอบที่ 199) — ทุกทางต้องมีรหัสผลลัพธ์ */
+  /*
+    5 จุดในไฟล์ (รอบที่ 199): เพิ่ม · บันทึก · บันทึก+เผยแพร่/ถอน · ย้ายเข้าถัง · กู้คืน
+    ⚠️ ปุ่มเผยแพร่เดิมเป็น "action แยก" (1 จุด) — รวมเข้า action บันทึกแล้ว ⇒ จำนวนจึงเท่าเดิม
+  */
   assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 5, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
+  assert.ok(campaignActions.includes('refreshAfterCampaignChange("campaign-status")'), "เผยแพร่/ถอนต้องมีรหัสผลลัพธ์ของตัวเอง");
   assert.ok(
     campaignActions.includes("redirect(invalidCampaignHref(parsed.problems))"),
     "ข้อมูลไม่ผ่านต้องบอกว่าไม่สำเร็จ **และบอกช่องที่ต้องแก้** (รอบที่ 195)",
@@ -423,7 +427,8 @@ test("★ campaigns: บอก “ช่องที่ต้องแก้” 
 
 test("★ campaigns: action + หน้าจอ ต่อสาย “ช่องที่ต้องแก้” ครบ (รอบที่ 195)", () => {
   const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
-  assert.equal((actions.match(/invalidCampaignHref\(/g) ?? []).length, 2, "ทั้ง \"บันทึก\" และ \"เผยแพร่\" ต้องบอกช่องที่ผิด");
+  /* รอบที่ 199: เหลือจุดตรวจเดียว (ใน saveCampaignAction) — ปุ่มเผยแพร่รวมอยู่ในฟอร์มเดียวกันแล้ว */
+  assert.equal((actions.match(/invalidCampaignHref\(/g) ?? []).length, 1, "จุดตรวจค่า+บอกช่องที่ผิดต้องมีที่เดียว (ฟอร์มเดียว)");
   assert.ok(!actions.includes('error=invalid"'), "ห้าม redirect แบบไม่บอกสาเหตุอีก");
 
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");
@@ -635,4 +640,43 @@ test("★ campaigns: การ์ดหลายหน้า — จุดยึ
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
   }
+});
+
+/**
+ * ★ รอบที่ 199 — บั๊กจริงจากเจ้าของ: *"ช่องหัวข้อ (TH) — ต้องกรอก กรอกไปแล้วก็ไม่ขึ้น"*
+ *
+ * ต้นเหตุ: ปุ่ม "เผยแพร่" เป็น **ฟอร์มแยก** ที่ฝังสำเนาค่าจาก *ฐานข้อมูล* (`campaign.title.th`)
+ * ⇒ พิมพ์หัวข้อใหม่แล้วกดเผยแพร่ ระบบตรวจค่า **เก่า** (ว่าง) แล้วขึ้นว่ายังไม่ได้กรอก
+ * ⇒ แก้: รวมเป็นฟอร์มเดียว — ตรวจค่าที่พิมพ์ → บันทึก → เปลี่ยนสถานะ (ปุ่มเลือกด้วย `name="intent"`)
+ * เทสต์นี้ล็อกกติกา: **ห้ามมีสำเนาค่าของการ์ดอยู่ในฟอร์มอื่นอีก**
+ */
+test("★ campaigns: “บันทึก + เผยแพร่” ต้องเป็นฟอร์มเดียว — ตรวจค่าที่พิมพ์ ไม่ใช่ค่าเก่า (บั๊กจริงรอบที่ 199)", () => {
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes('name="intent"'), "ปุ่มบันทึก/เผยแพร่ต้องส่ง `intent` จากฟอร์มเดียว");
+  assert.ok(
+    manager.includes('value={campaign.status === "published" ? "unpublish" : "publish"}'),
+    "ปุ่มเดียวสลับ เผยแพร่/ถอน ตามสถานะปัจจุบัน",
+  );
+  assert.ok(!manager.includes('name="status"'), "ห้ามส่งสถานะด้วยช่องซ่อน (ย้ายไปใช้ intent)");
+  assert.ok(
+    !/name="titleTh" value=\{campaign\.title\.th\}/.test(manager),
+    "ห้ามฝังสำเนาหัวข้อ (ค่าเก่า) ไว้ในฟอร์มอื่น — ต้นเหตุบั๊กเดิม",
+  );
+  assert.ok(
+    !manager.includes("<form action={setCampaignStatusAction}"),
+    "ห้ามมีฟอร์มสถานะแยกอีก",
+  );
+
+  const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  assert.ok(actions.includes('const intent = typeof formData.get("intent")'), "action อ่าน intent");
+  assert.ok(
+    /intent === "publish" \|\| intent === "unpublish"[\s\S]{0,400}setCampaignStatus\(id, nextStatus/.test(actions),
+    "intent เผยแพร่/ถอน ต้องเรียก setCampaignStatus หลังบันทึกสำเร็จ",
+  );
+  assert.ok(actions.includes('detail: intent === "publish" ? "campaign-publish" : "campaign-unpublish"'), "audit ครบทั้งสองทาง");
+  /* ลำดับสำคัญ: ตรวจค่า (parsed) → บันทึก (updateCampaign) → เปลี่ยนสถานะ */
+  const parsedAt = actions.indexOf("if (!parsed.ok) redirect(invalidCampaignHref");
+  const updateAt = actions.indexOf("await updateCampaign(");
+  const statusAt = actions.indexOf("await setCampaignStatus(id, nextStatus");
+  assert.ok(parsedAt > 0 && updateAt > parsedAt && statusAt > updateAt, "ต้องเรียง ตรวจ → บันทึก → เผยแพร่");
 });
