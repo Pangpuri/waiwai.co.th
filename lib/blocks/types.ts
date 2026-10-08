@@ -36,6 +36,7 @@ export const BLOCK_TYPES = [
   "recipeCards",
   /* รอบที่ 212 — บล็อกไดนามิก: ดึงข้อมูลจริงจากฐานข้อมูลตอนเรนเดอร์ */
   "productShowcase",
+  "recipeShowcase",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -434,6 +435,18 @@ export type ProductShowcaseBlock = BlockBase & {
   readonly showCount: boolean;
 };
 
+/** บล็อก "เมนูล่าสุด" (ไดนามิก) — เก็บแค่ตัวเลือก ดึงเมนูจริงตอนเรนเดอร์ (รอบที่ 222) */
+export type RecipeShowcaseBlock = BlockBase & {
+  readonly type: "recipeShowcase";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+  readonly columns: 1 | 2 | 3;
+  readonly limit: number;
+  readonly showDates: boolean;
+  readonly ctaLabel: LocalizedValue;
+  readonly ctaHref: string;
+};
+
 export type RecipeCardsBlock = BlockBase & {
   readonly type: "recipeCards";
   readonly heading: LocalizedValue;
@@ -478,7 +491,8 @@ export type Block =
   | JobBoardBlock
   | RosterTextBlock
   | RecipeCardsBlock
-  | ProductShowcaseBlock;
+  | ProductShowcaseBlock
+  | RecipeShowcaseBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -540,6 +554,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
+  { type: "recipeShowcase", label: "เมนูล่าสุด", hint: "ดึงเมนูล่าสุดจากฐานข้อมูล (ภาพ/ชื่อ/วันที่) — เลือกจำนวนได้" },
   {
     type: "productShowcase",
     label: "หมวดสินค้า + สินค้าแนะนำ",
@@ -652,6 +667,8 @@ export function createBlock(type: BlockType, id: string): Block {
     case "recipeCards":
       /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
+    case "recipeShowcase":
+      return { ...base, type: "recipeShowcase", heading: emptyText(), body: emptyText(), columns: 3, limit: 3, showDates: true, ctaLabel: emptyText(), ctaHref: "" };
     case "productShowcase":
       /* บล็อกไดนามิก — ไม่มีรายการในเอกสาร (ข้อมูลมาจากฐานข้อมูล) */
       return {

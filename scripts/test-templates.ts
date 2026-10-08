@@ -347,8 +347,8 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   const doc = buildHomeTemplate();
   assert.deepEqual(
     doc.blocks.map((block) => block.type),
-    ["productShowcase", "cards"],
-    "เทมเพลตหน้าแรก = 2 บล็อก (หมวดสินค้า · ที่ซื้อสินค้า)",
+    ["productShowcase", "recipeShowcase", "cards"],
+    "เทมเพลตหน้าแรก = 3 บล็อก (หมวดสินค้า · เมนูล่าสุด · ที่ซื้อสินค้า)",
   );
   assert.ok(!doc.blocks.some((block) => block.type === "hero"), "ห้ามมีบล็อก hero ในเทมเพลตหน้าแรก");
   assert.ok(!JSON.stringify(doc).includes("ข้อมูลทดสอบ"), "ห้ามมีข้อมูลทดสอบ");

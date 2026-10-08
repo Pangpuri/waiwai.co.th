@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
+import type { RecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import type { BlockDocument } from "@/lib/blocks/types";
 
@@ -61,11 +62,13 @@ export function PreviewFrame({
   initialDocument,
   language,
   productData = null,
+  recipeData = null,
 }: {
   readonly initialDocument: BlockDocument;
   readonly language: "th" | "en";
   /** ข้อมูลจริงของบล็อกไดนามิก — โหลดจากเซิร์ฟเวอร์ (ห้ามโหลดในนี้: พรีวิวเป็น client) */
   readonly productData?: ProductShowcaseData | null;
+  readonly recipeData?: RecipeShowcaseData | null;
 }) {
   const [document, setDocument] = useState<BlockDocument>(initialDocument);
   /** บล็อกที่กำลังเลือกในหลังบ้าน (ส่งมาจากตัวสร้าง) — ใช้ตีกรอบทึบในพรีวิว */
@@ -163,7 +166,7 @@ export function PreviewFrame({
       }}
     >
       {/* editable = ติดป้าย data-field/data-card-index ให้คลิกแก้ได้ตรงส่วน */}
-      <BlockDocumentView document={document} language={language} editable selectedBlockId={selectedBlockId} productData={productData} />
+      <BlockDocumentView document={document} language={language} editable selectedBlockId={selectedBlockId} productData={productData} recipeData={recipeData} />
     </div>
   );
 }

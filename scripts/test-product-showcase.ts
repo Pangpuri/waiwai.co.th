@@ -244,3 +244,26 @@ test("★ product showcase: หัวข้อส่วน + ปุ่มท้�
   assert.ok(block.ctaLabel.th !== "" && block.ctaLabel.en !== "", "ป้ายปุ่มสองภาษาต้องมาจากพจนานุกรม");
   assert.ok(block.heading.th !== "หมวดสินค้า", "หัวข้อส่วนต้องเป็นหัวข้อของส่วน (ไม่ใช่หัวข้อย่อยหมวด)");
 });
+
+/** ★ รอบที่ 222 (คิวข้อ 3) — บล็อก "เมนูล่าสุด": ลงทะเบียน + ตัวเรนเดอร์ + การส่งข้อมูล + แผง */
+test("★ recipe showcase: ลงทะเบียนครบ + ตัวเรนเดอร์ไม่แตะฐานข้อมูล + มีแผง/คำแปล", () => {
+  const types = readFileSync("lib/blocks/types.ts", "utf8");
+  assert.ok(types.includes('"recipeShowcase"'), "ต้องอยู่ใน BLOCK_TYPES");
+  assert.ok(types.includes("เมนูล่าสุด"), "ต้องมีป้ายในแคตตาล็อก");
+  const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
+  assert.ok(renderer.includes('case "recipeShowcase": {'), "ต้องมีกรณีเรนเดอร์");
+  assert.ok(renderer.includes("recipeShowcaseView(recipeData.recipes, block, language)"), "ต้องใช้ชั้นข้อมูลบริสุทธิ์ (ไม่ยิง DB)");
+  assert.ok(!renderer.includes("@/lib/recipes/repository"), "ห้ามตัวเรนเดอร์แตะชั้นฐานข้อมูล");
+  assert.ok(renderer.includes("recipeData={recipeData}"), "ต้องส่งข้อมูลลงไปถึง BlockView");
+  const panel = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  for (const needle of ["setRecipeShowcaseOptions", "blockRecipeLimit", "blockRecipeDates", "blockRecipeHint"]) {
+    assert.ok(panel.includes(needle), `แผงต้องมี: ${needle}`);
+  }
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("loadRecipeShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดเมนูให้");
+  const template = buildHomeTemplate();
+  assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "cards"]);
+  const block = template.blocks[1];
+  assert.equal(block?.type, "recipeShowcase");
+  if (block?.type === "recipeShowcase") assert.equal(block.ctaHref, "/recipes", "ปุ่มต้องพาไปหน้าเมนูอาหาร");
+});

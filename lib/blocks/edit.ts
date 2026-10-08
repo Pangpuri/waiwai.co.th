@@ -38,6 +38,7 @@ import {
   type HeroSlideItem,
   type PageLayout,
 } from "@/lib/blocks/types";
+import { clampRecipeShowcaseOptions, type RecipeShowcaseOptions } from "@/lib/blocks/recipe-showcase";
 import { clampShowcaseOptions, type ProductShowcaseOptions } from "@/lib/blocks/product-showcase";
 
 /**
@@ -977,6 +978,21 @@ export function setProductShowcaseOptions(
     block.featuredPerCategory = next.featuredPerCategory;
     block.categoryIds = [...next.categoryIds];
     block.showCount = next.showCount;
+  });
+}
+
+/** แก้ตัวเลือกของบล็อก "เมนูล่าสุด" (รอบที่ 222) — บีบค่าทุกครั้ง */
+export function setRecipeShowcaseOptions(
+  document: BlockDocument,
+  id: string,
+  patch: Partial<RecipeShowcaseOptions>,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "recipeShowcase") return;
+    const next = clampRecipeShowcaseOptions({ ...block, ...patch });
+    block.columns = next.columns;
+    block.limit = next.limit;
+    block.showDates = next.showDates;
   });
 }
 

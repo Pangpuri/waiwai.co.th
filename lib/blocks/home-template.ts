@@ -67,6 +67,23 @@ export function buildHomeTemplate(): BlockDocument {
     {
       id: "block-2",
       version: BLOCK_SCHEMA_VERSION,
+      type: "recipeShowcase",
+      style: style(),
+      heading: { th: th.recipes.title, en: en.recipes.title },
+      body: { th: th.recipes.body, en: en.recipes.body },
+      ctaLabel: { th: th.actions.viewAllRecipes, en: en.actions.viewAllRecipes },
+      ctaHref: "/recipes",
+      columns: 3,
+      limit: 3,
+      showDates: true,
+    },
+    {
+      /*
+        บล็อกไดนามิก "เมนูล่าสุด" (รอบที่ 222 · คิวข้อ 3) — ดึงเมนูจริงจากฐานข้อมูล
+        การ์ดพาไปหน้า /recipes (มี facade วิดีโอจริง · มติ D20 — ไม่เล่นวิดีโอในบล็อก)
+      */
+      id: "block-3",
+      version: BLOCK_SCHEMA_VERSION,
       type: "cards",
       style: style({ background: "subtle" }),
       heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },

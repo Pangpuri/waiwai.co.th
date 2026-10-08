@@ -4,6 +4,8 @@ import Image from "next/image";
 
 import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
+import { recipeShowcaseView } from "@/lib/blocks/recipe-showcase";
+import type { RecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
 
 import { blockRenderStringsFor, type BlockRenderStrings } from "@/features/blocks/render-strings";
 import { GalleryLightbox } from "@/features/blocks/ui/gallery-lightbox";
@@ -164,6 +166,7 @@ function BlockView({
   strings,
   nested = false,
   productData = null,
+  recipeData = null,
 }: {
   readonly block: Block;
   readonly language: Language;
@@ -178,6 +181,8 @@ function BlockView({
    * · ว่าง/ไม่มีคีย์ = บล็อกนั้นไม่เรนเดอร์ (รอบที่ 213)
    */
   readonly productData?: ProductShowcaseData | null;
+  /** ข้อมูลจริงของบล็อก "เมนูล่าสุด" (รอบที่ 222) */
+  readonly recipeData?: RecipeShowcaseData | null;
 }) {
   const shell = shellClass(block.style);
   const container = containerClass(block.style, nested);
@@ -721,6 +726,47 @@ function BlockView({
           </div>
         );
       }
+      case "recipeShowcase": {
+        /* บล็อกไดนามิก "เมนูล่าสุด" (รอบที่ 222) · ไม่มีข้อมูล = ไม่เรนเดอร์ · ไม่เล่นวิดีโอในบล็อก (มติ D20) */
+        if (recipeData === null) return null;
+        const recipeView = recipeShowcaseView(recipeData.recipes, block, language);
+        if (recipeView.isEmpty) return null;
+        const recipeHref = localizedBlockHref(block.ctaHref.trim() === "" ? "/recipes" : block.ctaHref, language);
+        const recipeGrid =
+          block.columns === 1
+            ? "grid gap-5"
+            : block.columns === 2
+              ? "grid gap-5 sm:grid-cols-2"
+              : "grid gap-5 sm:grid-cols-2 lg:grid-cols-3";
+        return (
+          <div className={`${container} flex flex-col gap-6`}>
+            <div className={`flex flex-col gap-2 ${align}`}>
+              {block.heading[language].trim() === "" ? null : (
+                <h2 className="text-fg text-2xl font-semibold">{block.heading[language]}</h2>
+              )}
+              {block.body[language].trim() === "" ? null : <p className="text-fg-muted text-sm">{block.body[language]}</p>}
+            </div>
+            <ul className={recipeGrid}>
+              {recipeView.items.map((recipe) => (
+                <li key={recipe.id} className="border-line bg-surface rounded-xl border p-3">
+                  <a href={recipeHref} className="flex flex-col gap-2">
+                    {recipe.image === null ? null : (
+                      <Image src={recipe.image} alt={recipe.title} width={640} height={360} sizes="(max-width: 640px) 100vw, 400px" className="h-auto w-full rounded-lg object-cover" />
+                    )}
+                    <span className="text-fg text-sm font-semibold">{recipe.title}</span>
+                    {recipe.dateLabel === "" ? null : <span className="text-fg-muted text-xs">{recipe.dateLabel}</span>}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            {block.ctaLabel[language].trim() === "" ? null : (
+              <a href={recipeHref} className="border-line-strong text-fg hover:bg-bg-subtle inline-flex w-fit items-center gap-2 rounded-full border-2 px-5 py-3 text-sm font-bold">
+                {block.ctaLabel[language]}
+              </a>
+            )}
+          </div>
+        );
+      }
       case "recipeCards": {
         const gridClass =
           block.columns === 1
@@ -821,6 +867,7 @@ function BlockView({
                     editable={editable}
                     selectedBlockId={selectedBlockId}
         productData={productData}
+        recipeData={recipeData}
                     strings={strings}
                     nested
                   />
@@ -862,6 +909,7 @@ export function BlockDocumentView({
   selectedBlockId = null,
   heading = "",
   productData,
+  recipeData,
 }: {
   readonly document: BlockDocument;
   readonly language?: Language;
@@ -872,6 +920,7 @@ export function BlockDocumentView({
   readonly heading?: string;
   /** ข้อมูลจริงของบล็อกไดนามิก (รอบที่ 213) — ผู้เรียก (หน้าเว็บ/พรีวิว) เป็นคนโหลดให้ */
   readonly productData?: ProductShowcaseData | null;
+  readonly recipeData?: RecipeShowcaseData | null;
 }) {
   if (document.blocks.length === 0) return null;
 
@@ -888,6 +937,7 @@ export function BlockDocumentView({
         editable={editable}
         selectedBlockId={selectedBlockId}
         productData={productData}
+        recipeData={recipeData}
         strings={strings}
       />
     ));
