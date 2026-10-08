@@ -23,6 +23,8 @@ export const HOME_SECTION_OWNERS: readonly SectionOwner[] = [
   /* หัวหน้าแรก + สไลด์ + การ์ด PR: เจ้าของคือเมนู "สไลด์ & แคมเปญ" (หน้าแรกเรนเดอร์จากที่นั่น — รอบ 217) */
   { key: "hero", screen: "/admin/hero" },
   /* ส่วนข้อมูลจริง 3 ส่วน + จดหมายข่าว: เจ้าของคือตัวสร้างหน้าเว็บ/ฐานข้อมูล (บล็อกไดนามิก รอบ 211–224) */
+  /* "ที่ซื้อสินค้า": เจ้าของย้ายมาที่ตัวสร้างหน้าเว็บ (บล็อก marketplaceLinks · รอบที่ 229) */
+  { key: "whereToBuy", screen: "/admin/builder/home" },
   { key: "products", screen: "/admin/builder/home" },
   { key: "recipes", screen: "/admin/builder/home" },
   { key: "news", screen: "/admin/builder/home" },
@@ -37,4 +39,4 @@ export function ownerOfSection(key: string): SectionOwner | null {
 }
 
 /** คีย์ที่หน้าจอนี้เป็นเจ้าของค่าจริง (ใช้ล็อกด้วยเทสต์) */
-export const HOME_SECTIONS_OWNED_HERE: readonly string[] = ["whereToBuy"];
+export const HOME_SECTIONS_OWNED_HERE: readonly string[] = [];

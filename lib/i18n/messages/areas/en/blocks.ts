@@ -5,6 +5,7 @@
  * is **editor-managed content** stored in JSONB, not the dictionary (decision D3).
  */
 export const blocks = {
+  marketplaceOpenInNewTab: "opens in a new tab",
   galleryOpen: "Open image",
   galleryClose: "Close",
   galleryDialog: "Image viewer",

@@ -46,6 +46,7 @@ export const adminBlockTypes = {
   blockNewsDates: "Show date",
   blockNewsExcerpts: "Show excerpt",
   blockNewsHint: "This block pulls the latest news from the database (image, date, excerpt) — nothing to type in. Cards link to that news item",
+  blockMarketplaceHint: "Shop buttons come from the project constants (real links) — only the heading and intro can be edited here",
   blockShowcaseColumns: "Columns",
   blockShowcaseCount: "Show product count on category cards",
   blockShowcaseFeatured: "Show featured products",

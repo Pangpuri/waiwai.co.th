@@ -6,6 +6,7 @@ import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { recipeShowcaseView } from "@/lib/blocks/recipe-showcase";
 import type { RecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
+import { marketplaceLinksView } from "@/lib/blocks/marketplace-links";
 import { newsShowcaseView } from "@/lib/blocks/news-showcase";
 import type { NewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 
@@ -728,6 +729,37 @@ function BlockView({
                 {block.ctaLabel[language]}
               </a>
             )}
+          </div>
+        );
+      }
+      case "marketplaceLinks": {
+        /* บล็อก "ที่ซื้อสินค้า" (รอบที่ 229) — ลิงก์ร้านจริงจากค่าคงที่ของโปรเจกต์ · ไม่มีข้อมูล = ไม่เรนเดอร์ */
+        const market = marketplaceLinksView(language);
+        if (market.isEmpty) return null;
+        return (
+          <div className={`${container} flex flex-col gap-4`}>
+            <div className={`flex flex-col gap-2 ${align}`}>
+              {block.heading[language].trim() === "" ? null : (
+                <h2 className="text-fg text-2xl font-semibold">{block.heading[language]}</h2>
+              )}
+              {block.body[language].trim() === "" ? null : <p className="text-fg-muted text-sm">{block.body[language]}</p>}
+            </div>
+            <ul className="flex flex-wrap gap-3">
+              {market.items.map((item) => (
+                <li key={item.id}>
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${item.label} (${market.newTabLabel})`}
+                    className="border-line-strong text-fg hover:bg-bg-subtle inline-flex items-center gap-2 rounded-full border-2 px-5 py-3 text-sm font-bold"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="text-fg-muted text-xs">{market.retailNote}</p>
           </div>
         );
       }

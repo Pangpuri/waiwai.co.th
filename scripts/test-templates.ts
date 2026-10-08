@@ -130,8 +130,8 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
   assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
   assert.deepEqual(
     [...blockCoverageGaps("home")],
-    ["whereToBuy"],
-    /* รอบที่ 228: "ที่ซื้อสินค้า" มีเจ้าของคือหน้าจอเนื้อหา ⇒ ต้องมีป้ายเตือน */
+    [],
+    /* รอบที่ 229: "ที่ซื้อสินค้า" มีบล็อกของตัวเองแล้ว ⇒ ไม่เหลือช่องว่าง */
     "รอบ 210: หน้าแรกต้องเตือนว่ายังมีฟอร์ม + ส่วนข้อมูลจริงที่เทมเพลตยังไม่ครอบคลุม",
   );
 
@@ -351,7 +351,7 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   const doc = buildHomeTemplate();
   assert.deepEqual(
     doc.blocks.map((block) => block.type),
-    ["productShowcase", "recipeShowcase", "newsShowcase", "form"],
+    ["productShowcase", "recipeShowcase", "newsShowcase", "form", "marketplaceLinks"],
     "เทมเพลตหน้าแรก = 4 บล็อก (หมวดสินค้า · เมนูล่าสุด · ข่าวล่าสุด · ที่ซื้อสินค้า)",
   );
   assert.ok(!doc.blocks.some((block) => block.type === "hero"), "ห้ามมีบล็อก hero ในเทมเพลตหน้าแรก");
@@ -400,7 +400,7 @@ test("★ templates: จดหมายข่าวใช้บล็อกฟ�
   if (form?.type !== "form") return;
   assert.equal(form.kind, "newsletter", "ต้องใช้ฟอร์มจดหมายข่าวจริง (ไม่สร้างฟอร์มใหม่)");
   assert.ok(form.heading.th !== "" && form.heading.en !== "", "หัวข้อส่วนจดหมายข่าวต้องมาจากพจนานุกรม");
-  assert.deepEqual([...blockCoverageGaps("home")], ["whereToBuy"], "รอบที่ 228: ที่ซื้อสินค้ามีเจ้าของคือหน้าจอเนื้อหา ⇒ ต้องมีป้ายเตือน");
+  assert.deepEqual([...blockCoverageGaps("home")], [], "รอบที่ 229: หน้าแรกมีบล็อกครบ (รวมที่ซื้อสินค้า)");
 });
 
 /** ★ รอบที่ 225 (เคลียร์หนี้ UX) — ปุ่มเทมเพลตต้องเห็นเสมอ + มีฉบับร่างต้องยืนยันก่อนทับ */
@@ -433,8 +433,8 @@ test("★ templates: ใช้เทมเพลตทับฉบับร่�
 /** ★ รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่") — หน้าจอเนื้อหาหน้าแรกต้องบอกว่าส่วนไหนค่าจริงมาจากที่อื่น */
 test("★ content: ทุกส่วนของหน้าแรกเป็นของหน้าจอนี้ หรือมีป้ายบอกเจ้าของที่ชัดเจน", () => {
   /* ของจริงที่หน้าเว็บอ่านค่า: whereToBuy (รอบ 209) — ที่เหลือมาจากระบบอื่น */
-  assert.deepEqual([...HOME_SECTIONS_OWNED_HERE], ["whereToBuy"]);
-  assert.equal(ownerOfSection("whereToBuy"), null, "ส่วนที่ต่อสายจริงแล้วต้องไม่มีป้ายเตือน");
+  assert.deepEqual([...HOME_SECTIONS_OWNED_HERE], [], "รอบที่ 229: ไม่มีส่วนไหนที่หน้าจอเนื้อหาเป็นเจ้าของแล้ว");
+  assert.equal(ownerOfSection("whereToBuy")?.screen, "/admin/builder/home", "ที่ซื้อสินค้าย้ายเจ้าของมาที่ตัวสร้าง (รอบ 229)");
   for (const key of ["hero", "products", "recipes", "news", "newsletter", "seo"]) {
     const owner = ownerOfSection(key);
     assert.ok(owner !== null, `${key}: ต้องมีป้ายบอกว่าแก้ที่ไหน`);

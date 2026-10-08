@@ -6,6 +6,7 @@
  *    ⇒ เก็บใน JSONB ไม่ใช่พจนานุกรม (มติ D3: EN บังคับเฉพาะระดับหน้า/ส่วน)
  */
 export const blocks = {
+  marketplaceOpenInNewTab: "เปิดในแท็บใหม่",
   galleryOpen: "เปิดภาพ",
   galleryClose: "ปิด",
   galleryDialog: "ดูภาพขยาย",

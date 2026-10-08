@@ -38,6 +38,7 @@ export const BLOCK_TYPES = [
   "productShowcase",
   "recipeShowcase",
   "newsShowcase",
+  "marketplaceLinks",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -461,6 +462,13 @@ export type NewsShowcaseBlock = BlockBase & {
   readonly ctaHref: string;
 };
 
+/** บล็อก "ที่ซื้อสินค้า" (ไดนามิกจากค่าคงที่ของโปรเจกต์) — รอบที่ 229 */
+export type MarketplaceLinksBlock = BlockBase & {
+  readonly type: "marketplaceLinks";
+  readonly heading: LocalizedValue;
+  readonly body: LocalizedValue;
+};
+
 export type RecipeCardsBlock = BlockBase & {
   readonly type: "recipeCards";
   readonly heading: LocalizedValue;
@@ -507,7 +515,8 @@ export type Block =
   | RecipeCardsBlock
   | ProductShowcaseBlock
   | RecipeShowcaseBlock
-  | NewsShowcaseBlock;
+  | NewsShowcaseBlock
+  | MarketplaceLinksBlock;
 
 export function isRowBlock(block: Block): block is RowBlock {
   return block.type === "row";
@@ -569,6 +578,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
+  { type: "marketplaceLinks", label: "ที่ซื้อสินค้า", hint: "ปุ่มช่องทางจำหน่ายจริง (Shopee · Lazada · LINE Shop) + หมายเหตุร้านค้า" },
   { type: "newsShowcase", label: "ข่าวล่าสุด", hint: "ดึงข่าว/กิจกรรมล่าสุดจากฐานข้อมูล (ภาพ/วันที่/คำโปรย) — เลือกจำนวนได้" },
   { type: "recipeShowcase", label: "เมนูล่าสุด", hint: "ดึงเมนูล่าสุดจากฐานข้อมูล (ภาพ/ชื่อ/วันที่) — เลือกจำนวนได้" },
   {
@@ -683,6 +693,8 @@ export function createBlock(type: BlockType, id: string): Block {
     case "recipeCards":
       /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
+    case "marketplaceLinks":
+      return { ...base, type: "marketplaceLinks", heading: emptyText(), body: emptyText() };
     case "newsShowcase":
       return { ...base, type: "newsShowcase", heading: emptyText(), body: emptyText(), columns: 3, limit: 3, showDates: true, showExcerpts: true, ctaLabel: emptyText(), ctaHref: "" };
     case "recipeShowcase":

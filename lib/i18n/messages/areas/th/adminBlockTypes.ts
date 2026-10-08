@@ -47,6 +47,7 @@ export const adminBlockTypes = {
   blockNewsDates: "แสดงวันที่",
   blockNewsExcerpts: "แสดงคำโปรย",
   blockNewsHint: "บล็อกนี้ดึงข่าว/กิจกรรมล่าสุดจากฐานข้อมูล (ภาพ · วันที่ · คำโปรย) — ไม่ต้องคีย์เอง · การ์ดพาไปหน้าข่าวชิ้นนั้น",
+  blockMarketplaceHint: "ปุ่มร้านค้ามาจากค่าคงที่ของโปรเจกต์ (ลิงก์จริง) — ที่นี่แก้ได้แค่หัวข้อและคำโปรย",
   blockShowcaseColumns: "จำนวนคอลัมน์",
   blockShowcaseCount: "แสดงจำนวนสินค้าบนการ์ดหมวด",
   blockShowcaseFeatured: "แสดงสินค้าแนะนำ",

@@ -1,7 +1,6 @@
-import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockCard, type BlockDocument } from "@/lib/blocks/types";
+import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockDocument } from "@/lib/blocks/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
-import { SITE } from "@/lib/site";
 
 /**
  * เทมเพลตตั้งต้นของหน้าแรก (ใช้ตอนกด "เริ่มจากเนื้อหาปัจจุบัน")
@@ -96,6 +95,18 @@ export function buildHomeTemplate(): BlockDocument {
       /* หัวข้อ/คำโปรยของส่วนจดหมายข่าว (รอบที่ 224 · คิวข้อ 5) — ฟอร์มจริง + consent มาจาก `SubmitForm` เดิม */
       heading: { th: th.newsletter.title, en: en.newsletter.title },
       body: { th: th.newsletter.body, en: en.newsletter.body },
+    },
+    {
+      /*
+        บล็อกไดนามิก "ที่ซื้อสินค้า" (รอบที่ 229) — ปุ่มร้านจริงจาก `SITE.marketplaces` + หมายเหตุร้านค้า
+        ⇒ เจ้าของส่วนนี้ย้ายมาเป็นตัวสร้างหน้าเว็บ (หน้าจอเนื้อหาจะขึ้นป้ายบอกว่าค่าจริงมาจากที่นี่)
+      */
+      id: "block-5",
+      version: BLOCK_SCHEMA_VERSION,
+      type: "marketplaceLinks",
+      style: style({ background: "subtle" }),
+      heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },
+      body: { th: th.whereToBuy.body, en: en.whereToBuy.body },
     },
   ];
 

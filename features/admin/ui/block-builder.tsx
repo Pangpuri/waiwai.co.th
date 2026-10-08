@@ -1230,6 +1230,15 @@ export function BlockBuilder({
               </div>
             </>
           );
+        case "marketplaceLinks":
+          /* บล็อก "ที่ซื้อสินค้า" (รอบที่ 229) — ปุ่มร้านมาจากค่าคงที่ของโปรเจกต์ ⇒ แก้แค่หัวข้อ/คำโปรย */
+          return (
+            <>
+              <TextPair idBase={`${base}-heading`} label="heading" value={block.heading} onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))} />
+              <TextPair idBase={`${base}-body`} label={`body (${strings.optionalHint})`} value={block.body} onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))} />
+              <p className="text-fg-muted text-xs">{strings.blockMarketplaceHint}</p>
+            </>
+          );
         case "newsShowcase":
           /* บล็อกไดนามิก (รอบที่ 223) — ไม่มีเนื้อหาในเอกสาร ⇒ แก้เฉพาะหัวข้อ/คำโปรย/ตัวเลือก/ปุ่ม */
           return (

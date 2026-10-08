@@ -849,6 +849,13 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         ...options,
       };
     }
+    case "marketplaceLinks":
+      return {
+        ...base,
+        type: "marketplaceLinks",
+        heading: readText(entry, "heading", `${path}.heading`, problems),
+        body: readText(entry, "body", `${path}.body`, problems),
+      };
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };
   }
