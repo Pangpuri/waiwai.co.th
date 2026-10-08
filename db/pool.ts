@@ -92,6 +92,52 @@ function createPool(url: string): Pool {
   });
 }
 
+/**
+ * รหัส error ของ Postgres ที่แปลว่า "credential ของ role นี้ใช้ไม่ได้"
+ * · `28P01` = invalid_password · `28000` = invalid_authorization_specification
+ */
+const ROLE_AUTH_FAILURE_CODES: readonly string[] = ["28P01", "28000"];
+
+/**
+ * error นี้เกิดจากรหัสผ่าน/สิทธิ์ของ role หรือไม่ (ตรรกะล้วน — ทดสอบได้โดยไม่ต้องมี DB)
+ */
+export function isRoleAuthFailure(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { readonly code?: unknown }).code;
+  return typeof code === "string" && ROLE_AUTH_FAILURE_CODES.includes(code);
+}
+
+/**
+ * ทิ้ง pool ที่ค้างของบทบาทนั้น ⇒ คำขอถัดไปสร้าง pool ใหม่จาก env ปัจจุบัน
+ *
+ * ⚠️ บทเรียนรอบที่ 196 (เคสจริง): `npm run db:roles` เปลี่ยนรหัสผ่านของ role **ขณะที่ dev ยังรันอยู่**
+ *    แล้วอัปเดต `.env.local` — Next รีโหลด env ให้ แต่ pool ถูกเก็บไว้บน `globalThis` ต่อโปรเซส
+ *    ⇒ ตัวเก่ายังใช้รหัสผ่านเดิมต่อไป ⇒ ทุกหน้าอ่านผ่านประตูอ่านพังด้วย `28P01` (หน้าเว็บสาธารณะเงียบเป็นข้อมูลตัวอย่าง)
+ */
+export function resetRolePool(role: DatabaseRole): void {
+  const scope = globalThis as PoolGlobal;
+  const key = role === "read" ? "__waiwaiReadPool" : role === "form" ? "__waiwaiFormPool" : "__waiwaiPool";
+  const pool = scope[key];
+  if (pool === undefined) return;
+  scope[key] = undefined;
+  /* ปิดแบบไม่รอคำตอบ — คำขอที่ค้างอยู่จบเอง · error ตอนปิดต้องไม่ทำให้คำขอหลักล้ม */
+  void pool.end().catch(() => {});
+}
+
+/**
+ * ข้อความบอกทางแก้เมื่อ credential ของ role ใช้ไม่ได้ (สำหรับ server log / หน้า error ของ dev — ไม่ใช่ข้อความ UI)
+ * มีเทสต์คุมว่าต้องบอกทั้ง "env key" และ "คำสั่งที่ต้องรัน" เสมอ
+ */
+export function roleCredentialHint(role: DatabaseRole): string {
+  const envKey = role === "read" ? "PUBLIC_DATABASE_URL" : role === "form" ? "FORM_DATABASE_URL" : "DATABASE_URL";
+  const label = role === "read" ? "อ่านอย่างเดียว (หน้าเว็บสาธารณะ)" : role === "form" ? "ฟอร์มสาธารณะ" : "หลังบ้าน";
+  return [
+    `เชื่อมต่อฐานข้อมูลด้วย role ${label} ไม่สำเร็จ — รหัสผ่านใน ${envKey} ไม่ตรงกับที่ตั้งไว้ในฐานข้อมูล`,
+    "แก้: รัน `npm run db:roles -- --reveal` แล้วอัปเดตค่าใน .env.local ให้ตรงกัน",
+    "ถ้าเพิ่งแก้ .env.local ขณะที่เซิร์ฟเวอร์ยังรันอยู่ ⇒ รีสตาร์ต (`npm run dev:clean` แล้ว `npm run dev`)",
+  ].join(" · ");
+}
+
 /** pool ของหลังบ้าน (อ่าน/เขียนเต็มสิทธิ์) */
 export function getPool(): Pool {
   const resolved = resolveRoleUrl("write", process.env);

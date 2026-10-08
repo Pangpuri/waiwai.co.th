@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { databaseRoleStatus, resolveRoleUrl } from "@/db/pool";
+import { databaseRoleStatus, isRoleAuthFailure, resolveRoleUrl, roleCredentialHint } from "@/db/pool";
+import { runWithRoleRetry } from "@/lib/db/read";
 import { FORBIDDEN_FOR_PUBLIC_READ, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, roleUrl } from "./db-roles.ts";
 
 /**
@@ -135,4 +136,95 @@ test("db-roles: เส้นทางสาธารณะต้องไม่�
     const source = read(...file.split("/"));
     assert.ok(!source.includes("getPool"), `${file} ห้าม import getPool() — ต้องผ่าน repository ที่ใช้ readQuery()`);
   }
+});
+
+/**
+ * ★ รอบที่ 196 — เคสจริงจากเจ้าของ: `npm run db:roles` เปลี่ยนรหัสผ่านของ role **ขณะที่ dev ยังรันอยู่**
+ * แล้วอัปเดต `.env.local` ⇒ Next รีโหลด env ให้ แต่ **pool เก่าบน `globalThis` ยังใช้รหัสเดิม** ⇒ ทุกหน้า 500
+ * ด้วย `28P01` (หน้าเว็บสาธารณะเงียบเป็นข้อมูลตัวอย่าง)
+ *
+ * ที่นี่พิสูจน์ "นโยบายกู้ตัวเอง" ด้วยตรรกะล้วน (ไม่ต้องมี DB):
+ *  1. สำเร็จปกติ = ไม่แตะ pool
+ *  2. credential เก่า → ทิ้ง pool → ลองใหม่สำเร็จ (หายเองโดยไม่ต้องรีสตาร์ต)
+ *  3. ล้มซ้ำ = เตือน 1 ครั้ง + โยน error **ที่บอกทางแก้** (ไม่ปล่อย error ดิบของ pg)
+ *  4. error อื่น (ไม่ใช่ credential) = ไม่ลองใหม่ ไม่กลืน
+ */
+test("db-roles: credential เปลี่ยนกลางคัน — ทิ้ง pool แล้วลองใหม่ 1 ครั้ง + บอกทางแก้ (รอบที่ 196)", async () => {
+  const authError = Object.assign(new Error('password authentication failed for user "waiwai_public_ro"'), { code: "28P01" });
+
+  /* ตัวจำแนก error: เฉพาะรหัส credential จริง */
+  assert.equal(isRoleAuthFailure(authError), true);
+  assert.equal(isRoleAuthFailure(Object.assign(new Error("no permission"), { code: "42501" })), false, "สิทธิ์ไม่พอ ≠ credential ผิด");
+  assert.equal(isRoleAuthFailure(new Error("boom")), false);
+  assert.equal(isRoleAuthFailure(null), false);
+  assert.equal(isRoleAuthFailure("28P01"), false, "สตริงเปล่า ๆ ไม่นับ");
+  assert.equal(isRoleAuthFailure(Object.assign(new Error("role ไม่มี"), { code: "28000" })), true);
+
+  /* ข้อความบอกทางแก้ต้องมีทั้ง env key และคำสั่งที่ต้องรัน */
+  for (const [role, envKey] of [["read", "PUBLIC_DATABASE_URL"], ["form", "FORM_DATABASE_URL"], ["write", "DATABASE_URL"]] as const) {
+    const hint = roleCredentialHint(role);
+    assert.ok(hint.includes(envKey), `${role}: ต้องบอก ${envKey}`);
+    assert.ok(hint.includes("db:roles") && hint.includes(".env.local"), `${role}: ต้องบอกคำสั่งที่ต้องรัน`);
+    assert.ok(hint.includes("dev:clean"), `${role}: ต้องบอกทางออกสุดท้าย (รีสตาร์ต dev)`);
+  }
+
+  /* 1) สำเร็จตั้งแต่ครั้งแรก = ไม่แตะ pool เลย */
+  let calls = 0;
+  let resets = 0;
+  const ok = await runWithRoleRetry({ role: "read", query: async () => { calls += 1; return "ok"; }, reset: () => { resets += 1; } });
+  assert.equal(ok, "ok");
+  assert.deepEqual([calls, resets], [1, 0], "เคสปกติต้องไม่สร้าง pool ใหม่");
+
+  /* 2) รหัสเก่า → ทิ้ง pool → ลองใหม่สำเร็จ (เคสจริงของเจ้าของ) */
+  calls = 0;
+  resets = 0;
+  const healed = await runWithRoleRetry({
+    role: "read",
+    query: async () => {
+      calls += 1;
+      if (calls === 1) throw authError;
+      return "fresh";
+    },
+    reset: () => { resets += 1; },
+  });
+  assert.equal(healed, "fresh", "ต้องกู้ตัวเองได้หลังทิ้ง pool");
+  assert.deepEqual([calls, resets], [2, 1], "ลองใหม่ 1 ครั้ง และทิ้ง pool 1 ครั้ง");
+
+  /* 3) ล้มซ้ำ = เตือน 1 ครั้ง + error ที่บอกทางแก้ (ไม่ใช่ error ดิบของ pg) */
+  calls = 0;
+  resets = 0;
+  const warned: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warned.push(args.map((value) => String(value)).join(" ")); };
+  try {
+    await assert.rejects(
+      () => runWithRoleRetry({ role: "read", query: async () => { calls += 1; throw authError; }, reset: () => { resets += 1; } }),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes("PUBLIC_DATABASE_URL") &&
+        error.message.includes("db:roles") &&
+        !error.message.includes("password authentication failed"),
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.deepEqual([calls, resets], [2, 1], "ลองใหม่แค่ครั้งเดียว (ไม่วน)");
+  assert.equal(warned.length, 1, "ต้องเตือนผู้ดูแล 1 ครั้ง");
+  assert.ok(warned[0]?.includes("PUBLIC_DATABASE_URL"), "ข้อความเตือนต้องบอก env ที่ต้องแก้");
+
+  /* 4) error อื่น = ไม่ลองใหม่ ไม่กลืน */
+  calls = 0;
+  resets = 0;
+  await assert.rejects(
+    () => runWithRoleRetry({ role: "read", query: async () => { calls += 1; throw Object.assign(new Error("relation does not exist"), { code: "42P01" }); }, reset: () => { resets += 1; } }),
+    /relation does not exist/,
+  );
+  assert.deepEqual([calls, resets], [1, 0], "error ที่ไม่ใช่ credential ต้องโยนกลับทันที");
+
+  /* 5) ประตูทั้งสองต้องผ่านเส้นทางนี้ (ไม่เรียก pool ตรง ๆ อีก) */
+  const gate = read("lib", "db", "read.ts");
+  assert.ok(gate.includes("runWithRoleRetry({"), "queryWithRole ต้องใช้ runWithRoleRetry");
+  assert.ok(gate.includes("resetRolePool(role)"), "ต้องทิ้ง pool ของบทบาทนั้นได้");
+  assert.equal((gate.match(/queryWithRole<T>\("read"/g) ?? []).length, 1, "readQuery ต้องผ่าน queryWithRole");
+  assert.equal((gate.match(/queryWithRole<T>\("form"/g) ?? []).length, 1, "formQuery ต้องผ่าน queryWithRole");
 });
