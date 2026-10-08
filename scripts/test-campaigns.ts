@@ -14,10 +14,12 @@ import {
   campaignWindowState,
   clampAnchor,
   isCampaignLiveNow,
+  liveCampaignsOf,
   mergeCampaignImage,
   normalizeMoment,
   parseCampaignInput,
   toDateTimeLocalValue,
+  type Campaign,
   type CampaignImageDraft,
 } from "@/lib/campaigns/model";
 import { feedbackOf, invalidCampaignHref } from "@/lib/hero/feedback";
@@ -109,10 +111,17 @@ test("campaigns: ต่อสายจริง — แท็บในหน้�
   assert.ok(/catch \{[\s\S]{0,160}return \[\];/.test(repo), "อ่านพังต้องคืนค่าว่าง");
 
   const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
-  for (const fn of ["addCampaignAction", "saveCampaignAction", "setCampaignStatusAction", "removeCampaignAction"]) {
+  /* 5 action: เพิ่ม · บันทึก · เผยแพร่/ถอน · ย้ายเข้าถัง · กู้คืน (รอบที่ 198 เพิ่มตัวสุดท้าย) */
+  for (const fn of [
+    "addCampaignAction",
+    "saveCampaignAction",
+    "setCampaignStatusAction",
+    "removeCampaignAction",
+    "restoreCampaignAction",
+  ]) {
     assert.ok(actions.includes(`export async function ${fn}`), `ต้องมี ${fn}`);
   }
-  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 4, "ทุก action ต้องตรวจสิทธิ์");
+  assert.equal((actions.match(/requireAdminUser\("content"\)/g) ?? []).length, 5, "ทุก action ต้องตรวจสิทธิ์");
   assert.ok(actions.includes("MAX_CAMPAIGNS"), "ต้องมีเพดานกันสร้างมั่ว");
   assert.ok(actions.includes("campaign-publish"), "ต้องมี audit ตอนเผยแพร่");
 
@@ -209,7 +218,8 @@ test("feedback: ทุกการบันทึกต้องบอกผล 
 
   const campaignActions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
   assert.ok(campaignActions.includes("?tab=campaigns&saved=${flag}"), "แคมเปญต้องกลับไปแท็บเดิมพร้อมรหัสผลลัพธ์");
-  assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 4, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
+  /* 5 ทาง: เพิ่ม · บันทึก · สถานะ · ย้ายเข้าถัง · กู้คืน (รอบที่ 198) — ทุกทางต้องมีรหัสผลลัพธ์ */
+  assert.equal((campaignActions.match(/refreshAfterCampaignChange\("/g) ?? []).length, 5, "ทุกทางบันทึกของแคมเปญต้องส่งรหัส");
   assert.ok(
     campaignActions.includes("redirect(invalidCampaignHref(parsed.problems))"),
     "ข้อมูลไม่ผ่านต้องบอกว่าไม่สำเร็จ **และบอกช่องที่ต้องแก้** (รอบที่ 195)",
@@ -409,6 +419,119 @@ test("★ campaigns: action + หน้าจอ ต่อสาย “ช่อ
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
     for (const key of ["feedbackFieldTitleTh", "feedbackFieldCtaHref", "feedbackFieldImagePath", "feedbackFieldImageAltTh", "feedbackFieldEndsAt"]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
+  }
+});
+
+/**
+ * ★ รอบที่ 198 — เจ้าของทดสอบแล้วเจอว่า *"กดเพิ่ม = ได้การ์ดใหม่ ไม่ได้แก้การ์ดที่ขยับอยู่"*
+ * ⇒ จอแคมเปญต้องรู้ก่อนว่า **ใบไหนคือการ์ดที่คนเห็นบนเว็บตอนนี้** แล้วพาไปแก้ใบนั้น
+ * (ไม่ใช่ให้ปุ่มที่เด่นที่สุดสร้างใบใหม่)
+ */
+test("★ campaigns: หา “การ์ดที่แสดงบนเว็บตอนนี้” ได้ + จอพาไปแก้ใบเดิม (รอบที่ 198)", () => {
+  const base: Campaign = {
+    id: "c1",
+    name: "ใบที่ใช้อยู่",
+    title: { th: "หัวข้อ", en: "" },
+    body: { th: "", en: "" },
+    ctaLabel: { th: "", en: "" },
+    ctaHref: "",
+    imagePath: "",
+    imageAltTh: "",
+    imageAltEn: "",
+    anchorX: 8,
+    anchorY: 50,
+    startsAt: null,
+    endsAt: null,
+    isActive: true,
+    status: "published",
+    sortOrder: 10,
+    slideIds: [],
+  };
+  const now = Date.parse("2026-10-08T09:00:00.000Z");
+  const live = liveCampaignsOf(
+    [
+      base,
+      { ...base, id: "c2", status: "draft" },
+      { ...base, id: "c3", isActive: false },
+      { ...base, id: "c4", title: { th: "  ", en: "" } },
+      { ...base, id: "c5", startsAt: "2026-10-09T00:00:00.000Z" },
+      { ...base, id: "c6", endsAt: "2026-10-07T00:00:00.000Z" },
+    ],
+    now,
+  );
+  assert.deepEqual(
+    live.map((campaign) => campaign.id),
+    ["c1"],
+    "ต้องได้เฉพาะใบที่เผยแพร่+เปิดใช้+มีหัวข้อ+อยู่ในช่วงเวลา",
+  );
+  assert.equal(liveCampaignsOf([], now).length, 0, "ไม่มีแคมเปญ = ว่าง (ไม่ throw)");
+
+  /* จอหลังบ้าน: แผง "การ์ดที่แสดงบนเว็บตอนนี้" + ลิงก์ไปฟอร์มใบนั้น + ป้ายบอกว่าใบไหนขึ้นอยู่ */
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("liveCampaignsOf(campaigns, now)"), "จอต้องคำนวณการ์ดที่ขึ้นอยู่จริง");
+  assert.ok(manager.includes("id={`campaign-${campaign.id}`}"), "แต่ละการ์ดต้องมี id ให้ลิงก์กระโดดไปหาได้");
+  assert.ok(manager.includes("href={`#campaign-${campaign.id}`}"), "ปุ่มแก้ไขต้องพาไปที่ฟอร์มของการ์ดใบนั้น");
+  assert.ok(manager.includes("strings.campaignLiveTitle"), "ต้องมีหัวข้อแผงการ์ดที่ใช้อยู่");
+  assert.ok(manager.includes("strings.campaignLiveEdit"), "ต้องมีปุ่ม “แก้ไขการ์ดนี้”");
+  assert.ok(manager.includes("strings.campaignLiveBadge"), "ต้องมีป้ายบอกใบที่กำลังแสดงบนเว็บ");
+  assert.ok(manager.includes("strings.campaignAddHint"), "ปุ่มเพิ่มใหม่ต้องมีคำเตือนว่าจะได้การ์ดซ้อน");
+
+  /* ลำดับความสำคัญในจอ: ปุ่ม “แก้ไขการ์ดนี้” ต้องมาก่อนปุ่ม “เพิ่มแคมเปญใหม่” */
+  const editAt = manager.indexOf("strings.campaignLiveEdit");
+  const addAt = manager.indexOf("action={addCampaignAction}");
+  assert.ok(editAt > 0 && addAt > editAt, "แผงการ์ดที่ใช้อยู่ต้องอยู่เหนือปุ่มเพิ่มใบใหม่");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of [
+      "campaignLiveTitle",
+      "campaignLiveNone",
+      "campaignLiveEdit",
+      "campaignLiveBadge",
+      "campaignLivePosition",
+      "campaignAddHint",
+    ]) {
+      assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
+    }
+  }
+});
+
+/**
+ * ★ รอบที่ 198 (ต่อ) — ถังขยะของแคมเปญ
+ * ก่อนรอบนี้ "ย้ายเข้าถัง" ได้อย่างเดียว ⇒ การ์ดที่เผยแพร่อยู่หายไปจากจอเลย (กู้คืนต้องเข้า SQL)
+ * เคสจริง: เจ้าของกดลบการ์ดทดสอบ แล้วพบว่ากู้คืนไม่ได้ (ของค้างในถัง 9 ใบ)
+ */
+test("★ campaigns: ถังขยะแคมเปญ — ดูได้ + กู้คืนได้ (ประตูอยู่ที่ SQL) (รอบที่ 198)", () => {
+  const repo = readFileSync("lib/campaigns/repository.ts", "utf8");
+  assert.ok(
+    /listTrashedCampaigns[\s\S]{0,500}deleted_at is not null/.test(repo),
+    "ตัวอ่านถังขยะต้องกรอง deleted_at is not null",
+  );
+  assert.ok(
+    /restoreCampaign[\s\S]{0,400}deleted_at is not null/.test(repo),
+    "กู้คืนต้องมีประตู fail-closed อยู่ที่ SQL (กู้ได้เฉพาะของในถัง)",
+  );
+  assert.ok(/restoreCampaign[\s\S]{0,300}deleted_at = null, deleted_by = null/.test(repo), "กู้คืนต้องล้าง deleted_at/deleted_by");
+
+  const actions = readFileSync("app/admin/hero/campaign-actions.ts", "utf8");
+  assert.ok(actions.includes("export async function restoreCampaignAction"), "ต้องมี action กู้คืน");
+  assert.ok(actions.includes('detail: "campaign-restore"'), "ต้องมี audit ของการกู้คืน");
+  assert.ok(actions.includes('requireAdminUser("content")'), "action กู้คืนต้องตรวจสิทธิ์");
+
+  const manager = readFileSync("features/admin/ui/campaign-manager.tsx", "utf8");
+  assert.ok(manager.includes("restoreCampaignAction"), "จอต้องมีปุ่มกู้คืน");
+  assert.ok(manager.includes("strings.campaignTrashTitle"), "จอต้องมีหัวข้อถังขยะแคมเปญ");
+  assert.ok(manager.includes("trashedCampaigns.length"), "จอต้องโชว์จำนวนของในถัง");
+
+  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  assert.ok(page.includes("listTrashedCampaigns()"), "หน้าจอต้องอ่านถังขยะแคมเปญ");
+  assert.ok(page.includes("trashedCampaigns={trashedCampaigns}"), "หน้าจอต้องส่งรายการถังขยะเข้าไป");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHeroCards.ts`, "utf8");
+    for (const key of ["campaignTrashTitle", "campaignTrashHint", "campaignTrashEmpty", "campaignRestore"]) {
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
   }

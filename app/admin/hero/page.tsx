@@ -13,7 +13,7 @@ import {
   saveHeroSettingAction,
 } from "@/app/admin/hero/actions";
 import { auditStamp } from "@/features/admin/audit-labels";
-import { listCampaignsForAdmin } from "@/lib/campaigns/repository";
+import { listCampaignsForAdmin, listTrashedCampaigns } from "@/lib/campaigns/repository";
 import { type CampaignFieldCode } from "@/lib/campaigns/model";
 import { HERO_EFFECTS, HERO_SPEED_PRESETS, type HeroEffect } from "@/lib/hero/model";
 import { listHeroPageSlidesForAdmin, listTrashedHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
@@ -90,6 +90,7 @@ export default async function AdminHeroPage({
   /* เวลาปัจจุบันจากเซิร์ฟเวอร์ — ให้หน้าจอคำนวณสถานะแคมเปญตรงกับที่หน้าเว็บจะเห็น */
   const nowIso = new Date().toISOString();
   const campaigns = await listCampaignsForAdmin();
+  const trashedCampaigns = await listTrashedCampaigns();
   const slideOptions: readonly CampaignSlideOption[] = slides.map((slide) => ({ id: slide.id, label: slide.id, mediaPath: slide.mediaPath }));
   const activeCount = slides.filter((slide) => slide.isActive).length;
 
@@ -229,7 +230,13 @@ export default async function AdminHeroPage({
       </section>
       </>
       ) : (
-        <CampaignManager campaigns={campaigns} slideOptions={slideOptions} strings={s} nowIso={nowIso} />
+        <CampaignManager
+          campaigns={campaigns}
+          trashedCampaigns={trashedCampaigns}
+          slideOptions={slideOptions}
+          strings={s}
+          nowIso={nowIso}
+        />
       )}
       </div>
     </ImageLibraryProvider>

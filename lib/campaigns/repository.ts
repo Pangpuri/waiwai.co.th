@@ -214,6 +214,32 @@ export async function setCampaignStatus(id: string, status: CampaignStatus, acto
 }
 
 /** ลบแคมเปญ = ย้ายเข้าถังขยะ (คู่ `deleted_at`/`deleted_by`) */
+/**
+ * แคมเปญที่อยู่ในถัง (ใหม่สุดก่อน) — จอหลังบ้าน (รอบที่ 198)
+ *
+ * ⚠️ ทำไมจำเป็น: `removeCampaignAction` ย้ายเข้าถังได้ แต่ **ไม่มีทางดู/กู้คืนจากจอเลย**
+ *    ⇒ เจ้าของกดลบการ์ดทดสอบแล้วกู้คืนไม่ได้ (ต้องเข้า SQL) — 9 ใบตกค้างในถังตอนพบปัญหา
+ */
+export async function listTrashedCampaigns(): Promise<readonly Campaign[]> {
+  if (!isDatabaseConfigured()) return [];
+  const result = await getPool().query<CampaignRow>(
+    `select ${COLUMNS} from campaign where deleted_at is not null order by deleted_at desc, id asc`,
+  );
+  /* หลังบ้านใช้ pool สิทธิ์เต็ม (ไม่ผ่านประตูอ่านสาธารณะ) — เหมือน `listCampaignsForAdmin` */
+  const links = await linksFor(result.rows.map((row) => row.id), false);
+  return result.rows.map((row) => toCampaign(row, links[row.id] ?? []));
+}
+
+/** กู้คืนจากถัง — ทำได้เฉพาะแถวที่อยู่ในถัง (ประตูอยู่ที่ SQL · fail-closed) */
+export async function restoreCampaign(id: string): Promise<boolean> {
+  const result = await getPool().query(
+    `update campaign set deleted_at = null, deleted_by = null, updated_at = now()
+      where id = $1 and deleted_at is not null`,
+    [id],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function trashCampaign(id: string, actor: string): Promise<boolean> {
   const result = await getPool().query(
     `update campaign set deleted_at = now(), deleted_by = $2, updated_at = now(), updated_by = $2

@@ -3,6 +3,7 @@
 import {
   addCampaignAction,
   removeCampaignAction,
+  restoreCampaignAction,
   saveCampaignAction,
   setCampaignStatusAction,
 } from "@/app/admin/hero/campaign-actions";
@@ -13,6 +14,7 @@ import {
   anchorPresetOf,
   campaignReadiness,
   campaignWindowState,
+  liveCampaignsOf,
   mergeCampaignImage,
   toDateTimeLocalValue,
   type Campaign,
@@ -40,16 +42,21 @@ export type CampaignSlideOption = { readonly id: string; readonly label: string;
  */
 export function CampaignManager({
   campaigns,
+  trashedCampaigns,
   slideOptions,
   strings,
   nowIso,
 }: {
   readonly campaigns: readonly Campaign[];
+  readonly trashedCampaigns: readonly Campaign[];
   readonly slideOptions: readonly CampaignSlideOption[];
   readonly strings: Messages["admin"];
   readonly nowIso: string;
 }) {
   const now = Date.parse(nowIso);
+  /* รอบที่ 198: การ์ดที่คนเห็นบนเว็บ "ตอนนี้" — โชว์ไว้บนสุดของแท็บเพื่อพาไปแก้ใบที่ถูก */
+  const live = liveCampaignsOf(campaigns, now);
+  const liveIds = new Set(live.map((campaign) => campaign.id));
   /* จุดยึดฉบับร่างต่อแคมเปญ: ลากในพรีวิว/แก้ตัวเลข แล้วกด "บันทึก" จึงเขียนฐานข้อมูล */
   const [anchors, setAnchors] = useState<Record<string, { x: number; y: number }>>(() =>
     Object.fromEntries(campaigns.map((campaign) => [campaign.id, { x: campaign.anchorX, y: campaign.anchorY }])),
@@ -94,11 +101,45 @@ export function CampaignManager({
         <p className="text-fg-muted text-xs">{strings.campaignMax.replace("{max}", String(MAX_CAMPAIGNS))}</p>
       </div>
 
-      <form action={addCampaignAction}>
-        <button type="submit" className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold">
-          {strings.campaignAdd}
-        </button>
-      </form>
+      {/*
+        ★ รอบที่ 198 — เจ้าของทดสอบแล้วเจอว่า "กดเพิ่ม = ได้การ์ดใหม่" ไม่ได้แก้การ์ดที่ขยับอยู่บนเว็บ
+        ⇒ เปิดแท็บนี้มาต้องเห็นก่อนว่า **ใบไหนคือการ์ดที่คนเห็นบนเว็บตอนนี้** แล้วมีปุ่มพาไปแก้ใบนั้น
+      */}
+      <div className="border-line bg-surface flex flex-col gap-2 rounded-xl border p-3">
+        <p className="text-fg text-sm font-semibold">{strings.campaignLiveTitle}</p>
+        {live.length === 0 ? (
+          <p className="text-fg-muted text-xs">{strings.campaignLiveNone}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {live.map((campaign) => (
+              <li key={campaign.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-fg text-xs">
+                  <span className="font-semibold">{campaign.name.trim() === "" ? campaign.title.th : campaign.name}</span>
+                  {" · "}
+                  {strings.campaignLivePosition
+                    .replace("{x}", String(campaign.anchorX))
+                    .replace("{y}", String(campaign.anchorY))}
+                </span>
+                <a
+                  href={`#campaign-${campaign.id}`}
+                  className="border-line text-fg rounded-md border px-2 py-1 text-xs font-semibold"
+                >
+                  {strings.campaignLiveEdit}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-fg-muted text-xs">{strings.campaignAddHint}</p>
+        <form action={addCampaignAction}>
+          <button type="submit" className="border-line text-fg rounded-md border px-3 py-1.5 text-sm font-semibold">
+            {strings.campaignAdd}
+          </button>
+        </form>
+      </div>
 
       {campaigns.length === 0 ? (
         <p className="border-line text-fg-muted rounded-xl border border-dashed p-6 text-sm">{strings.campaignEmpty}</p>
@@ -118,10 +159,17 @@ export function CampaignManager({
             });
             const preset = anchorPresetOf(campaign.anchorX, campaign.anchorY);
             return (
-              <li key={campaign.id} className="border-line bg-surface flex flex-col gap-3 rounded-xl border p-3">
+              <li
+                key={campaign.id}
+                id={`campaign-${campaign.id}`}
+                className="border-line bg-surface flex scroll-mt-24 flex-col gap-3 rounded-xl border p-3"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-fg text-sm font-semibold">{campaign.name.trim() === "" ? campaign.title.th : campaign.name}</p>
                   <span className="flex flex-wrap items-center gap-1 text-[11px]">
+                    {liveIds.has(campaign.id) ? (
+                      <span className="bg-brand-red text-on-brand rounded-full px-2 py-0.5 font-semibold">{strings.campaignLiveBadge}</span>
+                    ) : null}
                     <span className="border-line text-fg-muted rounded-full border px-2 py-0.5">
                       {campaign.status === "published" ? strings.campaignStatusPublished : strings.campaignStatusDraft}
                     </span>
@@ -307,6 +355,38 @@ export function CampaignManager({
           })}
         </ul>
       )}
+
+      {/*
+        ★ รอบที่ 198 — ถังขยะของแคมเปญ: ก่อนรอบนี้ย้ายเข้าถังได้แต่ **ไม่มีทางกู้คืนจากจอเลย**
+        (เจ้าของกดลบการ์ดทดสอบแล้วกู้ไม่ได้) ⇒ ต้องดู/กู้คืนได้จากที่นี่
+      */}
+      <details className="border-line rounded-xl border p-3">
+        <summary className="text-fg cursor-pointer text-sm font-semibold">
+          {strings.campaignTrashTitle} ({trashedCampaigns.length})
+        </summary>
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="text-fg-muted text-[11px]">{strings.campaignTrashHint}</p>
+          {trashedCampaigns.length === 0 ? (
+            <p className="text-fg-muted text-xs">{strings.campaignTrashEmpty}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {trashedCampaigns.map((campaign) => (
+                <li key={campaign.id} className="border-line flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2">
+                  <span className="text-fg text-xs">
+                    {campaign.name.trim() === "" ? campaign.title.th : campaign.name}
+                  </span>
+                  <form action={restoreCampaignAction}>
+                    <input type="hidden" name="id" value={campaign.id} />
+                    <button type="submit" className="border-line text-fg rounded-md border px-2 py-1 text-xs font-semibold">
+                      {strings.campaignRestore}
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
     </section>
   );
 }

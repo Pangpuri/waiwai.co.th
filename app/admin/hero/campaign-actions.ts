@@ -7,7 +7,14 @@ import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { CAMPAIGN_ANCHOR_PRESETS, MAX_CAMPAIGNS, isCampaignStatus, parseCampaignInput } from "@/lib/campaigns/model";
-import { countCampaigns, createCampaign, setCampaignStatus, trashCampaign, updateCampaign } from "@/lib/campaigns/repository";
+import {
+  countCampaigns,
+  createCampaign,
+  restoreCampaign,
+  setCampaignStatus,
+  trashCampaign,
+  updateCampaign,
+} from "@/lib/campaigns/repository";
 import { invalidCampaignHref } from "@/lib/hero/feedback";
 
 /**
@@ -121,5 +128,21 @@ export async function removeCampaignAction(formData: FormData): Promise<void> {
   if (ok) {
     await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-trash" });
     await refreshAfterCampaignChange("campaign-trashed");
+  }
+}
+
+/**
+ * กู้คืนแคมเปญจากถังขยะ (รอบที่ 198)
+ * ⚠️ ก่อนรอบนี้ย้ายเข้าถังได้อย่างเดียว — ไม่มีทางกู้จากจอเลย (การ์ดที่เผยแพร่อยู่หายถาวรในทางปฏิบัติ)
+ */
+export async function restoreCampaignAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = typeof formData.get("id") === "string" ? String(formData.get("id")) : "";
+  if (id === "") return;
+  const ok = await restoreCampaign(id);
+  if (!ok) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  if (ok) {
+    await recordAudit({ action: "hero-save", actorEmail: user.email, target: `campaign:${id}`, detail: "campaign-restore" });
+    await refreshAfterCampaignChange("campaign-restored");
   }
 }
