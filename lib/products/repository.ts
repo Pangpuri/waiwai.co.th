@@ -206,6 +206,7 @@ export async function countProductsByCategory(): Promise<Readonly<Record<string,
  * ⚠️ ลำดับการแสดง **ไม่ได้** มาจากฐานข้อมูล — ผู้เรียกเรียงตาม `CATALOG_ITEMS` ในโค้ด (แหล่งความจริงเดียวของ slug)
  */
 export type ProductCategoryCardRecord = {
+  /** รหัสหมวด = slug ในฐานข้อมูล (ชื่อหมวดของจริงอยู่ในพจนานุกรม — ไม่มีคอลัมน์ name ในตาราง) */
   readonly id: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
