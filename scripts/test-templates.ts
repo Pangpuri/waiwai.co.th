@@ -466,3 +466,14 @@ test("★ builder: เลือกบล็อก ⇒ พรีวิวเล�
   assert.ok(builder.includes("setSelectTick((previous) => previous + 1)"), "คลิกเลือกต้องเพิ่มตัวนับทุกครั้ง");
   assert.ok(builder.includes("[document, selectedId, selectTick]"), "ส่งข้อความเข้าพรีวิวเมื่อตัวนับเปลี่ยนด้วย");
 });
+
+/** ★ รอบที่ 231 — เลื่อนไปหาบล็อกด้วย "สัดส่วน" + ห้ามทำ deps ของ effect เปลี่ยนขนาด */
+test("★ builder: เลื่อนไปหาบล็อกผ่านข้อความสัดส่วน และ effect มี deps คงที่", () => {
+  const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
+  assert.ok(frame.includes("PREVIEW_SCROLL_MESSAGE"), "พรีวิวต้องส่งข้อความขอให้เลื่อน");
+  assert.ok(frame.includes("fraction: rect.top / total"), "ส่งสัดส่วน (ไม่ใช่พิกเซล — กันเรื่อง scale)");
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+  assert.ok(builder.includes("function scrollToBlock(fraction: number)"), "ตรรกะเลื่อนต้องอยู่ใน effect");
+  assert.ok(!builder.includes("scrollPreviewTo"), "ห้ามอ้าง useCallback ใน deps (React ฟ้อง 'deps เปลี่ยนขนาด')");
+  assert.ok(builder.includes("window.scrollTo({ top: Math.max(0, top), behavior: \"smooth\" })"), "ต้องเลื่อนหน้าจอหลังบ้านจริง");
+});

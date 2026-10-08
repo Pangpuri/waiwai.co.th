@@ -606,20 +606,6 @@ export function BlockBuilder({
     );
   }, [document, selectedId, selectTick]);
 
-  /*
-    รอบที่ 231 (บั๊กจริง: "คลิกได้ 2–3 ครั้งแล้วหยุด"): พรีวิวเต็มความสูง + ย่อด้วย scale
-    ⇒ เลื่อนใน iframe ไม่ช่วย ⇒ รับ "สัดส่วนตำแหน่ง" จากพรีวิว แล้วเลื่อนหน้าจอหลังบ้านไปหา
-    (ใช้สัดส่วน ⇒ ไม่ต้องรู้ค่า scale · ใช้ความสูงจริงของกรอบ iframe)
-  */
-  const scrollPreviewTo = useCallback((fraction: number) => {
-    if (!Number.isFinite(fraction)) return;
-    const frame = frameRef.current;
-    if (frame === null) return;
-    const rect = frame.getBoundingClientRect();
-    const top = rect.top + window.scrollY + fraction * rect.height - window.innerHeight / 3;
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-  }, []);
-
   /* หน่วง 250ms กันการส่งถี่เกินไปตอนพิมพ์รัว ๆ */
   useEffect(() => {
     if (previewMode !== "draft") return undefined;
@@ -629,6 +615,21 @@ export function BlockBuilder({
 
   /* คลิกในพรีวิว → เลือก "ส่วน/บล็อก/การ์ด" ที่คลิก และโฟกัสช่องแก้ที่ตรงกันทันที */
   useEffect(() => {
+    /*
+      รอบที่ 231: เลื่อนหน้าจอ "หลังบ้าน" ไปหาบล็อกที่พรีวิวส่งพิกัดมา
+      พรีวิวเต็มความสูง + ย่อด้วย scale ⇒ เลื่อนใน iframe ไม่ช่วย · ใช้ "สัดส่วน" ⇒ ไม่ต้องรู้ค่า scale
+      ⚠️ ประกาศใน effect (ไม่ใช่ useCallback) ⇒ deps คงที่เป็น [] เสมอ
+         (เคยพลาด: ใส่ useCallback ใน deps ⇒ React ฟ้อง "deps เปลี่ยนขนาดระหว่างเรนเดอร์")
+    */
+    function scrollToBlock(fraction: number) {
+      if (!Number.isFinite(fraction)) return;
+      const frame = frameRef.current;
+      if (frame === null) return;
+      const rect = frame.getBoundingClientRect();
+      const top = rect.top + window.scrollY + fraction * rect.height - window.innerHeight / 3;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
       const data: unknown = event.data;
@@ -636,7 +637,7 @@ export function BlockBuilder({
       const candidate = data as { type?: unknown; blockId?: unknown; field?: unknown; cardIndex?: unknown };
       /* พรีวิวบอกให้เลื่อนหน้าจอไปหาบล็อกที่เลือก (รอบที่ 231) */
       if (candidate.type === PREVIEW_SCROLL_MESSAGE) {
-        scrollPreviewTo(typeof (data as { fraction?: unknown }).fraction === "number" ? (data as { fraction: number }).fraction : Number.NaN);
+        scrollToBlock(typeof (data as { fraction?: unknown }).fraction === "number" ? (data as { fraction: number }).fraction : Number.NaN);
         return;
       }
       /* ค่าตั้ง navbar สด ๆ จากแผงขวา (ยังไม่บันทึก) → เก็บไว้ส่งต่อเข้า iframe */
@@ -668,7 +669,7 @@ export function BlockBuilder({
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [scrollPreviewTo]);
+  }, []);
 
   /* โฟกัส + เลื่อนไปยังช่องที่เพิ่งคลิกในพรีวิว (ให้พิมพ์ต่อได้เลย ไม่ต้องหาเอง) */
   useEffect(() => {
