@@ -422,6 +422,11 @@ test("★ templates: ใช้เทมเพลตทับฉบับร่�
   assert.ok(page.includes("data-template-form="), "ต้องมีฟอร์มเทมเพลตในหน้าตัวสร้าง");
   assert.ok(page.includes('name="confirm"') && page.includes("required"), "ต้องมี checkbox ยืนยันแบบ required");
   assert.ok(page.includes("startFromTemplateReplace"), "มีฉบับร่างแล้วต้องบอกว่า 'ทับฉบับร่าง'");
+  /* รอบที่ 227: กดใช้เทมเพลตโดยไม่ติ๊ก ⇒ ต้องมีข้อความบอก (ไม่เงียบ) */
+  assert.ok(page.includes("data-template-notice="), "ต้องมีข้อความแจ้งเมื่อยังไม่ติ๊กยืนยัน");
+  assert.ok(page.includes("startFromTemplateNeedsConfirm"), "ข้อความต้องมาจากพจนานุกรม");
+  const actionRound227 = readFileSync("app/admin/builder/actions.ts", "utf8");
+  assert.ok(actionRound227.includes('?template=confirm'), "action ต้องพากลับพร้อมสัญญาณแจ้งเตือน");
   assert.ok(!page.includes("{draftRow === null ? (\n        <section"), "แผงต้องไม่อยู่ในเงื่อนไข 'ไม่มีฉบับร่าง' อีกต่อไป");
 });
 

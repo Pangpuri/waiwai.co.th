@@ -65,9 +65,17 @@ function coveragePartLabel(
   }
 }
 
-export default async function AdminBuilderPage({ params }: { readonly params: Promise<{ readonly page: string }> }) {
+export default async function AdminBuilderPage({
+  params,
+  searchParams,
+}: {
+  readonly params: Promise<{ readonly page: string }>;
+  /* รอบที่ 227: ใช้บอกผู้ใช้ว่า "กดใช้เทมเพลตแล้วแต่ยังไม่ติ๊กยืนยัน" (Server Action ปฏิเสธเงียบ ๆ) */
+  readonly searchParams: Promise<{ readonly template?: string }>;
+}) {
   const user = await requireAdminUser("content");
   const { page } = await params;
+  const templateNotice = (await searchParams).template === "confirm";
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
@@ -158,6 +166,11 @@ export default async function AdminBuilderPage({ params }: { readonly params: Pr
           </h2>
           <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
           <TemplateCoverageNote {...coverage} />
+          {templateNotice ? (
+            <p className="text-brand-red text-sm" data-template-notice="">
+              {strings.startFromTemplateNeedsConfirm}
+            </p>
+          ) : null}
           <form action={startFromTemplateAction} className="flex flex-col gap-3" data-template-form="">
             <input type="hidden" name="page" value={page} />
             {draftRow === null ? null : (
