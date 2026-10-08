@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ownerOfSection } from "@/lib/content/home-section-owners";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -365,6 +366,19 @@ export function HomeEditor({ spec, initialDraft, strings }: Props) {
       {spec.sections.map((section) => (
         <details key={section.key} className="border-line bg-surface rounded-2xl border p-4" open={section.key === "hero"}>
           <summary className="text-fg cursor-pointer text-base font-semibold">{section.label}</summary>
+
+          {/*
+            รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่"): บอกตรง ๆ ว่าส่วนนี้ค่าจริงมาจากที่อื่น
+            — ยังคงฟิลด์ไว้ (ไม่ทำให้ข้อมูลเดิมหาย) แต่ผู้ใช้จะไม่เข้าใจผิดว่ากรอกแล้วขึ้นเว็บ
+          */}
+          {ownerOfSection(section.key) === null ? null : (
+            <p
+              className="border-line text-fg-muted mt-3 rounded-xl border border-dashed p-3 text-xs"
+              data-section-managed=""
+            >
+              {fillTemplate(strings.sectionManagedElsewhere, { screen: ownerOfSection(section.key)?.screen ?? "" })}
+            </p>
+          )}
 
           <div className="flex flex-col gap-4 pt-4">
             {section.fields

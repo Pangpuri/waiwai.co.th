@@ -8,6 +8,7 @@ import type { Messages } from "@/lib/i18n/messages/th";
 import type { adminDraft as thAdminDraft } from "@/lib/i18n/messages/areas/th/adminDraft";
 
 export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
+  sectionManagedElsewhere: "The live site shows this from another system (owner: {screen}) — values typed here are not shown yet. Do not edit in two places",
   draftAutosaveOn: "Autosave: on",
   draftAutosaveOff: "Autosave: off",
   draftAutosaveHint: "The draft is saved automatically {seconds} seconds after you stop editing (you can always press save yourself).",

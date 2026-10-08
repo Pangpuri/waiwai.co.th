@@ -7,6 +7,8 @@ import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { decideTemplateApply } from "@/lib/blocks/template-apply";
+import { HOME_SECTIONS_OWNED_HERE, ownerOfSection } from "@/lib/content/home-section-owners";
+import { HOME_SECTIONS } from "@/lib/content/model";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 import {
   BLOCK_COVERAGE_PART_IDS,
@@ -421,4 +423,27 @@ test("★ templates: ใช้เทมเพลตทับฉบับร่�
   assert.ok(page.includes('name="confirm"') && page.includes("required"), "ต้องมี checkbox ยืนยันแบบ required");
   assert.ok(page.includes("startFromTemplateReplace"), "มีฉบับร่างแล้วต้องบอกว่า 'ทับฉบับร่าง'");
   assert.ok(!page.includes("{draftRow === null ? (\n        <section"), "แผงต้องไม่อยู่ในเงื่อนไข 'ไม่มีฉบับร่าง' อีกต่อไป");
+});
+
+/** ★ รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่") — หน้าจอเนื้อหาหน้าแรกต้องบอกว่าส่วนไหนค่าจริงมาจากที่อื่น */
+test("★ content: ทุกส่วนของหน้าแรกเป็นของหน้าจอนี้ หรือมีป้ายบอกเจ้าของที่ชัดเจน", () => {
+  /* ของจริงที่หน้าเว็บอ่านค่า: whereToBuy (รอบ 209) — ที่เหลือมาจากระบบอื่น */
+  assert.deepEqual([...HOME_SECTIONS_OWNED_HERE], ["whereToBuy"]);
+  assert.equal(ownerOfSection("whereToBuy"), null, "ส่วนที่ต่อสายจริงแล้วต้องไม่มีป้ายเตือน");
+  for (const key of ["hero", "products", "recipes", "news", "newsletter", "seo"]) {
+    const owner = ownerOfSection(key);
+    assert.ok(owner !== null, `${key}: ต้องมีป้ายบอกว่าแก้ที่ไหน`);
+    assert.ok((owner?.screen ?? "").startsWith("/"), `${key}: ต้องชี้หน้าจอจริง`);
+  }
+  /* ทุกส่วนในสเปกต้องถูกตัดสินใจแล้ว (ไม่ปล่อยให้ไม่มีเจ้าของและไม่ได้ต่อสาย) */
+  for (const section of HOME_SECTIONS) {
+    const decided = ownerOfSection(section.key) !== null || HOME_SECTIONS_OWNED_HERE.includes(section.key);
+    assert.ok(decided, `ส่วน ${section.key}: ยังไม่ตัดสินใจว่าใครเป็นเจ้าของค่าจริง`);
+  }
+
+  /* หน้าจอต้องแสดงป้ายจริง (ไม่ใช่แค่มีตรรกะ) */
+  const editor = readFileSync("features/admin/ui/home-editor.tsx", "utf8");
+  assert.ok(editor.includes("data-section-managed="), "ต้องมีป้ายในหน้าจอ");
+  assert.ok(editor.includes("ownerOfSection(section.key)"), "ต้องใช้ทะเบียนกลาง");
+  assert.ok(editor.includes("strings.sectionManagedElsewhere"), "ข้อความต้องมาจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
 });
