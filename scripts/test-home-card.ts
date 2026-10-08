@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { heroCardContentOf, heroCardDefaults, heroCardDraftOf, parseHeroCardInput } from "@/lib/content/home-card";
+import { whereToBuyViewOf } from "@/lib/content/home-section";
+import { SITE } from "@/lib/site";
 import {
   AUTO_FRAME_RATIO_BOUNDS,
   PR_CARD_FRAMES,
@@ -314,4 +316,67 @@ test("★ pr card frame: ต่อสายจริง — จอเลือ�
       assert.ok(area.includes(`${key}:`), `${locale} ต้องมีคีย์ ${key}`);
     }
   }
+});
+
+/**
+ * ★ รอบที่ 209 — ต่อสาย "ที่ซื้อสินค้า" ให้อ่านค่าจากหลังบ้าน (ส่วนแรกของงานหน้าบ้านที่ไม่ใช่สไลด์)
+ * คำเจ้าของ: *"ศึกษาโครงสร้างหน้าแรก … แก้ไขส่วนไหนได้บ้าง โดยเก็บส่วน hardcode เป็นค่าเริ่มต้น ไว้ในฐานข้อมูลก่อน"*
+ */
+test("★ home section: 'ที่ซื้อสินค้า' อ่านจากหลังบ้าน + ถอยค่าเริ่มต้น (ตรรกะล้วน)", () => {
+  const withSection = (section: PageContent["sections"][string]): PageContent => ({ page: "home", sections: { whereToBuy: section } });
+  const item = (order: number, fields: Record<string, { th: string; en: string }>) => ({ order, fields, media: {} });
+
+  /* ไม่มีข้อมูลในที่เก็บ = ใช้ค่าเริ่มต้นจากพจนานุกรม + ช่องทางจากโค้ด (SITE) */
+  const fallbackView = whereToBuyViewOf(null, th, "th", SITE.marketplaces);
+  assert.equal(fallbackView.eyebrow, th.whereToBuy.eyebrow);
+  assert.equal(fallbackView.title, th.whereToBuy.title);
+  assert.equal(fallbackView.retailNote, th.whereToBuy.retailNote);
+  assert.equal(fallbackView.marketplaces.length, SITE.marketplaces.length, "ว่าง = ใช้ช่องทางเริ่มต้นครบ");
+  assert.equal(fallbackView.marketplaces[0]?.href, SITE.marketplaces[0]?.href);
+  assert.ok((fallbackView.marketplaces[0]?.label ?? "") !== "", "ป้ายต้องมาจากพจนานุกรม ไม่ใช่ id ดิบ");
+
+  /* มีข้อมูลในที่เก็บ = ทับค่าเริ่มต้น (ข้อความ + ช่องทาง) */
+  const stored = whereToBuyViewOf(
+    withSection({
+      fields: {
+        title: { th: "หัวข้อจากหลังบ้าน", en: "Title from admin" },
+        retailNote: { th: "", en: "" },
+      },
+      items: {
+        marketplaces: [
+          item(2, { name: { th: "ช่องทางที่ 2", en: "Channel 2" }, href: { th: "https://b.example", en: "" } }),
+          item(1, { name: { th: "ช่องทางที่ 1", en: "" }, href: { th: "https://a.example", en: "" } }),
+        ],
+      },
+    }),
+    th,
+    "th",
+    SITE.marketplaces,
+  );
+  assert.equal(stored.title, "หัวข้อจากหลังบ้าน", "ค่าที่ตั้งในหลังบ้านต้องชนะ");
+  assert.equal(stored.retailNote, th.whereToBuy.retailNote, "ช่องที่เว้นว่าง = ค่าเดิม");
+  assert.deepEqual(stored.marketplaces.map((row) => row.href), ["https://a.example", "https://b.example"], "เรียงตามลำดับที่บันทึก");
+  assert.equal(stored.marketplaces[0]?.label, "ช่องทางที่ 1");
+  assert.equal(whereToBuyViewOf(withSection({ fields: {}, items: { marketplaces: [item(1, { name: { th: "ช่องทางที่ 1", en: "Channel 1" }, href: { th: "https://a.example", en: "" } })] } }), en, "en", SITE.marketplaces).marketplaces[0]?.label, "Channel 1", "EN ใช้เมื่อมีจริง");
+
+  /* ช่องทางที่ไม่มีลิงก์ = ข้าม (ไม่เรนเดอร์ปุ่มพาไปที่ว่าง) */
+  const noHref = whereToBuyViewOf(
+    withSection({ fields: {}, items: { marketplaces: [item(1, { name: { th: "ไม่มีลิงก์", en: "" }, href: { th: "", en: "" } })] } }),
+    th,
+    "th",
+    SITE.marketplaces,
+  );
+  assert.deepEqual(noHref.marketplaces.map((row) => row.href), SITE.marketplaces.map((row) => row.href), "ไม่มีรายการที่ใช้ได้ = ถอยไปค่าเริ่มต้น");
+
+  /* ต่อสายจริง: คอมโพเนนต์ไม่ถือค่าคงที่เอง + หน้าแรกส่งวิวเข้าไป */
+  const ui = readFileSync("features/home/ui/where-to-buy.tsx", "utf8");
+  assert.ok(!ui.includes("SITE.marketplaces"), "คอมโพเนนต์ต้องไม่ฝังรายการช่องทางเองแล้ว");
+  assert.ok(ui.includes("view.marketplaces.map"), "ต้องเรนเดอร์จากวิวที่ส่งเข้ามา");
+  assert.ok(ui.includes("view.retailNote") && ui.includes("view.eyebrow"), "ข้อความต้องมาจากวิว");
+  const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  assert.ok(page.includes("whereToBuyViewOf(homeContent, messages, lang, SITE.marketplaces)"), "หน้าแรกต้องประกอบวิวจากที่เก็บจริง");
+  assert.ok(page.includes("<WhereToBuy messages={messages} view={whereToBuyView} />"), "ต้องส่งวิวเข้าเซกชัน");
+  /* ค่าเริ่มต้นใน DB (seed) ต้องดึงลิงก์จริงจาก SITE — ไม่พิมพ์ซ้ำ */
+  const seed = readFileSync("lib/content/home-seed.ts", "utf8");
+  assert.ok(seed.includes("href: notLocalized(marketplace.href)"), "seed ต้องเก็บลิงก์จริงของแต่ละช่องทาง");
 });

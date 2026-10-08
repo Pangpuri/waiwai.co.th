@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { Hero } from "@/features/home/ui/hero";
 import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
+import { whereToBuyViewOf } from "@/lib/content/home-section";
+import { SITE } from "@/lib/site";
 import { cardRatioOf } from "@/lib/hero/pr-card-frame";
 import { loadMediaSizes } from "@/lib/media/repository";
 import { loadHomeContentSafely } from "@/lib/content/repository";
@@ -82,6 +84,9 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const cardContent = heroCardContentOf(homeContent, messages, lang);
   const cardMediaId = cardContent.image.src.startsWith("/media/") ? cardContent.image.src.slice("/media/".length) : "";
   const cardSizes = cardMediaId === "" ? null : await loadMediaSizes([cardMediaId]);
+  /* "ที่ซื้อสินค้า" (รอบที่ 209) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม · ว่าง = ช่องทางเริ่มต้นจากโค้ด */
+  const whereToBuyView = whereToBuyViewOf(homeContent, messages, lang, SITE.marketplaces);
+
   const heroCard: HeroCardContent = {
     ...cardContent,
     frame: heroSetting.prCardFrame,
@@ -141,7 +146,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
       />
       <Recipes locale={lang} messages={messages} items={recipes} />
       <NewsList locale={lang} messages={messages} items={news} />
-      <WhereToBuy messages={messages} />
+      <WhereToBuy messages={messages} view={whereToBuyView} />
       <Newsletter messages={messages} />
     </>
   );
