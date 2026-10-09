@@ -101,6 +101,15 @@ export function alignClass(style: BlockStyle): string {
   return ALIGN[style.align];
 }
 
+/**
+ * ขนาดตัวอักษรของหัวข้อ (**ไม่มีสี**) — รอบที่ 244
+ * ใช้เมื่อหัวข้ออยู่บนพื้นสีที่ต้องกำหนดสีเอง (เช่นกรอบเหลืองของแบรนด์) เพราะ `headingClass`
+ * ฝัง `text-fg` มาด้วย ซึ่งจะอ่านไม่ออกบนพื้นเหลือง
+ */
+export function headingSizeClass(style: BlockStyle): string {
+  return HEADING_SIZE[style.size];
+}
+
 export function headingClass(style: BlockStyle): string {
   return ["text-fg font-bold", HEADING_SIZE[style.size]].join(" ");
 }

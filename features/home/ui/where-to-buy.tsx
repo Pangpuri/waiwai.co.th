@@ -1,6 +1,8 @@
 import type { WhereToBuyView } from "@/lib/content/home-section";
 import type { Messages } from "@/lib/i18n/messages/th";
 
+import { WHERE_TO_BUY_ANCHOR } from "@/lib/blocks/marketplace-links";
+
 import { SectionHeading } from "./section-heading";
 
 /**
@@ -26,7 +28,7 @@ type WhereToBuyProps = {
 export function WhereToBuy({ messages, view }: WhereToBuyProps) {
 
   return (
-    <section id="where-to-buy" className="container-site scroll-mt-40 py-16 lg:py-24">
+    <section id={WHERE_TO_BUY_ANCHOR} className="container-site scroll-mt-40 py-16 lg:py-24">
       <div className="rounded-3xl bg-brand-yellow px-6 py-12 text-accent-on-yellow sm:px-10 lg:px-14 lg:py-16">
         <SectionHeading eyebrow={view.eyebrow} title={view.title} body={view.body} />
 

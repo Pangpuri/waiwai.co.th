@@ -1,5 +1,6 @@
 import type { NavIconKey } from "@/lib/chrome/navbar";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { WHERE_TO_BUY_ANCHOR } from "@/lib/blocks/marketplace-links";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -64,7 +65,8 @@ export const HEADER_CTA: NavDefinition = {
   id: "shop-online",
   labelKey: "shopOnline",
   path: "/",
-  anchor: "where-to-buy",
+  /* รอบที่ 244: ชื่อ anchor มาจากแหล่งเดียวกับที่ตัวเรนเดอร์บล็อกใช้ — ห้ามพิมพ์ซ้ำ */
+  anchor: WHERE_TO_BUY_ANCHOR,
   exact: false,
 };
 

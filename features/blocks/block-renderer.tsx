@@ -6,7 +6,7 @@ import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import type { ProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { recipeShowcaseView } from "@/lib/blocks/recipe-showcase";
 import type { RecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
-import { marketplaceLinksView } from "@/lib/blocks/marketplace-links";
+import { WHERE_TO_BUY_ANCHOR, marketplaceLinksView } from "@/lib/blocks/marketplace-links";
 import { newsShowcaseView } from "@/lib/blocks/news-showcase";
 import type { NewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 
@@ -28,6 +28,7 @@ import {
   landingTailClass,
   pageLayoutClass,
   rowGridClass,
+  headingSizeClass,
   shellClass,
   sidebarAsideClass,
   sidebarMainClass,
@@ -733,33 +734,48 @@ function BlockView({
         );
       }
       case "marketplaceLinks": {
-        /* บล็อก "ที่ซื้อสินค้า" (รอบที่ 229) — ลิงก์ร้านจริงจากค่าคงที่ของโปรเจกต์ · ไม่มีข้อมูล = ไม่เรนเดอร์ */
+        /*
+          บล็อก "ที่ซื้อสินค้า" (รอบที่ 229) — ลิงก์ร้านจริงจากค่าคงที่ของโปรเจกต์ · ไม่มีข้อมูล = ไม่เรนเดอร์
+
+          รอบที่ 244 (🐞 เคสจริงจากเจ้าของ): ตอนหน้าแรกหันมาใช้บล็อก (รอบ 241) ของ 2 อย่างของดีไซน์เดิมหลุดไป
+          · `id={WHERE_TO_BUY_ANCHOR}` = ปลายทางของปุ่ม "สั่งซื้อสินค้าออนไลน์" บนหัวเว็บ (`HEADER_CTA`)
+            ⇒ ถ้าไม่มี ปุ่มบนหัวเว็บ "กดแล้วไม่ไปไหนเลย" (เจ้าของเจอจริง)
+          · **การ์ดกรอบเหลืองแบรนด์** (`bg-brand-yellow` + `text-accent-on-yellow`) ตามดีไซน์เดิม
+            ⇒ ถ้าไม่มี จะเหลือแค่ปุ่มลอยบนพื้นจาง ๆ (เจ้าของทักว่า "กรอบสีเหลืองหายไป")
+        */
         const market = marketplaceLinksView(language);
         if (market.isEmpty) return null;
         return (
-          <div className={`${container} flex flex-col gap-4`}>
-            <div className={`flex flex-col gap-2 ${align}`}>
-              {block.heading[language].trim() === "" ? null : (
-                <h2 className="text-fg text-2xl font-semibold">{block.heading[language]}</h2>
-              )}
-              {block.body[language].trim() === "" ? null : <p className="text-fg-muted text-sm">{block.body[language]}</p>}
+          <div className={container}>
+            <div
+              id={WHERE_TO_BUY_ANCHOR}
+              className="bg-brand-yellow text-accent-on-yellow scroll-mt-40 rounded-3xl px-6 py-12 sm:px-10 lg:px-14 lg:py-16"
+            >
+              <div className={`flex flex-col gap-2 ${align}`}>
+                {block.heading[language].trim() === "" ? null : (
+                  <h2 className={`font-bold ${headingSizeClass(block.style)}`}>{block.heading[language]}</h2>
+                )}
+                {block.body[language].trim() === "" ? null : (
+                  <p className="text-accent-on-yellow/90 text-sm sm:text-base">{block.body[language]}</p>
+                )}
+              </div>
+              <ul className="mt-9 flex flex-wrap gap-3">
+                {market.items.map((item) => (
+                  <li key={item.id}>
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${item.label} (${market.newTabLabel})`}
+                      className="bg-surface text-fg inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-bold shadow-sm"
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-accent-on-yellow/80 mt-7 text-sm">{market.retailNote}</p>
             </div>
-            <ul className="flex flex-wrap gap-3">
-              {market.items.map((item) => (
-                <li key={item.id}>
-                  <a
-                    href={item.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`${item.label} (${market.newTabLabel})`}
-                    className="border-line-strong text-fg hover:bg-bg-subtle inline-flex items-center gap-2 rounded-full border-2 px-5 py-3 text-sm font-bold"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className="text-fg-muted text-xs">{market.retailNote}</p>
           </div>
         );
       }
