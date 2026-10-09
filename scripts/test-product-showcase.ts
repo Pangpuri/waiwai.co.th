@@ -246,7 +246,15 @@ test("★ product showcase: การ์ดหมวดต้องมีภา�
   assert.ok(block.includes("alt={category.title}"), "ภาพต้องมี alt (ใช้ชื่อหมวด)");
   assert.ok(block.includes("bg-bg-subtle"), "ต้องมีแผงพื้นจางรองภาพแบบดีไซน์เดิม");
   /* การ์ดทั้งใบคลิกได้ (เหมือนดีไซน์เดิม) — ลิงก์เดียวต่อการ์ด */
-  assert.equal((block.match(/<a href=\{category.href\}/g) ?? []).length, 1, "การ์ดหมวดต้องมีลิงก์เดียว (ครอบทั้งการ์ด)");
+  const cardLinks = block.match(/<a href=\{localizedBlockHref\(category\.href, language\)\}/g) ?? [];
+  assert.equal(cardLinks.length, 1, "การ์ดหมวดต้องมีลิงก์เดียว (ครอบทั้งการ์ด)");
+
+  /*
+    ⚠️ รอบที่ 247 (ตระกูลเดียวกับรอบ 101): ลิงก์ในบล็อกต้องผ่าน `localizedBlockHref()` — ห้ามใช้ค่าดิบ
+    ไม่งั้นหน้า `/en` กดแล้วได้ 307 ไปหน้า **ไทย** (ผู้ชม EN หลุดภาษา) — เจอจริงตอนตรวจหน้าจริง
+  */
+  assert.equal(block.includes("href={category.href}"), false, "ห้ามใช้ category.href ดิบ (ต้องเติมภาษาที่นำหน้า)");
+  assert.equal(block.includes("href={product.href}"), false, "ห้ามใช้ product.href ดิบ (สินค้าเด่นก็ต้องเติมภาษา)");
 });
 
 /** ★ รอบที่ 220 — หัวข้อส่วน + ปุ่ม "ดูผลิตภัณฑ์ทั้งหมด" (ให้ตรงหน้าเว็บจริง) */

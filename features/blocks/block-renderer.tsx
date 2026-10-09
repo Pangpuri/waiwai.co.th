@@ -692,9 +692,12 @@ function BlockView({
                   เหลือแต่บล็อกข้อความ") · วิวส่ง `category.image` มาให้อยู่แล้ว แต่ตัวเรนเดอร์เคยไม่วาด
                   ⇒ ทำตามดีไซน์เดิม (`features/home/ui/products-showcase.tsx`): แผงภาพพื้นจาง + ลิงก์ทั้งการ์ด
                   · ไม่มีภาพ = ไม่มีแผงภาพ (การ์ดยังใช้ได้ ไม่มีกล่องเปล่า)
+
+                  ⚠️ รอบที่ 247: ลิงก์ต้องผ่าน `localizedBlockHref()` เหมือนทุกบล็อก (บทเรียนรอบ 101)
+                  ไม่งั้นหน้า `/en` กดการ์ดแล้วได้ 307 → หน้า **ไทย** (ผู้ชม EN หลุดภาษา)
                 */
                 <li key={category.id} className="border-line bg-surface flex overflow-hidden rounded-xl border">
-                  <a href={category.href} className="group flex h-full w-full flex-col">
+                  <a href={localizedBlockHref(category.href, language)} className="group flex h-full w-full flex-col">
                     {category.image === null ? null : (
                       <span className="bg-bg-subtle flex h-40 items-center justify-center p-4">
                         <Image
@@ -725,7 +728,8 @@ function BlockView({
                 <ul className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
                   {showcase.featured.map((product) => (
                     <li key={product.id}>
-                      <a href={product.href} className="group block">
+                      {/* ⚠️ รอบที่ 247: ลิงก์สินค้าเด่นต้องผ่าน localizedBlockHref() ด้วย (หน้า /en ต้องไม่เด้งไปไทย) */}
+                      <a href={localizedBlockHref(product.href, language)} className="group block">
                         {product.image === null ? null : (
                           <span className="bg-bg-subtle flex h-36 items-center justify-center rounded-xl p-3">
                             <Image src={product.image} alt={product.title} width={160} height={160} sizes="160px" className="h-auto max-h-32 w-auto object-contain" />
