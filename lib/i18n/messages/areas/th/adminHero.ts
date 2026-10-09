@@ -75,4 +75,10 @@ export const adminHero = {
   feedbackCardSaved: "บันทึกการ์ด PR แคมเปญแล้ว — หน้าเว็บอัปเดตทันที",
   heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
   heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
+  /* ── แถว "แถบเปิดหน้าแรก" ในตัวสร้าง (รอบที่ 250 · เคสจริง: ผู้ใช้คิดว่าบล็อกหาย) ── */
+  builderHeroRowTitle: "แถบเปิดหน้าแรก (สไลด์ + ข้อความ)",
+  builderHeroRowHint:
+    "ส่วนนี้ **ไม่ใช่บล็อก** โดยเจตนา — มีเจ้าของเดียวคือหน้าจอสไลด์/หน้าจอเนื้อหา (กันแก้ได้สองที่) · ลำดับจริงบนเว็บ: อยู่บนสุดเสมอ",
+  builderHeroEditSlides: "แก้ภาพ/เอฟเฟคสไลด์",
+  builderHeroEditTexts: "แก้ข้อความ (TH/EN)",
 };

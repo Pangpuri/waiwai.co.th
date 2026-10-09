@@ -7,6 +7,7 @@ import { loadRecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
 import { loadNewsShowcaseData } from "@/lib/blocks/news-showcase-data";
 import { Hero } from "@/features/home/ui/hero";
 import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
+import { heroTextsOf } from "@/lib/content/home-hero";
 import { whereToBuyViewOf } from "@/lib/content/home-section";
 import { SITE } from "@/lib/site";
 import { cardRatioOf } from "@/lib/hero/pr-card-frame";
@@ -85,6 +86,11 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const homeContent = await loadHomeContentSafely();
   const heroSetting = await loadHeroSetting();
   const cardContent = heroCardContentOf(homeContent, messages, lang);
+  /*
+    ข้อความ hero (รอบที่ 250) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม
+    ⚠️ ต้องส่งทั้ง "โหมดบล็อก" และ "เลย์เอาต์โค้ด" (สองสาขาด้านล่าง) ไม่งั้นโหมดหนึ่งจะยังใช้พจนานุกรม
+  */
+  const heroTexts = heroTextsOf(homeContent, messages, lang);
   const cardMediaId = cardContent.image.src.startsWith("/media/") ? cardContent.image.src.slice("/media/".length) : "";
   const cardSizes = cardMediaId === "" ? null : await loadMediaSizes([cardMediaId]);
   /* "ที่ซื้อสินค้า" (รอบที่ 209) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม · ว่าง = ช่องทางเริ่มต้นจากโค้ด */
@@ -118,6 +124,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
           dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
           heroSetting={await loadHeroSetting()}
           heroCard={heroCard}
+          texts={heroTexts}
         />
         {/* บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query) */}
         <BlockDocumentView
@@ -158,6 +165,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
       <Hero
         locale={lang}
         messages={messages}
+        texts={heroTexts}
         dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
         heroSetting={heroSetting}
         /* การ์ดประกาศที่ขยับ: ค่าจากหลังบ้าน (ถ้ามี) ทับพจนานุกรม — รอบที่ 200 */

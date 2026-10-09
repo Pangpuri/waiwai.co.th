@@ -1,6 +1,7 @@
 import { NEWS_ENTRIES, RECIPE_ORDER } from "@/features/home/content";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
+import { HERO_CTA_HREF } from "@/lib/content/home-hero";
 import { HERO_SLIDES } from "@/features/home/slides";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -75,6 +76,12 @@ const hero: SectionContent = {
     titleAccent: text(th.hero.titleAccent, en.hero.titleAccent),
     body: text(th.hero.body, en.hero.body),
     note: text(th.hero.note, en.hero.note),
+    /*
+      รอบที่ 250: ปุ่มหลักของ hero — เดิมฮาร์ดโค้ดในโค้ด ⇒ seed ค่าให้ตรงกับของเดิมเป๊ะ
+      (`messages.actions.viewProducts` + พาธกลาง `/products`) ⇒ รัน seed แล้วหน้าเว็บไม่เปลี่ยนหน้าตา
+    */
+    ctaLabel: text(th.actions.viewProducts, en.actions.viewProducts),
+    ctaHref: notLocalized(HERO_CTA_HREF),
   },
   items: { slides: heroSlides, card: heroCard },
 };

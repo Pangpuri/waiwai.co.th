@@ -2353,6 +2353,37 @@ export function BlockBuilder({
             <p className="text-fg-muted text-xs">{BLOCK_CATALOG.find((entry) => entry.type === newBlockType)?.hint ?? ""}</p>
           </div>
 
+          {/*
+            ── แถว "แถบเปิดหน้าแรก (hero)" — บอกความจริงว่าส่วนบนสุดไม่ใช่บล็อก (รอบที่ 250) ─────────
+            เคสจริงจากเจ้าของ: *"ผมว่าเราขาดบล็อคนึงรึเปล่า บล็อคที่ต่อจากสไลด์ …"*
+            ⇒ hero ไม่ใช่บล็อกโดยมติรอบ 217 (เจ้าของเดียว = `/admin/hero`) แต่ในตัวสร้างเดิม **มองไม่เห็นเลย**
+              ⇒ ผู้ใช้ที่แก้หน้าแรกจากที่นี่ไม่รู้ว่ามีส่วนนี้/แก้ที่ไหน · แถวนี้ไม่ลาก/ไม่เลือกได้ (เป็นข้อมูลอย่างเดียว)
+            ⚠️ ถ้าวันหนึ่ง hero กลายเป็นบล็อกจริง ต้องลบแถวนี้ทิ้งพร้อมกัน (เทสต์บังคับว่ามีลิงก์ครบสองทาง)
+          */}
+          <div className="border-line bg-bg-subtle flex flex-col gap-1 rounded-xl border border-dashed p-3" data-hero-row="">
+            <p className="text-fg text-xs font-semibold">
+              <span aria-hidden="true">① </span>
+              {strings.builderHeroRowTitle}
+            </p>
+            <p className="text-fg-muted text-xs">{strings.builderHeroRowHint}</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <Link
+                href="/admin/hero"
+                className="border-line-strong text-fg hover:bg-bg-subtle focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                data-hero-link="slides"
+              >
+                {strings.builderHeroEditSlides}
+              </Link>
+              <Link
+                href="/admin/content/home"
+                className="border-line-strong text-fg hover:bg-bg-subtle focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                data-hero-link="texts"
+              >
+                {strings.builderHeroEditTexts}
+              </Link>
+            </div>
+          </div>
+
           {/* เลเยอร์แบบซ้อนได้ (X1.1) — คอมโพเนนต์แยก เพื่อไม่ให้ไฟล์นี้ยาวเกินจำเป็น */}
           <BlockLayerList
             document={document}

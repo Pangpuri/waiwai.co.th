@@ -75,4 +75,10 @@ export const adminHero = {
   feedbackCardSaved: "PR card saved — the site is updated",
   heroAdminNoImage: "No image yet",
   heroAdminImagePlaceholder: "/media/... or /slide/...",
+  /* ── The home hero row in the builder (round 250) ── */
+  builderHeroRowTitle: "Home hero (slides + text)",
+  builderHeroRowHint:
+    "This section is intentionally **not a block** — it has a single owner (the slides screen / the content screen) so it cannot be edited in two places · On the live site it is always first.",
+  builderHeroEditSlides: "Edit slides / effects",
+  builderHeroEditTexts: "Edit text (TH/EN)",
 };

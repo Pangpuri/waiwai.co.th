@@ -45,6 +45,11 @@ function sectionField(key: string, label: string, maxLength: number, options: Te
   return spec("section", "text", key, label, maxLength, options);
 }
 
+/** ฟิลด์ URL ระดับ section — ไม่ผูกภาษา (ปลายทางเดียวกันทั้งสองภาษา) · ไม่บังคับ */
+function sectionUrl(key: string, label: string, maxLength: number): FieldSpec {
+  return spec("section", "url", key, label, maxLength, { localized: false, required: false });
+}
+
 /** ฟิลด์ระดับรายการ (EN เว้นว่างได้) */
 function itemField(key: string, label: string, maxLength: number, options: TextOptions = {}): FieldSpec {
   return spec("item", "text", key, label, maxLength, options);
@@ -69,6 +74,13 @@ const HERO: SectionSpec = {
     sectionField("titleAccent", "หัวข้อหลัก (ท่อนเน้นสี)", 60),
     sectionField("body", "คำโปรย", 400),
     sectionField("note", "ป้ายหมายเหตุ (เช่น ตัวอย่างรออนุมัติ)", 300, { required: false }),
+    /*
+      รอบที่ 250 (เคสจริงจากเจ้าของ): ปุ่มหลักของ hero ("ดูผลิตภัณฑ์ทั้งหมด") เดิม **ฮาร์ดโค้ดในโค้ด**
+      ⇒ แก้จากหลังบ้านไม่ได้ ทั้งที่ผู้ใช้เห็นปุ่มนี้ทุกครั้งที่เข้าเว็บ
+      ⚠️ ไม่บังคับกรอก — ว่าง = ถอยไปใช้ค่าเริ่มต้นในโค้ด ⇒ ข้อมูลเดิมไม่กลายเป็น "ไม่ผ่าน" และหน้าเว็บไม่พัง
+    */
+    sectionField("ctaLabel", "ป้ายปุ่มหลัก", 40, { required: false }),
+    sectionUrl("ctaHref", "ปลายทางปุ่มหลัก (เช่น /products)", 300),
   ],
   items: [
     {

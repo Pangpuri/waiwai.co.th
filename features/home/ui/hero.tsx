@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { heroTextsDefaults, type HeroTexts } from "@/lib/content/home-hero";
 import { SectionCurve } from "@/features/shell/ui/section-curve";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -26,6 +27,11 @@ type HeroProps = {
    * ไม่ส่งมา = พจนานุกรมล้วน (พฤติกรรมเดิมเป๊ะ)
    */
   readonly heroCard?: HeroCardContent;
+  /**
+   * ข้อความ TH/EN ของ hero (รอบที่ 250) — **หลังบ้าน (EAV) ทับพจนานุกรม**
+   * ไม่ส่งมา = พจนานุกรมล้วน (พฤติกรรมเดิมเป๊ะ)
+   */
+  readonly texts?: HeroTexts;
 };
 
 /**
@@ -49,8 +55,11 @@ export function Hero({
   dbSlides = [],
   heroSetting = DEFAULT_HERO_SETTING,
   heroCard,
+  texts: heroTexts,
 }: HeroProps) {
   const m = messages.hero;
+  /* ข้อความ: ค่าที่ส่งมา (จากหลังบ้าน) หรือค่าเริ่มต้นจากพจนานุกรม (รอบที่ 250) */
+  const texts = heroTexts ?? heroTextsDefaults(messages);
   /* เนื้อหาการ์ด: ค่าที่ส่งมา (จากหลังบ้าน) หรือค่าเริ่มต้นจากพจนานุกรม */
   const card = heroCard ?? heroCardDefaults(messages);
 
@@ -122,7 +131,7 @@ export function Hero({
         <div className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-line bg-bg-subtle px-3.5 py-1.5 text-xs font-bold tracking-[0.16em] text-fg-muted uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {m.eyebrow}
+            {texts.eyebrow}
           </p>
 
           {/*
@@ -132,19 +141,19 @@ export function Hero({
             ⚠️ ห้ามใช้สีเหลืองแบรนด์กับข้อความบนพื้นสว่าง — ให้เพียง ~1.4:1 (อ่านไม่ออก)
           */}
           <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
-            {m.title} <span className="text-accent">{m.titleAccent}</span>
+            {texts.title} <span className="text-accent">{texts.titleAccent}</span>
           </h1>
 
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            {m.body}
+            {texts.body}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
-              href={localePath(locale, "/products")}
+              href={localePath(locale, texts.ctaHref)}
               className="inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3.5 text-sm font-bold text-on-brand shadow-sm transition-transform hover:-translate-y-0.5"
             >
-              {messages.actions.viewProducts}
+              {texts.ctaLabel}
               <span aria-hidden="true">→</span>
             </Link>
 
@@ -156,7 +165,8 @@ export function Hero({
             */}
           </div>
 
-          <p className="mt-6 text-xs text-fg-muted">{m.note}</p>
+          {/* หมายเหตุ: ค่าจากหลังบ้าน · ล้างช่องแล้ว = ซ่อนป้ายจริง (รอบที่ 250) */}
+          {texts.note.trim() === "" ? null : <p className="mt-6 text-xs text-fg-muted">{texts.note}</p>}
         </div>
       </div>
     </section>

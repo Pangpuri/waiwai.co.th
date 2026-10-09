@@ -197,8 +197,9 @@ test("hero: ข้อความต้องไม่ทับบนภาพ�
   assert.ok(heading?.[1], "ไม่พบ <h1 className=…> ใน hero.tsx");
   assert.ok(heading[1].includes("text-brand-red"), "คำหลักต้องเป็นแดงแบรนด์");
 
-  const accent = /<span className="([^"]*)">\{m\.titleAccent\}/.exec(hero);
-  assert.ok(accent?.[1], "ไม่พบ span ของ m.titleAccent ใน hero.tsx");
+  /* รอบที่ 250: ข้อความหัวข้ออ่านจาก `texts.*` (ค่าหลังบ้านทับพจนานุกรม) ไม่ใช่ `m.*` ตรง ๆ */
+  const accent = /<span className="([^"]*)">\{texts\.titleAccent\}/.exec(hero);
+  assert.ok(accent?.[1], "ไม่พบ span ของ texts.titleAccent ใน hero.tsx");
   assert.ok(
     accent[1].includes("text-accent"),
     "คำรองต้องใช้ --accent (แดงเข้ม) ไม่ใช่เหลือง เพราะเหลืองบนพื้นสว่างอ่านไม่ออก",
