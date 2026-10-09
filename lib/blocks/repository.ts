@@ -5,6 +5,7 @@ import { readQuery } from "@/lib/db/read";
 import { recordAudit } from "@/lib/audit/log";
 import { countRawBlocks, migrateDocumentValue, storedVersionSummary } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { HISTORY_PANEL_LIMIT, MAX_PAGE_REVISIONS } from "@/lib/blocks/revision-plan";
 import type { BlockDocument } from "@/lib/blocks/types";
 
 /**
@@ -96,9 +97,39 @@ export async function saveJsonDraft(page: string, value: unknown, actor: string)
  */
 export async function publishDraft(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
   const result = await publishDraftInTransaction(page, actor, note);
+
+  /*
+    รอบที่ 249 (เคสจริงจากเจ้าของ: "ประวัติการเผยแพร่ค่อย ๆ ยืดมาเต็ม ควรมีลอจิกลบ"):
+    ตัดรุ่นที่เกินเพดานของหน้านี้ออกเมื่อเผยแพร่
+    · ทำ **นอก transaction** + กลืน error ⇒ งานเสริมต้องไม่ทำให้การเผยแพร่ล้ม
+    · เก็บบางรุ่นไว้เสมอ (`MAX_PAGE_REVISIONS` ≥ 1) ⇒ กู้คืนรุ่นล่าสุดได้ตลอด
+  */
+  await prunePageRevisions(page).catch(() => 0);
+
   /* ร่องรอยการเผยแพร่ (X2.2) — เขียนนอก transaction · ล้มเหลวก็ไม่ทำให้การเผยแพร่พัง */
   await recordAudit({ action: "publish", actorEmail: actor, target: page, detail: note });
   return result;
+}
+
+/**
+ * ลบ "ประวัติการเผยแพร่" ที่เกินเพดานของหน้านี้ (เก็บรุ่นล่าสุดไว้ `keep` รุ่น)
+ *
+ * ⚠️ ประตูความปลอดภัยอยู่ที่ SQL: เลือก "รุ่นที่ต้องเก็บ" ด้วย `order by revision desc limit $2` แล้วลบที่เหลือ
+ * ⇒ ต่อให้ส่ง `keep` เพี้ยนมาจากข้างนอก (0/ติดลบ/ไม่ใช่จำนวนเต็ม) มันจะถอยไปใช้เพดานนโยบาย = **ลบน้อยลง** เสมอ
+ *
+ * @returns จำนวนรุ่นที่ลบจริง (0 = ไม่มีอะไรต้องลบ)
+ */
+export async function prunePageRevisions(page: string, keep: number = MAX_PAGE_REVISIONS): Promise<number> {
+  const safeKeep = Number.isInteger(keep) && keep >= 1 ? keep : MAX_PAGE_REVISIONS;
+  const result = await getPool().query(
+    `delete from page_document_revision
+      where page = $1
+        and revision not in (
+          select revision from page_document_revision where page = $1 order by revision desc limit $2
+        )`,
+    [page, safeKeep],
+  );
+  return result.rowCount ?? 0;
 }
 
 async function publishDraftInTransaction(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
@@ -172,8 +203,8 @@ async function clearScheduleInTransaction(client: PoolClient, page: string): Pro
   );
 }
 
-/** ประวัติการเผยแพร่ (ใหม่สุดก่อน) */
-export async function listRevisions(page: string, limit = 20): Promise<readonly RevisionSummary[]> {
+/** ประวัติการเผยแพร่ (ใหม่สุดก่อน) — แสดงไม่เกิน `HISTORY_PANEL_LIMIT` รุ่น (รอบที่ 249) */
+export async function listRevisions(page: string, limit = HISTORY_PANEL_LIMIT): Promise<readonly RevisionSummary[]> {
   const result = await getPool().query<{
     revision: number;
     note: string | null;

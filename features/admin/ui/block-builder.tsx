@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { compareRevisionAction, publishAction, migrateBlocksAction, restoreRevisionAction, saveDraftAction, schedulePublishAction } from "@/app/admin/builder/actions";
+import {
+  clearRevisionHistoryAction,
+  compareRevisionAction,
+  migrateBlocksAction,
+  publishAction,
+  restoreRevisionAction,
+  saveDraftAction,
+  schedulePublishAction,
+} from "@/app/admin/builder/actions";
 import { deletePresetAction, savePresetAction } from "@/app/admin/builder/preset-actions";
 import { uploadImageAction } from "@/app/admin/media/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
@@ -25,6 +33,7 @@ import {
 import { scrollTargetFor, scrollableAncestorOf } from "@/features/admin/ui/preview-scroll";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
+import { HISTORY_PANEL_LIMIT, MAX_PAGE_REVISIONS, PRUNE_HISTORY_CONFIRM_VALUE } from "@/lib/blocks/revision-plan";
 import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
 import { CONTENT_PREVIEW_PART } from "@/lib/chrome/workspace-url";
 import {
@@ -201,6 +210,8 @@ type Props = {
   readonly draftUpdatedAt: string | null;
   readonly publishedAt: string | null;
   readonly revisions: readonly Revision[];
+  /** ผลของการกด "ล้างประวัติ" ที่ Server Action ส่งกลับมา (?history=…) — รอบที่ 249 */
+  readonly historyNotice?: string | null;
   /**
    * รุ่นรูปทรงของ "ข้อมูลที่เก็บไว้" ในฐานข้อมูล (X1.1)
    * ใช้เตือน + เปิดปุ่ม "ย้ายเป็นรุ่นปัจจุบัน" · ไม่บังคับ เพื่อกันหน้าจออื่นที่ยังไม่ส่งค่า
@@ -519,6 +530,7 @@ export function BlockBuilder({
   draftUpdatedAt,
   publishedAt,
   revisions,
+  historyNotice = null,
   storedVersions,
   strings,
 }: Props) {
@@ -2583,10 +2595,41 @@ export function BlockBuilder({
       */}
       <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-3">
         <h2 className="text-fg text-sm font-semibold">{strings.revisions}</h2>
+
+        {/*
+          ── นโยบายเพดานประวัติ + ทางล้างด้วยมือ (รอบที่ 249) ─────────────────────────────
+          เคสจริงจากเจ้าของ: *"ประวัติการเผยแพร่ นี่เก็บ log จริง แต่ก็ค่อย ๆ ยืดมาเต็มเลยครับ
+          ควรมีลอจิกลบหรือล้างออกบ้าง"*
+          ⇒ (1) ระบบตัดรุ่นเก่าอัตโนมัติเมื่อกดเผยแพร่ (เพดานมาจาก `MAX_PAGE_REVISIONS` ค่าคงที่ตัวเดียว)
+             (2) ปุ่มล้างด้วยมือ (ต้องติ๊กยืนยัน · เก็บรุ่นล่าสุดไว้เสมอ)
+             (3) รายการสูงสุด `HISTORY_PANEL_LIMIT` และเลื่อนในกรอบ ⇒ แผงไม่ยืดจนดันหน้าจอ
+        */}
         {revisions.length === 0 ? (
           <p className="text-fg-muted text-xs">{strings.noRevisions}</p>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <p className="text-fg-muted text-xs" data-history-note="">
+            {fillTemplate(strings.historyShown, { shown: HISTORY_PANEL_LIMIT, max: MAX_PAGE_REVISIONS })}
+          </p>
+        )}
+
+        {historyNotice === "needs-confirm" ? (
+          <p className="text-brand-red text-xs" data-history-notice="needs-confirm">
+            {strings.historyPruneNeedsConfirm}
+          </p>
+        ) : null}
+        {historyNotice === "nothing" ? (
+          <p className="text-fg-muted text-xs" data-history-notice="nothing">
+            {strings.historyPruneNothing}
+          </p>
+        ) : null}
+        {historyNotice === "pruned" ? (
+          <p className="text-fg-muted text-xs" data-history-notice="pruned">
+            {strings.historyPruned}
+          </p>
+        ) : null}
+
+        {revisions.length === 0 ? null : (
+          <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
             {revisions.map((entry) => (
               <li key={entry.revision} className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-fg-muted text-xs">
@@ -2622,6 +2665,33 @@ export function BlockBuilder({
               </li>
             ))}
           </ul>
+        )}
+
+        {/* ล้างประวัติด้วยมือ (รอบที่ 249) — ต้องติ๊กยืนยัน · เก็บรุ่นล่าสุดไว้เสมอ */}
+        {revisions.length <= 1 ? null : (
+          <details className="border-line rounded-xl border p-3" data-history-prune="">
+            <summary className="text-fg cursor-pointer text-xs font-semibold">{strings.historyPruneTitle}</summary>
+            <form action={clearRevisionHistoryAction} className="mt-2 flex flex-col gap-2" data-history-prune-form="">
+              <input type="hidden" name="page" value={page} />
+              <p className="text-fg-muted text-xs">{strings.historyPruneHint}</p>
+              <label className="text-fg-muted flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  name="confirm"
+                  value={PRUNE_HISTORY_CONFIRM_VALUE}
+                  required
+                  className="border-line accent-brand-red size-4 rounded border"
+                />
+                {strings.historyPruneConfirm}
+              </label>
+              <button
+                type="submit"
+                className="border-line-strong text-fg hover:bg-bg-subtle focus-visible:ring-ring w-fit rounded-lg border px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {strings.historyPruneButton}
+              </button>
+            </form>
+          </details>
         )}
 
         {compareState.status === "compared" && compareState.compare != null ? (

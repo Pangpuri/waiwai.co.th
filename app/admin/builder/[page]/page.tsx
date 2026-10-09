@@ -75,7 +75,7 @@ export default async function AdminBuilderPage({
   readonly params: Promise<{ readonly page: string }>;
   /* รอบที่ 227: ใช้บอกผู้ใช้ว่า "กดใช้เทมเพลตแล้วแต่ยังไม่ติ๊กยืนยัน" (Server Action ปฏิเสธเงียบ ๆ) */
   /* รอบที่ 240: ถอด `live` ออกด้วย — ไม่มีสวิตช์ "ใช้กับหน้าเว็บจริง" ให้ปฏิเสธอีกแล้ว */
-  readonly searchParams: Promise<{ readonly template?: string; readonly layout?: string }>;
+  readonly searchParams: Promise<{ readonly template?: string; readonly layout?: string; readonly history?: string }>;
 }) {
   const user = await requireAdminUser("content");
   const { page } = await params;
@@ -83,6 +83,8 @@ export default async function AdminBuilderPage({
   const templateNotice = query.template === "confirm";
   /* รอบที่ 246: ผลของการกด "กลับไปใช้ดีไซน์เดิม" (Server Action ปฏิเสธ/สำเร็จ แล้ว redirect กลับมาพร้อมรหัส) */
   const layoutNotice = query.layout ?? null;
+  /* รอบที่ 249: ผลของการกด "ล้างประวัติ" (?history=pruned|nothing|needs-confirm) */
+  const historyNotice = query.history ?? null;
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
@@ -282,6 +284,7 @@ export default async function AdminBuilderPage({
             draftUpdatedAt={draftRow?.updatedAt ?? null}
             publishedAt={publishedRow?.publishedAt ?? null}
             revisions={revisions}
+            historyNotice={historyNotice}
             storedVersions={storedVersions}
             previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
             coverage={coverage}

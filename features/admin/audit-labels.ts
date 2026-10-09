@@ -41,6 +41,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "publish-scheduled": strings.auditPublishScheduled,
     /* กลับไปใช้ดีไซน์เดิมของเว็บ = หยุดใช้บล็อกกับหน้านั้น (รอบที่ 246 — ทางออกทิศเดียว) */
     "layout-revert": strings.auditLayoutRevert,
+    /* ล้างประวัติการเผยแพร่ เหลือเฉพาะรุ่นล่าสุด (รอบที่ 249) */
+    "revisions-prune": strings.auditRevisionsPrune,
     "product-revision-restore": "กู้คืนประวัติสินค้า",
 "recipe-revision-restore": "กู้คืนประวัติเมนูอาหาร",
 "news-revision-restore": "กู้คืนประวัติข่าว",

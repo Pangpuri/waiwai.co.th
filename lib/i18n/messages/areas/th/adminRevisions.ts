@@ -36,4 +36,14 @@ export const thAdminRevisions = {
   revisionsFieldStatus: "สถานะ",
   revisionsFieldSortOrder: "ลำดับการแสดง",
   revisionsFieldEnglish: "ภาษาอังกฤษ",
+  /* ── ล้างประวัติการเผยแพร่ (รอบที่ 249 · เคสจริง: "ประวัติยืดมาเต็ม ควรมีลอจิกลบ") ── */
+  historyShown: "แสดง {shown} รุ่นล่าสุด · ระบบเก็บไม่เกิน {max} รุ่นต่อหน้า (รุ่นเก่ากว่าจะถูกลบอัตโนมัติเมื่อกด \"เผยแพร่\")",
+  historyPruneTitle: "ล้างประวัติ",
+  historyPruneHint: "ลบรุ่นเก่าออก เหลือเฉพาะรุ่นล่าสุด — กู้คืนรุ่นล่าสุดได้เสมอ",
+  historyPruneConfirm: "ยืนยัน: ลบประวัติรุ่นเก่าทั้งหมด เหลือเฉพาะรุ่นล่าสุด",
+  historyPruneButton: "ล้างประวัติ เหลือเฉพาะรุ่นล่าสุด",
+  historyPruneNeedsConfirm: "ยังไม่ได้ล้าง — ต้องติ๊กยืนยันก่อน",
+  historyPruned: "ล้างประวัติแล้ว {count} รุ่น (เหลือรุ่นล่าสุด)",
+  historyPruneNothing: "ไม่มีอะไรต้องล้าง — ประวัติเหลือรุ่นเดียวอยู่แล้ว",
+  auditRevisionsPrune: "ล้างประวัติการเผยแพร่",
 };

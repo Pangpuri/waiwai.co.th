@@ -33,4 +33,14 @@ export const enAdminRevisions = {
   revisionsFieldStatus: "Status",
   revisionsFieldSortOrder: "Display order",
   revisionsFieldEnglish: "English",
+  /* ── Clear publish history (round 249 · real case: the list kept growing) ── */
+  historyShown: "Showing the latest {shown} revisions · we keep at most {max} per page (older ones are removed automatically when you publish)",
+  historyPruneTitle: "Clear history",
+  historyPruneHint: "Deletes older revisions, keeping only the latest — the latest is always restorable",
+  historyPruneConfirm: "Confirm: delete all older revisions, keeping only the latest",
+  historyPruneButton: "Clear history, keep only the latest",
+  historyPruneNeedsConfirm: "Nothing was cleared — tick the confirmation first",
+  historyPruned: "Cleared {count} revisions (kept the latest)",
+  historyPruneNothing: "Nothing to clear — only one revision remains",
+  auditRevisionsPrune: "Cleared publish history",
 };

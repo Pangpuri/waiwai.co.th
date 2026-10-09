@@ -21,10 +21,12 @@ import {
   restoreRevisionToDraft,
   saveDraft,
   setPageLive,
+  prunePageRevisions,
   setPublishSchedule,
 } from "@/lib/blocks/repository";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import { decideRevertLayout } from "@/lib/blocks/layout-revert";
+import { PRUNE_HISTORY_CONFIRM_VALUE } from "@/lib/blocks/revision-plan";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { recordAudit } from "@/lib/audit/log";
 import { refreshPublicSite } from "@/lib/cache/refresh";
@@ -343,6 +345,29 @@ export async function revertToCodeLayoutAction(formData: FormData): Promise<void
   await refreshPublicSite("page");
   revalidatePath(pathOf(page));
   redirect(`${pathOf(page)}?layout=done`);
+}
+
+/**
+ * **ล้างประวัติการเผยแพร่** — เก็บเฉพาะรุ่นล่าสุด (รอบที่ 249 · เคสจริงจากเจ้าของ)
+ *
+ * *"ประวัติการเผยแพร่ นี่เก็บ log จริง แต่ก็ค่อย ๆ ยืดมาเต็มเลยครับ ควรมีลอจิกลบหรือล้างออกบ้าง"*
+ * - ระบบมีเพดานอัตโนมัติอยู่แล้ว (`MAX_PAGE_REVISIONS` ตัดตอนเผยแพร่) — ปุ่มนี้สำหรับ "ล้างเดี๋ยวนี้"
+ * - **ไม่ลบจนหมด**: เก็บบางรุ่นไว้เสมอ (รุ่นล่าสุด) ⇒ ยังกู้คืนได้
+ * - fail-closed: ต้องติ๊กยืนยัน (ค่าคงที่เดียวกับที่หน้าจอใช้) + บันทึก audit
+ */
+export async function clearRevisionHistoryAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const page = String(formData.get("page") ?? "").trim();
+  if (page === "" || !hasBlockTemplate(page)) redirect(pathOf(page));
+
+  if (String(formData.get("confirm") ?? "").trim() !== PRUNE_HISTORY_CONFIRM_VALUE) {
+    redirect(`${pathOf(page)}?history=needs-confirm`);
+  }
+
+  const removed = await prunePageRevisions(page, 1);
+  await recordAudit({ actorEmail: user.email, action: "revisions-prune", target: page, detail: `removed=${removed}` });
+  revalidatePath(pathOf(page));
+  redirect(`${pathOf(page)}?history=${removed > 0 ? "pruned" : "nothing"}`);
 }
 
 /**
