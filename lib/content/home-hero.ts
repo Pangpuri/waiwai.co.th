@@ -93,3 +93,136 @@ export function heroTextsOf(content: PageContent | null, messages: Messages, lan
     ctaHref: pick(fields["ctaHref"], fallback.ctaHref, "th"),
   };
 }
+
+/* ── ฟอร์ม "ข้อความหัวเว็บไซต์" บนหน้าจอสไลด์ & แคมเปญ (รอบที่ 251) ───────────────
+   มติเจ้าของ: *"รวมทุกอย่างของ hero ไว้ที่สไลด์ & แคมเปญ + เปลี่ยนชื่อเมนูเป็น
+   'สไลด์ แคมเปญ ข้อความหัวเว็บไซต์'"* ⇒ หน้าจอสไลด์เป็นเจ้าของส่วน hero ทั้งส่วน
+   ⚠️ เก็บที่เดิม (EAV `content_field` section `hero`) — ไม่ย้ายที่เก็บ ⇒ หน้าเว็บอ่านค่าเดิม
+*/
+
+/** ช่องที่ทำให้บันทึกไม่ผ่าน (ใช้บอกผู้ใช้) */
+export const HERO_TEXT_FIELD_CODES = [
+  "eyebrowTh",
+  "titleTh",
+  "titleAccentTh",
+  "bodyTh",
+  "ctaHref",
+] as const;
+export type HeroTextFieldCode = (typeof HERO_TEXT_FIELD_CODES)[number];
+
+export type HeroTextsInput = {
+  readonly eyebrowTh: string;
+  readonly eyebrowEn: string;
+  readonly titleTh: string;
+  readonly titleEn: string;
+  readonly titleAccentTh: string;
+  readonly titleAccentEn: string;
+  readonly bodyTh: string;
+  readonly bodyEn: string;
+  readonly noteTh: string;
+  readonly noteEn: string;
+  readonly ctaLabelTh: string;
+  readonly ctaLabelEn: string;
+  readonly ctaHref: string;
+};
+
+export type HeroTextsParseResult =
+  | { readonly ok: true; readonly value: HeroTextsInput }
+  | { readonly ok: false; readonly problems: readonly HeroTextFieldCode[] };
+
+/** พาธในเว็บ (`/…` ไม่ใช่ `//…`) หรือลิงก์ภายนอก http(s) — กติกาเดียวกับการ์ด PR */
+function isInSitePath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !value.includes(" ");
+}
+
+function text(raw: unknown, max: number): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().slice(0, max);
+}
+
+/**
+ * อ่านค่าจากฟอร์ม + ตรวจ (ตรรกะล้วน · ไม่แตะ DB)
+ *
+ * กติกา
+ * - **ไทยบังคับ** ในช่องที่เป็นแกนของส่วน (ข้อความเล็ก/หัวข้อ/ท่อนเน้น/คำโปรย) — เหมือนสเปกเนื้อหา
+ * - **อังกฤษไม่บังคับ** (มติ D22: EN = ความรับผิดชอบการตลาด) · ว่าง = หน้า EN ถอยไปใช้ไทย (`heroTextsOf`)
+ * - หมายเหตุ/ป้ายปุ่ม/ปลายทาง **ว่างได้** — ว่าง = ถอยค่าเริ่มต้นของโค้ด (หมายเหตุ: ว่าง = ซ่อนป้าย)
+ * - ปลายทางกรอกมา = ต้องเป็นพาธในเว็บหรือ http(s) เท่านั้น (ห้าม URL แปลกปลอม)
+ */
+export function parseHeroTextsInput(form: { get(key: string): unknown }): HeroTextsParseResult {
+  const value: HeroTextsInput = {
+    eyebrowTh: text(form.get("eyebrowTh"), 40),
+    eyebrowEn: text(form.get("eyebrowEn"), 40),
+    titleTh: text(form.get("titleTh"), 70),
+    titleEn: text(form.get("titleEn"), 70),
+    titleAccentTh: text(form.get("titleAccentTh"), 60),
+    titleAccentEn: text(form.get("titleAccentEn"), 60),
+    bodyTh: text(form.get("bodyTh"), 400),
+    bodyEn: text(form.get("bodyEn"), 400),
+    noteTh: text(form.get("noteTh"), 300),
+    noteEn: text(form.get("noteEn"), 300),
+    ctaLabelTh: text(form.get("ctaLabelTh"), 40),
+    ctaLabelEn: text(form.get("ctaLabelEn"), 40),
+    ctaHref: text(form.get("ctaHref"), 300),
+  };
+
+  const problems: HeroTextFieldCode[] = [];
+  if (value.eyebrowTh === "") problems.push("eyebrowTh");
+  if (value.titleTh === "") problems.push("titleTh");
+  if (value.titleAccentTh === "") problems.push("titleAccentTh");
+  if (value.bodyTh === "") problems.push("bodyTh");
+  if (value.ctaHref !== "" && !isInSitePath(value.ctaHref) && !/^https?:\/\//.test(value.ctaHref)) {
+    problems.push("ctaHref");
+  }
+
+  if (problems.length > 0) return { ok: false, problems };
+  return { ok: true, value };
+}
+
+/**
+ * ค่าตั้งต้นของฟอร์ม = ค่าที่ **บันทึกไว้จริง** (ว่าง = ว่าง) ไม่ใช่ค่าที่ merge กับพจนานุกรมแล้ว
+ * เพื่อให้ผู้ใช้เห็นว่าช่องไหน "ยังไม่ได้ตั้ง" (แต่ตัวอย่างบนเว็บยังใช้ค่าเริ่มต้น)
+ */
+export function heroTextsDraftOf(content: PageContent | null): HeroTextsInput {
+  const fields = content?.sections["hero"]?.fields;
+  const raw = (field: string, language: "th" | "en"): string => fields?.[field]?.[language] ?? "";
+
+  return {
+    eyebrowTh: raw("eyebrow", "th"),
+    eyebrowEn: raw("eyebrow", "en"),
+    titleTh: raw("title", "th"),
+    titleEn: raw("title", "en"),
+    titleAccentTh: raw("titleAccent", "th"),
+    titleAccentEn: raw("titleAccent", "en"),
+    bodyTh: raw("body", "th"),
+    bodyEn: raw("body", "en"),
+    noteTh: raw("note", "th"),
+    noteEn: raw("note", "en"),
+    ctaLabelTh: raw("ctaLabel", "th"),
+    ctaLabelEn: raw("ctaLabel", "en"),
+    ctaHref: raw("ctaHref", "th"),
+  };
+}
+
+/** แปลงค่าที่ตรวจแล้ว → ฟิลด์ของ section hero (รูปเดียวกับที่ EAV เก็บ) */
+export function heroTextsFieldsOf(value: HeroTextsInput): Readonly<Record<string, { readonly th: string; readonly en: string }>> {
+  return {
+    eyebrow: { th: value.eyebrowTh, en: value.eyebrowEn },
+    title: { th: value.titleTh, en: value.titleEn },
+    titleAccent: { th: value.titleAccentTh, en: value.titleAccentEn },
+    body: { th: value.bodyTh, en: value.bodyEn },
+    note: { th: value.noteTh, en: value.noteEn },
+    ctaLabel: { th: value.ctaLabelTh, en: value.ctaLabelEn },
+    ctaHref: { th: value.ctaHref, en: "" },
+  };
+}
+
+/** ช่องที่ต้องแก้ (จาก `?fields=` ของหน้าจอ) — กรองเฉพาะรหัสที่รู้จัก (ค่าจาก URL ไม่เชื่อถือได้) */
+export function heroTextFieldCodesOf(value: string | undefined): readonly HeroTextFieldCode[] {
+  if (value === undefined || value === "") return [];
+  const known = new Set<string>(HERO_TEXT_FIELD_CODES);
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item): item is HeroTextFieldCode => known.has(item));
+}

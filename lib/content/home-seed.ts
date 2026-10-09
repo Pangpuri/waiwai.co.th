@@ -2,7 +2,6 @@ import { NEWS_ENTRIES, RECIPE_ORDER } from "@/features/home/content";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { HERO_CTA_HREF } from "@/lib/content/home-hero";
-import { HERO_SLIDES } from "@/features/home/slides";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import { SITE } from "@/lib/site";
@@ -48,15 +47,11 @@ function item(
 
 /* ── hero ───────────────────────────────────────────────────────────── */
 
-const heroSlides: readonly ItemContent[] = HERO_SLIDES.map((slide, index) =>
-  item(
-    index + 1,
-    { focus: notLocalized(slide.objectPosition) },
-    {
-      image: image(slide.src, th.hero.slides[slide.id].alt, en.hero.slides[slide.id].alt, slide.reviewStatus === "watermarked"),
-    },
-  ),
-);
+/*
+  ⚠️ รอบที่ 251: ไม่มีกลุ่มรายการ "slides" ใน EAV อีกต่อไป (ข้อมูลตาย)
+  สไลด์จริงจัดการที่ตาราง `hero_slide` (หน้าจอสไลด์ & แคมเปญ) ⇒ ถอดออกจากสเปก + seed แล้ว
+  (ดูเหตุผลเต็มใน `lib/content/model.ts` § HERO)
+*/
 
 const heroCard: readonly ItemContent[] = [
   item(1, {
@@ -83,7 +78,8 @@ const hero: SectionContent = {
     ctaLabel: text(th.actions.viewProducts, en.actions.viewProducts),
     ctaHref: notLocalized(HERO_CTA_HREF),
   },
-  items: { slides: heroSlides, card: heroCard },
+  /* รอบที่ 251: ไม่มีกลุ่ม "slides" ใน EAV อีก — สไลด์จริงมาจากตาราง hero_slide / เทมเพลตในโค้ด */
+  items: { card: heroCard },
 };
 
 /* ── หมวดสินค้า ─────────────────────────────────────────────────────── */

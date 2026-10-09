@@ -137,6 +137,7 @@ test("validate: รายการที่กรอก EN มาไม่คร
 
 test("validate: ฟิลด์ที่ไม่ต้องแปล (โทนสี/ลิงก์/วันที่) ไม่นับในกติกา EN", () => {
   const content = clone();
+  /* รอบที่ 251: ต้องเป็นกลุ่มที่มีช่อง "tone" จริงใน seed (products/categories) */
   const category = first(section(content, "products").items.categories ?? []);
   const tone = category.fields.tone;
   assert.ok(tone);
@@ -148,7 +149,7 @@ test("validate: ฟิลด์ที่ไม่ต้องแปล (โท�
 
 test("validate: ภาพที่เก็บเป็น URL เต็ม = error (มติ D9 ต้องเก็บพาธ)", () => {
   const content = clone();
-  const slide = first(section(content, "hero").items.slides ?? []);
+  const slide = first(section(content, "hero").items.card ?? []);
   const image = slide.media.image;
   assert.ok(image);
   image.path = "https://cdn.example.com/slide.jpg";
@@ -160,7 +161,7 @@ test("validate: ภาพที่เก็บเป็น URL เต็ม = er
 
 test("validate: ภาพที่ไม่มี alt ภาษาไทย = error", () => {
   const content = clone();
-  const slide = first(section(content, "hero").items.slides ?? []);
+  const slide = first(section(content, "hero").items.card ?? []);
   const image = slide.media.image;
   assert.ok(image);
   image.altTh = "  ";
@@ -169,7 +170,7 @@ test("validate: ภาพที่ไม่มี alt ภาษาไทย = er
 
 test("validate: ภาพที่ไม่มีพาธ = error", () => {
   const content = clone();
-  const slide = first(section(content, "hero").items.slides ?? []);
+  const slide = first(section(content, "hero").items.card ?? []);
   const image = slide.media.image;
   assert.ok(image);
   image.path = "";
@@ -180,7 +181,7 @@ test("validate: ภาพที่ไม่มีพาธ = error", () => {
 
 test("validate: ลำดับซ้ำ = error", () => {
   const content = clone();
-  const slides = section(content, "hero").items.slides ?? [];
+  const slides = section(content, "news").items.news ?? [];
   const second = slides[1];
   assert.ok(second);
   second.order = 1;
@@ -189,7 +190,7 @@ test("validate: ลำดับซ้ำ = error", () => {
 
 test("validate: ลำดับไม่ใช่จำนวนเต็มบวก = error", () => {
   const content = clone();
-  const slide = first(section(content, "hero").items.slides ?? []);
+  const slide = first(section(content, "hero").items.card ?? []);
   slide.order = 0;
   assert.ok(errorCodes(content).includes("bad-order"));
 });
@@ -268,6 +269,6 @@ test("validate: กลุ่มรายการที่โมเดลไม�
 test("validate: กลุ่มรายการที่ต้องมีแต่หายไป = error", () => {
   const content = clone();
   /* รอบที่ 108: กลุ่ม `products.featured` ถูกตัดออกจากโมเดล (ของจริงมาจากฐานข้อมูล) ⇒ ใช้ `categories` แทน */
-  delete section(content, "products").items.categories;
+  delete section(content, "news").items.news;
   assert.ok(errorCodes(content).includes("missing-item-group"));
 });

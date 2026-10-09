@@ -83,15 +83,11 @@ const HERO: SectionSpec = {
     sectionUrl("ctaHref", "ปลายทางปุ่มหลัก (เช่น /products)", 300),
   ],
   items: [
-    {
-      key: "slides",
-      label: "สไลด์ภาพฉากหลัง",
-      maxItems: 8,
-      fields: [
-        itemImage("image", "ภาพสไลด์"),
-        itemField("focus", "จุดโฟกัสของภาพ (CSS object-position)", 40, { localized: false }),
-      ],
-    },
+    /*
+      ⚠️ รอบที่ 251: **ถอดกลุ่มรายการ "slides" ออก** เพราะเป็นข้อมูลตาย
+      สไลด์จริงจัดการที่ตาราง `hero_slide` (หน้าจอสไลด์ & แคมเปญ) ⇒ แถว EAV `slides-*` ไม่มีใครอ่านเลย
+      ⇒ เอาออกจากสเปก + ลบแถวเก่า (ถ้าคงไว้ ระบบจะมองเป็น "แถวที่โครงไม่รู้จัก" แล้ว **ปฏิเสธการบันทึก**)
+    */
     {
       key: "card",
       label: "การ์ดประกาศมุมขวาล่าง",

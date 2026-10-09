@@ -5,7 +5,7 @@
  * ⚠️ Image descriptions/translations are fields for the admin to fill in — we do not translate content for them.
  */
 export const adminHero = {
-  navHero: "Slides & campaigns",
+  navHero: "Slides, campaigns & header text",
   auditHeroSave: "Hero slide updated",
   heroAdminAdd: "Add slide",
   heroAdminAddHint: "After adding, pick an image and fill in the description (Thai is required)",
@@ -81,4 +81,24 @@ export const adminHero = {
     "This section is intentionally **not a block** — it has a single owner (the slides screen / the content screen) so it cannot be edited in two places · On the live site it is always first.",
   builderHeroEditSlides: "Edit slides / effects",
   builderHeroEditTexts: "Edit text (TH/EN)",
+  /* ── Site header text (round 251) ── */
+  textsTitle: "Site header text",
+  textsHint:
+    "The top-most text block on the home page (below the slides) — edits apply to the live site immediately · English fields are optional (the EN page falls back to Thai) · clearing the note hides that badge on the site",
+  textsGroupTexts: "Text",
+  textsGroupCta: "Main button",
+  textsEyebrow: "Small text above the heading",
+  textsTitleField: "Main heading",
+  textsTitleAccent: "Main heading (accent part)",
+  textsBody: "Intro line",
+  textsNote: "Note badge (empty = hidden)",
+  textsCtaLabel: "Button label (empty = default)",
+  textsCtaHref: "Button target (e.g. /products)",
+  textsSave: "Save text",
+  textsSaved: "Header text saved — the live site is updated",
+  textsInvalid: "Not saved — fill in the required Thai fields (and the target must be /path or https://)",
+  textsFields: "Fields to fix: {fields}",
+  textsLabelTh: "Thai",
+  textsLabelEn: "English (optional)",
+  textsMoveHint: "Moved to the \"Slides, campaigns & site header text\" screen",
 };

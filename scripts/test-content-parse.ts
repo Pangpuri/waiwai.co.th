@@ -36,10 +36,9 @@ test("parse: ข้อมูลที่ไม่ใช่ออบเจ็ก�
 test("parse: ชนิดข้อมูลผิด → รายงานปัญหา ไม่โยน error", () => {
   const broken = {
     sections: {
-      hero: {
-        fields: { title: { th: 123, en: "ok" } },
-        items: { slides: "ไม่ใช่ array" },
-      },
+      hero: { fields: { title: { th: 123, en: "ok" } } },
+      /* ⚠️ รอบที่ 251: กลุ่มตัวอย่างต้องเป็นของ section ที่มีกลุ่มนั้นจริง (products/categories) */
+      products: { items: { categories: "ไม่ใช่ array" } },
     },
   };
 
@@ -47,7 +46,7 @@ test("parse: ชนิดข้อมูลผิด → รายงานป�
   assert.equal(outcome.ok, false);
   assert.ok(!outcome.ok);
   assert.ok(outcome.problems.some((problem) => problem.includes("hero.fields.title.th")));
-  assert.ok(outcome.problems.some((problem) => problem.includes("hero.slides")));
+  assert.ok(outcome.problems.some((problem) => problem.includes("products.categories")));
 });
 
 test("parse: section/รายการที่หายไปถือเป็นค่าว่าง แล้วให้ validator เป็นคนบอกว่าจำเป็น", () => {
@@ -56,7 +55,7 @@ test("parse: section/รายการที่หายไปถือเป�
   assert.ok(outcome.ok);
 
   assert.equal(outcome.content.sections.hero?.fields.title?.th, "");
-  assert.deepEqual(outcome.content.sections.hero?.items.slides, []);
+  assert.deepEqual(outcome.content.sections.products?.items.categories, []);
 
   const issues = errorsOf(validateContent(HOME_PAGE_SPEC, outcome.content));
   assert.ok(issues.length > 0, "validator ต้องบอกว่าฟิลด์ที่จำเป็นว่าง (ไทยห้ามว่าง)");
@@ -113,8 +112,11 @@ test("parse: ไม่มี order → ใช้ลำดับในอาร�
     sections: {
       hero: {
         fields: { title: { th: "ก", en: "", อะไรก็ได้: "เมิน" } },
-        items: { slides: [{ fields: { focus: { th: "กลาง", en: "" } } }, { fields: { focus: { th: "ขวา", en: "" } } }] },
         อะไรก็ได้: true,
+      },
+      /* รอบที่ 251: ใช้กลุ่มที่มีจริง (products/categories) — เดิมใช้ hero/slides ที่ถูกถอดออก */
+      products: {
+        items: { categories: [{ fields: { name: { th: "กลาง", en: "" } } }, { fields: { name: { th: "ขวา", en: "" } } }] },
       },
     },
   });
@@ -122,7 +124,7 @@ test("parse: ไม่มี order → ใช้ลำดับในอาร�
   assert.equal(outcome.ok, true);
   assert.ok(outcome.ok);
   assert.deepEqual(
-    outcome.content.sections.hero?.items.slides?.map((item) => item.order),
+    outcome.content.sections.products?.items.categories?.map((item) => item.order),
     [1, 2],
   );
 });

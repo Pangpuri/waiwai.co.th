@@ -83,20 +83,20 @@ test("rows: ลบรายการออกจากเนื้อหา → 
 test("rows: ประกอบแถวกลับเป็นโครงได้ — ลำดับรายการเรียงตาม item_order", () => {
   const result = assemblePageContent(HOME_PAGE_SPEC, [
     row({ section: "hero", field: "title", th: "หัวข้อ", en: "Title" }),
-    row({ section: "hero", itemKey: "slides-1", itemOrder: 1, field: "focus", th: "ซ้าย", en: "" }),
-    row({ section: "hero", itemKey: "slides-2", itemOrder: 2, field: "focus", th: "กลาง", en: "" }),
+    row({ section: "products", itemKey: "categories-1", itemOrder: 1, field: "name", th: "ซ้าย", en: "" }),
+    row({ section: "products", itemKey: "categories-2", itemOrder: 2, field: "name", th: "กลาง", en: "" }),
     // ส่งสลับลำดับมาโดยตั้งใจ — ผลลัพธ์ต้องเรียงตาม item_order
-    row({ section: "hero", itemKey: "slides-3", itemOrder: 3, field: "focus", th: "ขวา", en: "" }),
+    row({ section: "products", itemKey: "categories-3", itemOrder: 3, field: "name", th: "ขวา", en: "" }),
   ]);
 
   assert.equal(result.unknownKeys.length, 0);
   assert.equal(result.content.sections.hero?.fields.title?.th, "หัวข้อ");
   assert.equal(result.content.sections.hero?.fields.title?.en, "Title");
 
-  const slides = result.content.sections.hero?.items.slides ?? [];
+  const slides = result.content.sections.products?.items.categories ?? [];
   assert.equal(slides.length, 3);
   assert.deepEqual(
-    slides.map((item) => item.fields.focus?.th),
+    slides.map((item) => item.fields.name?.th),
     ["ซ้าย", "กลาง", "ขวา"],
   );
   assert.deepEqual(
@@ -122,8 +122,8 @@ test("rows: แถวที่โครงไม่รู้จักต้อ�
     row({ section: "hero", field: "title", th: "ปกติ", en: "" }),
     row({ section: "section-ที่ถูกลบไปแล้ว", field: "title", th: "เก่า", en: "" }),
     row({ section: "hero", field: "field-ที่ไม่มีในโครง", th: "เก่า", en: "" }),
-    row({ section: "hero", itemKey: "group-ที่ไม่มี-1", itemOrder: 1, field: "focus", th: "เก่า", en: "" }),
-    row({ section: "hero", itemKey: "slides-99", itemOrder: 99, field: "field-ไม่มี", th: "เก่า", en: "" }),
+    row({ section: "products", itemKey: "group-ที่ไม่มี-1", itemOrder: 1, field: "name", th: "เก่า", en: "" }),
+    row({ section: "products", itemKey: "categories-99", itemOrder: 99, field: "field-ไม่มี", th: "เก่า", en: "" }),
   ]);
 
   assert.equal(result.content.sections.hero?.fields.title?.th, "ปกติ");

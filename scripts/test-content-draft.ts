@@ -45,7 +45,7 @@ test("draft: เติมโครงให้ครบตาม spec แม้�
   const hero = draft.sections.hero;
   assert.ok(hero);
   assert.equal(hero.fields.title?.th, "", "ฟิลด์ที่ยังไม่มีข้อมูลต้องมีช่องว่างให้กรอก");
-  assert.deepEqual(hero.items.slides, [], "กลุ่มที่ยังไม่มีรายการต้องเป็นอาร์เรย์ว่าง");
+  assert.deepEqual(hero.items.card, [], "กลุ่มที่ยังไม่มีรายการต้องเป็นอาร์เรย์ว่าง");
 });
 
 test("draft: แก้ข้อความระดับ section และระดับรายการ", () => {
@@ -55,9 +55,12 @@ test("draft: แก้ข้อความระดับ section และร�
   assert.equal(afterSection.sections.hero?.fields.title?.th, "หัวข้อใหม่");
   assert.notEqual(draft.sections.hero?.fields.title?.th, "หัวข้อใหม่", "ต้นฉบับต้องไม่ถูกแก้ (immutable)");
 
-  const afterItem = setItemText(afterSection, "hero", "slides", 0, "focus", "en", "left");
-  assert.equal(afterItem.sections.hero?.items.slides?.[0]?.fields.focus?.en, "left");
-  assert.equal(afterSection.sections.hero?.items.slides?.[0]?.fields.focus?.en, "", "ค่าก่อนหน้าต้องไม่เปลี่ยน");
+  /* ⚠️ รอบที่ 251: เดิมเทสต์นี้ใช้กลุ่ม hero/slides (ตัวอย่าง) — กลุ่มนั้นถูกถอดออกเพราะเป็นข้อมูลตาย
+     ⇒ ใช้กลุ่ม products/categories (มีจริง) และเทียบกับ "ค่าก่อนหน้า" ที่อ่านมา ไม่ได้ hardcode ว่าว่าง */
+  const beforeEn = afterSection.sections.products?.items.categories?.[0]?.fields.name?.en ?? "";
+  const afterItem = setItemText(afterSection, "products", "categories", 0, "name", "en", "left");
+  assert.equal(afterItem.sections.products?.items.categories?.[0]?.fields.name?.en, "left");
+  assert.equal(afterSection.sections.products?.items.categories?.[0]?.fields.name?.en, beforeEn, "ค่าก่อนหน้าต้องไม่เปลี่ยน");
 });
 
 test("draft: เพิ่มรายการ → ลำดับต่อท้าย และมีช่องข้อความครบทุกฟิลด์ (ยกเว้นภาพ)", () => {
@@ -88,11 +91,11 @@ test("draft: เพิ่มเกินจำนวนที่กำหนด�
 
 test("draft: ลบรายการแล้วจัดลำดับใหม่ 1..n (คีย์ใน DB ห้ามมีช่องว่าง)", () => {
   const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
-  const before = draft.sections.hero?.items.slides?.length ?? 0;
+  const before = draft.sections.products?.items.categories?.length ?? 0;
   assert.ok(before >= 2, "ต้องมีสไลด์อย่างน้อย 2 ใบในชุดตั้งต้น");
 
-  const after = removeItem(draft, "hero", "slides", 0);
-  const list = after.sections.hero?.items.slides ?? [];
+  const after = removeItem(draft, "products", "categories", 0);
+  const list = after.sections.products?.items.categories ?? [];
 
   assert.equal(list.length, before - 1);
   assert.deepEqual(

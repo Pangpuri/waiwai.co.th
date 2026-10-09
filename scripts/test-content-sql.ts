@@ -155,8 +155,16 @@ test("sql: แถวภาพที่ติดลายน้ำถูกบั
     .flatMap((statement) => rowsOf(statement.values))
     .filter((row) => row[indexOfColumn("media_has_watermark")] === true);
 
-  // ปัจจุบันมี 2 ภาพที่ติดลายน้ำ (สไลด์ event2 + โปสเตอร์การ์ด) — ตรงกับคำเตือนใน check:content
-  assert.equal(watermarked.length, 2, "ต้องบันทึกธงลายน้ำครบตามที่พบในข้อมูล");
+  /*
+    รอบที่ 251: นับ "ที่ควรมี" จาก seed จริง ไม่ hardcode ตัวเลข
+    (เดิมเขียน 2 เพราะสไลด์ hero ใน seed มีภาพติดลายน้ำด้วย — กลุ่มนั้นถูกถอดออกแล้ว)
+  */
+  const expected = Object.values(HOME_SEED.sections)
+    .flatMap((section) => Object.values(section.items).flat())
+    .flatMap((item) => Object.values(item.media))
+    .filter((media) => media.hasWatermark === true).length;
+  assert.ok(expected >= 1, "seed ต้องมีภาพติดลายน้ำอย่างน้อย 1 ใบ (ไม่งั้นเทสต์นี้ไม่ทดสอบอะไร)");
+  assert.equal(watermarked.length, expected, "ต้องบันทึกธงลายน้ำครบตามที่พบในข้อมูล");
 });
 
 test("sql: ทุกแถวบันทึกว่าใครแก้ (updated_by) และใช้ค่าจาก seed", () => {

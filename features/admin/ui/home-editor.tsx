@@ -363,7 +363,33 @@ export function HomeEditor({ spec, initialDraft, strings }: Props) {
 
       <StatusPanel state={state} strings={strings} />
 
-      {spec.sections.map((section) => (
+      {/*
+        รอบที่ 251 (มติเจ้าของ): บางส่วนถูกย้ายไปแก้ที่หน้าจออื่น (เช่น hero → "สไลด์ แคมเปญ ข้อความหัวเว็บไซต์")
+        ⚠️ ยังไม่เรนเดอร์ฟอร์มของส่วนนั้น (กันแก้ได้สองที่) แต่ **ค่ายังอยู่ใน draft** ⇒ กดบันทึกแล้วค่าไม่หาย
+      */}
+      {/*
+        ส่วนที่ถูก **ย้ายไปเป็นของหน้าจออื่นทั้งหมด** (รอบที่ 251: hero → "สไลด์ แคมเปญ ข้อความหัวเว็บไซต์")
+        ⇒ ไม่แสดงฟอร์มให้กรอก (กัน "แก้ได้สองที่") แต่ยังบอกทางไปแก้
+        ⚠️ ค่ายังอยู่ใน draft ⇒ กดบันทึกจากหน้าจอนี้แล้วค่า hero ไม่หาย (มีเทสต์คุม)
+      */}
+      {spec.sections
+        .filter((section) => ownerOfSection(section.key)?.hideForm === true)
+        .map((section) => (
+          <p
+            key={section.key}
+            className="border-line bg-bg-subtle text-fg-muted rounded-2xl border border-dashed p-3 text-xs"
+            data-moved-section={section.key}
+          >
+            <span className="text-fg font-semibold">{section.label}</span> — {strings.textsMoveHint}{" "}
+            <Link href={ownerOfSection(section.key)?.screen ?? "/admin/hero"} className="underline underline-offset-2">
+              {ownerOfSection(section.key)?.screen ?? "/admin/hero"}
+            </Link>
+          </p>
+        ))}
+
+      {spec.sections
+        .filter((section) => ownerOfSection(section.key)?.hideForm !== true)
+        .map((section) => (
         <details key={section.key} className="border-line bg-surface rounded-2xl border p-4" open={section.key === "hero"}>
           <summary className="text-fg cursor-pointer text-base font-semibold">{section.label}</summary>
 

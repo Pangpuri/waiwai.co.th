@@ -20,6 +20,8 @@ export const HERO_SAVED_CODES = [
   "slide-purged",
   /* รอบที่ 203 — บันทึกการ์ด PR (การ์ดที่ขยับบนหน้าแรก) จากหน้าแคมเปญ */
   "card-saved",
+  /* รอบที่ 251 — บันทึกข้อความหัวเว็บไซต์ (hero) จากหน้าจอสไลด์ */
+  "texts-saved",
 ] as const;
 export type HeroSavedCode = (typeof HERO_SAVED_CODES)[number];
 

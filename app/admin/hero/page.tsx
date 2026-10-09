@@ -2,11 +2,13 @@ import Link from "next/link";
 
 
 import { HeroPrCardEditor } from "@/features/admin/ui/hero-pr-card-editor";
+import { HeroTextsForm } from "@/features/admin/ui/hero-texts-form";
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
 import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { heroCardContentOf, heroCardDraftOf } from "@/lib/content/home-card";
+import { heroTextsDraftOf, heroTextFieldCodesOf } from "@/lib/content/home-hero";
 import { loadHomeContentSafely } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import {
@@ -51,6 +53,8 @@ export default async function AdminHeroPage({
 
   /* ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07) */
   const feedback = feedbackOf({ saved: query.saved, error: query.error });
+  /* รอบที่ 251: ช่องที่ต้องแก้ ส่งมากับ ?fields= (Server Action ตรวจไม่ผ่าน) */
+  const problemFieldsRaw = query.fields;
   const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
     "slide-added": s.feedbackSlideAdded,
     "slide-removed": s.feedbackSlideRemoved,
@@ -61,6 +65,7 @@ export default async function AdminHeroPage({
     "slide-restored": s.feedbackSlideRestored,
     "slide-purged": s.feedbackSlidePurged,
     "card-saved": s.feedbackCardSaved,
+    "texts-saved": s.textsSaved,
   };
   const errorMessages: Readonly<Record<HeroErrorCode, string>> = {
     invalid: s.feedbackErrorInvalid,
@@ -115,6 +120,14 @@ export default async function AdminHeroPage({
           {s.wiggleCardHint} · {wiggleCard.title}
         </p>
       </section>
+
+      {/*
+        ── ข้อความหัวเว็บไซต์ (hero) — รอบที่ 251 ────────────────────────────────────────────
+        มติเจ้าของ: รวมทุกอย่างของ hero ไว้ที่หน้าจอนี้ (สไลด์ · การ์ด · ข้อความ · ปุ่ม)
+        ⇒ หน้าจอ "เนื้อหาหน้าแรก" ไม่แสดงส่วน hero แล้ว (กันแก้ได้สองที่) — ค่าเก็บที่เดิม (EAV)
+        ⚠️ ฟอร์มเป็น Server Action ล้วน (ไม่ต้องมี JS) · ค่าที่ส่งกลับมาบอกผลด้วยรหัสใน URL
+      */}
+      <HeroTextsForm current={heroTextsDraftOf(homeContent)} strings={s} problemFields={heroTextFieldCodesOf(problemFieldsRaw)} />
 
 
       <form action={saveHeroSettingAction} className="border-line bg-surface flex flex-wrap items-end gap-3 rounded-xl border p-3">
