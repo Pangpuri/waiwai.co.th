@@ -11,7 +11,7 @@ export const adminSchedule: Pick<Messages["admin"], keyof typeof thAdminSchedule
   /* ── Schedule panel in the page builder ─────────────────────────────────── */
   scheduleTitle: "Schedule publishing",
   scheduleHint:
-    "The scheduled time publishes the saved draft — the draft on screen is saved first, then it goes live when the time comes.",
+    "The scheduled time publishes the saved version — it is saved first, then goes live when the time comes.",
   scheduleNone: "No schedule set",
   scheduleAt: "Publishes {time} (UTC)",
   scheduleBy: "Set by {email}",
