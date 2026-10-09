@@ -72,6 +72,21 @@ test("rbac: ทุกไฟล์ใน app/admin ต้องตรวจสิ
     */
     if (/can\(\s*user\.role\s*,\s*"[a-z]+"\s*\)/.test(source)) continue;
 
+    /*
+      ทางที่ 3 (layout ของหลังบ้าน): ไฟล์นี้ไม่ใช่ "หน้าจอ" แต่เป็น **เมนู**
+      ⇒ การประกาศสิทธิ์ของมันคือตาราง `sidebarPermission` แล้วกรองเมนูด้วยค่านั้น
+      ⚠️ บทเรียนรอบที่ 242: ก่อนหน้านี้ไฟล์นี้ "ผ่าน" การสแกนเพราะ **คอมเมนต์** มีข้อความ
+         `requireAdminUser("<permission>")` ⇒ ผลบวกปลอม (คอมเมนต์ไม่ใช่การตรวจสิทธิ์)
+         ⇒ ตอนนี้ต้องมีของจริง: ชนิด `AdminPermission` + ตาราง + การเรียก `can(...)` ด้วยค่านั้น
+    */
+    if (
+      file === "app/admin/layout.tsx" &&
+      source.includes("sidebarPermission: Readonly<Record<string, AdminPermission>>") &&
+      source.includes('can(user.role, sidebarPermission[item.href] ?? "content")')
+    ) {
+      continue;
+    }
+
     missing.push(file);
   }
 
@@ -319,10 +334,16 @@ test("rbac: บัญชี env ยังเป็นประตูหลัง
 
 test("rbac: เมนูหลังบ้านซ่อนลิงก์ตามสิทธิ์ (แต่ไม่ใช่มาตรการความปลอดภัย)", () => {
   const layout = sourceOf("app/admin/layout.tsx");
-  assert.ok(layout.includes("permission: \"users\""), "เมนูผู้ใช้ต้องผูกกับสิทธิ์ users");
-  assert.ok(layout.includes("can(user.role, link.permission)"), "ต้องกรองเมนูตามสิทธิ์ของบัญชี");
+  assert.ok(layout.includes('"/admin/users": "users"'), "ไซด์บาร์ต้องผูกสิทธิ์ users กับหน้าจัดการบัญชี");
+  assert.ok(layout.includes('sidebarPermission[item.href] ?? "content"'), "ต้องกรองเมนูตามสิทธิ์ของบัญชี");
   assert.ok(layout.includes('href: "/admin/users"'), "มีลิงก์ไปหน้าจัดการบัญชี");
-  assert.ok(layout.includes("roleLabelOf("), "แสดงบทบาทของผู้ใช้ปัจจุบัน");
+  assert.ok(layout.includes("roleLabelOf("), "แสดงบทบาทของผู้ใช้ปัจจุบัน (ย้ายไปท้ายไซด์บาร์)");
+  /*
+    รอบที่ 242 (คำสั่งเจ้าของ): "ส่วนไหนซ้ำซ้อนกับไซด์บาร์เอาออก" ⇒ ถอดแถบลิงก์ด้านบนออก
+    ⚠️ กันไม่ให้มีเมนูชุดที่สองกลับมาโดยไม่ตั้งใจ (ผู้ใช้จะกดมั่ว/สับสนอีก)
+  */
+  assert.equal(layout.includes("link.permission"), false, "ห้ามมีแถบลิงก์เมนูด้านบนชุดที่สอง");
+  assert.equal(layout.includes("messages.admin.chromeTitle"), false, "ห้ามเหลือป้ายเมนูของแถบด้านบน");
 });
 
 test("rbac: พจนานุกรมสองภาษามีคีย์ของ RBAC ครบ และไม่พิมพ์รายชื่อบทบาทซ้ำในโค้ด UI", () => {

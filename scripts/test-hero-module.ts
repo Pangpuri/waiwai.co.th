@@ -171,14 +171,16 @@ test("hero module: ต่อสายหน้าแรก — สไลด์�
 
 test("hero module: หลังบ้าน — เมนูในไซด์บาร์ + หน้าจอ /admin/hero (สิทธิ์ · อ่านผ่านชั้นข้อมูล)", () => {
   const layout = readFileSync("app/admin/layout.tsx", "utf8");
-  /* เมนูต้องอยู่ "ต่อจากส่วนกลางของเว็บ" ทั้งในลิสต์ด้านบนและกลุ่มไซด์บาร์ */
-  const linksIndex = layout.indexOf('{ href: "/admin/builder/chrome", label: messages.admin.chromeTitle');
-  const heroLinkIndex = layout.indexOf('{ href: "/admin/hero", label: messages.admin.heroAdminTitle');
-  assert.ok(heroLinkIndex > linksIndex, "เมนูลิสต์ต้องมี /admin/hero ต่อจากส่วนกลางของเว็บ");
+  /*
+    รอบที่ 242: หลังบ้านเหลือเมนูชุดเดียว = ไซด์บาร์ (ถอดแถบลิงก์ด้านบนที่ซ้ำออกตามคำสั่งเจ้าของ)
+    ⇒ ตรวจแค่ลำดับในไซด์บาร์: "สไลด์ & แคมเปญ" ต้องอยู่ต่อจาก "ส่วนกลางของเว็บ"
+  */
+  assert.equal(layout.includes("chromeTitle"), false, "ต้องไม่มีเมนูลิงก์ด้านบนชุดที่สองแล้ว (รอบ 242)");
   const sidebarChrome = layout.indexOf("{ href: \"/admin/builder/chrome\", label: messages.admin.navChrome }");
   const sidebarHero = layout.indexOf("{ href: \"/admin/hero\", label: messages.admin.navHero }");
-  assert.ok(sidebarHero > sidebarChrome, "ไซด์บาร์ต้องมีสไลด์ & แคมเปญ ต่อจากส่วนกลางของเว็บ");
-  assert.ok(layout.includes('permission: "content"') && layout.includes('"/admin/hero"'), "เมนูต้องผูกสิทธิ์");
+  assert.ok(sidebarChrome > 0 && sidebarHero > sidebarChrome, "ไซด์บาร์ต้องมีสไลด์ & แคมเปญ ต่อจากส่วนกลางของเว็บ");
+  assert.ok(layout.includes('"/admin/hero"'), "เมนูต้องมี /admin/hero");
+  assert.ok(layout.includes("sidebarPermission[item.href] ?? \"content\""), "เมนูต้องผูกสิทธิ์ (ค่าเริ่มต้น = content)");
 
   /* หน้าจอ: ตรวจสิทธิ์ + อ่านผ่านชั้นข้อมูล (ไม่ประกอบ SQL เองในหน้าจอ) */
   const page = readFileSync("app/admin/hero/page.tsx", "utf8");

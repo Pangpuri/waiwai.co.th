@@ -22,6 +22,10 @@ export type AdminSidebarStrings = {
   readonly toggleClose: string;
   readonly navLabel: string;
   readonly roleHint: string;
+  /** ชื่อระบบ/แบรนด์ที่หัวไซด์บาร์ (รอบที่ 242 — ย้ายมาจากแถบด้านบนที่ถูกถอดออก) */
+  readonly brand: string;
+  /** บัญชีที่ล็อกอินอยู่ เช่น "admin@waiwai.co.th · ผู้ดูแลระบบ" */
+  readonly account: string;
 };
 
 const STORAGE_KEY = "waiwai_admin_sidebar_open";
@@ -120,7 +124,7 @@ export function AdminSidebar({ groups, strings }: { readonly groups: readonly Ad
             open ? "opacity-100" : "pointer-events-none hidden opacity-0",
           ].join(" ")}
         >
-          {strings.navLabel}
+          {strings.brand}
         </span>
         <button
           type="button"
@@ -177,7 +181,17 @@ export function AdminSidebar({ groups, strings }: { readonly groups: readonly Ad
             </ul>
           </div>
         ))}
-        {open ? <p className="text-fg-muted px-1 text-xs">{strings.roleHint}</p> : null}
+        {/*
+          บัญชีที่ล็อกอินอยู่ + คำอธิบายสิทธิ์ (รอบที่ 242)
+          เดิมข้อมูลนี้อยู่ในแถบลิงก์ด้านบนของหลังบ้าน ซึ่งถูกถอดออก (ซ้ำกับไซด์บาร์)
+          ⇒ ย้ายมาไว้ท้ายเมนู ⇒ ผู้ใช้ยังรู้ว่า "ตอนนี้เข้าในนามใคร"
+        */}
+        {open ? (
+          <div className="flex flex-col gap-0.5 px-1">
+            <p className="text-fg text-xs font-semibold break-all">{strings.account}</p>
+            <p className="text-fg-muted text-xs">{strings.roleHint}</p>
+          </div>
+        ) : null}
       </nav>
     </aside>
   );

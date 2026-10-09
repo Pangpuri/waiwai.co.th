@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import "../globals.css";
@@ -37,32 +36,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const messages = await getMessagesFor("th");
   const user = await getSessionUser();
-
-  /*
-    เมนูหลังบ้าน (X1.10 · RBAC) — **แต่ละลิงก์ผูกกับสิทธิ์**
-    ⇒ บทบาทที่เข้าไม่ได้จะไม่เห็นลิงก์นั้น (และถึงพิมพ์ URL เองก็ถูกประตู `requireAdminUser("<permission>")` กันไว้)
-    ⚠️ การซ่อนเมนูไม่ใช่มาตรการความปลอดภัย — เป็นเพียงไม่ชวนให้กดผิด (การบังคับจริงอยู่ฝั่งเซิร์ฟเวอร์)
-  */
-  const links: readonly { readonly href: string; readonly label: string; readonly permission: AdminPermission }[] = [
-    { href: "/admin", label: messages.admin.dashboardTitle, permission: "content" },
-    /* "กิจกรรมของฉัน" (B3 · รอบที่ 90) — ทุกบทบาทเข้าถึงได้ (ร่องรอยของตัวเอง) */
-    { href: "/admin/activity", label: messages.admin.activityTitle, permission: "content" },
-    { href: "/admin/builder/chrome", label: messages.admin.chromeTitle, permission: "presets" },
-    { href: "/admin/hero", label: messages.admin.heroAdminTitle, permission: "content" },
-    { href: "/admin/builder/home", label: messages.admin.builderTitle, permission: "content" },
-    { href: "/admin/builder/mourning", label: messages.admin.mourningTitle, permission: "presets" },
-    { href: "/admin/content/home", label: messages.admin.contentTitle, permission: "content" },
-    { href: "/admin/inbox", label: messages.admin.inboxTitle, permission: "inbox" },
-    { href: "/admin/products", label: messages.admin.adminProductsTitle, permission: "content" },
-    { href: "/admin/recipes", label: messages.admin.recipesAdminTitle, permission: "content" },
-    { href: "/admin/sort", label: messages.admin.sortNavLabel, permission: "content" },
-    { href: "/admin/news", label: messages.admin.newsAdminTitle, permission: "content" },
-    { href: "/admin/media", label: messages.admin.mediaTitle, permission: "media" },
-    { href: "/admin/trash", label: messages.admin.trashTitle, permission: "trash" },
-    { href: "/admin/preview-links", label: messages.admin.previewLinkTitle, permission: "preview" },
-    { href: "/admin/settings", label: messages.admin.settingsTitle, permission: "settings" },
-    { href: "/admin/users", label: messages.admin.rbacUsersTitle, permission: "users" },
-  ];
 
   /*
     เมนูด้านข้าง (รอบที่ 156 · คำสั่งเจ้าของ) — จัดกลุ่มตามลำดับ: เนื้อหาเว็บไซต์ → จัดการข้อมูล → ระบบ
@@ -133,27 +106,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <html lang="th">
       <body className="bg-bg-cream text-fg min-h-dvh antialiased">
-        {user === null ? null : (
-          <nav aria-label={messages.admin.dashboardTitle} className="border-line bg-surface border-b">
-            <div className="mx-auto flex max-w-[1800px] flex-wrap items-center gap-2 px-4 py-2">
-              <span className="text-fg-muted mr-1 text-xs font-semibold uppercase">{messages.admin.brand}</span>
-              {links
-                .filter((link) => user !== null && can(user.role, link.permission))
-                .map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              <span className="text-fg-muted ml-auto text-xs">
-                {user.email} · {roleLabelOf(user.role, messages.admin)}
-              </span>
-            </div>
-          </nav>
-        )}
         {/* ต่ออายุ "บัตรผ่านดูเว็บระหว่างปิดปรับปรุง" — ทำงานเฉพาะเมื่อเปิดโหมด (รอบที่ 96) */}
         <MaintenanceBypassPing enabled={user !== null && isMaintenanceEnabled(process.env)} />
         {user === null ? (
@@ -168,6 +120,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 toggleClose: messages.admin.navToggleClose,
                 navLabel: messages.admin.navLabel,
                 roleHint: messages.admin.navRoleHint,
+                /* รอบที่ 242: ย้ายจากแถบด้านบนที่ถูกถอดออก (กันข้อมูลบัญชีหาย) */
+                brand: messages.admin.brand,
+                account: `${user.email} · ${roleLabelOf(user.role, messages.admin)}`,
               }}
             />
             <div className="min-w-0 flex-1">{children}</div>
