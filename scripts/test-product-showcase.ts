@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import {
   DEFAULT_PRODUCT_SHOWCASE,
   MAX_FEATURED_PER_CATEGORY,
@@ -224,6 +226,27 @@ test("★ product showcase: แสดงสินค้าแนะนำ + ห�
   const strings = readFileSync("features/blocks/render-strings.ts", "utf8");
   assert.equal(strings.split("featuredTitle: products").length - 1, 2, "ต้องมีข้อความทั้ง th และ en");
   assert.ok(strings.includes("productsTh.featuredTitle") && strings.includes("productsEn.featuredTitle"), "ดึงจากพจนานุกรม products ชุดเดียวกับหน้าเว็บ");
+});
+
+/**
+ * ★ รอบที่ 244 — 🐞 เคสจริงจากเจ้าของ: *"โลโก้หมวดสินค้าดันหายหมดเหลือแต่บล็อคข้อความ"*
+ * วิวส่ง `category.image` มาให้อยู่แล้ว แต่ตัวเรนเดอร์ของการ์ดหมวด **ไม่วาดภาพ**
+ * ⇒ ล็อกว่าการ์ดหมวดต้องมีภาพ + ใช้ next/image + มี alt (ชื่อหมวด) + แผงพื้นจางตามดีไซน์เดิม
+ */
+test("★ product showcase: การ์ดหมวดต้องมีภาพ (เคสจริงจากเจ้าของ — ภาพหมวดหายเหลือแต่ข้อความ)", () => {
+  const renderer = codeOf("features/blocks/block-renderer.tsx");
+  const start = renderer.indexOf('case "productShowcase"');
+  const end = renderer.indexOf('case "marketplaceLinks"');
+  assert.ok(start > 0 && end > start, "ต้องพบเคส productShowcase");
+  const block = renderer.slice(start, end);
+
+  assert.ok(block.includes("showcase.categories.map"), "ต้องเรนเดอร์การ์ดหมวด");
+  assert.ok(block.includes("category.image === null ? null"), "ต้องวาดภาพเมื่อหมวดมีภาพ (และข้ามเมื่อไม่มี)");
+  assert.ok(block.includes("src={category.image}"), "ต้องใช้พาธภาพจากวิว (ไม่ประกอบเอง)");
+  assert.ok(block.includes("alt={category.title}"), "ภาพต้องมี alt (ใช้ชื่อหมวด)");
+  assert.ok(block.includes("bg-bg-subtle"), "ต้องมีแผงพื้นจางรองภาพแบบดีไซน์เดิม");
+  /* การ์ดทั้งใบคลิกได้ (เหมือนดีไซน์เดิม) — ลิงก์เดียวต่อการ์ด */
+  assert.equal((block.match(/<a href=\{category.href\}/g) ?? []).length, 1, "การ์ดหมวดต้องมีลิงก์เดียว (ครอบทั้งการ์ด)");
 });
 
 /** ★ รอบที่ 220 — หัวข้อส่วน + ปุ่ม "ดูผลิตภัณฑ์ทั้งหมด" (ให้ตรงหน้าเว็บจริง) */

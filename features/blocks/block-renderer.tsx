@@ -687,14 +687,34 @@ function BlockView({
             <h3 className="text-fg text-xl font-semibold">{strings.showcase.categoriesTitle}</h3>
             <ul className={showcaseGrid}>
               {showcase.categories.map((category) => (
-                <li key={category.id} className="border-line bg-surface flex flex-col gap-2 rounded-xl border p-3">
-                  <a href={category.href} className="text-fg text-sm font-semibold">
-                    {category.title}
+                /*
+                  การ์ดหมวด — **ต้องมีภาพของหมวด** (รอบที่ 244 · 🐞 เคสจริงจากเจ้าของ: "โลโก้หมวดสินค้าหายหมด
+                  เหลือแต่บล็อกข้อความ") · วิวส่ง `category.image` มาให้อยู่แล้ว แต่ตัวเรนเดอร์เคยไม่วาด
+                  ⇒ ทำตามดีไซน์เดิม (`features/home/ui/products-showcase.tsx`): แผงภาพพื้นจาง + ลิงก์ทั้งการ์ด
+                  · ไม่มีภาพ = ไม่มีแผงภาพ (การ์ดยังใช้ได้ ไม่มีกล่องเปล่า)
+                */
+                <li key={category.id} className="border-line bg-surface flex overflow-hidden rounded-xl border">
+                  <a href={category.href} className="group flex h-full w-full flex-col">
+                    {category.image === null ? null : (
+                      <span className="bg-bg-subtle flex h-40 items-center justify-center p-4">
+                        <Image
+                          src={category.image}
+                          alt={category.title}
+                          width={320}
+                          height={160}
+                          sizes="(max-width: 640px) 92vw, 320px"
+                          className="h-auto max-h-32 w-auto object-contain transition-transform group-hover:scale-105"
+                        />
+                      </span>
+                    )}
+                    <span className="flex flex-1 flex-col gap-2 p-4">
+                      <span className="text-fg text-sm font-semibold">{category.title}</span>
+                      {category.description.trim() === "" ? null : (
+                        <span className="text-fg-muted text-xs">{category.description}</span>
+                      )}
+                      {block.showCount ? <span className="text-fg-muted text-[11px]">({category.productCount})</span> : null}
+                    </span>
                   </a>
-                  {category.description.trim() === "" ? null : (
-                    <p className="text-fg-muted text-xs">{category.description}</p>
-                  )}
-                  {block.showCount ? <p className="text-fg-muted text-[11px]">({category.productCount})</p> : null}
                 </li>
               ))}
             </ul>
