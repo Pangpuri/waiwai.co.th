@@ -209,10 +209,11 @@ test("templates: คำเตือนเรื่องส่วนที่ข
   assert.ok(page.includes("coverage={coverage}"), "ส่งค่าที่คำนวณแล้วเข้า BlockBuilder (ไม่คำนวณซ้ำ)");
   assert.equal(page.split("<TemplateCoverageNote").length - 1, 1, "หน้าจอต้องมีกล่องคำเตือนเดียวในโค้ด");
 
-  /* คำเตือนต้องอยู่ "ก่อน" ฟอร์มสวิตช์ในโค้ด (ผู้ใช้เห็นก่อนกด) */
+  /* คำเตือนต้องอยู่ "ก่อน" ฟอร์มเผยแพร่ในโค้ด (ผู้ใช้เห็นก่อนกดขึ้นเว็บ)
+     — เดิมเทียบกับฟอร์มสวิตช์ "ใช้กับหน้าเว็บจริง" · รอบที่ 240 ถอดสวิตช์นั้นออก เหลือปุ่มเผยแพร่ปุ่มเดียว */
   const coverageAt = builder.indexOf("coverage === undefined ? null :");
-  const switchAt = builder.indexOf("action={setPageLiveAction}");
-  assert.ok(coverageAt > 0 && switchAt > coverageAt, "คำเตือนต้องวางก่อนฟอร์มสวิตช์");
+  const publishAt = builder.indexOf("action={publishActionState}");
+  assert.ok(coverageAt > 0 && publishAt > coverageAt, "คำเตือนต้องวางก่อนฟอร์มเผยแพร่");
 });
 
 test("templates: บล็อกในเทมเพลตมี id ไม่ซ้ำ และทุก id ตรงรูปแบบของโปรเจกต์", () => {
@@ -299,9 +300,13 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
     assert.ok(source.includes("<BlockDocumentView"), `${page}: ต้องใช้ตัวเรนเดอร์ตัวเดียวกับหน้าแรก`);
     assert.ok(source.includes("return ("), `${page}: ต้องมีเลย์เอาต์เดิมเป็นทางถอย`);
 
-    /* สวิตช์ "ใช้กับหน้าเว็บจริง" เปิดได้เฉพาะหน้าที่มีเอกสาร — ต้องมีสวิตช์ในหน้าจอสร้าง */
+    /*
+      สถานะ "หน้านี้ขึ้นเว็บหรือยัง" ยังต้องอ่านจากฝั่งเซิร์ฟเวอร์ของหน้าจอสร้าง
+      (รอบที่ 240: ไม่ได้อ่านเพื่อเปิด/ปิดสวิตช์แล้ว — ใช้เลือกข้อความผลลัพธ์หลังกดเผยแพร่ว่า
+       "ขึ้นเว็บแล้ว" หรือ "บันทึกไว้ ยังไม่ขึ้นเว็บ" ⇒ ค่ามาจากนโยบายกลาง ไม่ใช่การเดาที่จอ)
+    */
     const builder = sourceOf("app/admin/builder/[page]/page.tsx");
-    assert.ok(builder.includes("isPageLive(page)"), "หน้าจอสร้างต้องอ่านสถานะสวิตช์ของหน้านั้น");
+    assert.ok(builder.includes("publishGoesLive(page)"), "หน้าจอสร้างต้องอ่านนโยบายกลางว่าหน้านี้กดเผยแพร่แล้วขึ้นเว็บไหม");
   }
 
   /* ทะเบียนกับไฟล์ route ของหน้าเมนูต้องตรงกันเป๊ะ — ลืมเพิ่มหน้า = เทสต์แดงทันที */

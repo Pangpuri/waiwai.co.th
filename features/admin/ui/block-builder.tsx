@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { compareRevisionAction, publishAction, migrateBlocksAction, restoreRevisionAction, saveDraftAction, schedulePublishAction, setPageLiveAction } from "@/app/admin/builder/actions";
+import { compareRevisionAction, publishAction, migrateBlocksAction, restoreRevisionAction, saveDraftAction, schedulePublishAction } from "@/app/admin/builder/actions";
 import { deletePresetAction, savePresetAction } from "@/app/admin/builder/preset-actions";
 import { uploadImageAction } from "@/app/admin/media/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
@@ -25,7 +25,6 @@ import {
 import { scrollTargetFor, scrollableAncestorOf } from "@/features/admin/ui/preview-scroll";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
-import { liveSyncStateOf } from "@/lib/blocks/live-guard";
 import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
 import { CONTENT_PREVIEW_PART } from "@/lib/chrome/workspace-url";
 import {
@@ -178,21 +177,11 @@ type Props = {
    */
   readonly previewLiveSrc?: string;
   /**
-   * หน้าเว็บสาธารณะกำลังใช้เนื้อหาชุดนี้อยู่หรือไม่ (เซสชัน S1)
-   * - **ไม่บังคับ** เพื่อกันกรณีหน้าจอใดลืมส่งค่า (เคยเกิด error ตอน build: "Property 'isLive' is missing")
-   * - ถ้าไม่ส่งมา = **ไม่แสดงสวิตช์นี้เลย** (ดีกว่าแสดงผิดว่า "ยังไม่ใช้กับหน้าเว็บจริง" ทั้งที่ใช้อยู่)
+   * หน้านี้ "กดเผยแพร่ = ขึ้นเว็บทันที" หรือไม่ (มติเจ้าของ 2026-10-09 · รอบที่ 240)
+   * - **ไม่บังคับ**: ไม่ส่ง = ถือว่าเป็นหน้าแบบ "บันทึกไว้ก่อน" (ไม่ขึ้นเว็บ)
+   * - ใช้แสดงคำใบ้ใต้ปุ่มเผยแพร่ให้ตรงกับสิ่งที่จะเกิดขึ้นจริง (ไม่ให้จอโกหก)
    */
-  readonly isLive?: boolean;
-  /**
-   * สถานะ "ฉบับที่เผยแพร่ ตรงกับฉบับร่างไหม" (รอบที่ 238 — 🐞 เคสจริงจากเจ้าของ)
-   * - **ไม่บังคับ**: ไม่ส่ง = ไม่แสดงบรรทัดสถานะ (หน้าจออื่นที่ยังไม่ส่งยังใช้งานได้)
-   * - ส่งมา = หน้าจอบอกความจริงว่าตอนนี้เว็บแสดงชุดไหน + **ปิดปุ่มเปิดสวิตช์** เมื่อยังไม่ตรง
-   */
-  readonly liveGuard?: { readonly hasPublished: boolean; readonly inSync: boolean };
-  /** จำนวนบล็อกของฉบับที่เผยแพร่ (null = ยังไม่มี) — ใช้ในข้อความอธิบาย */
-  readonly publishedBlocks?: number | null;
-  /** ข้อความหลัง Server Action ปฏิเสธการเปิดสวิตช์ (แปลแล้วจากฝั่งเซิร์ฟเวอร์) — ไม่ส่ง = ไม่แสดง */
-  readonly liveBlockedNotice?: string | null;
+  readonly publishLive?: boolean;
   /**
    * กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7 ส่วนที่ 1)
    * - **ไม่บังคับ**: `undefined` = หน้าจอไม่ได้ส่งค่า ⇒ ไม่แสดงแผงตั้งเวลาเลย
@@ -480,13 +469,13 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
     >
       <p className="text-fg font-semibold">{message}</p>
       {/*
-        รอบที่ 239 (🐞 จากคำถามเจ้าของ: "ขยับบล็อกแล้วกดเผยแพร่ ทำไมไม่ติด"):
-        กด "เผยแพร่" = เขียนฉบับเผยแพร่ **แต่หน้าเว็บยังไม่ใช้บล็อกจนกว่าสวิตช์ "ใช้กับหน้าเว็บจริง" จะเปิด**
-        ⇒ ต้องบอกตรง ๆ ว่าหน้าเว็บเปลี่ยนหรือยัง ไม่งั้นผู้ใช้จะคิดว่าเผยแพร่ไม่ทำงาน
+        รอบที่ 239/240: บอกให้ตรงว่าหน้าเว็บเปลี่ยนหรือยัง (ห้ามเงียบ — เคสจริง "กดเผยแพร่แล้วไม่ติด")
+        · ขึ้นเว็บแล้ว (หน้าแรก) → บรรทัดปกติ
+        · ยังไม่ขึ้นเว็บ (หน้าอื่นที่ยังไม่เปิด) → บรรทัดสีแดง เพราะผู้ใช้อาจคาดว่าเว็บเปลี่ยน
       */}
       {state.status === "published" && state.live === false ? (
         <p className="text-brand-red text-xs font-semibold" data-published-live="off">
-          {fillTemplate(strings.publishedNotLive, { revision: state.revision ?? 1 })}
+          {strings.publishedSavedOnly}
         </p>
       ) : null}
       {state.status === "published" && state.live === true ? (
@@ -522,10 +511,7 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
 export function BlockBuilder({
   page,
   previewLiveSrc,
-  isLive,
-  liveGuard,
-  publishedBlocks = null,
-  liveBlockedNotice = null,
+  publishLive = false,
   coverage,
   schedule,
   presets = [],
@@ -595,7 +581,10 @@ export function BlockBuilder({
   const pendingSaveRef = useRef<BlockDocument | null>(null);
   const savingRef = useRef(false);
 
-  const [draftState, draftAction] = useActionState(saveDraftAction, INITIAL_BUILDER_STATE);
+  /*
+    รอบที่ 240: ถอด `useActionState(saveDraftAction)` ของปุ่ม "บันทึกฉบับร่าง" ออก
+    (บันทึกอัตโนมัติเรียก `saveDraftAction` ตรง ๆ อยู่แล้ว ⇒ ไม่มีทางพิเศษที่สอง)
+  */
   const [publishState, publishActionState] = useActionState(publishAction, INITIAL_BUILDER_STATE);
   const [restoreState, restoreAction] = useActionState(restoreRevisionAction, INITIAL_BUILDER_STATE);
   const [migrateState, migrateAction] = useActionState(migrateBlocksAction, INITIAL_BUILDER_STATE);
@@ -804,15 +793,6 @@ export function BlockBuilder({
   const unsavedCount = unsavedDiff.summary.total;
   const dirty = unsavedCount > 0;
 
-  /*
-    ── สวิตช์ "ใช้กับหน้าเว็บจริง" (รอบที่ 238) ──────────────────────────────────
-    `liveState` = ฉบับที่เผยแพร่ตรงกับฉบับร่างที่โหลดมาตอนเปิดหน้าไหม (มาจากฝั่งเซิร์ฟเวอร์)
-    ⇒ ถ้ายังไม่ตรง **ปุ่ม "เปิด" ถูกปิด** เพราะเปิดไปก็ไม่เกิดอะไร (Server Action ปฏิเสธ)
-      และถ้าฝืนเปิด เว็บจะแสดงฉบับเก่า (เคสจริงที่เจ้าของเจอ)
-    ⚠️ ปุ่ม "ปิด" ไม่ถูกปิดเลย — เป็นทางหนีกลับไปใช้เลย์เอาต์เดิมเสมอ
-  */
-  const liveState = liveGuard === undefined ? null : liveSyncStateOf(liveGuard);
-  const liveBlocked = !isLive && liveState !== null && liveState !== "in-sync";
   const autosaveDecision = decideAutosave({
     enabled: autosaveEnabled,
     dirty,
@@ -859,12 +839,13 @@ export function BlockBuilder({
 
   /**
    * ซิงก์ "ฉบับที่บันทึกแล้ว" กับสิ่งที่เซิร์ฟเวอร์ทำจริง
-   * - บันทึกเอง/เผยแพร่สำเร็จ ⇒ ใช้เอกสารที่ส่งไปตอนนั้น (ผู้ใช้อาจพิมพ์ต่อระหว่างรอ)
+   * - **เผยแพร่สำเร็จ** ⇒ ใช้เอกสารที่ส่งไปตอนนั้น (ผู้ใช้อาจพิมพ์ต่อระหว่างรอ)
+   *   (บันทึกอัตโนมัติตั้ง `savedDocument` เองอยู่แล้วใน `runAutosave`)
    * - กู้คืนสำเร็จ ⇒ เปลี่ยนเอกสารบนหน้าจอเป็นรุ่นที่กู้คืนทันที
    *   ⚠️ ถ้าไม่ทำ บันทึกอัตโนมัติจะเขียนของเก่าทับรุ่นที่เพิ่งกู้คืน (งานหายเงียบ ๆ)
    */
   useEffect(() => {
-    if (draftState.status === "draft-saved" || publishState.status === "published") {
+    if (publishState.status === "published") {
       const submitted = pendingSaveRef.current;
       if (submitted !== null) {
         setSavedDocument(submitted);
@@ -881,7 +862,7 @@ export function BlockBuilder({
     setSavedDocument(restored);
     setSelectedId(restored.blocks[0]?.id ?? "");
     setSelectedCard(null);
-  }, [draftState.status, publishState.status, restoreState.status, restoreState.restoredDocument]);
+  }, [publishState.status, restoreState.status, restoreState.restoredDocument]);
 
   /** เตือนก่อนออกจากหน้าเมื่อมีงานที่ยังไม่บันทึก (ปิดแท็บ + คลิกลิงก์ในเว็บ) */
   useEffect(() => {
@@ -2117,67 +2098,10 @@ export function BlockBuilder({
         </div>
       </div>
 
-      <StatusPanel state={draftState} strings={strings} />
-      {/* สวิตช์ "ใช้กับหน้าเว็บจริง" (เซสชัน S1) — แสดงเฉพาะเมื่อหน้าจอส่งค่ามา (isLive ไม่บังคับ) */}
-      {isLive === undefined ? null : (
-        <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-fg text-sm font-semibold">
-                {isLive ? strings.liveOn : strings.liveOff}
-              </p>
-              <p className="text-fg-muted text-xs">{isLive ? strings.liveHintOn : strings.liveHintOff}</p>
-              {/*
-                รอบที่ 238 (🐞 เคสจริงจากเจ้าของ) — หน้าเว็บจริงอ่าน "ฉบับที่เผยแพร่" ไม่ใช่ "ฉบับร่างที่กำลังแก้"
-                ⇒ ต้องบอกตรง ๆ ตอนนี้เว็บแสดงชุดไหน และถ้ายังไม่ตรง **ห้ามเปิดสวิตช์**
-                (ผู้ใช้เคยเปิดแล้วเว็บกลายเป็นบล็อกเก่าที่มีข้อมูลทดสอบ ⇒ ต้องปิดสวิตช์กลับ)
-              */}
-              {liveState === null ? null : liveState === "in-sync" ? (
-                <p className="text-fg-muted text-xs" data-live-sync="in-sync">
-                  {fillTemplate(strings.liveSyncOk, { published: publishedBlocks ?? 0 })}
-                </p>
-              ) : (
-                <p className="text-brand-red text-xs" data-live-sync={liveState}>
-                  {liveState === "missing"
-                    ? strings.liveSyncMissing
-                    : fillTemplate(strings.liveSyncStale, {
-                        draft: document.blocks.length,
-                        published: publishedBlocks ?? 0,
-                      })}
-                </p>
-              )}
-            </div>
-            {/* คำเตือนก่อนเปิดสวิตช์: เปิดแล้วหน้าเว็บจะแสดงเฉพาะบล็อก (S2 รอบที่ 83) */}
-            {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
-
-            <form action={setPageLiveAction} className="flex items-center gap-2" data-live-form="">
-              <input type="hidden" name="page" value={page} />
-              <input type="hidden" name="live" value={isLive ? "0" : "1"} />
-              {/*
-                ปุ่ม "เปิด" ถูกปิดเมื่อยังเปิดไม่ได้ (ฉบับร่างยังไม่ถูกเผยแพร่) — ตรงกับด่านที่ Server Action
-                (บทเรียนรอบที่ 85: อย่าให้ปุ่มกดแล้วเด้ง/ไม่เกิดอะไรโดยไม่บอกเหตุผล)
-              */}
-              <button
-                type="submit"
-                disabled={liveBlocked}
-                title={liveBlocked ? strings.liveTurnOnBlocked : undefined}
-                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {isLive ? strings.liveTurnOff : strings.liveTurnOn}
-              </button>
-            </form>
-          </div>
-
-          {/* ข้อความหลังถูกปฏิเสธ (Server Action เด้งกลับมาพร้อมเหตุผล — ไม่เงียบ) */}
-          {liveBlockedNotice === null ? null : (
-            <p className="text-brand-red text-xs" role="status" data-live-notice="">
-              {liveBlockedNotice}
-            </p>
-          )}
-        </section>
-      )}
-
       <StatusPanel state={publishState} strings={strings} />
+
+      {/* คำเตือน "ส่วนที่เทมเพลตยังไม่ครอบคลุม" (S2 รอบที่ 83) — ต้องเห็นก่อนกดเผยแพร่ */}
+      {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
 
       {/*
         ตั้งเวลาเผยแพร่ (X2.7 ส่วนที่ 1) — แสดงเฉพาะเมื่อหน้าจอส่งค่า `schedule` มา (แบบเดียวกับสวิตช์เว็บจริง)
@@ -2589,10 +2513,15 @@ export function BlockBuilder({
         </section>
       </div>
 
-      {/* ฟอร์มบันทึก/เผยแพร่ + สถานะงานที่ยังไม่บันทึก (X1.5) */}
+      {/*
+        ── ปุ่มเดียว: "เผยแพร่" (มติเจ้าของ 2026-10-09 · รอบที่ 240) ─────────────────────────
+        ถอด "บันทึกฉบับร่าง" ออก — งานที่ยังไม่กดเผยแพร่ถูกเก็บให้เองด้วย **บันทึกอัตโนมัติ** (3 วิ)
+        ⇒ ผู้ใช้เหลือการตัดสินใจเดียว: "ขึ้นเว็บได้หรือยัง" (ปุ่มซ้ำซ้อนคือสิ่งที่ทำให้คนบรีฟงง)
+        ⚠️ ยังเรียก Server Action ตัวเดิม (saveDraft ใช้ภายใน autosave · publish = บันทึก + ขึ้นเว็บ)
+      */}
       <div className="border-line bg-surface flex flex-wrap items-center gap-3 rounded-2xl border p-3">
         <form
-          action={draftAction}
+          action={publishActionState}
           onSubmit={() => {
             /* จำเอกสารที่ส่งไปจริง — ใช้ตั้ง "ฉบับที่บันทึกแล้ว" เมื่อ action ตอบกลับ (X1.5) */
             pendingSaveRef.current = document;
@@ -2600,19 +2529,13 @@ export function BlockBuilder({
         >
           <input type="hidden" name="page" value={page} />
           <input type="hidden" name="payload" value={payload} />
-          <SubmitButton label={strings.saveDraft} pendingLabel={strings.savingDraft} tone="outline" />
-        </form>
-
-        <form
-          action={publishActionState}
-          onSubmit={() => {
-            pendingSaveRef.current = document;
-          }}
-        >
-          <input type="hidden" name="page" value={page} />
-          <input type="hidden" name="payload" value={payload} />
           <SubmitButton label={strings.publish} pendingLabel={strings.publishing} tone="brand" />
         </form>
+
+        {/* บอกล่วงหน้าว่ากดแล้วจะเกิดอะไร (หน้าแรก = ขึ้นเว็บ · หน้าอื่น = เก็บไว้) — จอต้องไม่โกหก */}
+        <p className="text-fg-muted text-xs" data-publish-hint={publishLive ? "live" : "saved-only"}>
+          {publishLive ? strings.publishHintLive : strings.publishHintSavedOnly}
+        </p>
 
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <p className={`text-xs font-semibold ${dirty ? "text-fg" : "text-fg-muted"}`}>

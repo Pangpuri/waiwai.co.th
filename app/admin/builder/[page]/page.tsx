@@ -10,13 +10,13 @@ import { TemplateCoverageNote } from "@/features/admin/ui/template-coverage-note
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { documentsEqual } from "@/lib/blocks/diff";
+import { publishGoesLive } from "@/lib/blocks/live-scope";
 import { blockCoverageGaps, hasBlockTemplate, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
-import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
+import { listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/db/pool";
@@ -74,8 +74,8 @@ export default async function AdminBuilderPage({
 }: {
   readonly params: Promise<{ readonly page: string }>;
   /* รอบที่ 227: ใช้บอกผู้ใช้ว่า "กดใช้เทมเพลตแล้วแต่ยังไม่ติ๊กยืนยัน" (Server Action ปฏิเสธเงียบ ๆ) */
-  /* รอบที่ 238: `live` = เหตุผลที่ Server Action ปฏิเสธการเปิดสวิตช์ "ใช้กับหน้าเว็บจริง" */
-  readonly searchParams: Promise<{ readonly template?: string; readonly live?: string }>;
+  /* รอบที่ 240: ถอด `live` ออกด้วย — ไม่มีสวิตช์ "ใช้กับหน้าเว็บจริง" ให้ปฏิเสธอีกแล้ว */
+  readonly searchParams: Promise<{ readonly template?: string }>;
 }) {
   const user = await requireAdminUser("content");
   const { page } = await params;
@@ -122,13 +122,12 @@ export default async function AdminBuilderPage({
     อ่านข้อมูลของหน้าแบบขนาน (4 คำสั่งไม่ขึ้นแก่กัน) + แถวที่เหลืออีกชุด
     ⚠️ ยังต้องมี DB จริง (ตรวจ `isDatabaseConfigured` ด้านบนแล้ว) — ถ้าไม่มี จะออกก่อนถึงบรรทัดนี้
   */
-  const [draftRow, publishedRow, revisions, storedVersions, isLive, presets, schedule] = await Promise.all([
+  const [draftRow, publishedRow, revisions, storedVersions, presets, schedule] = await Promise.all([
     loadDocumentRow(page, "draft"),
     loadDocumentRow(page, "published"),
     listRevisions(page),
     /* รุ่นรูปทรงของข้อมูลที่เก็บไว้ (X1.1) — หน้าจอเตือน + มีปุ่มย้ายเป็นรุ่นปัจจุบัน */
     readStoredVersions(page),
-    isPageLive(page),
     listBlockPresets(),
     /* กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7) — ยังไม่มีฉบับร่าง/ยังไม่ตั้ง = null */
     readPublishSchedule(page),
@@ -141,23 +140,12 @@ export default async function AdminBuilderPage({
   const initialDraft = parsedDraft !== null && parsedDraft.ok ? parsedDraft.document : emptyDocument;
 
   /*
-    ── สถานะ "ฉบับที่เผยแพร่ ตรงกับ ฉบับร่าง ไหม" (รอบที่ 238 — 🐞 เคสจริงจากเจ้าของ) ──────────
-    หน้าเว็บจริงอ่าน **ฉบับที่เผยแพร่** ไม่ใช่ฉบับร่างที่กำลังแก้ ⇒ ต้องบอกให้ตรง ๆ ว่าตอนนี้เว็บ
-    กำลังแสดงชุดไหน และถ้ายังไม่ตรง ห้ามเปิดสวิตช์ (ผู้ใช้เคยเปิดแล้วเว็บกลายเป็นบล็อกเก่า)
-    ⚠️ ค่าที่คำนวณนี้เป็นของ "ตอนโหลดหน้า" — ถ้าแก้ฉบับร่างต่อ ตัวสร้างจะเทียบสด ๆ เองอีกชั้น
+    ── รอบที่ 240 (มติเจ้าของ): "หน้าแรก = กดเผยแพร่แล้วขึ้นเว็บเลย" ────────────────────────
+    ตัดสวิตช์ "ใช้กับหน้าเว็บจริง" ออกทั้งดุ้น (รอบ 238/239 แก้อาการของมันไปสองรอบแล้ว)
+    ⇒ เหลือปุ่มเดียว และคำใบ้ใต้ปุ่มมาจาก **นโยบายกลางตัวเดียวกับที่ Server Action ใช้**
+      (`publishGoesLive()`) ⇒ จอบอกล่วงหน้าตรงกับสิ่งที่จะเกิดขึ้นจริงเสมอ
   */
-  const parsedPublished = publishedRow === null ? null : parseBlockDocument(page, publishedRow.raw);
-  const publishedDocument = parsedPublished !== null && parsedPublished.ok ? parsedPublished.document : null;
-  const liveGuard = {
-    hasPublished: publishedDocument !== null,
-    inSync: publishedDocument !== null && documentsEqual(publishedDocument, initialDraft),
-  };
-  const liveBlockedNotice =
-    query.live === "no-published"
-      ? strings.liveBlockedNoPublished
-      : query.live === "draft-not-published"
-        ? strings.liveBlockedStale
-        : null;
+  const publishLive = publishGoesLive(page);
 
   /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
   const coverage = {
@@ -231,7 +219,6 @@ export default async function AdminBuilderPage({
           <BlockBuilder
             presets={presets}
             page={page}
-            isLive={isLive}
             schedule={schedule}
             initialDraft={initialDraft}
             draftUpdatedAt={draftRow?.updatedAt ?? null}
@@ -240,9 +227,7 @@ export default async function AdminBuilderPage({
             storedVersions={storedVersions}
             previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
             coverage={coverage}
-            liveGuard={liveGuard}
-            publishedBlocks={publishedDocument === null ? null : publishedDocument.blocks.length}
-            liveBlockedNotice={liveBlockedNotice}
+            publishLive={publishLive}
             strings={strings}
           />
         </ImageLibraryProvider>

@@ -1,29 +1,20 @@
 /**
- * Dictionary area: admin — the "make it live" switch (round 238)
+ * Dictionary area: admin — "what pressing Publish does" (round 240 · formerly the `live*` group)
  *
- * ⚠️ Why a separate file: the `admin` area hit the 32KB cap (check:i18n rule:
- * "split into a sub-area, never raise the cap") ⇒ all `live*` keys moved here.
+ * **Owner's decision, 2026-10-09:** remove the "Make it live" switch (the second step confused
+ * people being briefed). Home page: Publish = save + **go live immediately**.
+ * Other pages: Publish = save only (not live yet).
+ * ⇒ These strings have one job: state exactly what will happen / has happened (honest UI).
  *
- * Context (a real report from the owner, 2026-10-09):
- *   the public site serves the **published** document, not the draft being edited
- *   ⇒ turning the switch on before publishing showed an old page (preview looked right).
- *   Every string must state which version is being served and what to do first.
+ * ⚠️ Kept out of `admin.ts` because that area hit the 32KB cap (check:i18n: split, don't raise).
+ * ⚠️ Never promise "now live" for a page that is not live — the two key pairs must match
+ *    `publishGoesLive()` in `lib/blocks/live-scope.ts`.
  */
 export const adminLive = {
-  liveOn: "Live on the public site",
-  liveOff: "Not live yet",
-  liveTurnOn: "Make it live",
-  liveTurnOff: "Stop using (back to the designed layout)",
-  liveHintOn: "The public site is serving the published version — draft edits need another “Publish” before they appear.",
-  liveHintOff: "The public site still shows the designed layout — turn this on when the content is ready.",
-  /* Published-vs-draft status (stops turning the switch on and getting an old page) */
-  liveSyncOk: "The published version matches the draft you are editing ({published} blocks) — preview equals live.",
-  liveSyncStale: "The draft ({draft} blocks) is not published yet — the site still shows the published version ({published} blocks); press “Publish” before turning this on.",
-  liveSyncMissing: "This page has no published version yet — press “Publish” first, then turn this on.",
-  liveTurnOnBlocked: "Cannot turn on yet — press “Publish” so the draft goes live (otherwise the site shows the old version).",
-  liveBlockedStale: "Not turned on — the draft has not been published. Press “Publish” first (turning it on now would show the old version).",
-  liveBlockedNoPublished: "Not turned on — this page has no published version yet. Press “Publish” first.",
-  /* Round 239 — tell the truth after “Publish”: the switch is a separate step from publishing */
-  publishedNotLive: "Published (revision {revision}) — but the public site is still not using this content, because the “Make it live” switch is off ⇒ press that switch in the panel above.",
-  publishedLive: "The public site is showing this published version — what you see in the preview is what visitors see.",
+  /* After a successful publish — the screen picks by the real state read from the DB (never guesses) */
+  publishedLive: "Published — now live (visitors are seeing this version).",
+  publishedSavedOnly: "Saved — this page is not live yet (the team will switch it on when the content is ready).",
+  /* Hint under the Publish button — says up front what pressing it will do */
+  publishHintLive: "Pressing “Publish” saves and goes live immediately (preview equals what visitors see).",
+  publishHintSavedOnly: "This page is not live yet — pressing “Publish” saves it for later.",
 };

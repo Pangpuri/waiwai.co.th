@@ -6,8 +6,8 @@ import { redirect } from "next/navigation";
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
 import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
-import { documentDiff, documentsEqual } from "@/lib/blocks/diff";
-import { decideLiveEnable } from "@/lib/blocks/live-guard";
+import { documentDiff } from "@/lib/blocks/diff";
+import { publishGoesLive } from "@/lib/blocks/live-scope";
 import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { decideTemplateApply } from "@/lib/blocks/template-apply";
@@ -124,6 +124,14 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
     revalidatePath(pathOf(page));
 
     /*
+      ── มติเจ้าของ 2026-10-09 (รอบที่ 240): "หน้าแรก = กดเผยแพร่แล้วขึ้นเว็บเลย" ────────────
+      เดิมต้องกดสองขั้น (เผยแพร่ → เปิดสวิตช์ "ใช้กับหน้าเว็บจริง") ⇒ ผู้ใช้งงว่า "เผยแพร่แล้วทำไมเว็บไม่เปลี่ยน"
+      ⇒ หน้าแรก: เปิด `is_live` ให้เองในขั้นเดียว (หน้าที่เหลือยังไม่ขึ้นเว็บ — เจ้าของ: "ยังไม่เริ่มจริงจัง")
+      ⚠️ ต้องเปิด **ก่อน** สั่ง refresh เพื่อให้ ISR สร้างหน้าใหม่จากฉบับที่เผยแพร่แล้ว
+    */
+    if (publishGoesLive(page)) await setPageLive(page, true, user.email);
+
+    /*
       เผยแพร่สำเร็จแล้ว → ทำให้หน้าเว็บสาธารณะสดใหม่ (X1.7)
       ISR + on-demand revalidate = หน้าเว็บใหม่ทันทีโดยไม่ต้อง build · ถ้าตั้ง REBUILD_HOOK_URL/REBUILD_COMMAND
       (โฮสต์ที่ไม่มี ISR) จึงสั่ง build เพิ่ม · ล้มเหลวก็ไม่ทำให้การเผยแพร่ล้ม
@@ -131,10 +139,7 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
     const refresh = await refreshPublicSite("page");
     const rebuild = refresh.rebuild;
 
-    /*
-      รอบที่ 239 (🐞 "กดเผยแพร่แล้วไม่ติด"): เขียนฉบับเผยแพร่เสร็จ ≠ หน้าเว็บเปลี่ยน
-      ⇒ ถ้าสวิตช์ "ใช้กับหน้าเว็บจริง" ยังปิดอยู่ หน้าเว็บยังใช้เลย์เอาต์ที่ออกแบบไว้ ⇒ ต้องบอกให้ชัด
-    */
+    /* อ่านสถานะจริงหลังเผยแพร่ ⇒ หน้าจอบอกผู้ใช้ได้ตรง ๆ ว่าหน้าเว็บเปลี่ยนหรือยัง (รอบที่ 239) */
     const live = await isPageLive(page);
 
     return {
@@ -359,50 +364,6 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   await saveDraft(page, nextDocument, user.email);
   revalidatePath(pathOf(page));
   redirect(pathOf(page));
-}
-
-/**
- * เปิด/ปิด "ใช้เนื้อหานี้กับหน้าเว็บจริง" (เซสชั่น S1)
- * เปิด = หน้าเว็บสาธารณะเรนเดอร์ **เอกสารที่เผยแพร่** แทนเลย์เอาต์ที่ออกแบบไว้ · ปิด = กลับไปใช้ของเดิมทันที
- *
- * 🐞 รอบที่ 238 (เคสจริงจากเจ้าของ): เดิมเปิดได้เสมอโดยไม่ดูว่าฉบับที่เผยแพร่คืออะไร
- * ⇒ ผู้ใช้เห็นพรีวิวสด (ฉบับร่าง) มีสินค้า/เมนู/ข่าวครบ แต่พอเปิดสวิตช์ **เว็บกลายเป็นฉบับเก่า**
- * (เทมเพลตเดิมที่มีข้อมูลทดสอบ) เพราะหน้าเว็บอ่าน "ฉบับที่เผยแพร่" ไม่ใช่ "ฉบับร่างที่กำลังแก้"
- * ⇒ แก้ที่ราก (fail-closed): **เปิดได้ต่อเมื่อฉบับที่เผยแพร่ตรงกับฉบับร่างแล้วเท่านั้น**
- *    ไม่ตรง = ไม่เปิด + เด้งกลับพร้อมเหตุผล (`?live=draft-not-published`) ให้ผู้ใช้กด "เผยแพร่" ก่อน
- * ⚠️ การ **ปิด** สวิตช์ไม่ตรวจอะไร (เป็นทางหนีกลับไปใช้เลย์เอาต์เดิมเสมอ)
- */
-export async function setPageLiveAction(formData: FormData): Promise<void> {
-  const user = await requireAdminUser("content");
-
-  const page = String(formData.get("page") ?? "").trim();
-  if (page === "") return;
-
-  const live = formData.get("live") === "1";
-
-  if (live) {
-    const [draftRow, publishedRow] = await Promise.all([loadDocumentRow(page, "draft"), loadDocumentRow(page, "published")]);
-    const draft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
-    const published = publishedRow === null ? null : parseBlockDocument(page, publishedRow.raw);
-
-    const hasDraft = draft !== null && draft.ok;
-    const hasPublished = published !== null && published.ok;
-    const inSync = hasDraft && hasPublished && documentsEqual(published.document, draft.document);
-
-    const decision = decideLiveEnable({ hasPublished, inSync });
-    if (!decision.allowed) redirect(`${pathOf(page)}?live=${decision.reason}`);
-  }
-
-  await setPageLive(page, live, user.email);
-
-  revalidatePath(pathOf(page));
-  await refreshPublicSite("page");
-}
-
-/** ใช้ในหน้าจอเพื่อแสดงสถานะสวิตช์ (อ่านอย่างเดียว) */
-export async function readPageLiveAction(page: string): Promise<boolean> {
-  await requireAdminUser("content");
-  return isPageLive(page);
 }
 
 /**
