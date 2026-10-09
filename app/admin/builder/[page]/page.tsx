@@ -10,6 +10,7 @@ import { TemplateCoverageNote } from "@/features/admin/ui/template-coverage-note
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { documentsEqual } from "@/lib/blocks/diff";
 import { blockCoverageGaps, hasBlockTemplate, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
@@ -73,11 +74,13 @@ export default async function AdminBuilderPage({
 }: {
   readonly params: Promise<{ readonly page: string }>;
   /* รอบที่ 227: ใช้บอกผู้ใช้ว่า "กดใช้เทมเพลตแล้วแต่ยังไม่ติ๊กยืนยัน" (Server Action ปฏิเสธเงียบ ๆ) */
-  readonly searchParams: Promise<{ readonly template?: string }>;
+  /* รอบที่ 238: `live` = เหตุผลที่ Server Action ปฏิเสธการเปิดสวิตช์ "ใช้กับหน้าเว็บจริง" */
+  readonly searchParams: Promise<{ readonly template?: string; readonly live?: string }>;
 }) {
   const user = await requireAdminUser("content");
   const { page } = await params;
-  const templateNotice = (await searchParams).template === "confirm";
+  const query = await searchParams;
+  const templateNotice = query.template === "confirm";
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
@@ -136,6 +139,25 @@ export default async function AdminBuilderPage({
 
   /* เอกสารที่อ่านจาก DB ต้องผ่าน parse ก่อนใช้ — ถ้าเสียหายให้เริ่มจากหน้าว่าง (ไม่ทำให้หน้าจอพัง) */
   const initialDraft = parsedDraft !== null && parsedDraft.ok ? parsedDraft.document : emptyDocument;
+
+  /*
+    ── สถานะ "ฉบับที่เผยแพร่ ตรงกับ ฉบับร่าง ไหม" (รอบที่ 238 — 🐞 เคสจริงจากเจ้าของ) ──────────
+    หน้าเว็บจริงอ่าน **ฉบับที่เผยแพร่** ไม่ใช่ฉบับร่างที่กำลังแก้ ⇒ ต้องบอกให้ตรง ๆ ว่าตอนนี้เว็บ
+    กำลังแสดงชุดไหน และถ้ายังไม่ตรง ห้ามเปิดสวิตช์ (ผู้ใช้เคยเปิดแล้วเว็บกลายเป็นบล็อกเก่า)
+    ⚠️ ค่าที่คำนวณนี้เป็นของ "ตอนโหลดหน้า" — ถ้าแก้ฉบับร่างต่อ ตัวสร้างจะเทียบสด ๆ เองอีกชั้น
+  */
+  const parsedPublished = publishedRow === null ? null : parseBlockDocument(page, publishedRow.raw);
+  const publishedDocument = parsedPublished !== null && parsedPublished.ok ? parsedPublished.document : null;
+  const liveGuard = {
+    hasPublished: publishedDocument !== null,
+    inSync: publishedDocument !== null && documentsEqual(publishedDocument, initialDraft),
+  };
+  const liveBlockedNotice =
+    query.live === "no-published"
+      ? strings.liveBlockedNoPublished
+      : query.live === "draft-not-published"
+        ? strings.liveBlockedStale
+        : null;
 
   /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
   const coverage = {
@@ -218,6 +240,9 @@ export default async function AdminBuilderPage({
             storedVersions={storedVersions}
             previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
             coverage={coverage}
+            liveGuard={liveGuard}
+            publishedBlocks={publishedDocument === null ? null : publishedDocument.blocks.length}
+            liveBlockedNotice={liveBlockedNotice}
             strings={strings}
           />
         </ImageLibraryProvider>

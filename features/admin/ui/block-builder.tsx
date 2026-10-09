@@ -25,6 +25,7 @@ import {
 import { scrollTargetFor, scrollableAncestorOf } from "@/features/admin/ui/preview-scroll";
 import { AUTOSAVE_DELAY_MS, decideAutosave, needsLeaveWarning, shortTimeOf } from "@/lib/blocks/autosave";
 import { documentDiff } from "@/lib/blocks/diff";
+import { liveSyncStateOf } from "@/lib/blocks/live-guard";
 import { MAX_HERO_SLIDES } from "@/lib/blocks/types";
 import { CONTENT_PREVIEW_PART } from "@/lib/chrome/workspace-url";
 import {
@@ -182,6 +183,16 @@ type Props = {
    * - ถ้าไม่ส่งมา = **ไม่แสดงสวิตช์นี้เลย** (ดีกว่าแสดงผิดว่า "ยังไม่ใช้กับหน้าเว็บจริง" ทั้งที่ใช้อยู่)
    */
   readonly isLive?: boolean;
+  /**
+   * สถานะ "ฉบับที่เผยแพร่ ตรงกับฉบับร่างไหม" (รอบที่ 238 — 🐞 เคสจริงจากเจ้าของ)
+   * - **ไม่บังคับ**: ไม่ส่ง = ไม่แสดงบรรทัดสถานะ (หน้าจออื่นที่ยังไม่ส่งยังใช้งานได้)
+   * - ส่งมา = หน้าจอบอกความจริงว่าตอนนี้เว็บแสดงชุดไหน + **ปิดปุ่มเปิดสวิตช์** เมื่อยังไม่ตรง
+   */
+  readonly liveGuard?: { readonly hasPublished: boolean; readonly inSync: boolean };
+  /** จำนวนบล็อกของฉบับที่เผยแพร่ (null = ยังไม่มี) — ใช้ในข้อความอธิบาย */
+  readonly publishedBlocks?: number | null;
+  /** ข้อความหลัง Server Action ปฏิเสธการเปิดสวิตช์ (แปลแล้วจากฝั่งเซิร์ฟเวอร์) — ไม่ส่ง = ไม่แสดง */
+  readonly liveBlockedNotice?: string | null;
   /**
    * กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7 ส่วนที่ 1)
    * - **ไม่บังคับ**: `undefined` = หน้าจอไม่ได้ส่งค่า ⇒ ไม่แสดงแผงตั้งเวลาเลย
@@ -497,6 +508,9 @@ export function BlockBuilder({
   page,
   previewLiveSrc,
   isLive,
+  liveGuard,
+  publishedBlocks = null,
+  liveBlockedNotice = null,
   coverage,
   schedule,
   presets = [],
@@ -774,6 +788,16 @@ export function BlockBuilder({
   const unsavedDiff = useMemo(() => documentDiff(savedDocument, document), [savedDocument, document]);
   const unsavedCount = unsavedDiff.summary.total;
   const dirty = unsavedCount > 0;
+
+  /*
+    ── สวิตช์ "ใช้กับหน้าเว็บจริง" (รอบที่ 238) ──────────────────────────────────
+    `liveState` = ฉบับที่เผยแพร่ตรงกับฉบับร่างที่โหลดมาตอนเปิดหน้าไหม (มาจากฝั่งเซิร์ฟเวอร์)
+    ⇒ ถ้ายังไม่ตรง **ปุ่ม "เปิด" ถูกปิด** เพราะเปิดไปก็ไม่เกิดอะไร (Server Action ปฏิเสธ)
+      และถ้าฝืนเปิด เว็บจะแสดงฉบับเก่า (เคสจริงที่เจ้าของเจอ)
+    ⚠️ ปุ่ม "ปิด" ไม่ถูกปิดเลย — เป็นทางหนีกลับไปใช้เลย์เอาต์เดิมเสมอ
+  */
+  const liveState = liveGuard === undefined ? null : liveSyncStateOf(liveGuard);
+  const liveBlocked = !isLive && liveState !== null && liveState !== "in-sync";
   const autosaveDecision = decideAutosave({
     enabled: autosaveEnabled,
     dirty,
@@ -2081,26 +2105,60 @@ export function BlockBuilder({
       <StatusPanel state={draftState} strings={strings} />
       {/* สวิตช์ "ใช้กับหน้าเว็บจริง" (เซสชัน S1) — แสดงเฉพาะเมื่อหน้าจอส่งค่ามา (isLive ไม่บังคับ) */}
       {isLive === undefined ? null : (
-        <section className="border-line bg-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-fg text-sm font-semibold">
-              {isLive ? strings.liveOn : strings.liveOff}
-            </p>
-            <p className="text-fg-muted text-xs">{isLive ? strings.liveHintOn : strings.liveHintOff}</p>
-          </div>
-          {/* คำเตือนก่อนเปิดสวิตช์: เปิดแล้วหน้าเว็บจะแสดงเฉพาะบล็อก (S2 รอบที่ 83) */}
-          {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
+        <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-fg text-sm font-semibold">
+                {isLive ? strings.liveOn : strings.liveOff}
+              </p>
+              <p className="text-fg-muted text-xs">{isLive ? strings.liveHintOn : strings.liveHintOff}</p>
+              {/*
+                รอบที่ 238 (🐞 เคสจริงจากเจ้าของ) — หน้าเว็บจริงอ่าน "ฉบับที่เผยแพร่" ไม่ใช่ "ฉบับร่างที่กำลังแก้"
+                ⇒ ต้องบอกตรง ๆ ตอนนี้เว็บแสดงชุดไหน และถ้ายังไม่ตรง **ห้ามเปิดสวิตช์**
+                (ผู้ใช้เคยเปิดแล้วเว็บกลายเป็นบล็อกเก่าที่มีข้อมูลทดสอบ ⇒ ต้องปิดสวิตช์กลับ)
+              */}
+              {liveState === null ? null : liveState === "in-sync" ? (
+                <p className="text-fg-muted text-xs" data-live-sync="in-sync">
+                  {fillTemplate(strings.liveSyncOk, { published: publishedBlocks ?? 0 })}
+                </p>
+              ) : (
+                <p className="text-brand-red text-xs" data-live-sync={liveState}>
+                  {liveState === "missing"
+                    ? strings.liveSyncMissing
+                    : fillTemplate(strings.liveSyncStale, {
+                        draft: document.blocks.length,
+                        published: publishedBlocks ?? 0,
+                      })}
+                </p>
+              )}
+            </div>
+            {/* คำเตือนก่อนเปิดสวิตช์: เปิดแล้วหน้าเว็บจะแสดงเฉพาะบล็อก (S2 รอบที่ 83) */}
+            {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
 
-          <form action={setPageLiveAction} className="flex items-center gap-2">
-            <input type="hidden" name="page" value={page} />
-            <input type="hidden" name="live" value={isLive ? "0" : "1"} />
-            <button
-              type="submit"
-              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
-            >
-              {isLive ? strings.liveTurnOff : strings.liveTurnOn}
-            </button>
-          </form>
+            <form action={setPageLiveAction} className="flex items-center gap-2" data-live-form="">
+              <input type="hidden" name="page" value={page} />
+              <input type="hidden" name="live" value={isLive ? "0" : "1"} />
+              {/*
+                ปุ่ม "เปิด" ถูกปิดเมื่อยังเปิดไม่ได้ (ฉบับร่างยังไม่ถูกเผยแพร่) — ตรงกับด่านที่ Server Action
+                (บทเรียนรอบที่ 85: อย่าให้ปุ่มกดแล้วเด้ง/ไม่เกิดอะไรโดยไม่บอกเหตุผล)
+              */}
+              <button
+                type="submit"
+                disabled={liveBlocked}
+                title={liveBlocked ? strings.liveTurnOnBlocked : undefined}
+                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isLive ? strings.liveTurnOff : strings.liveTurnOn}
+              </button>
+            </form>
+          </div>
+
+          {/* ข้อความหลังถูกปฏิเสธ (Server Action เด้งกลับมาพร้อมเหตุผล — ไม่เงียบ) */}
+          {liveBlockedNotice === null ? null : (
+            <p className="text-brand-red text-xs" role="status" data-live-notice="">
+              {liveBlockedNotice}
+            </p>
+          )}
         </section>
       )}
 

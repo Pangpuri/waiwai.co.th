@@ -25,6 +25,7 @@ import type { thAdminRevisions } from "@/lib/i18n/messages/areas/th/adminRevisio
 import type { thAdminSort } from "@/lib/i18n/messages/areas/th/adminSort";
 import type { thAdminNav } from "@/lib/i18n/messages/areas/th/adminNav";
 import type { thAdminNotice } from "@/lib/i18n/messages/areas/th/adminNotice";
+import type { adminLive as thAdminLive } from "@/lib/i18n/messages/areas/th/adminLive";
 
 /** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset/block-types/schedule/notice) — ไฟล์นี้ไม่ต้องมีอีก */
 type MovedKeys =
@@ -49,7 +50,8 @@ type MovedKeys =
   | keyof typeof thAdminBlockTypes
   | keyof typeof thAdminSchedule
   | keyof typeof thAdminHero
-  | keyof typeof thAdminHeroCards;
+  | keyof typeof thAdminHeroCards
+  | keyof typeof thAdminLive;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",
@@ -231,12 +233,7 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   restoredOk: "Restored into the draft — press Publish to update the live site.",
   emptyPage: "This page has no blocks yet — press \"Add block\" to start.",
   dbMissingShort: "Database is not configured — DATABASE_URL is required.",
-  liveOn: "Live on the public site",
-  liveOff: "Not live yet",
-  liveTurnOn: "Make it live",
-  liveTurnOff: "Stop using (back to the designed layout)",
-  liveHintOn: "The public site is serving this content.",
-  liveHintOff: "The public site still shows the designed layout — turn this on when the content is ready.",
+  /* ⚠️ Round 238: all `live*` keys moved to the `adminLive` sub-area (this area hit the 32KB cap) */
   rebuildHook: "Published — the host has been asked to rebuild.",
   rebuildCommand: "Published — a rebuild was started on the server.",
   rebuildManual: "Published — no rebuild is configured, run the build manually.",

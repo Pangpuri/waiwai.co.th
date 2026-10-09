@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
 import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
-import { documentDiff } from "@/lib/blocks/diff";
+import { documentDiff, documentsEqual } from "@/lib/blocks/diff";
+import { decideLiveEnable } from "@/lib/blocks/live-guard";
 import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { decideTemplateApply } from "@/lib/blocks/template-apply";
@@ -355,7 +356,14 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
 
 /**
  * เปิด/ปิด "ใช้เนื้อหานี้กับหน้าเว็บจริง" (เซสชั่น S1)
- * เปิด = หน้าเว็บสาธารณะเรนเดอร์เอกสารที่เผยแพร่แทนเลย์เอาต์ที่ออกแบบไว้ · ปิด = กลับไปใช้ของเดิมทันทีหลังสร้างใหม่
+ * เปิด = หน้าเว็บสาธารณะเรนเดอร์ **เอกสารที่เผยแพร่** แทนเลย์เอาต์ที่ออกแบบไว้ · ปิด = กลับไปใช้ของเดิมทันที
+ *
+ * 🐞 รอบที่ 238 (เคสจริงจากเจ้าของ): เดิมเปิดได้เสมอโดยไม่ดูว่าฉบับที่เผยแพร่คืออะไร
+ * ⇒ ผู้ใช้เห็นพรีวิวสด (ฉบับร่าง) มีสินค้า/เมนู/ข่าวครบ แต่พอเปิดสวิตช์ **เว็บกลายเป็นฉบับเก่า**
+ * (เทมเพลตเดิมที่มีข้อมูลทดสอบ) เพราะหน้าเว็บอ่าน "ฉบับที่เผยแพร่" ไม่ใช่ "ฉบับร่างที่กำลังแก้"
+ * ⇒ แก้ที่ราก (fail-closed): **เปิดได้ต่อเมื่อฉบับที่เผยแพร่ตรงกับฉบับร่างแล้วเท่านั้น**
+ *    ไม่ตรง = ไม่เปิด + เด้งกลับพร้อมเหตุผล (`?live=draft-not-published`) ให้ผู้ใช้กด "เผยแพร่" ก่อน
+ * ⚠️ การ **ปิด** สวิตช์ไม่ตรวจอะไร (เป็นทางหนีกลับไปใช้เลย์เอาต์เดิมเสมอ)
  */
 export async function setPageLiveAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser("content");
@@ -364,6 +372,20 @@ export async function setPageLiveAction(formData: FormData): Promise<void> {
   if (page === "") return;
 
   const live = formData.get("live") === "1";
+
+  if (live) {
+    const [draftRow, publishedRow] = await Promise.all([loadDocumentRow(page, "draft"), loadDocumentRow(page, "published")]);
+    const draft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
+    const published = publishedRow === null ? null : parseBlockDocument(page, publishedRow.raw);
+
+    const hasDraft = draft !== null && draft.ok;
+    const hasPublished = published !== null && published.ok;
+    const inSync = hasDraft && hasPublished && documentsEqual(published.document, draft.document);
+
+    const decision = decideLiveEnable({ hasPublished, inSync });
+    if (!decision.allowed) redirect(`${pathOf(page)}?live=${decision.reason}`);
+  }
+
   await setPageLive(page, live, user.email);
 
   revalidatePath(pathOf(page));

@@ -28,6 +28,7 @@ import { adminTrash } from "./areas/en/adminTrash.ts";
 import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/en/adminBlockTypes.ts";
 import { adminSchedule } from "./areas/en/adminSchedule.ts";
+import { adminLive } from "./areas/en/adminLive.ts";
 import { adminRbac } from "./areas/en/adminRbac.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
 import { enAdminNotice } from "./areas/en/adminNotice.ts";
@@ -99,5 +100,6 @@ export const en: Messages = {
     ...adminChromePreset,
     ...adminBlockTypes,
     ...adminSchedule,
+    ...adminLive,
   },
 };

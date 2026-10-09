@@ -28,6 +28,7 @@ import { adminTrash } from "./areas/th/adminTrash.ts";
 import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/th/adminBlockTypes.ts";
 import { adminSchedule } from "./areas/th/adminSchedule.ts";
+import { adminLive } from "./areas/th/adminLive.ts";
 import { adminRbac } from "./areas/th/adminRbac.ts";
 import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { thAdminNotice } from "./areas/th/adminNotice.ts";
@@ -98,6 +99,7 @@ export const th = {
     ...adminChromePreset,
     ...adminBlockTypes,
     ...adminSchedule,
+    ...adminLive,
   },
 };
 
