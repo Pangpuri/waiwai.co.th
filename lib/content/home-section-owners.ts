@@ -25,20 +25,39 @@ export type SectionOwner = {
    * ⚠️ ค่ายังอยู่ใน draft ⇒ กดบันทึกจากหน้าจอนี้แล้วค่า hero ไม่หาย (มีเทสต์คุม)
    */
   readonly hideForm?: boolean;
+  /**
+   * **ส่วนนี้เลิกใช้แล้ว** — หน้าเว็บไม่อ่านค่าจากแถว EAV เหล่านี้อีกเลย (รอบที่ 252 · ตรวจด้วยการค้นซอร์สจริง)
+   *
+   * ที่มา: หลังย้ายหน้าแรกไปใช้ **บล็อก** (รอบ 211–224) + **ฐานข้อมูล** + **ตั้งค่าส่วนกลาง**
+   * ข้อมูลจริงของส่วนเหล่านี้มาจากที่อื่นทั้งหมด ⇒ ฟอร์มในหน้านี้เคยเป็น "ช่องที่กรอกแล้วไม่มีผล"
+   * ⇒ ซ่อนฟอร์ม + บอกว่าแหล่งจริงอยู่ที่ไหน · ⚠️ **ไม่ลบข้อมูล** (แถวยังอยู่ ค่ายังไม่หาย)
+   */
+  readonly dead?: boolean;
+  /**
+   * ค่าที่กรอกในหน้านี้ **มีผลเฉพาะเมื่อหน้าแรกยังใช้เลย์เอาต์โค้ด** (โหมดยังไม่เปิดบล็อก)
+   *
+   * ใช้กับ "ที่ซื้อสินค้า" (`whereToBuyViewOf` ใน `app/[lang]/page.tsx` — เดิมรอบ 209)
+   * ⚠️ เมื่อหน้าแรกใช้บล็อก บล็อก `marketplaceLinks` เป็นตัวตัดสินแทน
+   */
+  readonly codeLayoutOnly?: boolean;
 };
 
 export const HOME_SECTION_OWNERS: readonly SectionOwner[] = [
-  /* หัวหน้าแรก + สไลด์ + การ์ด PR: เจ้าของคือเมนู "สไลด์ & แคมเปญ" (หน้าแรกเรนเดอร์จากที่นั่น — รอบ 217) */
+  /* หัวหน้าแรก + สไลด์ + การ์ด PR: เจ้าของคือเมนู "สไลด์ แคมเปญ ข้อความหัวเว็บไซต์" (รอบ 217 · 251) */
   { key: "hero", screen: "/admin/hero", hideForm: true },
-  /* ส่วนข้อมูลจริง 3 ส่วน + จดหมายข่าว: เจ้าของคือตัวสร้างหน้าเว็บ/ฐานข้อมูล (บล็อกไดนามิก รอบ 211–224) */
-  /* "ที่ซื้อสินค้า": เจ้าของย้ายมาที่ตัวสร้างหน้าเว็บ (บล็อก marketplaceLinks · รอบที่ 229) */
-  { key: "whereToBuy", screen: "/admin/builder/home" },
-  { key: "products", screen: "/admin/builder/home" },
-  { key: "recipes", screen: "/admin/builder/home" },
-  { key: "news", screen: "/admin/builder/home" },
-  { key: "newsletter", screen: "/admin/builder/home" },
+  /*
+    ★ รอบที่ 252 — "ที่ซื้อสินค้า": EAV ยัง **ถูกอ่านจริง** แต่เฉพาะเมื่อหน้าแรกใช้ **เลย์เอาต์โค้ด**
+    (`whereToBuyViewOf(homeContent, …)` ถูกเรนเดอร์ที่สาขาเลย์เอาต์โค้ดเท่านั้น)
+    ⇒ หน้าจอนี้ยังเป็นเจ้าของค่าจริงในกรณีนั้น → ดู `HOME_SECTIONS_OWNED_HERE`
+  */
+  { key: "whereToBuy", screen: "/admin/content/home", codeLayoutOnly: true },
+  /* ข้อมูลจริงมาจากฐานข้อมูล + บล็อกในตัวสร้างหน้าเว็บ (สองทางนี้เป็นเจ้าของ) */
+  { key: "products", screen: "/admin/builder/home", dead: true },
+  { key: "recipes", screen: "/admin/builder/home", dead: true },
+  { key: "news", screen: "/admin/builder/home", dead: true },
+  { key: "newsletter", screen: "/admin/builder/home", dead: true },
   /* SEO รายหน้า: เจ้าของคือหน้าตั้งค่าส่วนกลาง */
-  { key: "seo", screen: "/admin/settings" },
+  { key: "seo", screen: "/admin/settings", dead: true },
 ];
 
 /** ส่วนนี้ถูกดูแลที่อื่นไหม (คืน null = หน้านี้เป็นเจ้าของค่าจริง) */
@@ -46,5 +65,10 @@ export function ownerOfSection(key: string): SectionOwner | null {
   return HOME_SECTION_OWNERS.find((entry) => entry.key === key) ?? null;
 }
 
-/** คีย์ที่หน้าจอนี้เป็นเจ้าของค่าจริง (ใช้ล็อกด้วยเทสต์) */
-export const HOME_SECTIONS_OWNED_HERE: readonly string[] = [];
+/**
+ * คีย์ที่หน้าจอนี้เป็นเจ้าของค่าจริง (ใช้ล็อกด้วยเทสต์)
+ *
+ * ★ รอบที่ 252: "ที่ซื้อสินค้า" กลับมาเป็นของหน้าจอนี้ **ในกรณีที่หน้าแรกใช้เลย์เอาต์โค้ด**
+ * (`whereToBuyViewOf` อ่าน EAV จริง) · เมื่อหน้าแรกเปิดใช้บล็อก บล็อก `marketplaceLinks` ตัดสินแทน
+ */
+export const HOME_SECTIONS_OWNED_HERE: readonly string[] = ["whereToBuy"];

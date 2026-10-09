@@ -125,7 +125,8 @@ test("hero texts: หน้าจอสไลด์แสดงฟอร์ม �
   const editor = codeOf("features/admin/ui/home-editor.tsx");
   assert.ok(editor.includes("ownerOfSection(section.key)?.hideForm === true"), "กรองส่วนที่ซ่อนฟอร์มออก");
   assert.ok(editor.includes("data-moved-section={section.key}"), "ต้องบอกทางไปแก้");
-  assert.ok(editor.includes("ownerOfSection(section.key)?.hideForm !== true"), "ส่วนที่เหลือยังแสดงตามเดิม");
+  /* รอบที่ 252: เงื่อนไขการเรนเดอร์ฟอร์มกรองทั้ง hideForm และ dead ⇒ ส่วนที่เลิกใช้แล้วก็ไม่แสดงฟอร์ม */
+  assert.ok(editor.includes("owner?.hideForm !== true && owner?.dead !== true"), "ส่วนที่เหลือ (ที่มีเจ้าของที่นี่) ยังแสดงฟอร์ม");
 
   /* ฟอร์มต้องเป็น Server Action ล้วน + ป้ายจากพจนานุกรม + มีช่องครบ */
   const heroForm = codeOf("features/admin/ui/hero-texts-form.tsx");

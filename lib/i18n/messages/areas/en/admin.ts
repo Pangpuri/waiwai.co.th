@@ -88,7 +88,9 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   setupCommand: "npm run admin:create -- --email=you@waiwai.co.th",
 
   contentTitle: "Edit the home page",
-  contentIntro: "Edit the Thai and English copy of each section. Everything is validated before it is written to the database.",
+  /* Round 252: state the real scope — only sections owned here are editable */
+  contentIntro:
+    "This screen only really edits the \"Where to buy\" section (it applies while the home page uses the code layout) — every other section has its own owner; see the labels below · stored values are kept, nothing is deleted",
   backToOverview: "Back to overview",
   save: "Save",
   saving: "Saving…",

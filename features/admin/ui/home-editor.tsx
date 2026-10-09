@@ -387,8 +387,32 @@ export function HomeEditor({ spec, initialDraft, strings }: Props) {
           </p>
         ))}
 
+      {/*
+        ★ รอบที่ 252 — ส่วนที่ **เลิกใช้แล้ว**: หน้าเว็บไม่อ่านค่า EAV ของส่วนนี้เลย (แหล่งจริงคือบล็อก/ฐานข้อมูล/ตั้งค่าส่วนกลาง)
+        ⇒ ซ่อนฟอร์มทั้งหมด (เดิมเป็น "ช่องที่กรอกแล้วไม่มีผล") + บอกว่าไปแก้ที่ไหน
+        ⚠️ **ไม่ลบข้อมูล** — แถวในฐานข้อมูลยังอยู่ครบ และค่ายังถูกส่งกลับตอนบันทึก (ไม่มีอะไรหาย)
+      */}
       {spec.sections
-        .filter((section) => ownerOfSection(section.key)?.hideForm !== true)
+        .filter((section) => ownerOfSection(section.key)?.dead === true)
+        .map((section) => (
+          <p
+            key={section.key}
+            className="border-line bg-bg-subtle text-fg-muted rounded-2xl border border-dashed p-3 text-xs"
+            data-dead-section={section.key}
+          >
+            <span className="text-fg font-semibold">{section.label}</span> —{" "}
+            {fillTemplate(strings.sectionDead, { screen: ownerOfSection(section.key)?.screen ?? "" })}{" "}
+            <Link href={ownerOfSection(section.key)?.screen ?? "/admin"} className="underline underline-offset-2">
+              {ownerOfSection(section.key)?.screen ?? "/admin"}
+            </Link>
+          </p>
+        ))}
+
+      {spec.sections
+        .filter((section) => {
+          const owner = ownerOfSection(section.key);
+          return owner?.hideForm !== true && owner?.dead !== true;
+        })
         .map((section) => (
         <details key={section.key} className="border-line bg-surface rounded-2xl border p-4" open={section.key === "hero"}>
           <summary className="text-fg cursor-pointer text-base font-semibold">{section.label}</summary>
@@ -396,8 +420,16 @@ export function HomeEditor({ spec, initialDraft, strings }: Props) {
           {/*
             รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่"): บอกตรง ๆ ว่าส่วนนี้ค่าจริงมาจากที่อื่น
             — ยังคงฟิลด์ไว้ (ไม่ทำให้ข้อมูลเดิมหาย) แต่ผู้ใช้จะไม่เข้าใจผิดว่ากรอกแล้วขึ้นเว็บ
+            ★ รอบที่ 252: "ที่ซื้อสินค้า" หน้าจอนี้เป็นเจ้าของค่าจริง **แต่มีผลเฉพาะเลย์เอาต์โค้ด** ⇒ ใช้ข้อความอีกแบบ
           */}
-          {ownerOfSection(section.key) === null ? null : (
+          {ownerOfSection(section.key)?.codeLayoutOnly === true ? (
+            <p
+              className="border-line text-fg-muted mt-3 rounded-xl border border-dashed p-3 text-xs"
+              data-section-code-layout=""
+            >
+              {strings.sectionCodeLayoutOnly}
+            </p>
+          ) : ownerOfSection(section.key) === null ? null : (
             <p
               className="border-line text-fg-muted mt-3 rounded-xl border border-dashed p-3 text-xs"
               data-section-managed=""

@@ -39,4 +39,8 @@ export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
   /* Page-level change (X1.8): the layout is not tied to any block, so it has its own label */
   draftDiffLayout: "Page layout",
   draftRestoredApplied: "Restored — what is on screen was replaced by the restored revision (not live yet)",
+  /* ── Round 252: retired sections / code-layout-only sections ── */
+  sectionDead: "This section is no longer used — the site does not read these values (real source: {screen}) · nothing to edit here, the stored values are kept intact.",
+  sectionCodeLayoutOnly:
+    "Values here apply **only while the home page uses the code layout** — once the page runs on blocks (page builder), the marketplace block decides instead.",
 };

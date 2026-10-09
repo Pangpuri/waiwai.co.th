@@ -26,6 +26,10 @@ export default async function AdminHomeContentPage() {
     <header className="flex flex-col gap-1">
       <p className="text-fg-muted text-xs font-medium tracking-wide uppercase">{strings.brand}</p>
       <h1 className="text-fg text-2xl font-bold">{strings.contentTitle}</h1>
+      {/* ★ รอบที่ 252: บอกขอบเขตจริงของหน้าจอนี้ (ส่วนอื่นมีเจ้าของอยู่ที่อื่น — กันเข้าใจผิดว่ากรอกแล้วขึ้นเว็บ) */}
+      <p className="text-fg-muted max-w-3xl text-xs" data-content-intro="">
+        {strings.contentIntro}
+      </p>
     </header>
   );
 
