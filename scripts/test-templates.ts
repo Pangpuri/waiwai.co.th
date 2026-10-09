@@ -494,3 +494,18 @@ test("★ builder: เปิดหน้าแล้วต้องไม่เ�
   );
   assert.ok(builder.includes('const [selectedId, setSelectedId] = useState<string>("");'), "ต้องเริ่มด้วยไม่เลือกอะไร");
 });
+
+/** ★ รอบที่ 236 — คลิกทั้งแถวในรายการบล็อกต้องเลือกได้ (ไม่ต้องเล็งที่ตัวหนังสือ) */
+test("★ builder: แถวในรายการบล็อกคลิกได้ทั้งแถว (ปุ่มย่อยต้องไม่ทะลุไปเลือก)", () => {
+  const list = readFileSync("features/admin/ui/block-layer-list.tsx", "utf8");
+  assert.ok(list.includes("onClick={() => handlers.onSelect(block.id)}"), "แถวต้องคลิกเลือกได้");
+  const rowClickCount = list.split("onClick={() => handlers.onSelect(block.id)}").length - 1;
+  assert.ok(rowClickCount >= 1, "ต้องมีการคลิกเลือกบนแถว");
+  /* อุปกรณ์ย่อยของแถวต้องกันการคลิกทะลุทั้งคู่: (1) กลุ่มปุ่ม ↑ ↓ ทำซ้ำ ลบ · (2) ช่อง "ย้ายไป"
+     — ถ้าช่อง "ย้ายไป" ทะลุ จะเรียก onSelect ⇒ โพสต์เข้า iframe ⇒ จอเลื่อนตามทั้งที่แค่เลือกปลายทาง (รอบ 230–235) */
+  const guardCount = list.split("onClick={(event) => event.stopPropagation()}").length - 1;
+  assert.ok(
+    guardCount >= 2,
+    "ปุ่มย่อย + ช่อง \"ย้ายไป\" ต้องหยุดการคลิกไม่ให้ทะลุไปเลือกบล็อก",
+  );
+});

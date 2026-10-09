@@ -118,6 +118,12 @@ function LayerItem({
           setDragging(null);
           setDropKey(null);
         }}
+        /*
+          รอบที่ 236 (ฟีดแบ็กเจ้าของ: "คลิกโดนช่องเปล่า ๆ ของบล็อก ไม่เลื่อน")
+          ⇒ ให้ **ทั้งแถว** คลิกเลือกได้ (เดิมมีเฉพาะตัวหนังสือหัวเรื่อง ⇒ ช่องว่างในแถวคลิกไม่ติด)
+          ⚠️ ปุ่มย่อย (↑ ↓ ทำซ้ำ ลบ) ยังทำงานของตัวเอง — คลิกจะไม่ทะลุมาถึงแถวเพราะปุ่มเรียก stopPropagation
+        */
+        onClick={() => handlers.onSelect(block.id)}
         className={`flex flex-col gap-1 rounded-lg border p-2 transition-colors ${
           selected ? "border-brand-red bg-surface-raised" : "border-line hover:border-brand-red/60"
         } ${dragging === block.id ? "opacity-40" : ""} ${isDropping ? "border-t-brand-red border-t-4" : ""}`}
@@ -135,7 +141,8 @@ function LayerItem({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-1">
+        {/* ปุ่มย่อยของแถว — หยุดการคลิกไม่ให้ทะลุไป "เลือกบล็อก" ของทั้งแถว (รอบที่ 236) */}
+        <div className="flex flex-wrap gap-1" onClick={(event) => event.stopPropagation()}>
           <TinyButton label="↑" disabled={location.index === 0} onClick={() => handlers.onMove(block.id, -1)} title={strings.moveUp} />
           <TinyButton
             label="↓"
@@ -149,7 +156,8 @@ function LayerItem({
 
         {/* ย้ายข้ามภาชนะ (ระดับหน้า ↔ คอลัมน์) — ทางเลือกที่ไม่ต้องลาก (ใช้เมาส์/คีย์บอร์ดก็ได้) */}
         {rows.length === 0 ? null : (
-          <label className="text-fg-muted flex items-center gap-1 text-[11px]">
+          /* รอบที่ 236: เป็น "อุปกรณ์ย่อย" ของแถวเหมือนปุ่ม ⇒ ต้องไม่ทะลุไปเลือกบล็อก (ไม่งั้นกดเลือกปลายทางแล้วจอเลื่อนตาม) */
+          <label className="text-fg-muted flex items-center gap-1 text-[11px]" onClick={(event) => event.stopPropagation()}>
             <span className="shrink-0">{strings.moveToLabel}</span>
             <select
               value=""
