@@ -131,12 +131,19 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
     const refresh = await refreshPublicSite("page");
     const rebuild = refresh.rebuild;
 
+    /*
+      รอบที่ 239 (🐞 "กดเผยแพร่แล้วไม่ติด"): เขียนฉบับเผยแพร่เสร็จ ≠ หน้าเว็บเปลี่ยน
+      ⇒ ถ้าสวิตช์ "ใช้กับหน้าเว็บจริง" ยังปิดอยู่ หน้าเว็บยังใช้เลย์เอาต์ที่ออกแบบไว้ ⇒ ต้องบอกให้ชัด
+    */
+    const live = await isPageLive(page);
+
     return {
       status: "published",
       errors: [],
       warnings: prepared.warnings,
       problems: [],
       revision,
+      live,
       rebuild: rebuild.kind,
       rebuildDetail: rebuild.kind === "failed" ? rebuild.detail : null,
     };

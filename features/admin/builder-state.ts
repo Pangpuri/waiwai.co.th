@@ -26,6 +26,12 @@ export type BuilderState = {
   readonly rebuild?: "hook-triggered" | "command-ok" | "manual" | "failed" | "isr";
   /** รายละเอียดเมื่อ rebuild ไม่สำเร็จ (ไม่มี URL/โทเคน) */
   readonly rebuildDetail?: string | null;
+  /**
+   * หน้าเว็บสาธารณะใช้ "เนื้อหาชุดที่เผยแพร่" อยู่หรือไม่ (รอบที่ 239)
+   * ⚠️ จำเป็นต่อการบอกความจริงหลังกด "เผยแพร่": ถ้าสวิตช์ "ใช้กับหน้าเว็บจริง" ปิดอยู่
+   *    การกดเผยแพร่จะ **ไม่ทำให้หน้าเว็บเปลี่ยนเลย** (ผู้ใช้เข้าใจผิดว่า "กดแล้วไม่ติด")
+   */
+  readonly live?: boolean;
   /** ผลการย้ายรุ่นข้อมูลที่เก็บไว้ (X1.1) — จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในแต่ละฉบับ */
   readonly migrated?: { readonly draft: number; readonly published: number } | null;
   /**

@@ -23,4 +23,7 @@ export const adminLive = {
   liveTurnOnBlocked: "Cannot turn on yet — press “Publish” so the draft goes live (otherwise the site shows the old version).",
   liveBlockedStale: "Not turned on — the draft has not been published. Press “Publish” first (turning it on now would show the old version).",
   liveBlockedNoPublished: "Not turned on — this page has no published version yet. Press “Publish” first.",
+  /* Round 239 — tell the truth after “Publish”: the switch is a separate step from publishing */
+  publishedNotLive: "Published (revision {revision}) — but the public site is still not using this content, because the “Make it live” switch is off ⇒ press that switch in the panel above.",
+  publishedLive: "The public site is showing this published version — what you see in the preview is what visitors see.",
 };

@@ -479,6 +479,21 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
       className={`flex flex-col gap-1 rounded-xl border p-3 text-sm ${failed ? "border-brand-red bg-surface" : "border-line bg-surface-raised"}`}
     >
       <p className="text-fg font-semibold">{message}</p>
+      {/*
+        รอบที่ 239 (🐞 จากคำถามเจ้าของ: "ขยับบล็อกแล้วกดเผยแพร่ ทำไมไม่ติด"):
+        กด "เผยแพร่" = เขียนฉบับเผยแพร่ **แต่หน้าเว็บยังไม่ใช้บล็อกจนกว่าสวิตช์ "ใช้กับหน้าเว็บจริง" จะเปิด**
+        ⇒ ต้องบอกตรง ๆ ว่าหน้าเว็บเปลี่ยนหรือยัง ไม่งั้นผู้ใช้จะคิดว่าเผยแพร่ไม่ทำงาน
+      */}
+      {state.status === "published" && state.live === false ? (
+        <p className="text-brand-red text-xs font-semibold" data-published-live="off">
+          {fillTemplate(strings.publishedNotLive, { revision: state.revision ?? 1 })}
+        </p>
+      ) : null}
+      {state.status === "published" && state.live === true ? (
+        <p className="text-fg-muted text-xs" data-published-live="on">
+          {strings.publishedLive}
+        </p>
+      ) : null}
       {/* กู้คืนแล้วหน้าจอถูกแทนด้วยรุ่นที่กู้คืน (X1.5) — บอกให้ชัดเพื่อไม่ให้สับสนว่า "กดแล้วทำไมไม่เปลี่ยน" */}
       {state.status === "restored" ? <p className="text-fg-muted text-xs">{strings.draftRestoredApplied}</p> : null}
       {rebuildMessage === null ? null : (

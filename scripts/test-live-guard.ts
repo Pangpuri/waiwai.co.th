@@ -124,12 +124,15 @@ test("live-guard: ข้อความต้องไม่โกหก + ม�
       "liveTurnOnBlocked",
       "liveBlockedStale",
       "liveBlockedNoPublished",
+      "publishedNotLive",
+      "publishedLive",
     ]) {
       assert.ok(dictionary.includes(`${key}:`), `${locale}/adminLive.ts ต้องมีคีย์ ${key}`);
     }
     /* ตัวเติมต้องมีครบ (ไม่งั้นผู้ใช้เห็น {published} ดิบ) */
     assert.ok(dictionary.includes("{published}"), `${locale}: liveSyncOk ต้องมี {published}`);
     assert.ok(dictionary.includes("{draft}"), `${locale}: liveSyncStale ต้องมี {draft}`);
+    assert.ok(dictionary.includes("{revision}"), `${locale}: publishedNotLive ต้องมี {revision}`);
   }
 
   /* ข้อความ "เปิดอยู่" ต้องบอกว่าหน้าเว็บแสดง **ฉบับที่เผยแพร่** (ไม่ใช่ "เนื้อหาชุดนี้" แบบเดิมที่ทำให้เข้าใจผิด) */
@@ -145,4 +148,38 @@ test("live-guard: ข้อความต้องไม่โกหก + ม�
     const composed = sourceOf(`lib/i18n/messages/${locale}.ts`);
     assert.ok(composed.includes("...adminLive,"), `${locale}.ts ต้องประกอบพื้นที่ย่อย adminLive เข้า admin`);
   }
+});
+
+/* ── 5) 🐞 รอบที่ 239 — "กดเผยแพร่แล้วทำไมไม่ติด" (คำถามเจ้าของ) ─────────────────
+ *
+ * เดิม: กด "เผยแพร่" สำเร็จ → จอขึ้น "เผยแพร่แล้ว — หน้าเว็บจะสร้างใหม่ทันที"
+ * แต่ถ้าสวิตช์ "ใช้กับหน้าเว็บจริง" ปิดอยู่ **หน้าเว็บไม่เปลี่ยนเลย** ⇒ ผู้ใช้คิดว่าเผยแพร่พัง
+ * (เคสจริง: เจ้าของขยับบล็อก "ที่ซื้อสินค้า" ขึ้นก่อนข่าว แล้วกดเผยแพร่ ⇒ DB เขียนถูกทุกอย่าง
+ *  แต่หน้าเว็บยังใช้เลย์เอาต์โค้ดเพราะ `is_live = false`)
+ *
+ * กติกาใหม่: ผลลัพธ์การเผยแพร่ต้องบอกว่า "หน้าเว็บเปลี่ยนหรือยัง" เสมอ
+ */
+
+test("live-guard: ผลการเผยแพร่ต้องบอกว่าหน้าเว็บเปลี่ยนหรือยัง (สวิตช์คนละตัวกับการเผยแพร่)", () => {
+  /* action ต้องอ่านสถานะสวิตช์จริงหลังเผยแพร่ แล้วส่งกลับไปกับผลลัพธ์ */
+  const actions = sourceOf("app/admin/builder/actions.ts");
+  assert.ok(actions.includes("const live = await isPageLive(page);"), "publishAction ต้องอ่านสถานะสวิตช์จริง");
+  assert.ok(actions.includes("      live,\n"), "ต้องส่ง live กลับไปในผลลัพธ์ที่สำเร็จ");
+
+  const state = sourceOf("features/admin/builder-state.ts");
+  assert.ok(state.includes("readonly live?: boolean;"), "BuilderState ต้องมีฟิลด์ live (ไม่บังคับ)");
+
+  /* หน้าจอต้องแยกข้อความสองทาง: ขึ้นเว็บแล้ว / ยังไม่ขึ้น + จุดตรวจให้เทสต์กับ HTTP เห็น */
+  const builder = sourceOf("features/admin/ui/block-builder.tsx");
+  assert.ok(builder.includes('state.status === "published" && state.live === false'), "ต้องมีสาขา 'เผยแพร่แล้วแต่ยังไม่ขึ้นเว็บ'");
+  assert.ok(builder.includes('state.status === "published" && state.live === true'), "ต้องมีสาขา 'เผยแพร่แล้วและขึ้นเว็บแล้ว'");
+  assert.ok(builder.includes('data-published-live="off"') && builder.includes('data-published-live="on"'), "ต้องมีจุดตรวจ data-published-live");
+  assert.ok(builder.includes("strings.publishedNotLive"), "ต้องใช้ข้อความที่บอกเหตุผล + วิธีแก้");
+
+  /* ข้อความต้องบอก "ทำอะไรต่อ" ไม่ใช่แค่บอกว่าเผยแพร่แล้ว */
+  const th = sourceOf("lib/i18n/messages/areas/th/adminLive.ts");
+  assert.ok(th.includes("หน้าเว็บจริงยังไม่ใช้เนื้อหาชุดนี้"), "ข้อความ TH ต้องบอกว่าหน้าเว็บยังไม่เปลี่ยน");
+  assert.ok(th.includes("ใช้กับหน้าเว็บจริง"), "ข้อความ TH ต้องบอกปุ่มที่ต้องกดต่อ");
+  const en = sourceOf("lib/i18n/messages/areas/en/adminLive.ts");
+  assert.ok(en.includes("still not using this content"), "ข้อความ EN ต้องบอกว่าหน้าเว็บยังไม่เปลี่ยน");
 });
