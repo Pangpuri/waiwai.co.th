@@ -116,6 +116,20 @@ export async function findMediaIdBySha256(sha256: string): Promise<string | null
   }
 }
 
+/**
+ * หา id ของภาพจากหลายลายนิ้วมือในคำสั่งเดียว (รอบที่ 253 — ใช้ตอนสร้างบล็อกจากเทมเพลต)
+ * คืน Map: sha256 → id (เฉพาะที่มีจริง)
+ */
+export async function findMediaIdsBySha256(hashes: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  const unique = [...new Set(hashes.filter((hash) => hash.trim() !== ""))];
+  if (unique.length === 0) return new Map();
+  const result = await getPool().query<{ id: string; sha256: string }>(
+    `select id, sha256 from media where sha256 = any($1::text[]) and deleted_at is null`,
+    [unique],
+  );
+  return new Map(result.rows.map((row) => [row.sha256, row.id]));
+}
+
 export async function getMediaBinary(id: string): Promise<MediaBinary | null> {
   const result = await readQuery<{
     mime: AllowedImageMime;

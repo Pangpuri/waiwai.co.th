@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
 import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { ABOUT_MEDIA, aboutImagePath } from "@/lib/blocks/about-media";
 import { documentDiff } from "@/lib/blocks/diff";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
 import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
@@ -30,6 +31,7 @@ import { PRUNE_HISTORY_CONFIRM_VALUE } from "@/lib/blocks/revision-plan";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { recordAudit } from "@/lib/audit/log";
 import { refreshPublicSite } from "@/lib/cache/refresh";
+import { findMediaIdsBySha256 } from "@/lib/media/repository";
 
 /**
  * Server Actions ของหน้าจอสร้างหน้าเว็บ (บล็อกอิสระ)
@@ -393,7 +395,16 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   });
   if (!decision.allowed) redirect(`${pathOf(page)}?template=confirm`);
 
-  const template = buildBlockTemplate(page);
+  /*
+    ★ รอบที่ 253: เทมเพลตของหน้า **บริษัท** ต้องรู้พาธภาพจาก **คลังภาพ** (/media/<id>)
+    ⇒ อ่าน id จากคลังด้วยลายนิ้วมือของไฟล์เดิม (`ABOUT_MEDIA.sha256`) แล้วส่งตัวช่วยเข้าเทมเพลต
+    ⚠️ ยังไม่นำเข้า = ถอยไปใช้ไฟล์ใน public/ (เทมเพลตยังสร้างได้ หน้าเว็บไม่พัง)
+  */
+  const templateOptions =
+    page === "about"
+      ? { image: await aboutTemplateImageResolver() }
+      : undefined;
+  const template = buildBlockTemplate(page, templateOptions);
   if (template === null) redirect(pathOf(page));
 
   /* เทมเพลตต้องผ่าน parser ก่อนเขียนลงฐานข้อมูล (ที่เดียวที่สร้างเอกสารให้ผู้ใช้เริ่ม) */
@@ -446,4 +457,19 @@ export async function migrateBlocksAction(_previous: BuilderState, formData: For
   } catch {
     return { status: "failed", errors: [], warnings: [], problems: ["ย้ายรุ่นข้อมูลไม่สำเร็จ"], revision: null };
   }
+}
+
+/* ── ตัวช่วยของเทมเพลตหน้า "บริษัท" (รอบที่ 253) ────────────────────────────────────
+   ⚠️ ไฟล์นี้เป็น `"use server"` ⇒ **ห้าม export ตัวช่วยที่ไม่ใช่ async** (Next บังคับ)
+   ⇒ ประกาศเป็นฟังก์ชันภายในโมดูล (ผู้เรียกคือ action ด้านบน)
+*/
+
+/** หา id ในคลังภาพจากลายนิ้วมือของไฟล์เดิม แล้วคืนตัวช่วย `(key) => "/media/<id>"` */
+async function aboutTemplateImageResolver(): Promise<(key: string) => string> {
+  const ids = await findMediaIdsBySha256(ABOUT_MEDIA.map((asset) => asset.sha256)).catch(() => new Map<string, string>());
+  return (key: string) =>
+    aboutImagePath(key, (sha256) => {
+      const id = ids.get(sha256);
+      return id === undefined ? null : `/media/${id}`;
+    });
 }

@@ -243,7 +243,9 @@ test("templates: รายการหน้าที่พรีวิวได
 
 test("templates: ปุ่มในหลังบ้านใช้ทะเบียน (ไม่ใช่ home อย่างเดียว)", () => {
   const actions = sourceOf("app/admin/builder/actions.ts");
-  assert.ok(actions.includes("buildBlockTemplate(page)"), "action ต้องสร้างเทมเพลตตามหน้าจากทะเบียน");
+  /* รอบที่ 253: ส่ง options (พาธภาพจากคลัง + ลิงก์แผนที่) เข้าเทมเพลตด้วย — ยังต้องมาจากทะเบียนกลาง */
+  assert.ok(actions.includes("buildBlockTemplate(page,"), "action ต้องสร้างเทมเพลตตามหน้าจากทะเบียน (พร้อม options)");
+  assert.ok(actions.includes("aboutTemplateImageResolver()"), "หน้าบริษัทต้องใช้พาธภาพจากคลังภาพ");
   assert.ok(actions.includes("hasBlockTemplate(page)"), "ต้องกันหน้าที่ไม่มีเทมเพลต");
   assert.ok(!actions.includes("buildHomeTemplate"), "ห้ามผูกกับเทมเพลตหน้าแรกอย่างเดียวอีก");
   assert.ok(actions.includes("parseBlockDocument(page, template)"), "เทมเพลตต้องผ่าน parse ก่อนบันทึก");

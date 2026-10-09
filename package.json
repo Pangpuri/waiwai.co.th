@@ -35,7 +35,8 @@
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",
     "env:vercel": "node --import ./scripts/alias-hook.mjs scripts/env-vercel.ts",
     "check:deploy": "node --import ./scripts/alias-hook.mjs scripts/check-deploy.ts",
-    "hero:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-hero-slides.ts"
+    "hero:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-hero-slides.ts",
+    "about:media": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about-media.ts"
   },
   "dependencies": {
     "next": "^16.3.8",

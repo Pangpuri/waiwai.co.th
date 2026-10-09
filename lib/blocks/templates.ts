@@ -49,7 +49,18 @@ export const BLOCK_TEMPLATE_PAGE_IDS = [...MENU_TEMPLATE_PAGE_IDS, ...PRODUCT_DE
 
 export type BlockTemplatePageId = (typeof BLOCK_TEMPLATE_PAGE_IDS)[number];
 
-const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, () => BlockDocument | null>> = {
+/**
+ * ตัวเลือกตอนสร้างเทมเพลต (รอบที่ 253) — หน้าที่ใช้ **ภาพจริงจากคลังภาพ** ต้องรู้พาธ `/media/<id>`
+ * (ผู้เรียกอ่าน id จากคลังแล้วส่งตัวช่วยมา · เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์)
+ *
+ * ⚠️ **ไม่มีตัวเลือก `mapUrl`** — การใส่ `linkHref` โดยไม่มีข้อความบนปุ่ม = ลิงก์ที่มองไม่เห็น
+ *    + validator เตือน `map-link-without-label` (ดูเหตุผลใน `about-template.ts`)
+ */
+export type TemplateBuildOptions = {
+  readonly image?: (key: string) => string;
+};
+
+const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, (options?: TemplateBuildOptions) => BlockDocument | null>> = {
   home: buildHomeTemplate,
   about: buildAboutTemplate,
   careers: buildCareersTemplate,
@@ -97,8 +108,11 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
     ⚠️ hero **ไม่นับเป็นช่องว่าง** — หน้าแรกเรนเดอร์ hero จริงจาก `/admin/hero` (สไลด์ + การ์ด PR) แหล่งเดียว (รอบที่ 217)
   */
   home: [],
-  /* หน้าข้อความล้วน — ไม่มีแกลเลอรีในเลย์เอาต์เดิม (เผื่อไว้ถ้าเจ้าของเพิ่มภาพชุดภายหลัง) */
-  about: ["gallery"],
+  /*
+    ★ รอบที่ 253 (มติเจ้าของ: ย้ายเนื้อหาบริษัทเข้า DB ครบ 10 ส่วน) — เทมเพลตครอบคลุมครบแล้ว
+    รวม **แกลเลอรีใบรับรองมาตรฐาน 11 ใบ** (ภาพจริงจากคลังภาพ) ⇒ ไม่มีช่องว่างเหลือ
+  */
+  about: [],
   /* รอบที่ 88: บล็อก `jobBoard` (ตำแหน่งจริงจาก `JOBS`) ⇒ ครอบคลุมครบ */
   careers: [],
   /* รอบที่ 87: ฟอร์มติดต่อ + แผนที่ (ภาพ) เป็นบล็อกแล้ว ⇒ ครอบคลุมครบ */
@@ -139,9 +153,9 @@ export function hasBlockTemplate(page: string): page is BlockTemplatePageId {
  * สร้างเทมเพลตของหน้านั้น (คืน `null` ถ้ายังไม่มีเทมเพลต)
  * ⚠️ เอกสารที่ได้ยัง **ไม่ผ่านการ parse** — ผู้เรียกต้องส่งเข้า `parseBlockDocument` ก่อนเขียนลงฐานข้อมูล
  */
-export function buildBlockTemplate(page: string): BlockDocument | null {
+export function buildBlockTemplate(page: string, options?: TemplateBuildOptions): BlockDocument | null {
   if (!hasBlockTemplate(page)) return null;
-  return TEMPLATE_BUILDERS[page]();
+  return TEMPLATE_BUILDERS[page](options);
 }
 
 /** รหัสของส่วนที่เทมเพลตของหน้านั้นไม่ครอบคลุม (หน้านอกทะเบียน = ไม่มีข้อมูล) */

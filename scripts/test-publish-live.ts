@@ -14,12 +14,16 @@ import {
 
 /**
  * เทสต์รอบที่ 240 — มติเจ้าของ 2026-10-09: "กดเผยแพร่ = ขึ้นเว็บเลย (หน้าแรก)" + ถอดปุ่มซ้ำซ้อน
+ * **ต่อรอบที่ 253** — เพิ่มหน้า "เกี่ยวกับไวไว" (/about) เข้ารายการนี้ หลังย้ายเนื้อหาบริษัทเข้า DB ครบ
  *
  * ที่มา (ต่อจากรอบ 238/239 — สองรอบนั้นแก้ "อาการ" ของสวิตช์สองขั้น):
  *   เจ้าของ: *"ลองทดสอบขยับบล็อกแล้วกดเผยแพร่ ยังไม่ติด"* ⇒ ต้นเหตุจริงคือ **สองขั้นที่ต้องเปิดทั้งคู่**
  *   ⇒ รอบนี้แก้ที่ต้นเหตุ: ถอดสวิตช์ "ใช้กับหน้าเว็บจริง" ออก + ถอดปุ่ม "บันทึกฉบับร่าง"
  *     · หน้าแรก = 1 ขั้น (เผยแพร่ ⇒ ขึ้นเว็บทันที)
  *     · หน้าอื่น = ยังไม่ขึ้นเว็บ (เจ้าของ: "ยังไม่เริ่มจริงจัง") ⇒ กดเผยแพร่ = บันทึกไว้
+ *
+ * ⚠️ รอบที่ 253: **รายการนี้คือทางเดียวที่ทำให้หน้าขึ้นเว็บ** (ไม่เหลือสวิตช์ในจอแล้ว)
+ *    ⇒ หน้า /about ที่ทำเนื้อหาครบแล้วต้องอยู่ในรายการนี้ ไม่งั้นเจ้าของแก้แล้วไม่มีทางเห็นบนเว็บ
  *
  * เทสต์กันถอยหลัง 4 เรื่อง
  *   1. นโยบายกลาง (ตรรกะล้วน) — หน้าไหนขึ้นเว็บ หน้าไหนไม่
@@ -41,17 +45,20 @@ function sourceOf(relativePath: string): string {
 
 /* ── 1) นโยบายกลาง ─────────────────────────────────────────────────────────── */
 
-test("publish-live: หน้าแรกเท่านั้นที่กดเผยแพร่แล้วขึ้นเว็บ", () => {
-  assert.deepEqual([...PUBLISH_GOES_LIVE_PAGES], ["home"], "มติเจ้าของ: เฉพาะหน้าแรก (หน้าอื่นยังไม่เริ่มจริงจัง)");
+test("publish-live: หน้าแรก + หน้าบริษัท กดเผยแพร่แล้วขึ้นเว็บ (หน้าอื่นยังไม่ขึ้น)", () => {
+  assert.deepEqual([...PUBLISH_GOES_LIVE_PAGES], ["home", "about"], "มติเจ้าของ: หน้าแรก + /about (รอบ 253) · หน้าอื่นยังไม่เริ่มจริงจัง");
 
   assert.equal(publishGoesLive("home"), true);
-  assert.equal(publishGoesLive("about"), false);
+  assert.equal(publishGoesLive("about"), true, "รอบ 253: ย้ายเนื้อหาบริษัทเข้า DB แล้ว ⇒ ต้องมีทางขึ้นเว็บ");
   assert.equal(publishGoesLive("products"), false);
+  assert.equal(publishGoesLive("careers"), false);
   assert.equal(publishGoesLive(""), false, "ค่าที่ไม่รู้จักต้องไม่ทำให้ขึ้นเว็บ (fail-closed)");
 
   assert.equal(publishOutcomeOf("home"), "goes-live");
+  assert.equal(publishOutcomeOf("about"), "goes-live");
   assert.equal(publishOutcomeOf("careers"), "saved-only");
   assert.equal(expectedLiveOf("home"), true);
+  assert.equal(expectedLiveOf("about"), true);
   assert.equal(expectedLiveOf("news"), false);
 });
 
