@@ -24,10 +24,12 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashKindMedia: "Image",
   trashKindPreset: "Block preset",
   trashKindChromePreset: "Site-wide preset",
-  /* Content kinds (รอบที่ 176 — combined 6-kind table) */
+  /* Content kinds (รอบที่ 176 — combined table started with 6 kinds) */
   trashKindProduct: "Product",
   trashKindRecipe: "Recipe",
   trashKindNews: "News/event",
+  /* 7th kind (รอบที่ 237) — home page slides (missed because slide trash came after round 176) */
+  trashKindSlide: "Home page slide",
   trashDaysLeft: "{days} days left",
   trashDueNow: "Will be deleted in the next run",
   trashRestore: "Restore",
@@ -44,20 +46,24 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashBackToMedia: "Go to the media library",
   trashListLabel: "Items in the trash",
   trashConfirmEmpty: "Confirm: I understand this cannot be undone",
-  trashEmptyIncludesContent: "This deletes every type in the trash — including any products, recipes and news items kept there.",
+  trashEmptyIncludesContent: "This deletes every type in the trash — including any products, recipes, news items and home page slides kept there.",
   trashCardTitle: "Trash",
   trashCardHint: "Deleted items stay restorable until the retention window ends.",
   trashCardCount: "{count} items in the trash",
   trashCardEmpty: "Trash is empty",
   trashCardDbMissing: "Database not configured",
-  /* ตารางรวม (รอบที่ 176) */
-  trashTableHint: "All trash types in one table (images · presets · products · recipes · news) — restore or delete permanently right here.",
+  /* Combined table (รอบที่ 176 · slides added รอบที่ 237) */
+  trashTableHint: "All trash types in one table (images · presets · slides · products · recipes · news) — restore or delete permanently right here.",
   trashContentTitle: "Content trash",
   trashContentHint: "The counts above show what is still restorable — restore or delete permanently in the table below, or open the item's own screen “Trash” tab for full context.",
   trashContentStats: "{product} products · {recipe} recipes · {news} news",
   trashContentProduct: "Products & categories",
   trashContentRecipe: "Recipes",
   trashContentNews: "News & events",
+  /* Slide trash index (รอบที่ 237) — slides are owned by /admin/hero */
+  trashHeroTitle: "Home page slide trash",
+  trashHeroStats: "{slide} slides in the trash",
+  trashHeroHint: "Restore or delete permanently in the table below — or use the button above to manage slides on the home page screen.",
   auditTrashMove: "Moved to trash",
   auditTrashRestore: "Restored from trash",
   auditTrashDelete: "Permanently deleted from trash",

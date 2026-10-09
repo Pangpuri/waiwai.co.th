@@ -39,6 +39,8 @@ export type TrashStrings = {
   readonly trashKindProduct: string;
   readonly trashKindRecipe: string;
   readonly trashKindNews: string;
+  /** ชนิดที่ 7 (รอบที่ 237) — สไลด์หน้าแรก */
+  readonly trashKindSlide: string;
   readonly trashDaysLeft: string;
   readonly trashDueNow: string;
   readonly trashRestore: string;
@@ -86,6 +88,9 @@ function kindLabelOf(strings: TrashStrings, kind: TrashViewKind): string {
       return strings.trashKindRecipe;
     case "news":
       return strings.trashKindNews;
+    /* รอบที่ 237: สไลด์หน้าแรก (ชนิดที่ 7) — type บังคับให้มาเพิ่มที่นี่ */
+    case "slide":
+      return strings.trashKindSlide;
   }
 }
 

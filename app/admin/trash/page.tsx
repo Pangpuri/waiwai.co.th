@@ -9,12 +9,16 @@ import { fillTemplate } from "@/lib/i18n/template";
 import { describeRetention } from "@/lib/retention/format";
 import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
 import { contentTrashStats, listContentTrash } from "@/lib/trash/content";
+import { heroTrashStats, listHeroTrash } from "@/lib/trash/hero";
 import {
   CONTENT_TRASH_KINDS,
   CONTENT_TRASH_SCREENS,
+  HERO_TRASH_KINDS,
+  HERO_TRASH_SCREENS,
   daysLeftInTrash,
   mergeTrashEntries,
   type ContentTrashKind,
+  type HeroTrashKind,
 } from "@/lib/trash/plan";
 import { listTrash, trashStats } from "@/lib/trash/repository";
 
@@ -26,7 +30,8 @@ import { listTrash, trashStats } from "@/lib/trash/repository";
  * - หน้านี้ให้ "กู้คืน" และ "ลบถาวร" ด้วยการกดครั้งเดียว พร้อมบอกว่าเหลือเวลาอีกกี่วันก่อนระบบลบให้เอง
  *
  * รอบที่ 175: เพิ่ม **ดัชนีของถังขยะเนื้อหา** (ตัวนับ + ลิงก์ไปแท็บของจอนั้น)
- * รอบที่ 176 (มติเจ้าของ "เห็นและจัดการจากที่เดียว"): **ตารางรวมทุกชนิด 6 ชนิด**
+ * รอบที่ 176 (มติเจ้าของ "เห็นและจัดการจากที่เดียว"): **ตารางรวมทุกชนิด** (เริ่ม 6 ชนิด)
+ * รอบที่ 237: เพิ่ม **สไลด์หน้าแรก** เป็นชนิดที่ 7 (เดิมตกหล่นเพราะสไลด์มีถังขยะทีหลังรอบที่ 176)
  * - แถวเนื้อหา (สินค้า/เมนู/ข่าว) ถูกเรนเดอร์ในตารางเดียวกับภาพ/พรีเซ็ต ⇒ กดกู้คืน/ลบถาวรได้จากที่นี่
  *   (ไม่ต้องสลับไป 3 จอ) · บล็อกดัชนีด้านบนยังอยู่เพื่อ **กระโดดไปแก้ที่จอของชนิดนั้น** เมื่อต้องดูบริบท
  * - ยังไม่ย้ายการแก้ไข/เผยแพร่มาที่นี่ — ทำเฉพาะ "กู้คืน/ลบถาวร" ตามเจตนาของถัง
@@ -41,18 +46,32 @@ export default async function AdminTrashPage() {
   const strings = messages.admin;
 
   const configured = isDatabaseConfigured();
-  /* ตารางรวม: ภาพ/พรีเซ็ต (ถังเดิม) + เนื้อหา (รอบที่ 176) — เนื้อหาคืน [] เมื่อไม่มี DB */
-  const entries = mergeTrashEntries([...(configured ? await listTrash() : []), ...(await listContentTrash())]);
+  /*
+    ตารางรวม: ภาพ/พรีเซ็ต (ถังเดิม) + สไลด์ (รอบที่ 237) + เนื้อหา (รอบที่ 176)
+    — แต่ละฝ่ายคืน [] เมื่อไม่มี DB
+  */
+  const entries = mergeTrashEntries([
+    ...(configured ? await listTrash() : []),
+    ...(await listHeroTrash()),
+    ...(await listContentTrash()),
+  ]);
   const stats = configured ? await trashStats() : { media: 0, preset: 0, chromePreset: 0, total: 0 };
   /* เนื้อหาในถัง — ไม่มี DB = 0 ทุกชนิด (หน้าจอต้องไม่พัง) */
   const contentTrash = await contentTrashStats();
-  const totalAll = stats.total + contentTrash.total;
+  /* สไลด์ในถัง (รอบที่ 237) — เหตุผลเดียวกัน */
+  const heroTrash = await heroTrashStats();
+  const totalAll = stats.total + contentTrash.total + heroTrash.total;
 
   /* ป้ายชื่อของแต่ละชนิดเนื้อหา — เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที */
   const contentTrashLabels: Readonly<Record<ContentTrashKind, string>> = {
     product: strings.trashContentProduct,
     recipe: strings.trashContentRecipe,
     news: strings.trashContentNews,
+  };
+
+  /* ป้ายชื่อของแต่ละชนิดสไลด์ (รอบที่ 237) */
+  const heroTrashLabels: Readonly<Record<HeroTrashKind, string>> = {
+    slide: strings.trashKindSlide,
   };
 
   const now = new Date();
@@ -80,6 +99,7 @@ export default async function AdminTrashPage() {
     trashKindProduct: strings.trashKindProduct,
     trashKindRecipe: strings.trashKindRecipe,
     trashKindNews: strings.trashKindNews,
+    trashKindSlide: strings.trashKindSlide,
     trashDaysLeft: strings.trashDaysLeft,
     trashDueNow: strings.trashDueNow,
     trashRestore: strings.trashRestore,
@@ -149,6 +169,28 @@ export default async function AdminTrashPage() {
               ))}
             </div>
             <p className="text-fg-muted text-[11px]">{strings.trashContentHint}</p>
+          </section>
+
+          {/* ดัชนีถังขยะสไลด์ (รอบที่ 237) — สไลด์มีเจ้าของอยู่หน้า `/admin/hero` (เป็นทางที่สอง) */}
+          <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-4">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-fg text-sm font-semibold">{strings.trashHeroTitle}</h2>
+              <p className="text-fg-muted text-xs">
+                {fillTemplate(strings.trashHeroStats, { slide: heroTrash.slide })}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {HERO_TRASH_KINDS.map((kind) => (
+                <Link
+                  key={kind}
+                  href={HERO_TRASH_SCREENS[kind]}
+                  className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {heroTrashLabels[kind]}
+                </Link>
+              ))}
+            </div>
+            <p className="text-fg-muted text-[11px]">{strings.trashHeroHint}</p>
           </section>
 
           {rows.length === 0 ? (

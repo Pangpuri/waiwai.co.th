@@ -8,19 +8,25 @@ import { can } from "@/lib/auth/roles";
 import {
   CONTENT_TRASH_KINDS,
   CONTENT_TRASH_SCREENS,
+  HERO_TRASH_KINDS,
+  HERO_TRASH_SCREENS,
   TRASH_AUDIT_ACTIONS,
   TRASH_KINDS,
   TRASH_VIEW_KINDS,
   contentTrashTotal,
   daysLeftInTrash,
   emptyContentTrashCounts,
+  emptyHeroTrashCounts,
   emptyTrashCounts,
+  heroTrashTotal,
   isContentTrashKind,
+  isHeroTrashKind,
   isTrashExpired,
   isTrashKind,
   isTrashViewKind,
   mergeTrashEntries,
   summarizeContentTrash,
+  summarizeHeroTrash,
   summarizeTrash,
   trashTotal,
   type TrashEntryLike,
@@ -424,6 +430,8 @@ test("trash-content: ตัวเติม {placeholder} ต้องครบ�
   const placeholders: Readonly<Record<string, readonly string[]>> = {
     trashStats: ["{media}", "{preset}", "{chrome}"],
     trashContentStats: ["{product}", "{recipe}", "{news}"],
+    /* รอบที่ 237 — ตัวนับสไลด์ในถัง */
+    trashHeroStats: ["{slide}"],
   };
 
   for (const locale of ["th", "en"]) {
@@ -451,6 +459,10 @@ test("trash-content: ตัวเติม {placeholder} ต้องครบ�
         assert.ok(source.includes(key), `${file}: fillTemplate(strings.trashContentStats) ต้องส่ง ${key}`);
       }
     }
+    /* รอบที่ 237 — ตัวเติมของถังขยะสไลด์ */
+    if (source.includes("strings.trashHeroStats")) {
+      assert.ok(source.includes("slide:"), `${file}: fillTemplate(strings.trashHeroStats) ต้องส่ง slide:`);
+    }
   }
 });
 
@@ -464,8 +476,11 @@ test("trash-content: ตัวเติม {placeholder} ต้องครบ�
  *   4. ป้ายชนิด/คำเตือน "ลบทั้งหมด" หาย ⇒ ผู้ใช้กดลบทั้งถังโดยไม่รู้ว่าครอบเนื้อหาด้วย
  */
 
-test("trash-view: ชนิดรวมครอบทั้งสองชุด ไม่ซ้ำ และตรวจค่าจากฟอร์มได้", () => {
-  assert.deepEqual([...TRASH_VIEW_KINDS], ["media", "preset", "chromePreset", "product", "recipe", "news"]);
+test("trash-view: ชนิดรวมครอบทั้งสามชุด ไม่ซ้ำ และตรวจค่าจากฟอร์มได้", () => {
+  assert.deepEqual(
+    [...TRASH_VIEW_KINDS],
+    ["media", "preset", "chromePreset", "product", "recipe", "news", "slide"],
+  );
   assert.equal(new Set(TRASH_VIEW_KINDS).size, TRASH_VIEW_KINDS.length, "ชนิดรวมต้องไม่ซ้ำ");
 
   for (const kind of TRASH_KINDS) {
@@ -476,12 +491,21 @@ test("trash-view: ชนิดรวมครอบทั้งสองชุ�
     assert.equal(isContentTrashKind(kind), true, `${kind} ต้องผ่านตัวตรวจของเนื้อหา`);
     assert.equal(isTrashViewKind(kind), true, `${kind} ต้องผ่านตัวตรวจรวม (หน้าถังขยะรับค่านี้)`);
   }
+  /* รอบที่ 237 — ชุดที่สาม: สไลด์ */
+  for (const kind of HERO_TRASH_KINDS) {
+    assert.equal(isTrashKind(kind), false, `${kind} ไม่ใช่ชนิดของถังรวมดั้งเดิม`);
+    assert.equal(isContentTrashKind(kind), false, `${kind} ไม่ใช่ชนิดของเนื้อหา`);
+    assert.equal(isHeroTrashKind(kind), true, `${kind} ต้องผ่านตัวตรวจของสไลด์`);
+    assert.equal(isTrashViewKind(kind), true, `${kind} ต้องผ่านตัวตรวจรวม (หน้าถังขยะรับค่านี้)`);
+  }
 
   /* ค่าที่ไม่รู้จักต้องไม่ผ่าน — กันการยิงฟอร์มปลอมมาหาชนิดอื่น */
-  for (const bad of ["", "MEDIA", "product ", " products", "products", "news; drop table news", "trash", "users"]) {
+  for (const bad of ["", "MEDIA", "product ", " products", "products", "news; drop table news", "trash", "users", "slides", "hero"]) {
     assert.equal(isTrashViewKind(bad), false, `"${bad}" ต้องไม่ใช่ชนิดที่รู้จัก`);
   }
   assert.equal(isContentTrashKind("media"), false, "ภาพไม่ใช่ชนิดของเนื้อหา");
+  assert.equal(isHeroTrashKind("media"), false, "ภาพไม่ใช่สไลด์");
+  assert.equal(isHeroTrashKind("product"), false, "สินค้าไม่ใช่สไลด์");
 });
 
 test("trash-view: mergeTrashEntries เรียงใหม่สุดก่อน · นิ่งเมื่อเวลาซ้ำ · ไม่แก้ของเดิม", () => {
@@ -551,12 +575,15 @@ test("trash-view: คำสั่งของเนื้อหามีปร�
   assert.ok(actions.includes("revalidatePath(path)"), "ต้อง revalidate แท็บถังขยะของจอเนื้อหาด้วย");
 });
 
-test("trash-view: ตารางรวม + ป้ายชนิดครบ 6 + คำเตือนก่อนกดลบทั้งถัง", () => {
+test("trash-view: ตารางรวม + ป้ายชนิดครบ 7 + คำเตือนก่อนกดลบทั้งถัง", () => {
   const page = sourceOf("app/admin/trash/page.tsx");
   assert.ok(page.includes("listContentTrash("), "หน้าถังขยะต้องดึงรายการเนื้อหาด้วย");
   assert.ok(page.includes("mergeTrashEntries("), "ต้องรวมเป็นตารางเดียว");
   assert.ok(page.includes("daysLeftInTrash("), "แถวเนื้อหาต้องมีเวลาก่อนลบถาวรเหมือนภาพ/พรีเซ็ต");
   assert.equal(page.match(/listContentTrash\(\)/g)?.length, 1, "ต้องอ่านเนื้อหาครั้งเดียว (ไม่ยิงคิวรีซ้ำ)");
+  /* รอบที่ 237 — สไลด์ต้องถูกอ่านรวมเข้าไปในตารางเดียวด้วย (ครั้งเดียว) */
+  assert.ok(page.includes("listHeroTrash("), "หน้าถังขยะต้องดึงรายการสไลด์ในถังด้วย");
+  assert.equal(page.match(/listHeroTrash\(\)/g)?.length, 1, "ต้องอ่านสไลด์ครั้งเดียว (ไม่ยิงคิวรีซ้ำ)");
 
   const list = sourceOf("features/admin/ui/trash-list.tsx");
   for (const key of [
@@ -566,8 +593,9 @@ test("trash-view: ตารางรวม + ป้ายชนิดครบ 6
     "trashKindProduct",
     "trashKindRecipe",
     "trashKindNews",
+    "trashKindSlide",
   ]) {
-    assert.ok(list.includes(key), `ป้ายชนิดต้องมีครบทั้ง 6 (${key})`);
+    assert.ok(list.includes(key), `ป้ายชนิดต้องมีครบทั้ง 7 (${key})`);
   }
   assert.ok(list.includes("trashEmptyIncludesContent"), "ปุ่มลบทั้งหมดต้องเตือนว่าครอบเนื้อหาด้วย");
   assert.ok(!list.includes("dangerouslySetInnerHTML"), "ห้ามฝัง HTML ดิบในตารางถังขยะ");
@@ -575,7 +603,16 @@ test("trash-view: ตารางรวม + ป้ายชนิดครบ 6
   /* พจนานุกรมต้องมีคีย์ครบทั้งสองภาษา (ด่าน check:i18n ตรวจคู่กันอยู่แล้ว — ย้ำที่ระดับนี้ด้วย) */
   for (const locale of ["th", "en"]) {
     const dictionary = sourceOf(`lib/i18n/messages/areas/${locale}/adminTrash.ts`);
-    for (const key of ["trashKindProduct", "trashKindRecipe", "trashKindNews", "trashEmptyIncludesContent", "trashTableHint"]) {
+    for (const key of [
+      "trashKindProduct",
+      "trashKindRecipe",
+      "trashKindNews",
+      "trashKindSlide",
+      "trashEmptyIncludesContent",
+      "trashTableHint",
+      "trashHeroTitle",
+      "trashHeroHint",
+    ]) {
       assert.ok(dictionary.includes(`${key}:`), `${locale}/adminTrash.ts ต้องมีคีย์ ${key}`);
     }
   }
@@ -585,6 +622,87 @@ test("trash-view: ตารางรวม + ป้ายชนิดครบ 6
   assert.ok(checkDb.includes("checkContentTrashTable"), "check:db ต้องมีวงจรตารางรวมถังขยะ");
   assert.ok(checkDb.includes("restoreContentTrashItem("), "ต้องพิสูจน์กู้คืนจากตารางรวมกับ DB จริง");
   assert.ok(checkDb.includes("deleteContentTrashItemPermanently("), "ต้องพิสูจน์ลบถาวรจากตารางรวมกับ DB จริง");
+  /* รอบที่ 237 — วงจรของสไลด์ในตารางรวม */
+  assert.ok(checkDb.includes("checkHeroTrashTable"), "check:db ต้องมีวงจรตารางรวมถังขยะสไลด์");
+  assert.ok(checkDb.includes("restoreHeroTrashItem("), "ต้องพิสูจน์กู้คืนสไลด์จากตารางรวมกับ DB จริง");
+  assert.ok(checkDb.includes("deleteHeroTrashItemPermanently("), "ต้องพิสูจน์ลบถาวรสไลด์จากตารางรวมกับ DB จริง");
+});
+
+/* ── 5.1) ถังขยะสไลด์ในตารางรวม (รอบที่ 237) ────────────────────────────────────
+ *
+ * เดิมสไลด์มีถังขยะของตัวเอง (รอบที่ 186) แต่ **ไม่โผล่ใน `/admin/trash`** และไม่ถูกนับบนการ์ด `/admin`
+ * (มติ "เห็นและจัดการจากที่เดียว" รอบที่ 176 ถูกเขียนก่อนสไลด์มีถัง) ⇒ เทสต์ชุดนี้กันถอยหลัง 4 เรื่อง
+ *   1. ทะเบียนชนิดสไลด์หาย/มีชนิดปลอมเพิ่ม ⇒ ฟอร์มจากตารางรวมจบที่ `invalid`
+ *   2. คำสั่งของสไลด์หลุดประตู `deleted_at is not null` ⇒ กู้คืน/ลบของที่ยังใช้งานอยู่ได้
+ *   3. ลิงก์ไปหน้าสไลด์หาย ⇒ ผู้ดูแลหาที่จัดการต่อไม่ได้
+ *   4. actions ไม่แยกทางไปฝ่ายสไลด์ ⇒ กดกู้คืน/ลบจากตารางรวมได้ `invalid` เงียบ ๆ
+ */
+
+test("trash-hero: ทะเบียนชนิด/ยอด/สรุปของถังขยะสไลด์", () => {
+  assert.deepEqual([...HERO_TRASH_KINDS], ["slide"], "ชุดสไลด์มีชนิดเดียวโดยเจตนา");
+  assert.deepEqual(emptyHeroTrashCounts(), { slide: 0 }, "นับเป็น 0 ทุกชนิด");
+  assert.equal(heroTrashTotal({ slide: 3 }), 3, "ยอดรวม = ผลบวกของทุกชนิด");
+  assert.equal(heroTrashTotal(emptyHeroTrashCounts()), 0, "ถังว่าง = 0");
+  assert.equal(summarizeHeroTrash({ slide: 2 }), "slide=2", "สรุปสำหรับ audit log ต้องมีทุกชนิด");
+  assert.equal(HERO_TRASH_SCREENS.slide, "/admin/hero", "ลิงก์ต้องชี้ไปหน้าจอที่เป็นเจ้าของถังสไลด์");
+});
+
+test("trash-hero: คำสั่งของสไลด์มีประตู 'อยู่ในถังเท่านั้น' + ไม่รับชื่อตารางจากผู้ใช้", () => {
+  const hero = sourceOf("lib/trash/hero.ts");
+
+  assert.ok(hero.includes("export async function heroTrashStats"), "ต้องมีตัวนับของถังขยะสไลด์");
+  assert.ok(hero.includes("export async function listHeroTrash"), "ต้องมีตัวอ่านรายการของในถังสไลด์");
+  for (const guard of [
+    "where deleted_at is not null", // listHeroTrash / heroTrashStats
+    "delete from hero_slide where deleted_at is not null", // ลบทั้งถังของสไลด์
+  ]) {
+    assert.ok(hero.includes(guard), `ต้องมีประตู SQL: ${guard}`);
+  }
+  /* กู้คืน/ลบถาวรใช้ฟังก์ชันของโมดูลสไลด์ (ประตูอยู่ที่นั่นแล้ว) — ห้ามเขียน SQL ซ้ำเอง */
+  assert.ok(hero.includes("restoreHeroPageSlide("), "กู้คืนต้องใช้ประตูของโมดูลสไลด์");
+  assert.ok(hero.includes("deleteHeroPageSlideForever("), "ลบถาวรต้องใช้ประตูของโมดูลสไลด์");
+  const repository = sourceOf("lib/hero/repository.ts");
+  assert.ok(
+    repository.includes("where id = $1 and deleted_at is not null"),
+    "ประตู 'ต้องอยู่ในถัง' ต้องอยู่ที่ SQL ของ repository",
+  );
+
+  assert.ok(hero.includes("recordAudit"), "กู้คืน/ลบถาวรต้องมีร่องรอยใน audit log");
+  assert.ok(hero.includes("if (!isDatabaseConfigured()) return 0"), "ไม่มี DB = คืน 0 ไม่โยน error");
+
+  /* actions ต้องแยกทางไปฝ่ายสไลด์ (ไม่ใช่ส่งเข้าเนื้อหา) */
+  const actions = sourceOf("app/admin/trash/actions.ts");
+  for (const fn of ["restoreHeroTrashItem(", "deleteHeroTrashItemPermanently(", "emptyHeroTrash("]) {
+    assert.ok(actions.includes(fn), `action ต้องเรียก ${fn}`);
+  }
+  assert.ok(actions.includes("isHeroTrashKind("), "ต้องแยกชนิดสไลด์ออกจากเนื้อหาก่อนเรียก");
+  assert.ok(actions.includes('revalidatePath(HERO_PATH)'), "ต้อง revalidate หน้าสไลด์ด้วย (ของหายจากหน้านั้น)");
+});
+
+test("trash-hero: การ์ด /admin + หน้าถังขยะ นับ/ลิงก์สไลด์ครบ (ไม่ให้ยอดรวมโกหก)", () => {
+  for (const file of ["app/admin/page.tsx", "app/admin/trash/page.tsx"]) {
+    const source = sourceOf(file);
+    assert.ok(source.includes("heroTrashStats("), `${file}: ต้องนับสไลด์ในถัง`);
+    assert.ok(source.includes("HERO_TRASH_SCREENS"), `${file}: ต้องลิงก์จากทะเบียนกลาง (ไม่พิมพ์พาธเอง)`);
+    assert.ok(source.includes("HERO_TRASH_KINDS.map("), `${file}: ต้องวนทุกชนิด (เพิ่มชนิดใหม่แล้วโผล่เอง)`);
+  }
+
+  /* ยอดรวมบนการ์ดต้องรวมสไลด์ — ไม่งั้นตัวเลขไม่ตรงกับของจริงในถัง */
+  const overview = sourceOf("app/admin/page.tsx");
+  assert.ok(
+    overview.includes("(heroTrash?.total ?? 0)"),
+    "trashTotalAll ต้องบวกยอดของสไลด์ด้วย (ไม่งั้นการ์ดนับขาด)",
+  );
+
+  /* สิทธิ์: ผู้ที่เห็นการ์ด (trash ⊂ publisher) ต้องเปิดหน้าสไลด์ได้ (hero ⊂ content?) — ตรวจจากทะเบียนจริง */
+  assert.ok(can("publisher", "trash"), "ผู้ที่เห็นการ์ดถังขยะคือ publisher ขึ้นไป");
+  assert.ok(can("publisher", "content"), "publisher ต้องเปิดหน้าสไลด์หน้าแรกได้ (ลิงก์ต้องไม่เด้ง /admin/denied)");
+
+  /* ลบทั้งถังต้องครอบสไลด์ + คำเตือนต้องบอก (ผู้ใช้ต้องไม่ถูกหลอกว่าลบแค่บางชนิด) */
+  const actions = sourceOf("app/admin/trash/actions.ts");
+  assert.ok(actions.includes("emptyHeroTrash(user.email)"), "ปุ่มลบทั้งหมดต้องครอบสไลด์ด้วย");
+  const dictionary = sourceOf("lib/i18n/messages/areas/th/adminTrash.ts");
+  assert.ok(dictionary.includes("สไลด์หน้าแรก"), "คำเตือน 'ลบทั้งหมด' ต้องเอ่ยถึงสไลด์");
 });
 
 /* ── 6) ปิดหนี้รอบ 176: ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177) ──────

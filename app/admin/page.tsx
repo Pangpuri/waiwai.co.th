@@ -13,7 +13,15 @@ import { describeRetention } from "@/lib/retention/format";
 import { type RetentionClass } from "@/lib/retention/plan";
 import { retentionOverview } from "@/lib/retention/purge";
 import { contentTrashStats } from "@/lib/trash/content";
-import { CONTENT_TRASH_KINDS, CONTENT_TRASH_SCREENS, type ContentTrashKind } from "@/lib/trash/plan";
+import { heroTrashStats } from "@/lib/trash/hero";
+import {
+  CONTENT_TRASH_KINDS,
+  CONTENT_TRASH_SCREENS,
+  HERO_TRASH_KINDS,
+  HERO_TRASH_SCREENS,
+  type ContentTrashKind,
+  type HeroTrashKind,
+} from "@/lib/trash/plan";
 import { trashStats } from "@/lib/trash/repository";
 
 /**
@@ -56,16 +64,23 @@ export default async function AdminHomePage() {
     อ่านล้วน + คืน 0 เมื่อไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
     อ่านเฉพาะเมื่อมีสิทธิ์ (เหตุผลเดียวกับระยะเก็บด้านบน)
     รอบที่ 175: นับ **เนื้อหา** (สินค้า/เมนู/ข่าว) ด้วย — เดิมการ์ดนับแค่ภาพ/พรีเซ็ต ⇒ เจ้าของเห็นไม่ครบ
+    รอบที่ 237: นับ **สไลด์หน้าแรก** ด้วย — เดิมสไลด์มีถังขยะของตัวเองแต่ไม่โผล่ที่นี่ (ยอดรวมไม่ตรงกับของจริง)
   */
   const trash = canTrash ? await trashStats() : null;
   const contentTrash = canTrash ? await contentTrashStats() : null;
-  const trashTotalAll = (trash?.total ?? 0) + (contentTrash?.total ?? 0);
+  const heroTrash = canTrash ? await heroTrashStats() : null;
+  const trashTotalAll = (trash?.total ?? 0) + (contentTrash?.total ?? 0) + (heroTrash?.total ?? 0);
 
   /* ป้ายชื่อของแต่ละชนิดเนื้อหาในถัง — เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที */
   const contentTrashLabels: Readonly<Record<ContentTrashKind, string>> = {
     product: strings.trashContentProduct,
     recipe: strings.trashContentRecipe,
     news: strings.trashContentNews,
+  };
+
+  /* ป้ายชื่อของแต่ละชนิดสไลด์ในถัง (รอบที่ 237) */
+  const heroTrashLabels: Readonly<Record<HeroTrashKind, string>> = {
+    slide: strings.trashKindSlide,
   };
 
   /*
@@ -237,8 +252,8 @@ export default async function AdminHomePage() {
       </section>
       ) : null}
 
-      {/* ── ถังขยะ (X2.4 · ขยายรอบที่ 175) — เฉพาะผู้มีสิทธิ์ trash ─────────────── */}
-      {canTrash && trash !== null && contentTrash !== null ? (
+      {/* ── ถังขยะ (X2.4 · ขยายรอบที่ 175 · 237) — เฉพาะผู้มีสิทธิ์ trash ─────────────── */}
+      {canTrash && trash !== null && contentTrash !== null && heroTrash !== null ? (
       <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-fg text-sm font-semibold">{strings.trashCardTitle}</h2>
@@ -284,6 +299,25 @@ export default async function AdminHomePage() {
             ))}
           </div>
           <p className="text-fg-muted text-[11px]">{strings.trashContentHint}</p>
+        </div>
+
+        {/* สไลด์ในถัง (รอบที่ 237) — กู้คืน/ลบถาวรได้จากหน้าถังขยะ หรือจัดการในหน้าสไลด์ */}
+        <div className="border-line flex flex-col gap-2 border-t pt-3">
+          <p className="text-fg-muted text-xs">
+            {fillTemplate(strings.trashHeroStats, { slide: heroTrash.slide })}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {HERO_TRASH_KINDS.map((kind) => (
+              <Link
+                key={kind}
+                href={HERO_TRASH_SCREENS[kind]}
+                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {heroTrashLabels[kind]}
+              </Link>
+            ))}
+          </div>
+          <p className="text-fg-muted text-[11px]">{strings.trashHeroHint}</p>
         </div>
       </section>
       ) : null}

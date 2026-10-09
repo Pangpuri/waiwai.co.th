@@ -158,6 +158,9 @@ import {
   trashStats,
 } from "@/lib/trash/repository";
 import { contentTrashStats, deleteContentTrashItemPermanently, listContentTrash, purgeExpiredContentTrash, restoreContentTrashItem } from "@/lib/trash/content";
+/* รอบที่ 237 — ถังขยะสไลด์ในตารางรวม */
+import { createHeroPageSlide, trashHeroPageSlide } from "@/lib/hero/repository";
+import { deleteHeroTrashItemPermanently, heroTrashStats, listHeroTrash, restoreHeroTrashItem } from "@/lib/trash/hero";
 import { listReorderItems, parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { MOURNING_PAGE_KEY, defaultMourningConfig, parseMourningConfig } from "@/lib/mourning/config";
 
@@ -352,6 +355,9 @@ async function main(): Promise<void> {
 
   /* 36) ประตูสองทาง + `deleted_by` ของเนื้อหา (รอบที่ 177 — ปิดหนี้รอบ 176) */
   await checkContentTrashGuard();
+
+  /* 37) ถังขยะสไลด์ในตารางรวม `/admin/trash` (รอบที่ 237) */
+  await checkHeroTrashTable();
 
   await closePool();
 
@@ -3953,6 +3959,93 @@ async function checkContentTrashGuard(): Promise<void> {
     if (recipeId !== "") await deleteRecipe(recipeId);
 
     assert.equal(await countWhere("product where id like 'p99999%'", []), 0, "ต้องไม่เหลือสินค้าทดสอบ");
+  }
+}
+
+/**
+ * 37) ถังขยะสไลด์ใน **ตารางรวม** `/admin/trash` (รอบที่ 237)
+ *
+ * ที่มา: สไลด์มีถังขยะของตัวเองตั้งแต่รอบที่ 186 (กู้คืน/ลบถาวรในหน้า `/admin/hero`)
+ * แต่ **มติเจ้าของรอบที่ 176 "เห็นและจัดการจากที่เดียว" ถูกเขียนก่อนสไลด์มีถัง** ⇒
+ * `/admin/trash` ไม่เคยมีแถวสไลด์ และตัวนับบนการ์ด `/admin` ก็นับไม่รวม ⇒ ยอดรวมไม่ตรงกับของจริง
+ *
+ * วงจรนี้พิสูจน์ 5 ข้อกับ DB จริง
+ *   1. ของที่ยังใช้งานอยู่ **ไม่โผล่** ในรายการถัง
+ *   2. ย้ายเข้าถัง ⇒ โผล่ในตารางรวมด้วยชนิด `slide` + ป้ายที่อ่านได้ + วันที่แปลงได้ + ชื่อคนลบ
+ *   3. **ตัวนับเพิ่มตรง 1** (ใช้ผลต่าง — ฐานข้อมูลจริงอาจมีของของคนอื่นอยู่ในถัง)
+ *   4. ประตู fail-closed: กู้คืน/ลบถาวรของที่ **ยังใช้งานอยู่** = `false` และไม่ถูกแตะ
+ *   5. กู้คืน ⇒ กลับมาใช้งาน + หลุดจากถัง · ลบถาวร ⇒ แถวหายจริง (เรียกซ้ำ = `false`)
+ */
+async function checkHeroTrashTable(): Promise<void> {
+  const actor = "check-db-hero-trash-table@example.invalid";
+  const createdIds: string[] = [];
+
+  try {
+    const trashedId = await createHeroPageSlide(actor);
+    assert.ok(trashedId !== null, "ต้องสร้างสไลด์ทดสอบใบที่ 1 ได้");
+    const activeId = await createHeroPageSlide(actor);
+    assert.ok(activeId !== null, "ต้องสร้างสไลด์ทดสอบใบที่ 2 ได้");
+    createdIds.push(trashedId, activeId);
+
+    const beforeStats = await heroTrashStats();
+
+    /* 1) ยังไม่ย้ายเข้า ⇒ ต้องไม่โผล่ในรายการถัง */
+    assert.equal(
+      (await listHeroTrash()).some((entry) => entry.id === trashedId),
+      false,
+      "สไลด์ที่ยังใช้งานอยู่ต้องไม่อยู่ในรายการถัง",
+    );
+
+    /* 2) ย้ายเข้าถัง ⇒ โผล่ในตารางรวมพร้อมข้อมูลที่อ่านได้ */
+    assert.equal(await trashHeroPageSlide(trashedId, actor), true, "ย้ายสไลด์เข้าถังต้องสำเร็จ");
+    const row = (await listHeroTrash()).find((entry) => entry.id === trashedId);
+    assert.ok(row !== undefined, "สไลด์ในถังต้องโผล่ในรายการของตารางรวม");
+    assert.equal(row.kind, "slide", "ชนิดต้องเป็น slide (ไม่ใช่ product/news)");
+    assert.ok(row.label.trim() !== "", "ต้องมีป้ายชื่อให้คนอ่าน (ไม่ว่าง)");
+    assert.equal(Number.isNaN(new Date(row.deletedAt).getTime()), false, "วันที่ต้องแปลงได้ (pg คืน Date ⇒ ชั้นข้อมูลต้องทำเป็น ISO)");
+    assert.equal(row.deletedBy, actor, "ต้องบันทึกคนลบไว้ตรวจย้อนหลัง");
+
+    /* 3) ตัวนับเพิ่มตรง 1 (ใช้ผลต่าง ไม่พึ่งสภาพแวดล้อมว่าง — บทเรียนรอบ 127) */
+    const afterStats = await heroTrashStats();
+    assert.equal(afterStats.slide - beforeStats.slide, 1, "ตัวนับสไลด์ในถังต้องเพิ่ม 1");
+    assert.equal(afterStats.total - beforeStats.total, 1, "ยอดรวมของถังสไลด์ต้องเพิ่ม 1");
+
+    /* 4) fail-closed: ของที่ยังใช้งานอยู่ต้องไม่ถูกแตะ */
+    assert.equal(await restoreHeroTrashItem(activeId, actor), false, "กู้คืนสไลด์ที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await deleteHeroTrashItemPermanently(activeId, actor), false, "ลบถาวรสไลด์ที่ใช้งานอยู่ต้องไม่สำเร็จ");
+    assert.equal(await countWhere("hero_slide where id = $1 and deleted_at is null", [activeId]), 1, "สไลด์ที่ใช้งานอยู่ต้องอยู่ครบ");
+
+    /* 5ก) กู้คืนจากตารางรวม ⇒ กลับมาใช้งาน + หลุดจากถัง */
+    assert.equal(await restoreHeroTrashItem(trashedId, actor), true, "กู้คืนสไลด์จากตารางรวมต้องสำเร็จ");
+    assert.equal(
+      await countWhere("hero_slide where id = $1 and deleted_at is null", [trashedId]),
+      1,
+      "กู้คืนแล้วต้องใช้งานได้ตามเดิม",
+    );
+    assert.equal(await restoreHeroTrashItem(trashedId, actor), false, "เรียกกู้คืนซ้ำต้องไม่สำเร็จ (ไม่อยู่ในถังแล้ว)");
+    assert.equal(
+      (await listHeroTrash()).some((entry) => entry.id === trashedId),
+      false,
+      "กู้คืนแล้วต้องหลุดจากรายการถัง",
+    );
+
+    /* 5ข) ลบถาวรจากตารางรวม ⇒ แถวหายจริง */
+    assert.equal(await trashHeroPageSlide(trashedId, actor), true, "ย้ายเข้าถังอีกครั้งต้องสำเร็จ");
+    assert.equal(await deleteHeroTrashItemPermanently(trashedId, actor), true, "ลบถาวรสไลด์ในถังต้องสำเร็จ");
+    assert.equal(await countWhere("hero_slide where id = $1", [trashedId]), 0, "ลบถาวรแล้วแถวต้องหายจริง");
+    assert.equal(await deleteHeroTrashItemPermanently(trashedId, actor), false, "ลบซ้ำต้องไม่สำเร็จ");
+
+    done(
+      "ตารางรวมถังขยะสไลด์: อ่าน/กู้คืน/ลบถาวรจากที่เดียว",
+      "ของใช้งานอยู่ไม่โผล่ · ตัวนับตรง · ประตู 'อยู่ในถัง' กันของใช้งานอยู่ · กู้คืนแล้วหลุดจากถัง · ลบถาวรหายจริง",
+    );
+  } finally {
+    await getPool().query("delete from hero_slide where id = any($1::text[])", [createdIds]);
+    assert.equal(
+      await countWhere("hero_slide where id = any($1::text[])", [createdIds]),
+      0,
+      "ต้องไม่เหลือสไลด์ทดสอบ",
+    );
   }
 }
 

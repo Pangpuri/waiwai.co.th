@@ -135,26 +135,69 @@ export const CONTENT_TRASH_SCREENS: Readonly<Record<ContentTrashKind, string>> =
   news: "/admin/news?tab=trash",
 };
 
-/* ── ชนิดรวมของ "ถังขยะ" ทั้งหน้า (รอบที่ 176) ──────────────────────────────────
+/* ── ถังขยะ "สไลด์หน้าแรก" (รอบที่ 237) — ปิดหนี้ที่ตกหล่นจากรอบ 176 ─────────────
+ *
+ * ที่มา: สไลด์มีถังขยะของตัวเองตั้งแต่รอบที่ 186 (กู้คืน/ลบถาวรในหน้า `/admin/hero`)
+ * แต่ **มติ "เห็นและจัดการจากที่เดียว" (รอบที่ 176) ถูกเขียนก่อนสไลด์มีถัง** ⇒ `/admin/trash`
+ * ไม่เคยแสดงสไลด์เลย และตัวนับบนการ์ด `/admin` ก็นับไม่ครบ (ผู้ดูแลเห็นยอดรวมไม่ตรงกับของจริง)
+ *
+ * กติกา (เหมือนชุดเนื้อหาเป๊ะ)
+ * - ของเดิมยังกู้คืน/ลบถาวรจากหน้า `/admin/hero` ได้ — เป็น **ทางที่สอง** ไม่ใช่ย้ายบ้าน
+ * - ระยะเก็บเดียวกัน (`TRASH_RETENTION_DAYS` · ตัวลบอัตโนมัติอยู่ `lib/trash/hero.ts`)
+ * - ⚠️ ตัวลบอัตโนมัติของ `hero_slide` ถูกต่อเข้า `runScheduledPurge` แล้วตั้งแต่รอบที่ 191
+ */
+
+export const HERO_TRASH_KINDS = ["slide"] as const;
+
+export type HeroTrashKind = (typeof HERO_TRASH_KINDS)[number];
+
+/** จำนวนสไลด์ในถัง (นับเป็น 0 ทุกชนิด) — เขียนตรง ๆ ให้ type ฟ้องเมื่อเพิ่มชนิดใหม่ */
+export function emptyHeroTrashCounts(): Record<HeroTrashKind, number> {
+  return { slide: 0 };
+}
+
+export function heroTrashTotal(counts: Readonly<Record<HeroTrashKind, number>>): number {
+  return HERO_TRASH_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
+}
+
+/** สรุปผลเป็นข้อความสั้น ๆ สำหรับ `detail` ของ audit log (รูปแบบเดียวกับ summarizeContentTrash) */
+export function summarizeHeroTrash(counts: Readonly<Record<HeroTrashKind, number>>): string {
+  return HERO_TRASH_KINDS.map((kind) => `${kind}=${counts[kind]}`).join(" ");
+}
+
+export function isHeroTrashKind(value: string): value is HeroTrashKind {
+  return (HERO_TRASH_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * หน้าจอที่ "กู้คืน/ลบถาวร" ของสไลด์ในถัง (ทางที่สอง) — ค่ากลางเดียว กันพาธหลุดจากกัน
+ * ⚠️ หน้าสไลด์แสดงส่วนถังขยะในหน้าเดียว (ไม่มีแท็บ) ⇒ ลิงก์คือ `/admin/hero` ตรง ๆ
+ */
+export const HERO_TRASH_SCREENS: Readonly<Record<HeroTrashKind, string>> = {
+  slide: "/admin/hero",
+};
+
+/* ── ชนิดรวมของ "ถังขยะ" ทั้งหน้า (รอบที่ 176 · ขยายรอบที่ 237) ──────────────────
  *
  * เดิมรอบที่ 170 แยกสองชุดโดยเจตนา (`TRASH_KINDS` = ภาพ/พรีเซ็ต · `CONTENT_TRASH_KINDS` = เนื้อหา)
  * เพราะเนื้อหามีแท็บถังขยะของตัวเอง · **รอบที่ 176 เจ้าของสั่งให้เห็น/จัดการจากที่เดียว**
- * ⇒ ยังคงสองชุดเดิมไว้ (ประตู SQL/ฟังก์ชันของแต่ละฝ่ายไม่เปลี่ยน) แล้วเพิ่ม "ชนิดรวม" สำหรับหน้าจอ
- *   เฉพาะที่ `/admin/trash` — ของแต่ละชนิดยังเข้าได้จากแท็บเดิมด้วย (เป็นทางที่สอง ไม่ใช่ย้ายบ้าน)
+ * ⇒ ยังคงชุดเดิมไว้ (ประตู SQL/ฟังก์ชันของแต่ละฝ่ายไม่เปลี่ยน) แล้วเพิ่ม "ชนิดรวม" สำหรับหน้าจอ
+ *   เฉพาะที่ `/admin/trash` — ของแต่ละชนิดยังเข้าได้จากจอเดิมด้วย (เป็นทางที่สอง ไม่ใช่ย้ายบ้าน)
+ * **รอบที่ 237:** เพิ่มชุด `HERO_TRASH_KINDS` (สไลด์) ⇒ ตารางรวมมี **7 ชนิด**
  * ⚠️ ตัวตรวจค่าจากฟอร์มที่หน้าถังขยะต้องใช้ `isTrashViewKind()` (ไม่ใช่ `isTrashKind()`)
- *    ไม่งั้นกดกู้คืนสินค้า/เมนู/ข่าวจากตารางรวมแล้วจบที่ `invalid` เงียบ ๆ
+ *    ไม่งั้นกดกู้คืนสินค้า/เมนู/ข่าว/สไลด์จากตารางรวมแล้วจบที่ `invalid` เงียบ ๆ
  */
 
-export type TrashViewKind = TrashKind | ContentTrashKind;
+export type TrashViewKind = TrashKind | ContentTrashKind | HeroTrashKind;
 
-export const TRASH_VIEW_KINDS: readonly TrashViewKind[] = [...TRASH_KINDS, ...CONTENT_TRASH_KINDS];
+export const TRASH_VIEW_KINDS: readonly TrashViewKind[] = [...TRASH_KINDS, ...CONTENT_TRASH_KINDS, ...HERO_TRASH_KINDS];
 
 export function isContentTrashKind(value: string): value is ContentTrashKind {
   return (CONTENT_TRASH_KINDS as readonly string[]).includes(value);
 }
 
 export function isTrashViewKind(value: string): value is TrashViewKind {
-  return isTrashKind(value) || isContentTrashKind(value);
+  return isTrashKind(value) || isContentTrashKind(value) || isHeroTrashKind(value);
 }
 
 /** แถวของในถังแบบกลาง — ทั้งภาพ/พรีเซ็ตและเนื้อหาแปลงมาเป็นรูปเดียวกันเพื่อแสดงในตารางเดียว */
