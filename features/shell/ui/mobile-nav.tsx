@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { SectionAnchor } from "@/features/shell/ui/section-anchor";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -110,14 +112,15 @@ export function MobileNav({ links, cta, labels, toggleLabel, buttons }: MobileNa
             })}
             {actionButtons.map((button) => (
               <li key={button.id} className="pt-2">
-                <Link
+                {/* ⚠️ ปุ่ม CTA อาจชี้ไปส่วนในหน้าเดียวกัน (#where-to-buy) — ต้องใช้ SectionAnchor (รอบที่ 248) */}
+                <SectionAnchor
                   href={button.href}
-                  onClick={() => setOpen(false)}
+                  onNavigate={() => setOpen(false)}
                   className={`flex items-center justify-center gap-2 rounded-full px-4 py-3 text-center text-base font-semibold ${button.className}`}
                 >
                   <NavIcon name={button.icon} />
                   {button.label}
-                </Link>
+                </SectionAnchor>
               </li>
             ))}
           </ul>

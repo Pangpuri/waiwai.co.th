@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { SectionAnchor } from "@/features/shell/ui/section-anchor";
+
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -88,10 +90,11 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
           <div className="flex items-center gap-2">
             {/* ปุ่มที่ตั้งให้อยู่ "ซ้ายของเมนู" (จอใหญ่เท่านั้น) */}
             {view.buttonsLeft.map((button) => (
-              <Link key={button.id} href={button.href} className={`hidden items-center gap-1.5 lg:inline-flex ${button.className}`}>
+              /* ⚠️ ใช้ SectionAnchor ไม่ใช่ <Link> — ปุ่มอาจชี้ไปส่วนในหน้าเดียวกัน (รอบที่ 248) */
+              <SectionAnchor key={button.id} href={button.href} className={`hidden items-center gap-1.5 lg:inline-flex ${button.className}`}>
                 <NavIcon name={button.icon} />
                 {button.label}
-              </Link>
+              </SectionAnchor>
             ))}
 
             <div className="hidden md:block">
@@ -109,10 +112,11 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
 
             {/* ปุ่มที่ตั้งให้อยู่ "ขวาของเมนู" — ค่าเริ่มต้นคือปุ่ม CTA เดิม */}
             {view.buttonsRight.map((button) => (
-              <Link key={button.id} href={button.href} className={`hidden items-center gap-1.5 lg:inline-flex ${button.className}`}>
+              /* ⚠️ ใช้ SectionAnchor ไม่ใช่ <Link> — ปุ่ม CTA "สั่งซื้อสินค้าออนไลน์" ชี้ #where-to-buy (เคสจริง รอบที่ 248) */
+              <SectionAnchor key={button.id} href={button.href} className={`hidden items-center gap-1.5 lg:inline-flex ${button.className}`}>
                 <NavIcon name={button.icon} />
                 {button.label}
-              </Link>
+              </SectionAnchor>
             ))}
 
             <MobileNav
