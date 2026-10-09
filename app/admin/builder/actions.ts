@@ -24,7 +24,9 @@ import {
   setPublishSchedule,
 } from "@/lib/blocks/repository";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
+import { decideRevertLayout } from "@/lib/blocks/layout-revert";
 import type { BlockDocument } from "@/lib/blocks/types";
+import { recordAudit } from "@/lib/audit/log";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 
 /**
@@ -309,6 +311,38 @@ async function readCurrentDraftForCompare(page: string, formData: FormData): Pro
   if (row === null) return null;
   const parsed = parseBlockDocument(page, row.raw);
   return parsed.ok ? parsed.document : null;
+}
+
+/**
+ * **กลับไปใช้ดีไซน์เดิมของเว็บ** = ปิดการใช้บล็อกกับหน้านี้ (รอบที่ 246 · มติเจ้าของ)
+ *
+ * ที่มา (เคสจริง): เจ้าของถาม *"กลับดีฟอลยังไงครับ"* หลังจัดหน้าแรกด้วยบล็อก — แต่รอบที่ 240
+ * เราถอดสวิตช์ "ใช้กับหน้าเว็บจริง" ออกไปแล้ว ⇒ ไม่มีทางถอยกลับจากหลังบ้านเลย
+ *
+ * กติกาของปุ่มนี้ (ตั้งใจให้ต่างจากสวิตช์เดิม)
+ * - **ทิศเดียว**: ปิดเท่านั้น ⇒ ไม่มีทาง "กดผิดแล้วเปิดเว็บทั้งที่ยังไม่พร้อม"
+ *   · เปิดใช้อีกครั้ง = กด **"เผยแพร่"** (เส้นทางปกติ ไม่มีปุ่มเพิ่ม)
+ * - **ต้องติ๊กยืนยัน** (fail-closed เหมือน `startFromTemplateAction`) ⇒ กันกดพลาด
+ * - ใช้ได้เฉพาะเมื่อหน้านี้ใช้บล็อกอยู่จริง (อ่านจาก DB — `decideRevertLayout` ตัวเดียวกับหน้าจอ)
+ * - **ไม่แตะเนื้อหา**: ฉบับร่าง/ฉบับเผยแพร่/ประวัติรุ่น ยังอยู่ครบ (แค่หยุดใช้กับหน้าเว็บ)
+ * - สั่ง `refreshPublicSite` ให้หน้าเว็บกลับมาใช้เลย์เอาต์โค้ดทันที (ISR) + บันทึก audit
+ */
+export async function revertToCodeLayoutAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const page = String(formData.get("page") ?? "").trim();
+
+  if (!hasBlockTemplate(page)) redirect(pathOf(page));
+
+  const isLive = await isPageLive(page).catch(() => false);
+  const reason = decideRevertLayout({ isLive, confirmValue: String(formData.get("confirm") ?? "") });
+  if (reason !== "ok") redirect(`${pathOf(page)}?layout=${reason}`);
+
+  await setPageLive(page, false, user.email);
+  await recordAudit({ actorEmail: user.email, action: "layout-revert", target: page, detail: null });
+
+  await refreshPublicSite("page");
+  revalidatePath(pathOf(page));
+  redirect(`${pathOf(page)}?layout=done`);
 }
 
 /**

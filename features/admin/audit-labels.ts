@@ -39,6 +39,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     publish: strings.auditPublish,
     /* เผยแพร่โดย "ถึงกำหนดเวลา" ไม่ใช่มีคนกด (X2.7) — คนละร่องรอยกับการกดเอง */
     "publish-scheduled": strings.auditPublishScheduled,
+    /* กลับไปใช้ดีไซน์เดิมของเว็บ = หยุดใช้บล็อกกับหน้านั้น (รอบที่ 246 — ทางออกทิศเดียว) */
+    "layout-revert": strings.auditLayoutRevert,
     "product-revision-restore": "กู้คืนประวัติสินค้า",
 "recipe-revision-restore": "กู้คืนประวัติเมนูอาหาร",
 "news-revision-restore": "กู้คืนประวัติข่าว",

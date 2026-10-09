@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { startFromTemplateAction } from "@/app/admin/builder/actions";
+import { revertToCodeLayoutAction, startFromTemplateAction } from "@/app/admin/builder/actions";
 import { BlockBuilder } from "@/features/admin/ui/block-builder";
 import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { PageSeoSettings } from "@/features/admin/ui/page-seo-settings";
@@ -16,7 +16,7 @@ import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
-import { listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
+import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { isDatabaseConfigured } from "@/db/pool";
@@ -75,12 +75,14 @@ export default async function AdminBuilderPage({
   readonly params: Promise<{ readonly page: string }>;
   /* รอบที่ 227: ใช้บอกผู้ใช้ว่า "กดใช้เทมเพลตแล้วแต่ยังไม่ติ๊กยืนยัน" (Server Action ปฏิเสธเงียบ ๆ) */
   /* รอบที่ 240: ถอด `live` ออกด้วย — ไม่มีสวิตช์ "ใช้กับหน้าเว็บจริง" ให้ปฏิเสธอีกแล้ว */
-  readonly searchParams: Promise<{ readonly template?: string }>;
+  readonly searchParams: Promise<{ readonly template?: string; readonly layout?: string }>;
 }) {
   const user = await requireAdminUser("content");
   const { page } = await params;
   const query = await searchParams;
   const templateNotice = query.template === "confirm";
+  /* รอบที่ 246: ผลของการกด "กลับไปใช้ดีไซน์เดิม" (Server Action ปฏิเสธ/สำเร็จ แล้ว redirect กลับมาพร้อมรหัส) */
+  const layoutNotice = query.layout ?? null;
 
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
@@ -122,7 +124,7 @@ export default async function AdminBuilderPage({
     อ่านข้อมูลของหน้าแบบขนาน (4 คำสั่งไม่ขึ้นแก่กัน) + แถวที่เหลืออีกชุด
     ⚠️ ยังต้องมี DB จริง (ตรวจ `isDatabaseConfigured` ด้านบนแล้ว) — ถ้าไม่มี จะออกก่อนถึงบรรทัดนี้
   */
-  const [draftRow, publishedRow, revisions, storedVersions, presets, schedule] = await Promise.all([
+  const [draftRow, publishedRow, revisions, storedVersions, presets, schedule, isLive] = await Promise.all([
     loadDocumentRow(page, "draft"),
     loadDocumentRow(page, "published"),
     listRevisions(page),
@@ -131,6 +133,8 @@ export default async function AdminBuilderPage({
     listBlockPresets(),
     /* กำหนดเวลาเผยแพร่ที่ตั้งไว้ (X2.7) — ยังไม่มีฉบับร่าง/ยังไม่ตั้ง = null */
     readPublishSchedule(page),
+    /* ใช้กับ "กลับไปใช้ดีไซน์เดิม" (รอบที่ 246) — หน้านี้ใช้บล็อกกับเว็บจริงอยู่ไหม (อ่านจาก DB ห้ามเดา) */
+    isPageLive(page).catch(() => false),
   ]);
 
   const parsedDraft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
@@ -212,6 +216,60 @@ export default async function AdminBuilderPage({
           <p className="text-fg-muted text-xs">{strings.templateMissingList}</p>
         </section>
       ) : null}
+
+      {/*
+        ── กลับไปใช้ดีไซน์เดิมของเว็บ (รอบที่ 246 · มติเจ้าของ) ──────────────────────────────
+        เคสจริง: เจ้าของถาม *"กลับดีฟอลยังไงครับ"* — รอบที่ 240 ถอดสวิตช์ออกไปแล้ว จึงไม่มีทางถอยจากหลังบ้าน
+        ⇒ แสดง **เฉพาะเมื่อหน้านี้ใช้บล็อกกับเว็บจริงอยู่** (`isLive` อ่านจาก DB) และเป็น **ทิศเดียว** (ปิดเท่านั้น)
+        ⚠️ ด่านจริงอยู่ที่ Server Action (`decideRevertLayout`: ไม่ติ๊กยืนยัน = ไม่ทำอะไรเลย)
+      */}
+      {hasBlockTemplate(page) && isLive ? (
+        <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5" data-layout-revert="">
+          <h2 className="text-fg text-lg font-semibold">{strings.layoutRevertTitle}</h2>
+          <p className="text-fg-muted text-sm">{strings.layoutRevertHint}</p>
+
+          {layoutNotice === "needs-confirm" ? (
+            <p className="text-brand-red text-sm" data-layout-notice="needs-confirm">
+              {strings.layoutRevertNeedsConfirm}
+            </p>
+          ) : null}
+          {layoutNotice === "not-live" ? (
+            <p className="text-fg-muted text-sm" data-layout-notice="not-live">
+              {strings.layoutRevertNotLive}
+            </p>
+          ) : null}
+          {layoutNotice === "done" ? (
+            <p className="text-fg-muted text-sm" data-layout-notice="done">
+              {strings.layoutRevertDone}
+            </p>
+          ) : null}
+
+          <form action={revertToCodeLayoutAction} className="flex flex-col gap-3" data-layout-revert-form="">
+            <input type="hidden" name="page" value={page} />
+            <label className="text-fg-muted flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                name="confirm"
+                value="revert"
+                required
+                className="border-line accent-brand-red size-4 rounded border"
+              />
+              {strings.layoutRevertConfirm}
+            </label>
+            <button
+              type="submit"
+              className="border-line-strong text-fg hover:bg-bg-subtle focus-visible:ring-ring w-fit rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              {strings.layoutRevertButton}
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      {/*
+        ⚠️ หมายเหตุสำหรับผู้ที่จะแก้ต่อ: ปุ่ม "กลับไปใช้ดีไซน์เดิม" ต้องอยู่ใน *หน้านี้* (Server Component)
+        ไม่ใช่ใน BlockBuilder (client) — เพราะต้องอ่าน `isLive` จริงจาก DB ทุกครั้งที่เปิดหน้า
+      */}
 
       {draftRow === null ? null : (
 
