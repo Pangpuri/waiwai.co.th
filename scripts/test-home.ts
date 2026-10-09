@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { codeOf } from "./source-scan.ts";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -32,16 +33,6 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
   return readFileSync(path.join(ROOT, relativePath), "utf8");
-}
-
-/**
- * ตัดคอมเมนต์ออก — ใช้สแกน "โค้ดจริง" เท่านั้น
- * (คอมเมนต์ที่อธิบายบทเรียนมีคำว่า `/products/cup-noodles` ได้ — เป็นประวัติ ไม่ใช่ลิงก์)
- */
-function codeOf(relativePath: string): string {
-  return sourceOf(relativePath)
-    .replaceAll(/\/\*[\s\S]*?\*\//g, " ")
-    .replaceAll(/(^|\s)\/\/[^\n]*/g, " ");
 }
 
 const categoryRow: ProductCategoryCardRecord = {

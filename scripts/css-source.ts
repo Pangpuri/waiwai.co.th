@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+import { stripComments } from "./source-scan.ts";
+
 /**
  * อ่าน `app/globals.css` สำหรับเทสต์ — **ตัดคอมเมนต์ออกก่อนเสมอ**
  *
@@ -12,5 +14,6 @@ import { readFile } from "node:fs/promises";
 export async function readStrippedCss(): Promise<string> {
   const raw = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-  return raw.replace(/\/\*[\s\S]*?\*\//g, " ");
+  /* รอบที่ 243: ใช้ตัวช่วยกลาง (implementation เดียวทั้งโปรเจกต์) */
+  return stripComments(raw);
 }

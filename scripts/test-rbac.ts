@@ -3,6 +3,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { ADMIN_ROLES, isAdminRole } from "@/lib/auth/types";
 import {
   ADMIN_PERMISSIONS,
@@ -28,6 +30,16 @@ import {
 const ROOT = join(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
+  /*
+    รอบที่ 243 (ปิดหนี้ "คอมเมนต์ทำให้ผ่านด่าน"): ค่าเริ่มต้นของเทสต์นี้คือ **โค้ดจริง** (ตัดคอมเมนต์)
+    ⚠️ เคสจริงรอบที่ 242: `app/admin/layout.tsx` ผ่านด่านสิทธิ์เพราะ *คอมเมนต์* มีข้อความ
+    `requireAdminUser("<permission>")` ⇒ ถ้าสแกนแบบดิบ ด่านจะโกหกได้
+  */
+  return codeOf(relativePath);
+}
+
+/** อ่านแบบ **ดิบ** (รวมคอมเมนต์) — ใช้เฉพาะเทสต์ที่ *ตั้งใจ* ตรวจทั้งไฟล์รวมคอมเมนต์ */
+function rawSourceOf(relativePath: string): string {
   return readFileSync(join(ROOT, relativePath), "utf8");
 }
 
@@ -421,7 +433,8 @@ test("rbac: ประตูต้อง 'บังคับ' ส่งสิท�
       if (!relative.endsWith(".ts") && !relative.endsWith(".tsx")) continue;
       /* dal.ts = ที่ประกาศฟังก์ชัน (รูปแบบที่ถูกคือมีพารามิเตอร์ ไม่ใช่ `()`) */
       if (relative === "lib/auth/dal.ts") continue;
-      if (sourceOf(relative).includes("requireAdminUser()")) offenders.push(relative);
+      /* ⚠️ ตั้งใจใช้ raw: เทสต์นี้ต้องการให้ **คอมเมนต์** ก็ไม่มีรูปแบบเก่าหลงเหลือ (ดูเหตุผลด้านบน) */
+      if (rawSourceOf(relative).includes("requireAdminUser()")) offenders.push(relative);
     }
   };
   for (const root of roots) walk(root);

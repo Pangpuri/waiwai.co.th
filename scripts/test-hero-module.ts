@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf, stripComments } from "./source-scan.ts";
+
 import { managedHeroSlideViews } from "@/features/home/slides";
 import {
   MAX_HERO_PAGE_SLIDES,
@@ -126,7 +128,7 @@ test("hero module: แปลง object-position เดิม → จุดโฟ
   const script = readFileSync("scripts/import-hero-slides.ts", "utf8");
   assert.ok(script.includes("preserveOrder: true"), "ตัวนำเข้าต้องคง sort_order เดิม (บทเรียนรอบ 140)");
   assert.ok(script.includes("--dry-run"), "ต้องมีโหมดดูผลอย่างเดียว");
-  assert.ok(!/\bdelete\b/i.test(script.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")), "ตัวนำเข้าต้องไม่ลบข้อมูล");
+  assert.ok(!/\bdelete\b/i.test(stripComments(script)), "ตัวนำเข้าต้องไม่ลบข้อมูล");
 });
 
 test("hero module: ชั้นอ่านฝั่งเว็บต้อง fallback ปลอดภัย (ไม่มี DB/ตารางหาย = คืน [] ไม่ throw)", () => {
@@ -183,7 +185,7 @@ test("hero module: หลังบ้าน — เมนูในไซด์�
   assert.ok(layout.includes("sidebarPermission[item.href] ?? \"content\""), "เมนูต้องผูกสิทธิ์ (ค่าเริ่มต้น = content)");
 
   /* หน้าจอ: ตรวจสิทธิ์ + อ่านผ่านชั้นข้อมูล (ไม่ประกอบ SQL เองในหน้าจอ) */
-  const page = readFileSync("app/admin/hero/page.tsx", "utf8");
+  const page = codeOf("app/admin/hero/page.tsx");
   assert.ok(page.includes('requireAdminUser("content")'), "หน้าจอต้องตรวจสิทธิ์ก่อนอ่านข้อมูล");
   assert.ok(page.includes("listHeroPageSlidesForAdmin()"), "ต้องอ่านผ่านชั้นข้อมูลของโมดูล");
   assert.ok(page.includes("heroAdminNextStep"), "ต้องบอกผู้ใช้ว่าเฟสถัดไปทำอะไร (ไม่ให้เข้าใจว่าจบแล้ว)");

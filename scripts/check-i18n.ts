@@ -15,6 +15,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { stripComments } from "./source-scan.ts";
 import { en } from "../lib/i18n/messages/en.ts";
 import { th } from "../lib/i18n/messages/th.ts";
 
@@ -40,27 +41,6 @@ const DICTIONARY_FILES = new Set(["th.ts", "en.ts"]);
 const THAI_CHARACTER = /[\u0E00-\u0E7F]/;
 const ALLOW_MARKER = "i18n-allow";
 const IGNORED_DIRECTORIES = new Set(["node_modules", ".next", ".git", "scripts", "public"]);
-
-/** ตัดคอมเมนต์ออกก่อนตรวจ เพื่อไม่ให้คอมเมนต์ไทยถูกรายงานผิด */
-function stripComments(source: string): string {
-  /*
-    แทนคอมเมนต์แบบบล็อกด้วยช่องว่าง "โดยคงจำนวนบรรทัดเดิม"
-    ถ้าลบทิ้งทั้งก้อน เลขบรรทัดที่รายงานจะเลื่อน → ชี้ผิดบรรทัด
-  */
-  const withoutBlocks = source.replace(/\/\*[\s\S]*?\*\//g, (match) =>
-    match.replace(/[^\n]/g, " "),
-  );
-
-  return withoutBlocks
-    .split(/\r?\n/)
-    .map((line) => {
-      const index = line.indexOf("//");
-      // ไม่ตัดที่ "://" ของ URL
-      if (index === -1 || line[index - 1] === ":") return line;
-      return line.slice(0, index);
-    })
-    .join("\n");
-}
 
 function flattenKeys(value: Record<string, unknown>, prefix = ""): string[] {
   return Object.entries(value).flatMap(([key, child]) => {

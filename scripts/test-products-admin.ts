@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { productIdOfSourceId, validateIngredientInput, validateProductInput, type ProductInput } from "@/lib/products/model";
 
 /**
@@ -67,9 +69,9 @@ test("products admin: validator กลางปฏิเสธเมื่อ id
 
 /* ── ตรวจซอร์ส: กฎที่ "ห้ามลืม" ───────────────────────────────────────────── */
 
-const actions = readFileSync("app/admin/products/actions.ts", "utf8");
+const actions = codeOf("app/admin/products/actions.ts");
 const repository = readFileSync("lib/products/repository.ts", "utf8");
-const listPage = readFileSync("app/admin/products/page.tsx", "utf8");
+const listPage = codeOf("app/admin/products/page.tsx");
 const editorPage = readFileSync("app/admin/products/[id]/page.tsx", "utf8");
 const editorForm = readFileSync("features/admin/ui/product-editor-form.tsx", "utf8");
 const categoryForm = readFileSync("features/admin/ui/product-category-form.tsx", "utf8");

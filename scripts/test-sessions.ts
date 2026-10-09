@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { stripComments } from "./source-scan.ts";
+
 import {
   MAX_ACTIVE_SESSIONS_PER_USER,
   SESSION_TOUCH_MINUTES,
@@ -21,7 +23,11 @@ import { RETENTION_CLASSES, RETENTION_DAYS, LOG_RETENTION_CLASSES } from "@/lib/
  */
 
 const root = join(import.meta.dirname, "..");
-const read = (...parts: readonly string[]): string => readFileSync(join(root, ...parts), "utf8");
+/**
+ * อ่านไฟล์ (ตัดคอมเมนต์) — รอบที่ 243: การสแกน "ต้องมีโค้ด X" ต้องดูที่โค้ดจริง
+ * ⚠️ ไม่งั้นคอมเมนต์ที่เล่าบทเรียน (ยกโค้ดเดิมมาเป็นตัวอย่าง) จะทำให้ด่านผ่านทั้งที่โค้ดไม่มี
+ */
+const read = (...parts: readonly string[]): string => stripComments(readFileSync(join(root, ...parts), "utf8"));
 
 test("session: รหัสเซสชันสุ่มไม่ซ้ำ และยาวพอ", () => {
   const ids = new Set<string>();

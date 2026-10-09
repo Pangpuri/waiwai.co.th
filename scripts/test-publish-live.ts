@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import {
   PUBLISH_GOES_LIVE_PAGES,
   expectedLiveOf,
@@ -33,15 +35,9 @@ function sourceOf(relativePath: string): string {
 }
 
 /**
- * ตัดคอมเมนต์ออกก่อนสแกน "โค้ด"
- * ⚠️ จำเป็น: คอมเมนต์ที่อธิบายว่าอะไรถูกถอดออก (เช่น `useActionState(saveDraftAction)`)
- *   ทำให้การสแกนแบบ raw หลอกว่าโค้ดยังอยู่ — เทสต์ต้องดูที่โค้ดจริงเท่านั้น
+ * ⚠️ ต้องใช้ `codeOf()` จากตัวช่วยกลาง (`scripts/source-scan.ts`) — คอมเมนต์ที่อธิบายว่าอะไรถูกถอดออก
+ *   (เช่น `useActionState(saveDraftAction)`) ทำให้การสแกนแบบดิบหลอกว่าโค้ดยังอยู่ (รอบที่ 243 รวมตัวช่วยเป็นชุดเดียว)
  */
-function codeOf(relativePath: string): string {
-  return sourceOf(relativePath)
-    .replaceAll(/\/\*[\s\S]*?\*\//g, "")
-    .replaceAll(/\/\/[^\n]*/g, "");
-}
 
 /* ── 1) นโยบายกลาง ─────────────────────────────────────────────────────────── */
 

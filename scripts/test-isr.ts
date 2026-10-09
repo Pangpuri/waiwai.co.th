@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+import { stripComments } from "./source-scan.ts";
+
 import { PAGE_REVALIDATE_SECONDS, PUBLISH_KINDS, activeRefreshMode, localeRoots, refreshPlan, shouldRunRebuild } from "@/lib/cache/plan";
 
 /**
@@ -200,10 +202,8 @@ test("isr: ห้ามปิด dynamicParams ของหน้าใน [lang
   const files = walk("app/[lang]").filter((file) => file.endsWith("page.tsx"));
   assert.ok(files.length >= 10, `ต้องเจอหน้าอย่างน้อย 10 ไฟล์ (พบ ${String(files.length)})`);
   for (const file of files) {
-    /* ⚠️ ตัดคอมเมนต์ก่อนตรวจ — ไฟล์จริงอธิบายบทเรียนไว้โดยยกโค้ดเดิมมาเป็นตัวอย่างในคอมเมนต์ */
-    const code = sourceOf(file)
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
+    /* ⚠️ ตัดคอมเมนต์ก่อนตรวจ (ตัวช่วยกลาง) — ไฟล์จริงอธิบายบทเรียนไว้โดยยกโค้ดเดิมมาเป็นตัวอย่างในคอมเมนต์ */
+    const code = stripComments(sourceOf(file));
     assert.ok(
       !/export const dynamicParams\s*=\s*false/.test(code),
       `${file}: ห้ามปิด dynamicParams — revalidatePath("/", "layout") จะทำให้หน้านี้ 404 จนกว่าจะ build ใหม่`,

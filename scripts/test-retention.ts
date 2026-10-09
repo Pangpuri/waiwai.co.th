@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { EMPTY_PAGE_SEO, type PageRecord } from "@/lib/pages/model";
 import { CODE_ONLY_PAGE_PATHS } from "@/lib/pages/paths";
 import { describeRetention, retentionPhrase } from "@/lib/retention/format";
@@ -39,7 +41,8 @@ import { buildSitemapEntries } from "@/lib/site-settings/sitemap";
 const ROOT = path.resolve(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
-  return readFileSync(path.join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) — กันด่าน "มีโค้ด X" ผ่านเพราะคอมเมนต์ */
+  return codeOf(relativePath);
 }
 
 /* ── 1) ตัวเลขตามมติผู้ใช้ (2026-10-03) ─────────────────────────────────────── */

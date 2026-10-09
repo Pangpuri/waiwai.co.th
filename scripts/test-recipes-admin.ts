@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import {
   isYouTubeVideoId,
   recipeIdOfSourceId,
@@ -67,8 +69,8 @@ test("recipes admin: validator กลางปฏิเสธค่าที่�
 /* ── ตรวจซอร์ส: กฎที่ "ห้ามลืม" ───────────────────────────────────────────── */
 
 const repository = readFileSync("lib/recipes/repository.ts", "utf8");
-const actions = readFileSync("app/admin/recipes/actions.ts", "utf8");
-const listPage = readFileSync("app/admin/recipes/page.tsx", "utf8");
+const actions = codeOf("app/admin/recipes/actions.ts");
+const listPage = codeOf("app/admin/recipes/page.tsx");
 const editorPage = readFileSync("app/admin/recipes/[id]/page.tsx", "utf8");
 const editorForm = readFileSync("features/admin/ui/recipe-editor-form.tsx", "utf8");
 const publicList = readFileSync("features/recipes/ui/recipe-video-list.tsx", "utf8");

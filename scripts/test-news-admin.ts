@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { MAX_NEWS_BLOCKS, MAX_NEWS_IMAGES } from "@/lib/news/body";
 import {
   newsBlocksToText,
@@ -78,7 +80,7 @@ test("news admin: เกินเพดานแล้วต้องราย�
 /* ── ตรวจซอร์ส: กฎที่ "ห้ามลืม" ของรอบนี้ ───────────────────────────────────── */
 
 const repo = readFileSync("lib/news/repository.ts", "utf8");
-const actions = readFileSync("app/admin/news/actions.ts", "utf8");
+const actions = codeOf("app/admin/news/actions.ts");
 
 test("news admin: ฝั่งเว็บสาธารณะต้องกรองเฉพาะ 'เผยแพร่และไม่ถังขยะ' ทุกคำสั่ง", () => {
   assert.ok(repo.includes("PUBLIC_NEWS_CONDITION"), "ต้องมีค่าคงที่เงื่อนไขกลาง");

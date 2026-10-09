@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { MAX_UPLOAD_BYTES, extensionFor, readImageInfo, safeFilename } from "@/lib/media/image-info";
 
 /** เทสต์การตรวจภาพจากหัวไฟล์ (ไม่เชื่อ File.type จากเบราว์เซอร์) */
@@ -144,7 +146,7 @@ test("media: ช่องภาพใช้คลังจาก context แล�
   const root = join(import.meta.dirname, "..");
   const drop = readFileSync(join(root, "features", "admin", "ui", "image-drop.tsx"), "utf8");
   const library = readFileSync(join(root, "features", "admin", "ui", "image-library.tsx"), "utf8");
-  const page = readFileSync(join(root, "app", "admin", "builder", "[page]", "page.tsx"), "utf8");
+  const page = codeOf("app/admin/builder/[page]/page.tsx");
 
   /* 1) ช่องภาพทุกช่องใช้คลังผ่าน context (ไม่ต้องแก้ทุกจุดเรียก — จุดเดียวคือในตัว ImageDrop) */
   assert.ok(drop.includes("useImageLibrary()"), "ImageDrop ต้องอ่านคลังจาก context");

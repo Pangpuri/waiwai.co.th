@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import {   } from "node:fs";
 import { test } from "node:test";
+
+import { codeOf } from "./source-scan.ts";
 
 import {
   EMPTY_ERASURE_COUNTS,
@@ -23,10 +24,10 @@ import {
  * 3. **ข้อมูลกลับเข้าไปในบันทึก** — หลังลบแล้วดันเขียนอีเมลเต็มลง audit log
  */
 
-const ROOT = path.resolve(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
-  return readFileSync(path.join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) — กันด่าน "มีโค้ด X" ผ่านเพราะคอมเมนต์ */
+  return codeOf(relativePath);
 }
 
 /* ── 1) ทำให้เป็นรูปแบบเดียวกัน (ตัดสินใจว่าจะเจอหรือไม่เจอ) ──────────────────── */

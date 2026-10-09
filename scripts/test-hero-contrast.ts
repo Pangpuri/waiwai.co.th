@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
+import { stripComments } from "./source-scan.ts";
+
 /**
  * ด่านคอนทราสต์ของ "ข้อความ hero" ซึ่งตอนนี้อยู่ **บนพื้นหน้าเว็บ** (ไม่ทับบนภาพแล้ว)
  *
@@ -182,9 +184,7 @@ test("hero: ข้อความต้องไม่ทับบนภาพ�
     ⚠️ ต้องตัดคอมเมนต์ก่อนตรวจ — คอมเมนต์อธิบายในไฟล์นั้นเอ่ยชื่อ utility เดิมไว้ (text-shadow-photo ฯลฯ)
     ทำให้เทสต์แดงทั้งที่โค้ดถูก · เจอจริงในรอบที่ 21 (บทเรียนเดียวกับตอนตรวจ CSS ที่มีวงเล็บปีกกาในคอมเมนต์)
   */
-  const hero = raw
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/^[ \t]*\/\/.*$/gm, " ");
+  const hero = stripComments(raw);
 
   // 1) ต้องไม่มี utility เงา/ออร่าที่ใช้กับ "ข้อความบนภาพ" อีก (ถอดออกจาก globals.css แล้ว)
   assert.ok(

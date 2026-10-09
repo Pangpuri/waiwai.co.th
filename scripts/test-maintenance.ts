@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { PROXY_BYPASS_PREFIXES } from "@/lib/i18n/config";
 import {
   MAINTENANCE_BYPASS_REFRESH_MS,
@@ -36,10 +38,10 @@ import { buildMaintenanceRobots, buildRobots } from "@/lib/site-settings/sitemap
  * 3. **เปิดแล้วไม่รู้ตัว / ตั้งค่าผิดแล้วเงียบ** — ต้องเห็นสถานะบนหลังบ้าน ไม่ใช่เดา
  */
 
-const ROOT = path.resolve(import.meta.dirname, "..");
-
 function sourceOf(relativePath: string): string {
-  return readFileSync(path.join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) — กันด่าน "มีโค้ด X" ผ่านเพราะคอมเมนต์ */
+
+  return codeOf(relativePath);
 }
 
 /* ── 1) อ่านค่าสวิตช์ ───────────────────────────────────────────────────────── */

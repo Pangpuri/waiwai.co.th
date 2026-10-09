@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import {   } from "node:fs";
 import { test } from "node:test";
+
+import { codeOf, rawOf } from "./source-scan.ts";
 
 import { EMPTY_PAGE_SEO, type PageRecord } from "@/lib/pages/model";
 import { PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
@@ -31,10 +32,10 @@ import { buildSitemapEntries } from "@/lib/site-settings/sitemap";
  * 4. **จำกัดสิทธิ์**: สร้างได้เฉพาะหน้าที่อยู่ในรายการที่พรีวิวได้ · ตัวสร้างต้องล็อกอิน
  */
 
-const ROOT = path.resolve(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
-  return readFileSync(path.join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) — กันด่าน "มีโค้ด X" ผ่านเพราะคอมเมนต์ */
+  return codeOf(relativePath);
 }
 
 /* ── 1) นโยบาย: อายุ · เพดาน · การหมดอายุ ─────────────────────────────────────── */
@@ -115,8 +116,8 @@ test("preview-link: ฐานข้อมูลเก็บเฉพาะ hash 
   assert.ok(!select.includes("token_hash"), "รายการที่แสดงต้องไม่ดึง token_hash");
   assert.ok(!select.includes("token,"), "รายการที่แสดงต้องไม่ดึงโทเคน");
 
-  /* audit ต้องไม่เก็บโทเคน */
-  assert.ok(repo.includes("ห้ามเขียนโทเคนลง audit"), "ต้องมีข้อเตือนในโค้ดเรื่อง audit");
+  /* audit ต้องไม่เก็บโทเคน — บรรทัดนี้ *ตั้งใจ* ดูคอมเมนต์เตือน (เอกสารในโค้ด) ⇒ ใช้ raw ไม่ใช่ codeOf */
+  assert.ok(rawOf("lib/preview-link/repository.ts").includes("ห้ามเขียนโทเคนลง audit"), "ต้องมีข้อเตือนในโค้ดเรื่อง audit");
   assert.ok(!/detail:.*\$\{token\}/.test(repo), "ห้ามเอาโทเคนไปใส่ detail ของ audit");
 });
 

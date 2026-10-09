@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import {   } from "node:fs";
 import { test } from "node:test";
+
+import { codeOf, rawOf } from "./source-scan.ts";
 
 import { TRASH_RETENTION_DAYS, RETENTION_CLASSES, trashCutoffFor } from "@/lib/retention/plan";
 import { can } from "@/lib/auth/roles";
@@ -42,10 +43,10 @@ import {
  *    ตัวลบตามกำหนดต้องถูกเรียกจากตัวลบกลาง (cron/ล็อกอิน) ไม่ใช่ต้องมีคนกดเอง
  */
 
-const ROOT = path.resolve(import.meta.dirname, "..");
 
 function sourceOf(relativePath: string): string {
-  return readFileSync(path.join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) */
+  return codeOf(relativePath);
 }
 
 /* ── 1) นโยบายระยะเก็บของถังขยะ ──────────────────────────────────────────────── */
@@ -757,7 +758,8 @@ test("trash-guard: ทั้ง 3 ตารางมีประตูสอง�
 });
 
 test("trash-guard: migration 0026 เพิ่ม deleted_by ให้ 3 ตาราง + backfill ที่รันซ้ำได้", () => {
-  const migration = sourceOf("db/migrations/0026-content-deleted-by.sql");
+  /* ⚠️ ไฟล์ SQL: คอมเมนต์หัวไฟล์เป็น **สัญญา** ของด่าน migration (marker `idempotent: …`) ⇒ ต้องอ่านแบบ raw */
+  const migration = rawOf("db/migrations/0026-content-deleted-by.sql");
 
   for (const table of ["product", "recipe", "news"]) {
     assert.ok(

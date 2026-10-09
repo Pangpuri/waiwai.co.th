@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { test } from "node:test";
+
+import { codeOf } from "./source-scan.ts";
 
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -24,10 +24,9 @@ import {
  * ⚠️ รันได้โดยไม่ต้องมีฐานข้อมูล (อ่านไฟล์ + ตรรกะล้วน) · วงจรจริงกับ DB อยู่ใน `npm run check:db`
  */
 
-const ROOT = join(import.meta.dirname, "..");
-
 function sourceOf(relativePath: string): string {
-  return readFileSync(join(ROOT, relativePath), "utf8");
+  /* รอบที่ 243: ค่าเริ่มต้น = โค้ดจริง (ตัดคอมเมนต์) */
+  return codeOf(relativePath);
 }
 
 const NOW = new Date("2026-10-03T12:00:00.000Z");
