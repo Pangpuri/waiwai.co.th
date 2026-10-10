@@ -60,7 +60,9 @@ export default async function CertificationsPage({
   */
   const liveDocument = await loadLiveBlockDocument("certifications");
   if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
+    /* ⚠️ ต้องส่ง `heading` ⇒ ตัวเรนเดอร์ใส่ `<h1 class="sr-only">` ให้ (a11y · มติเจ้าของ 2026-10-10:
+       หน้าเหลือแต่ภาพ ไม่มีหัวข้อบนจอ ⇒ h1 สำหรับโปรแกรมอ่านหน้าจอยังต้องมี — บทเรียนรอบ 258/259) */
+    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.about.certifications.meta.title} />;
   }
 
   const m = messages.about.certifications;

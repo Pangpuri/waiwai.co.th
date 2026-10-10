@@ -112,6 +112,10 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   /* Hero slides & campaigns (round 184) */
   blockImageLabel: "Image for this block",
   /* "Big image" block (round 259) — full width, never cropped */
+  /* Gallery block — image cell shape (round 262) */
+  blockGalleryShape: "Image cell shape",
+  blockGalleryShapeLandscape: "Landscape 4:3 (photos · fills the frame by cropping)",
+  blockGalleryShapePortrait: "Portrait A4 (documents/certificates · never cropped)",
   blockImageBigHint: "Shown at full width with the file's real aspect ratio (never cropped) — good for diagrams",
   /* Hero slides (round 183 · phase ค) */
   cardImageLabel: "Image for this card",

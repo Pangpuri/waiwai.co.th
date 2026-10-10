@@ -403,7 +403,11 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
     ⚠️ ยังไม่นำเข้า = ถอยไปใช้ไฟล์ใน public/ (เทมเพลตยังสร้างได้ หน้าเว็บไม่พัง)
     ℹ️ รอบที่ 260: หน้า `about` ออกจากเส้นทางนี้แล้ว (ใช้ตัวนำเข้า — ไม่มีเทมเพลตตั้งต้น)
   */
-  const templateOptions = page === "executives" ? { image: await aboutTemplateImageResolver() } : undefined;
+  /* รอบที่ 262: หน้า "ใบรับรองมาตรฐาน" ใช้ภาพจากคลังภาพด้วย (คีย์ `cert:<id>` ในทะเบียน) */
+  const templateOptions =
+    page === "executives" || page === "certifications"
+      ? { image: await aboutTemplateImageResolver() }
+      : undefined;
   const template = buildBlockTemplate(page, templateOptions);
   if (template === null) redirect(pathOf(page));
 

@@ -574,7 +574,7 @@ function BlockView({
               </h2>
             ) : null}
             {visible.length === 0 ? null : (
-              <GalleryLightbox items={visible} columns={block.columns} strings={strings.gallery} />
+              <GalleryLightbox items={visible} columns={block.columns} shape={block.imageShape} strings={strings.gallery} />
             )}
           </div>
         );

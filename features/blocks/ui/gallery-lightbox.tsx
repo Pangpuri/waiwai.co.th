@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { GalleryStrings } from "@/features/blocks/render-strings";
+import type { GalleryImageShape } from "@/lib/blocks/types";
 
 /**
  * แกลเลอรี + lightbox ของ "บล็อกแกลเลอรี" (รอบที่ 86) — **Client Component**
@@ -29,13 +30,28 @@ const GRID_CLASS: Record<2 | 3 | 4, string> = {
   4: "grid gap-4 sm:grid-cols-2 lg:grid-cols-4",
 };
 
+/**
+ * สัดส่วน "ช่องภาพ" ในกริด (รอบที่ 262)
+ * - `landscape` = 4:3 + `object-cover` ⇒ ชุดภาพถ่าย (ตัดขอบได้)
+ * - `portrait` = **A4 (1:1.414)** + `object-contain` ⇒ **เอกสาร/ใบรับรอง**: ไม่ตัดอะไรทิ้ง
+ *   (ภาพใบรับรองของบริษัทเป็น A4 ตั้งทุกใบ ⇒ เต็มกรอบพอดี ไม่มีแถบว่าง)
+ * ⚠️ ห้ามใช้ `object-cover` กับโหมด portrait เด็ดขาด — ใบรับรองถูกตัดขอบ = ข้อมูลบนเอกสารหาย
+ */
+const CELL_CLASS: Record<GalleryImageShape, string> = {
+  landscape: "bg-bg-subtle aspect-[4/3] w-full object-cover",
+  portrait: "bg-bg-cream aspect-[1/1.414] w-full object-contain",
+};
+
 export function GalleryLightbox({
   items,
   columns,
+  shape = "landscape",
   strings,
 }: {
   readonly items: readonly GalleryLightboxItem[];
   readonly columns: 2 | 3 | 4;
+  /** สัดส่วนช่องภาพ (ค่าเริ่มต้น = แนวนอนแบบเดิม ⇒ แกลเลอรีเดิมไม่เปลี่ยนหน้าตา) */
+  readonly shape?: GalleryImageShape;
   readonly strings: GalleryStrings;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -98,7 +114,7 @@ export function GalleryLightbox({
                   src={item.path}
                   alt={item.alt}
                   loading="lazy"
-                  className="bg-bg-subtle aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]"
+                  className={`${CELL_CLASS[shape]} transition-transform group-hover:scale-[1.02]`}
                 />
                 {item.caption.trim() === "" ? null : (
                   <span className="text-fg-muted block px-3 py-2 text-left text-xs">{item.caption}</span>

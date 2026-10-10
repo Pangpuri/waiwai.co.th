@@ -353,11 +353,26 @@ export type BlockGalleryItem = {
 };
 
 /** บล็อก "แกลเลอรี + lightbox" — คลิกภาพแล้วเปิดดูเต็มจอ (เขียนเอง · ไม่เพิ่ม dependency) */
+/**
+ * สัดส่วน "ช่องภาพ" ของแกลเลอรี (รอบที่ 262)
+ *
+ * - `landscape` (ค่าเริ่มต้น) = กรอบ 4:3 + `object-cover` → ดูเป็นชุดภาพถ่าย (ตัดขอบได้)
+ * - `portrait` = กรอบ **A4 (1:1.414)** + `object-contain` → **ไม่ตัดอะไรทิ้งเลย** เหมาะกับ
+ *   **เอกสาร/ใบรับรอง** (ภาพใบรับรองทุกใบของบริษัทเป็น A4 ตั้ง 1:1.414 อยู่แล้ว ⇒ เต็มกรอบพอดี)
+ *
+ * มติเจ้าของ 2026-10-10 (หน้า "ใบรับรองมาตรฐาน"): *"เหลือเพียงแค่รูปของใบรับรองเปล่า ๆ กดขยายดูได้พอแล้ว
+ * คำอธิบายภาพก็ไม่ต้องนะ เค้าโครงก็แบบเดียวกับหน้าบ้าน"* ⇒ หน้าเว็บใช้ `portrait` เลียนแบบการ์ดหน้าบ้าน
+ * (หน้าบ้านใช้กรอบ 3:4 + `object-contain`) — ที่นี่ใช้ A4 เพื่อให้เต็มกรอบและไม่ต้องมีแถบว่าง
+ */
+export const GALLERY_IMAGE_SHAPES = ["landscape", "portrait"] as const;
+export type GalleryImageShape = (typeof GALLERY_IMAGE_SHAPES)[number];
+
 export type GalleryBlock = BlockBase & {
   readonly type: "gallery";
   readonly heading: LocalizedValue;
   readonly items: readonly BlockGalleryItem[];
   readonly columns: 2 | 3 | 4;
+  readonly imageShape: GalleryImageShape;
 };
 
 /* ── ชนิดบล็อกใหม่ รอบที่ 88 (กระดานรับสมัครงาน · รายชื่อคณะผู้บริหาร) ────────── */
@@ -596,7 +611,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "table", label: "ตาราง", hint: "หัวคอลัมน์ + แถวข้อมูล (เลื่อนแนวนอนได้บนมือถือ)" },
   { type: "map", label: "แผนที่", hint: "ภาพแผนที่ + คำบรรยาย + ลิงก์เปิดแผนที่" },
   { type: "form", label: "ฟอร์ม", hint: "ฝังฟอร์มจริง (ติดต่อ · ข่าวสาร · สมัครงาน)" },
-  { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox)" },
+  { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox) · เลือกสัดส่วนช่องภาพได้ (ภาพถ่าย/เอกสาร)" },
   { type: "jobBoard", label: "กระดานรับสมัครงาน", hint: "ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ (จัดกลุ่มตามฝ่ายได้)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
@@ -709,7 +724,7 @@ export function createBlock(type: BlockType, id: string): Block {
     case "form":
       return { ...base, type: "form", kind: "contact", heading: emptyText(), body: emptyText() };
     case "gallery":
-      return { ...base, type: "gallery", heading: emptyText(), items: [], columns: 3 };
+      return { ...base, type: "gallery", heading: emptyText(), items: [], columns: 3, imageShape: "landscape" };
     case "jobBoard":
       /* เริ่มด้วยรายการว่าง + จัดกลุ่มตามฝ่าย (ผู้ใช้กด "เพิ่มตำแหน่ง" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "jobBoard", heading: emptyText(), body: emptyText(), groupByDepartment: true, items: [] };

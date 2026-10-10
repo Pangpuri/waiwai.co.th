@@ -169,6 +169,8 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
       heading: { th: "", en: "" },
       items,
       columns: ABOUT_IMAGE_FIT.galleryColumns,
+      /* ภาพประกอบหน้าบริษัทเป็นภาพถ่าย ⇒ กรอบแนวนอนแบบเดิม (รอบที่ 262 เพิ่มตัวเลือกสัดส่วน) */
+      imageShape: "landscape",
     });
   }
 

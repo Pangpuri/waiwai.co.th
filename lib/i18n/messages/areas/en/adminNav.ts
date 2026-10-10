@@ -7,6 +7,8 @@ export const enAdminNav = {
   navHome: "Edit home page",
   navAbout: "Edit company page",
   navExecutives: "Edit executives page",
+  /* Round 262: placed right after "Company", matching the front-end menu order */
+  navCertifications: "Edit certifications page",
   navProducts: "Edit products page",
   navRecipes: "Edit recipes",
   navNews: "Edit news & activities",

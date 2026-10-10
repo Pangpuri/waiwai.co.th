@@ -45,16 +45,17 @@ function sourceOf(relativePath: string): string {
 
 /* ── 1) นโยบายกลาง ─────────────────────────────────────────────────────────── */
 
-test("publish-live: หน้าแรก + หน้าบริษัท + คณะผู้บริหาร กดเผยแพร่แล้วขึ้นเว็บ (หน้าอื่นยังไม่ขึ้น)", () => {
+test("publish-live: หน้าแรก + บริษัท + คณะผู้บริหาร + ใบรับรอง กดเผยแพร่แล้วขึ้นเว็บ", () => {
   assert.deepEqual(
     [...PUBLISH_GOES_LIVE_PAGES],
-    ["home", "about", "executives"],
-    "มติเจ้าของ: หน้าแรก (รอบ 240) · /about (รอบ 253) · /about/executives (รอบ 259 — 'โครงหลังบ้านก็อิงตามหน้าบ้าน')",
+    ["home", "about", "executives", "certifications"],
+    "มติเจ้าของ: หน้าแรก (รอบ 240) · /about (รอบ 253) · คณะผู้บริหาร (รอบ 259) · ใบรับรองมาตรฐาน (รอบ 262 — เหลือแต่ภาพจากฐานข้อมูล)",
   );
 
   assert.equal(publishGoesLive("home"), true);
   assert.equal(publishGoesLive("about"), true, "รอบ 253: ย้ายเนื้อหาบริษัทเข้า DB แล้ว ⇒ ต้องมีทางขึ้นเว็บ");
   assert.equal(publishGoesLive("executives"), true, "รอบ 259: ย้ายภาพผังเข้า DB แล้ว ⇒ ต้องมีทางขึ้นเว็บ");
+  assert.equal(publishGoesLive("certifications"), true, "รอบ 262: ย้ายภาพใบรับรองเข้า DB แล้ว ⇒ ต้องมีทางขึ้นเว็บ");
   assert.equal(publishGoesLive("products"), false);
   assert.equal(publishGoesLive("careers"), false);
   assert.equal(publishGoesLive(""), false, "ค่าที่ไม่รู้จักต้องไม่ทำให้ขึ้นเว็บ (fail-closed)");
@@ -62,10 +63,12 @@ test("publish-live: หน้าแรก + หน้าบริษัท + ค
   assert.equal(publishOutcomeOf("home"), "goes-live");
   assert.equal(publishOutcomeOf("about"), "goes-live");
   assert.equal(publishOutcomeOf("executives"), "goes-live");
+  assert.equal(publishOutcomeOf("certifications"), "goes-live");
   assert.equal(publishOutcomeOf("careers"), "saved-only");
   assert.equal(expectedLiveOf("home"), true);
   assert.equal(expectedLiveOf("about"), true);
   assert.equal(expectedLiveOf("executives"), true);
+  assert.equal(expectedLiveOf("certifications"), true);
   assert.equal(expectedLiveOf("news"), false);
 });
 

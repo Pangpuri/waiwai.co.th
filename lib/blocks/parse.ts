@@ -16,6 +16,7 @@ import {
   MAX_BLOCK_DEPTH,
   MAX_CARDS,
   MAX_COLUMNS,
+  GALLERY_IMAGE_SHAPES,
   MAX_GALLERY_ITEMS,
   MAX_JOB_ITEMS,
   MAX_RECIPE_ITEMS,
@@ -787,6 +788,8 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         heading: readText(entry, "heading", `${path}.heading`, problems),
         items: readGalleryItems(entry, path, problems),
         columns: readGalleryColumns(entry, `${path}.columns`, problems),
+        /* รอบที่ 262 — ไม่ระบุ = "landscape" (เอกสารเดิมไม่เปลี่ยนพฤติกรรม) */
+        imageShape: readChoice(entry, "imageShape", GALLERY_IMAGE_SHAPES, "landscape", `${path}.imageShape`, problems),
       };
     case "jobBoard":
       return {

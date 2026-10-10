@@ -1852,6 +1852,17 @@ export function BlockBuilder({
                 options={[2, 3, 4].map((value) => ({ value, label: String(value) }))}
                 onChange={(next) => update(setBlockChoice(document, block.id, "columns", Number(next)))}
               />
+              {/* รอบที่ 262 — สัดส่วนช่องภาพ: แนวนอน (ภาพถ่าย · ครอปได้) / แนวตั้ง A4 (เอกสาร · ไม่ครอป) */}
+              <SelectField
+                idBase={`${base}-shape`}
+                label={strings.blockGalleryShape}
+                value={block.imageShape}
+                options={[
+                  { value: "landscape", label: strings.blockGalleryShapeLandscape },
+                  { value: "portrait", label: strings.blockGalleryShapePortrait },
+                ]}
+                onChange={(next) => update(setBlockChoice(document, block.id, "imageShape", next))}
+              />
 
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
