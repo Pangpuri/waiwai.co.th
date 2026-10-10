@@ -118,3 +118,32 @@ test("ci: ห้ามมีความลับจริง และห้า
   assert.ok(workflow.includes("contents: read"), "ต้องจำกัดสิทธิ์ของ token ให้อ่านเท่านั้น");
   assert.ok(workflow.includes("runs-on: ubuntu-latest"), "ต้องระบุเครื่องรันให้ชัด");
 });
+
+/**
+ * ★ รอบที่ 260 — **CI แดงติดกันหลายรอบเพราะด่าน DB บังคับข้อมูลที่ CI ไม่มี**
+ *
+ * งาน `database` ของ CI ทำได้แค่ migrate → seed → check:migrations → db:roles → check:db
+ * แต่ **หมวดสินค้า · ข่าว · เมนู มาจาก "ตัวนำเข้า"** (`products:import` / `news:import` / `recipes:import`)
+ * ซึ่งต้องต่ออินเทอร์เน็ตไปเว็บเดิม ⇒ CI ไม่มีข้อมูลพวกนั้น
+ *
+ * ⇒ ด่านที่ `assert` ว่าต้องมี = **แดงทุกครั้ง** ⇒ คนจะเลิกสนใจสีแดง แล้วพลาดความล้มเหลวจริง
+ *    (เคสจริง: run #144 ล้มที่ check:db ขั้นเดียว ขณะที่งาน `gates` รวม build ผ่านหมด)
+ *
+ * เทสต์นี้บังคับว่า วงจรที่พึ่งข้อมูลจากตัวนำเข้า ต้อง **ข้ามอย่างเปิดเผย (⚠️)** ไม่ใช่ assert
+ * และต้องแยก `skip()` ออกจาก `done()` ให้ผู้ใช้อ่านออกว่า "ข้าม" ≠ "ผ่าน"
+ */
+test("ci: ด่าน check:db ต้องไม่บังคับข้อมูลที่ CI ไม่มี (ต้องข้ามอย่างเปิดเผย)", () => {
+  const db = readFileSync(path.join(ROOT, "scripts", "check-db.ts"), "utf8");
+
+  /* ห้าม assert ว่าต้องมีข้อมูลจากตัวนำเข้า (นี่คือสาเหตุที่ CI แดง) */
+  assert.ok(!db.includes("ต้องมีข่าวในฐานข้อมูลให้ตรวจ"), "ห้าม assert ว่าต้องมีข่าว (CI ไม่ได้นำเข้า)");
+  assert.ok(!db.includes('assert.ok(categoryId !== ""'), "ห้าม assert ว่าต้องมีหมวดสินค้า (มาจาก products:import)");
+
+  /* ต้องมีทางออกที่ "ข้ามอย่างเปิดเผย" */
+  assert.ok(db.includes("function skip("), "ต้องมีตัวช่วย skip() แยกจาก done()");
+  assert.ok(db.includes("firstCategoryIdOrSkip("), "วงจรที่ใช้หมวดสินค้าต้องใช้ตัวช่วยที่ข้ามได้");
+  assert.ok(db.includes('skip("ข่าวจริงทั้งชุด'), "วงจรข่าวต้องข้ามอย่างเปิดเผยเมื่อฐานข้อมูลยังไม่มีข่าว");
+
+  const skipFn = db.slice(db.indexOf("function skip("), db.indexOf("function skip(") + 200);
+  assert.ok(skipFn.includes("⚠️"), "ป้ายของ skip ต้องเป็น ⚠️ (ไม่ใช่ ✓) — ไม่งั้นอ่านแล้วเข้าใจว่าผ่าน");
+});

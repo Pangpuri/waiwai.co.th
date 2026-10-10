@@ -187,6 +187,14 @@ function done(label: string, detail = ""): void {
   CHECKS.push(`  ✓ ${label}${detail === "" ? "" : ` — ${detail}`}`);
 }
 
+/**
+ * รายงานว่า **ข้าม** วงจรนั้น (ไม่ใช่ "ผ่าน") — ใช้เมื่อฐานข้อมูลนี้ไม่มีข้อมูลที่วงจรต้องใช้
+ * ⚠️ ต้องต่างจาก `done()` ให้เห็นชัด: "ผ่าน" กับ "ข้าม" คนละเรื่อง (ไม่งั้นด่านหลอกตัวเอง)
+ */
+function skip(label: string, reason: string): void {
+  CHECKS.push(`  ⚠️ ${label} — ข้าม: ${reason}`);
+}
+
 async function main(): Promise<void> {
   if (!isDatabaseConfigured()) {
     process.stderr.write("✗ ไม่พบ DATABASE_URL — ใส่ใน .env.local ก่อน (ดู AGENTS.md § ตั้งค่า env)\n");
@@ -1389,7 +1397,7 @@ async function checkPageTemplates(): Promise<void> {
     );
     const row = published.rows[0];
     if (row === undefined) {
-      done(`หน้า ${page}: ตัวนำเข้า — ยังไม่มีฉบับเผยแพร่ในเครื่องนี้ (ข้าม)`, "ไม่มีแถว");
+      skip(`หน้า ${page}: ตัวนำเข้า — เอกสารที่เผยแพร่ต้องถูกต้อง (อ่านอย่างเดียว)`, "ยังไม่มีฉบับเผยแพร่ในฐานข้อมูลนี้");
       continue;
     }
 
@@ -2410,7 +2418,18 @@ async function checkNewsEditorRoundTrip(): Promise<void> {
     "select id, body from news where deleted_at is null order by id",
   );
 
-  assert.ok(rows.length > 0, "ต้องมีข่าวในฐานข้อมูลให้ตรวจ (รัน npm run news:import ก่อน)");
+  /*
+    ⚠️ **ห้าม assert ว่าต้องมีข่าว** (แก้ 2026-10-10 · รอบที่ 260)
+    เคสจริง: ด่านนี้เคยแดง **ตลอด** บน CI เพราะงาน `database` ของ CI ทำได้แค่
+    migrate → seed → check:migrations → db:roles → check:db
+    ส่วนข่าว/สินค้า/เมนูต้องรัน `news:import` (ต่ออินเทอร์เน็ตไปเว็บเดิม) ซึ่ง CI ไม่ได้ทำ
+    ⇒ ด่านที่บังคับว่าต้องมี "ข้อมูลที่ CI ไม่มี" = แดงทุกครั้ง แล้วคนจะเลิกสนใจสีแดง (ด่านหลอก)
+    ⇒ ฐานข้อมูลที่ยังไม่มีข่าว = **ข้ามอย่างเปิดเผย** (ไม่เงียบ) · เครื่องที่มีข้อมูลจริงยังตรวจครบเหมือนเดิม
+  */
+  if (rows.length === 0) {
+    skip("ข่าวจริงทั้งชุด: ข้อความ↔บล็อก ไป-กลับไม่เพี้ยน", "ฐานข้อมูลนี้ยังไม่มีข่าว (ต้องรัน `npm run news:import`)");
+    return;
+  }
 
   const broken: string[] = [];
   for (const row of rows) {
@@ -2797,6 +2816,24 @@ async function checkRecipeAdmin(): Promise<void> {
 }
 
 /**
+ * หมวดสินค้าที่มีอยู่จริง (ฐานข้อมูลที่ยังไม่ได้รัน `products:import` จะไม่มีหมวดเลย)
+ *
+ * ⚠️ **ห้ามใช้ `assert` กับค่านี้** (แก้ 2026-10-10 · รอบที่ 260)
+ * งาน `database` ของ CI ทำได้แค่ migrate → seed → check:migrations → db:roles → check:db
+ * แต่หมวดสินค้า/ข่าว/เมนูมาจาก **ตัวนำเข้า** (ต่ออินเทอร์เน็ตเว็บเดิม) ⇒ CI ไม่มีข้อมูลพวกนี้
+ * ⇒ ด่านที่ assert ว่าต้องมี = **แดงตลอด** แล้วคนจะเลิกสนใจสีแดง (ด่านหลอก)
+ * ⇒ ว่าง = **ข้ามอย่างเปิดเผย** (`skipNoCategory`) · เครื่องที่มีข้อมูลจริงยังตรวจครบเหมือนเดิม
+ */
+async function firstCategoryIdOrSkip(label: string): Promise<string> {
+  const categories = await listProductCategoriesForAdmin();
+  const categoryId = categories[0]?.id ?? "";
+  if (categoryId === "") {
+    skip(label, "ฐานข้อมูลนี้ยังไม่มีหมวดสินค้า (ต้องรัน `npm run products:import`)");
+  }
+  return categoryId;
+}
+
+/**
  * 26) ถังขยะ + ลบถาวร (รอบที่ 139) — **วงจรจริงกับฐานข้อมูล**
  *
  * เจ้าของสั่ง "ลุยที่ยังเหลือ" = ปิดหนี้ "ลบให้ครบวงจร" ⇒ วงจรนี้พิสูจน์ 4 อย่าง
@@ -2814,9 +2851,8 @@ async function checkTrashForever(): Promise<void> {
     "base64",
   );
 
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดในฐานข้อมูลก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("ถังขยะ (กู้คืน/ลบถาวร) — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const beforeCounts = await countProductsByCategory();
   const beforeCount = beforeCounts[categoryId] ?? 0;
@@ -2988,9 +3024,8 @@ async function checkTrashForever(): Promise<void> {
  * 5. คืนสภาพตารางได้ครบ (finally) — ไม่ทิ้งรอยทดสอบ
  */
 async function checkContentTrashPurge(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("ตัวลบถังขยะเนื้อหาตามกำหนด — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const actor = "check-db-content-trash@example.invalid";
   const oldProductId = "p999993";
@@ -3128,9 +3163,8 @@ async function checkContentTrashPurge(): Promise<void> {
  * ⚠️ ใช้ id เฉพาะของวงจรนี้แล้วลบใน `finally` เสมอ · ของที่ยังใช้งานอยู่ต้องรอดครบ
  */
 async function checkContentTrashTable(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("ตารางรวมถังขยะเนื้อหา — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const actor = "check-db-trash-table@example.invalid";
   const trashedProductId = "p999990";
@@ -3254,9 +3288,8 @@ async function checkContentTrashTable(): Promise<void> {
  *    (บทเรียนรอบที่ 127: เทสต์ห้ามพึ่ง "สภาพแวดล้อมว่าง")
  */
 async function checkContentTrashStats(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("ตัวนับถังขยะเนื้อหา — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const actor = "check-db-content-trash-stats@example.invalid";
   const trashedProductId = "p999996";
@@ -3373,9 +3406,8 @@ async function checkContentTrashStats(): Promise<void> {
  * การนำเข้า "ครั้งที่สอง" จะเห็นว่าตนเองเป็นคนแก้ล่าสุด แล้วทับงานคนทันที)
  */
 async function checkProductImportGuard(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดในฐานข้อมูลก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("นำเข้าสินค้าซ้ำไม่ทับงานคน — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const fromSource: ProductInput = {
     id: IMPORT_GUARD_CHECK_ID,
@@ -3583,9 +3615,8 @@ async function checkContentImportGuard(): Promise<void> {
  * ⚠️ ใช้หมวดที่มีอยู่จริง (ไม่สร้าง/ไม่ลบหมวด) — กันพังแบบวงจรก่อน ๆ
  */
 async function checkRevisionHistory(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวด (วงจรนี้ใช้หมวดที่มีอยู่จริง)");
+  const categoryId = await firstCategoryIdOrSkip("ประวัติรุ่นสินค้า/เมนู/ข่าว — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const base = {
     id: REVISION_CHECK_ID,
@@ -3842,7 +3873,7 @@ function isInsufficientPrivilege(error: unknown): boolean {
 
 async function checkLeastPrivilege(): Promise<void> {
   if (!isReadOnlyConfigured()) {
-    done("least privilege: ข้ามการพิสูจน์ role อ่านอย่างเดียว", "ไม่ได้ตั้ง PUBLIC_DATABASE_URL (ดู `npm run db:roles`)");
+    skip("least privilege: role อ่านอย่างเดียวอ่านได้/เขียนไม่ได้", "ไม่ได้ตั้ง PUBLIC_DATABASE_URL (ดู `npm run db:roles`)");
   } else {
     const readPool = getReadPool();
     const readable = await readPool.query<{ total: string }>("select count(*)::text as total from news");
@@ -3870,7 +3901,7 @@ async function checkLeastPrivilege(): Promise<void> {
   }
 
   if (!isFormRoleConfigured()) {
-    done("least privilege: ข้ามการพิสูจน์ role ฟอร์ม", "ไม่ได้ตั้ง FORM_DATABASE_URL");
+    skip("least privilege: role ฟอร์ม INSERT ได้", "ไม่ได้ตั้ง FORM_DATABASE_URL");
     return;
   }
 
@@ -3927,9 +3958,8 @@ async function checkLeastPrivilege(): Promise<void> {
  *   5. หน้าถังขยะอ่าน `deleted_by` ของแถวนั้นได้ (ไม่ใช่ `updated_by` ของคนที่มาแก้ทีหลัง)
  */
 async function checkContentTrashGuard(): Promise<void> {
-  const categories = await listProductCategoriesForAdmin();
-  const categoryId = categories[0]?.id ?? "";
-  assert.ok(categoryId !== "", "ต้องมีหมวดสินค้าอย่างน้อย 1 หมวดก่อนรันวงจรนี้");
+  const categoryId = await firstCategoryIdOrSkip("ประตูสองทางของถังขยะเนื้อหา — ใช้หมวดสินค้าจริง");
+  if (categoryId === "") return;
 
   const actor = "check-db-trash-guard@example.invalid";
   const secondActor = "check-db-trash-guard-2@example.invalid";
