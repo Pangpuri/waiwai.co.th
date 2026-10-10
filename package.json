@@ -33,6 +33,7 @@
     "products:logos": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products-logos.ts",
     "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts",
     "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts",
+    "about:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about.ts",
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",
     "env:vercel": "node --import ./scripts/alias-hook.mjs scripts/env-vercel.ts",
     "check:deploy": "node --import ./scripts/alias-hook.mjs scripts/check-deploy.ts",
