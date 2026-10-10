@@ -6,10 +6,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { ABOUT_TEXT_FIXES, applyAboutTextFixes } from "@/lib/about/corrections";
-import { aboutSourceImageUrls, buildAboutDocument } from "@/lib/about/document";
+import { ABOUT_IMAGE_FIT, aboutSourceImageUrls, buildAboutDocument } from "@/lib/about/document";
 import { parseAboutPage } from "@/lib/about/import-parse";
 import { ABOUT_SOURCE_ASSETS } from "@/lib/about/source-assets";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import type { BlockWidth } from "@/lib/blocks/types";
 
 /**
  * เทสต์ตัวนำเข้า **หน้า "บริษัท" (/about) จากหน้าต้นทาง** — รอบที่ 255 · หนี้ D-253-1
@@ -190,6 +191,47 @@ test("about import: ยังไม่นำเข้ารูป = ไม่ข
   assert.ok(hero?.type === "hero");
   assert.equal(hero.image, null);
   assert.ok(parseBlockDocument("about", document).ok);
+});
+
+test("about import: กล่องภาพต้องไม่ขยายภาพต้นทาง (มติเจ้าของ 2026-10-10 — \"ลดขนาดภาพให้เหมาะสม\")", () => {
+  /*
+    ความกว้างจริงของพรีเซ็ต (= `lib/blocks/style.ts` → `WIDTH`) และ `containerClass` ใส่ `px-4` เสมอ (32px)
+    ⚠️ ตัวเลขนี้คือ "สัญญา" ระหว่างค่าดีฟอลต์ของเทมเพลตกับขนาดไฟล์จริงของภาพต้นทาง
+  */
+  const CONTAINER_PX: Record<BlockWidth, number> = { narrow: 672, normal: 896, wide: 1152, full: 1280 };
+  const PAGE_PADDING = 32; /* px-4 ซ้าย+ขวา */
+  const GRID_GAP = 16; /* gap-4 */
+
+  const source = parseAboutPage(FIXTURE);
+  const document = buildAboutDocument(source, (url) => `/media/id-${url.slice(-8)}`);
+
+  /* ── แบนเนอร์ (ไฟล์ 800px) — ขยายได้ไม่เกิน 10% ── */
+  const hero = document.blocks[0];
+  assert.ok(hero?.type === "hero");
+  const heroBox = CONTAINER_PX[hero.style.width] - PAGE_PADDING;
+  const bannerScale = heroBox / ABOUT_IMAGE_FIT.sourceBannerWidth;
+  assert.ok(
+    bannerScale <= 1.1,
+    `แบนเนอร์แสดง ${String(heroBox)}px จากไฟล์ ${String(ABOUT_IMAGE_FIT.sourceBannerWidth)}px = ขยาย ${bannerScale.toFixed(2)}× ⇒ จะเบลอ`,
+  );
+
+  /* ── การ์ดภาพ (ไฟล์ 244px) — ต้องแสดงไม่เกินขนาดไฟล์จริง ── */
+  const gallery = document.blocks.find((block) => block.type === "gallery");
+  assert.ok(gallery?.type === "gallery");
+  assert.equal(gallery.columns, ABOUT_IMAGE_FIT.galleryColumns, "3 คอลัมน์ = ตรงกับที่ต้นทางวาง (แถวละ 3 ใบ)");
+  const gridInner = CONTAINER_PX[gallery.style.width] - PAGE_PADDING;
+  const cell = (gridInner - GRID_GAP * (gallery.columns - 1)) / gallery.columns;
+  assert.ok(
+    cell <= ABOUT_IMAGE_FIT.sourcePhotoWidth,
+    `การ์ดแสดง ${String(Math.round(cell))}px จากไฟล์ ${String(ABOUT_IMAGE_FIT.sourcePhotoWidth)}px ⇒ ภาพจะถูกขยาย`,
+  );
+
+  /* ── กันถอยหลัง: ค่าเดิม (`wide`) ขยายภาพจริง ⇒ เทสต์ต้องจับได้ถ้ามีคนเปลี่ยนกลับ ── */
+  const previousCell = (CONTAINER_PX.wide - PAGE_PADDING - GRID_GAP * (gallery.columns - 1)) / gallery.columns;
+  assert.ok(
+    previousCell > ABOUT_IMAGE_FIT.sourcePhotoWidth,
+    "ต้องยืนยันได้ว่าค่าเดิม (wide) ขยายภาพจริง — ไม่งั้นเทสต์นี้ไม่ได้ป้องกันอะไร",
+  );
 });
 
 test("about import: ภาพทุกใบต้องไม่มี URL เต็มหลุดเข้าเอกสาร (มติ D9)", () => {

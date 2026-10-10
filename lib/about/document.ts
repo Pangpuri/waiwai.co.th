@@ -20,6 +20,33 @@ import type { Block, BlockDocument, BlockGalleryItem } from "@/lib/blocks/types"
 /** คืนพาธ `/media/<id>` ของภาพต้นทาง หรือ `null` ถ้ายังไม่ได้นำเข้า */
 export type AboutImageResolver = (sourceUrl: string) => string | null;
 
+/**
+ * ⚠️ **ขนาดที่แสดงผลของภาพหน้าบริษัท — ตั้งใจ "ไม่ขยายภาพ"** (มติเจ้าของ 2026-10-10)
+ *
+ * คำเจ้าของ: *"ถ้าภาพไม่คมคงต้องลดขนาดภาพให้เหมาะสมนั่นแหล่ะครับ ทางออกที่ง่ายที่สุดเลย
+ *   แล้วให้มันเป็นค่าดีฟอลต์ของเทมเพลตเลย"*
+ *
+ * ภาพของหน้าต้นทางมีขนาดเล็ก (แบนเนอร์ **800×367** · ภาพประกอบ 12 ใบ **244×150** — เป็น thumbnail
+ * ที่ต้นทางวางไว้ 200px) ⇒ ถ้าให้แสดงเต็มความกว้าง ภาพจะถูก **ขยาย** แล้วดูไม่คม
+ * ⇒ ล็อกความกว้างของบล็อกไว้ที่ค่าที่แสดงผล **ไม่เกินขนาดไฟล์จริง**
+ *
+ * เลขที่ใช้คำนวณ (คลาสจริงอยู่ที่ `lib/blocks/style.ts` · `containerClass` ใส่ `px-4` เสมอ = 32px)
+ * - hero:  `normal` = `max-w-4xl` 896px → พื้นที่จริง 864px เทียบแบนเนอร์ 800px ⇒ **1.08×** (แทบไม่ต่างจากต้นทาง 888px)
+ * - gallery: `narrow` = `max-w-2xl` 672px → 672−32−gap(2×16) = **203px/ใบ** เทียบ 244px ⇒ **0.83×** (ย่อ = คม)
+ *   · 3 คอลัมน์ = ตรงกับที่ต้นทางวาง (แถวละ 3 ใบ)
+ *
+ * ⚠️ **ห้ามเปลี่ยนกลับเป็น `wide`/`full`** — มีเทสต์คำนวณส่วนต่างไว้กันถอยหลัง (`scripts/test-about-import.ts`)
+ * ⚠️ ถ้าเจ้าของอัปโหลดภาพความละเอียดสูงทับภายหลัง จะขยายกล่องในตัวสร้างได้ตามใจ (ช่องมีอยู่แล้ว)
+ */
+export const ABOUT_IMAGE_FIT = {
+  heroWidth: "normal",
+  galleryWidth: "narrow",
+  galleryColumns: 3,
+  /** ความกว้างไฟล์จริงของภาพต้นทาง (px) — ใช้เป็นเพดานของขนาดที่แสดงผล */
+  sourceBannerWidth: 800,
+  sourcePhotoWidth: 244,
+} as const;
+
 /** URL ของภาพทุกใบในโครง (ไม่ซ้ำ · เรียงตามลำดับเอกสาร — แบนเนอร์ก่อน) */
 export function aboutSourceImageUrls(source: AboutSource): readonly string[] {
   const urls: string[] = [];
@@ -48,7 +75,8 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
     id: nextId(),
     version: TEMPLATE_BLOCK_VERSION,
     type: "hero",
-    style: templateStyle({ size: "lg", align: "left" }),
+    /* ⚠️ `width: "normal"` — ดูเหตุผลที่ `ABOUT_IMAGE_FIT` ด้านบน (ห้ามขยายภาพต้นทาง) */
+    style: templateStyle({ size: "lg", align: "left", width: ABOUT_IMAGE_FIT.heroWidth }),
     title: { th: source.pageTitle, en: "" },
     subtitle: { th: "", en: "" },
     note: { th: "", en: "" },
@@ -92,10 +120,11 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
       id: nextId(),
       version: TEMPLATE_BLOCK_VERSION,
       type: "gallery",
-      style: templateStyle({ width: "wide", background: "subtle" }),
+      /* ⚠️ `narrow` + 3 คอลัมน์ — ดูเหตุผลที่ `ABOUT_IMAGE_FIT` ด้านบน (203px/ใบ · ไม่ขยายภาพ 244px) */
+      style: templateStyle({ width: ABOUT_IMAGE_FIT.galleryWidth, background: "subtle" }),
       heading: { th: "", en: "" },
       items,
-      columns: 3,
+      columns: ABOUT_IMAGE_FIT.galleryColumns,
     });
   }
 
