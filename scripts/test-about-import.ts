@@ -11,6 +11,7 @@ import { parseAboutPage } from "@/lib/about/import-parse";
 import { ABOUT_SOURCE_ASSETS } from "@/lib/about/source-assets";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import type { BlockWidth } from "@/lib/blocks/types";
+import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 
 /**
  * เทสต์ตัวนำเข้า **หน้า "บริษัท" (/about) จากหน้าต้นทาง** — รอบที่ 255 · หนี้ D-253-1
@@ -234,6 +235,41 @@ test("about import: กล่องภาพต้องไม่ขยายภ
   );
 });
 
+test("about import: 🔴 เอกสารต้องผ่าน validator จริง 0 error (บทเรียนบั๊ก 'กดเผยแพร่แล้วเว็บไม่เปลี่ยน')", () => {
+  /*
+    บั๊กจริง 2026-10-10: รอบ 255 รันแค่ `parseBlockDocument` ตอนนำเข้า ⇒ พลาด `empty-th` ที่
+    `blocks[1].heading.th` ⇒ `prepare()` ปฏิเสธก่อนเขียน DB ⇒ เจ้าของกด "เผยแพร่" แล้วเงียบ
+    ⇒ เทสต์นี้บังคับให้เอกสารที่ตัวนำเข้าสร้าง **ผ่านด่านเดียวกับที่ปุ่มเผยแพร่ใช้**
+  */
+  const source = parseAboutPage(FIXTURE);
+  const document = buildAboutDocument(source, (url) => `/media/id-${url.slice(-8)}`);
+  const errors = documentErrorsOf(validateDocument(document));
+  assert.deepEqual(
+    errors.map((entry) => `${entry.path} ${entry.code}`),
+    [],
+    "เอกสารต้องไม่มี error — ไม่งั้นกดเผยแพร่จะไม่ผ่านและหน้าบ้านไม่เปลี่ยน",
+  );
+});
+
+test("about import: ส่วนที่ต้นทางไม่มีหัวข้อ ต้องเติมหัวข้อจากคำของต้นทางเอง (ห้ามว่าง ห้ามแต่งใหม่)", () => {
+  const source = parseAboutPage(FIXTURE);
+  const document = buildAboutDocument(source, () => null);
+  const intro = document.blocks.find((block) => block.type === "richText");
+  assert.ok(intro?.type === "richText");
+  assert.equal(intro.heading.th, "บริษัท โรงงานทดสอบ จำกัด", "ตัดที่ป้าย 'ก่อตั้งขึ้น' = ชื่อบริษัทตามต้นทาง");
+  assert.ok(!intro.heading.th.includes("ก่อตั้งขึ้น"), "หัวข้อต้องไม่ดูดทั้งประโยคมายาว");
+
+  /* ไม่มีป้ายในประโยคเลย ⇒ ถอยไปใช้ชื่อหน้าจาก page-header (ไม่ปล่อยว่าง) */
+  const fallback = buildAboutDocument(
+    { pageTitle: "บริษัท", bannerUrl: null, nodes: [{ kind: "section", heading: "", paragraphs: ["ข้อความล้วนไม่มีป้าย"] }] },
+    () => null,
+  );
+  const fallbackIntro = fallback.blocks.find((block) => block.type === "richText");
+  assert.ok(fallbackIntro?.type === "richText");
+  assert.equal(fallbackIntro.heading.th, "บริษัท");
+  assert.equal(documentErrorsOf(validateDocument(fallback)).length, 0);
+});
+
 test("about import: ภาพทุกใบต้องไม่มี URL เต็มหลุดเข้าเอกสาร (มติ D9)", () => {
   const source = parseAboutPage(FIXTURE);
   const document = buildAboutDocument(source, (url) => `/media/id-${url.slice(-10)}`);
@@ -271,6 +307,10 @@ test("about import: สคริปต์ใช้ท่อนำเข้าก
   assert.ok(script.includes("ensureImportedMedia("), "ต้องใช้ท่อนำเข้ากลาง (ตรวจหัวไฟล์ + dedupe sha256)");
   assert.ok(script.includes("saveDraft("), "บันทึกเป็น 'ฉบับร่าง' ของหน้า about");
   assert.ok(script.includes("parseBlockDocument("), "ต้องตรวจเอกสารด้วย parser กลางก่อนเขียน");
+  assert.ok(
+    script.includes("validateDocument(") && script.includes("documentErrorsOf("),
+    "ต้องตรวจด้วย validator จริงด้วย (บั๊ก 2026-10-10: รันแต่ parser ⇒ กดเผยแพร่ไม่ผ่าน)",
+  );
   assert.ok(script.includes("--force"), "ต้องมีทางเลือก --force สำหรับทับงานคน");
   assert.ok(script.includes("updatedBy !== ACTOR"), "ค่าเริ่มต้นต้องไม่ทับงานที่คนแก้");
   assert.ok(!script.includes("dangerouslySetInnerHTML"), "ห้ามตีความ HTML ต้นทางเป็น markup ตรง ๆ");

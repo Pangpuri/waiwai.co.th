@@ -7,6 +7,8 @@ import { parseAboutPage, type AboutSource } from "@/lib/about/import-parse";
 import { aboutSourceAssetOf } from "@/lib/about/source-assets";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { loadDocumentRow, saveDraft } from "@/lib/blocks/repository";
+import type { BlockDocument } from "@/lib/blocks/types";
+import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import { ensureImportedMedia, type ImportMediaCache, type ImportMediaStats } from "@/lib/import/media";
 
 /**
@@ -122,8 +124,48 @@ async function main(): Promise<void> {
     return;
   }
 
+  /*
+    ── ด่านตรวจเอกสาร = **ด่านเดียวกับที่ปุ่ม "เผยแพร่" ใช้** ───────────────────────
+    ⚠️ **บทเรียนราคาแพง (2026-10-10):** รอบ 255 รันแค่ `parseBlockDocument` ตอนนำเข้า ⇒ พลาด error
+    ของ `validateDocument` (`empty-th @ blocks[1].heading.th`) ⇒ เจ้าของกด "เผยแพร่" แล้ว `prepare()`
+    ปฏิเสธก่อนเขียน DB (ไม่มี audit/ไม่มีแถว published) ⇒ **หน้าบ้านไม่เปลี่ยนทั้งที่ทำถูกทุกอย่าง**
+    ⇒ ต้องรัน **ทั้ง parser + validator** ที่นี่ (และให้ `--dry-run` ตรวจด้วยพาธภาพสมมติ)
+  */
+  const checkDocument = (document: BlockDocument): boolean => {
+    const parsed = parseBlockDocument("about", document);
+    if (!parsed.ok) {
+      log("✗ เอกสารไม่ผ่าน parser:");
+      for (const problem of parsed.problems) log(`   · ${problem}`);
+      return false;
+    }
+
+    const issues = validateDocument(parsed.document);
+    const errors = documentErrorsOf(issues);
+    if (errors.length > 0) {
+      log("✗ เอกสารไม่ผ่านด่านตรวจเนื้อหา (validator) — ยังไม่เขียนฐานข้อมูล:");
+      for (const error of errors) log(`   · ${error.path} — ${error.code}${error.detail === null ? "" : ` (${error.detail})`}`);
+      log("   ℹ️ ต้องแก้ที่ตัวประกอบเอกสาร (`lib/about/document.ts`) ไม่ใช่แก้ที่ข้อมูลในฐานข้อมูล");
+      return false;
+    }
+
+    const warnings = documentWarningsOf(issues);
+    if (warnings.length > 0) {
+      log(`ℹ️ คำเตือน ${String(warnings.length)} ข้อ (ไม่บล็อกการเผยแพร่): ${[...new Set(warnings.map((w) => w.code))].join(" · ")}`);
+    }
+    return true;
+  };
+
+  const cache: ImportMediaCache = new Map();
+  const stats: ImportMediaStats = { newImages: 0, reusedImages: 0 };
+  const paths = new Map<string, string>();
+
   if (options.dryRun) {
-    log("(dry-run) ไม่แตะฐานข้อมูล/ไม่โหลดรูป");
+    const preview = buildAboutDocument(source, () => "/media/dry-run");
+    if (!checkDocument(preview)) {
+      process.exitCode = 1;
+      return;
+    }
+    log(`(dry-run) เอกสาร ${String(preview.blocks.length)} บล็อก ผ่าน parser + validator · ไม่แตะฐานข้อมูล/ไม่โหลดรูป`);
     return;
   }
 
@@ -134,10 +176,6 @@ async function main(): Promise<void> {
   }
 
   /* ── 2) นำรูปเข้าคลังภาพ (dedupe sha256) ──────────────────────────────────── */
-  const cache: ImportMediaCache = new Map();
-  const stats: ImportMediaStats = { newImages: 0, reusedImages: 0 };
-  const paths = new Map<string, string>();
-
   if (options.withImages) {
     for (const url of urls) {
       const asset = aboutSourceAssetOf(url);
@@ -161,12 +199,10 @@ async function main(): Promise<void> {
     log(`รูป: ใหม่ ${String(stats.newImages)} · ใช้ของเดิม ${String(stats.reusedImages)} · ใช้ไม่ได้ ${String(urls.length - paths.size)}`);
   }
 
-  /* ── 3) ประกอบเอกสาร + ตรวจด้วย parser กลาง ──────────────────────────────── */
-  const document = buildAboutDocument(source, (url) => paths.get(url) ?? null);
-  const parsed = parseBlockDocument("about", document);
-  if (!parsed.ok) {
-    log("✗ เอกสารไม่ผ่านตัวตรวจ:");
-    for (const problem of parsed.problems) log(`   · ${problem}`);
+  /* ประกอบด้วยพาธภาพจริง แล้วตรวจด้วยด่านเดียวกัน (ด่านนี้ต้องผ่านก่อนเขียนทุกครั้ง) */
+  const finalDocument = buildAboutDocument(source, (url) => paths.get(url) ?? null);
+  if (!checkDocument(finalDocument)) {
+    log("   ℹ️ ยกเลิก — ไม่เขียนทับฉบับร่าง (รูปที่นำเข้าไปแล้วอยู่ในคลังภาพได้ ไม่มีผลเสีย)");
     process.exitCode = 1;
     return;
   }
@@ -182,9 +218,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  await saveDraft("about", parsed.document, ACTOR);
+  await saveDraft("about", finalDocument, ACTOR);
   log("");
-  log(`✓ บันทึกฉบับร่างหน้า about แล้ว — ${String(parsed.document.blocks.length)} บล็อก (รูป ${String(paths.size)} ใบ)`);
+  log(`✓ บันทึกฉบับร่างหน้า about แล้ว — ${String(finalDocument.blocks.length)} บล็อก (รูป ${String(paths.size)} ใบ)`);
   log("ℹ️ ตรวจพรีวิวที่ /admin/builder/about แล้วกด \"เผยแพร่\" เมื่อพร้อม (ยังไม่ขึ้นเว็บจนกว่าจะกด)");
 }
 

@@ -63,6 +63,33 @@ function altTextOf(pageTitle: string): string {
   return pageTitle.trim() === "" ? "ภาพประกอบของบริษัท" : `ภาพประกอบของบริษัท ${pageTitle.trim()}`;
 }
 
+/** ป้ายที่ใช้แยก "ชื่อบริษัท" ออกจากประโยคแรกของส่วนเปิดเรื่อง (ข้อความของต้นทางเอง) */
+const INTRO_MARKER = "ก่อตั้งขึ้น";
+/** ความยาวสูงสุดของหัวข้อที่อนุมานได้ (กันดูดทั้งย่อหน้ามาเป็นหัวข้อ) */
+const MAX_DERIVED_HEADING = 80;
+
+/**
+ * หัวข้อของ **ส่วนที่ต้นทางไม่มีหัวข้อ** (ส่วนเปิดเรื่อง "บริษัท+ที่ตั้ง")
+ *
+ * 🔴 **บั๊กจริงที่เจ้าของเจอ (2026-10-10):** รอบ 255 ส่ง `heading: ""` ไป ⇒ validator ฟ้อง
+ * `empty-th @ blocks[1].heading.th` (บล็อก `richText` **บังคับ** ให้มีหัวข้อไทย)
+ * ⇒ กด "เผยแพร่" แล้ว `prepare()` ปฏิเสธ **ก่อน** เขียนฐานข้อมูล (จึงไม่มี audit/ไม่มีแถว published)
+ * ⇒ หน้าบ้านไม่เปลี่ยน · **บทเรียน: ตัวนำเข้าต้องรัน `validateDocument` ด้วย ไม่ใช่แค่ `parseBlockDocument`**
+ *
+ * วิธีเติมหัวข้อ: ใช้ **คำของต้นทางเองเท่านั้น** (ห้ามแต่งขึ้นใหม่)
+ * 1. ตัดประโยคแรกที่ป้าย "ก่อตั้งขึ้น" → "บริษัท โรงงานผลิตภัณฑ์อาหารไทย จำกัด" (ชื่อบริษัทตามต้นทาง)
+ * 2. ถอยไปใช้ชื่อหน้าจาก `page-header` (เช่น "บริษัท")
+ */
+function headingForEmptySection(paragraphs: readonly string[], pageTitle: string): string {
+  const first = paragraphs[0]?.trim() ?? "";
+  const at = first.indexOf(INTRO_MARKER);
+  if (at > 0) {
+    const candidate = first.slice(0, at).trim();
+    if (candidate !== "" && candidate.length <= MAX_DERIVED_HEADING) return candidate;
+  }
+  return pageTitle.trim();
+}
+
 export function buildAboutDocument(source: AboutSource, resolveImage: AboutImageResolver): BlockDocument {
   const blocks: Block[] = [];
   let index = 0;
@@ -94,7 +121,11 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
         version: TEMPLATE_BLOCK_VERSION,
         type: "richText",
         style: templateStyle(),
-        heading: { th: node.heading, en: "" },
+        /* ⚠️ ต้นทางไม่มีหัวข้อให้ส่วนเปิดเรื่อง ⇒ ต้องเติม (validator บังคับ) — ดู `headingForEmptySection` */
+        heading: {
+          th: node.heading !== "" ? node.heading : headingForEmptySection(node.paragraphs, source.pageTitle),
+          en: "",
+        },
         body: { th: node.paragraphs.join("\n\n"), en: "" },
         ctaLabel: { th: "", en: "" },
         ctaHref: "",

@@ -1331,7 +1331,14 @@ async function checkPageTemplates(): Promise<void> {
       assert.ok(revision >= 1, `${page}: เผยแพร่ต้องได้เลขรุ่น`);
 
       /* ── 2) สวิตช์: ค่าเริ่มต้นต้องเป็น "ปิด" และหน้าเว็บยังใช้เลย์เอาต์เดิม ── */
-      assert.equal(await isPageLive(page), false, `${page}: ค่าเริ่มต้นคือสวิตช์ปิด`);
+      /*
+        ⚠️ **ห้าม assume ว่าหน้านี้ไม่เคยเปิดขึ้นเว็บ** (บทเรียนที่ 127: เทสต์ห้ามพึ่ง "สภาพแวดล้อมว่าง")
+        `publishDraft` **คงค่า `is_live` เดิมไว้** (ตั้งใจ — เผยแพร่ซ้ำหน้าที่ขึ้นเว็บแล้วต้องไม่ปิดเว็บเอง)
+        ⇒ หน้าที่เจ้าของกดเผยแพร่จริงแล้ว (เช่น `about` ตั้งแต่ 2026-10-10) จะมี `is_live = true` ค้างอยู่
+        ⇒ ด่านนี้ต้อง **ปิดสวิตช์เองก่อนตรวจ** พฤติกรรม "ปิด = กลับไปใช้เลย์เอาต์เดิม"
+      */
+      await setPageLive(page, false, TEMPLATE_TEST_ACTOR);
+      assert.equal(await isPageLive(page), false, `${page}: สั่งปิดสวิตช์แล้วต้องเป็น false`);
       assert.equal(await loadLiveBlockDocument(page), null, `${page}: ปิดสวิตช์แล้วต้องไม่ใช้เอกสารบล็อก`);
 
       /* ── 3) เปิดสวิตช์ ⇒ ได้เอกสารที่เผยแพร่จริง ── */
