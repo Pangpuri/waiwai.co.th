@@ -9,7 +9,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { ABOUT_MEDIA, aboutImagePath } from "@/lib/blocks/about-media";
 import { documentDiff } from "@/lib/blocks/diff";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
-import { buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
+import { buildBlockTemplate, hasBlockTemplate, isBlockBuilderPage } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { parseScheduleEpoch } from "@/lib/blocks/schedule";
@@ -335,7 +335,8 @@ export async function revertToCodeLayoutAction(formData: FormData): Promise<void
   const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
 
-  if (!hasBlockTemplate(page)) redirect(pathOf(page));
+  /* ⚠️ ใช้ isBlockBuilderPage (ไม่ใช่ hasBlockTemplate) — หน้า about ไม่มีเทมเพลตตั้งต้น แต่ก็ต้อง "กลับไปใช้ดีไซน์เดิม" ได้ */
+  if (!isBlockBuilderPage(page)) redirect(pathOf(page));
 
   const isLive = await isPageLive(page).catch(() => false);
   const reason = decideRevertLayout({ isLive, confirmValue: String(formData.get("confirm") ?? "") });
@@ -360,7 +361,8 @@ export async function revertToCodeLayoutAction(formData: FormData): Promise<void
 export async function clearRevisionHistoryAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
-  if (page === "" || !hasBlockTemplate(page)) redirect(pathOf(page));
+  /* ⚠️ isBlockBuilderPage — หน้า about ไม่มีเทมเพลตตั้งต้น แต่ก็ยังมีประวัติการเผยแพร่ให้ล้างได้ */
+  if (page === "" || !isBlockBuilderPage(page)) redirect(pathOf(page));
 
   if (String(formData.get("confirm") ?? "").trim() !== PRUNE_HISTORY_CONFIRM_VALUE) {
     redirect(`${pathOf(page)}?history=needs-confirm`);
@@ -396,15 +398,12 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   if (!decision.allowed) redirect(`${pathOf(page)}?template=confirm`);
 
   /*
-    ★ รอบที่ 253: เทมเพลตของหน้า **บริษัท** ต้องรู้พาธภาพจาก **คลังภาพ** (/media/<id>)
+    ★ รอบที่ 253: เทมเพลตของหน้า **คณะผู้บริหาร** ต้องรู้พาธภาพจาก **คลังภาพ** (/media/<id>)
     ⇒ อ่าน id จากคลังด้วยลายนิ้วมือของไฟล์เดิม (`ABOUT_MEDIA.sha256`) แล้วส่งตัวช่วยเข้าเทมเพลต
     ⚠️ ยังไม่นำเข้า = ถอยไปใช้ไฟล์ใน public/ (เทมเพลตยังสร้างได้ หน้าเว็บไม่พัง)
+    ℹ️ รอบที่ 260: หน้า `about` ออกจากเส้นทางนี้แล้ว (ใช้ตัวนำเข้า — ไม่มีเทมเพลตตั้งต้น)
   */
-  const templateOptions =
-    /* รอบที่ 259: หน้า "คณะผู้บริหาร" ก็ใช้ภาพจากคลังภาพเหมือนกัน (ภาพผังเป็นคีย์ `executives` ในทะเบียน) */
-    page === "about" || page === "executives"
-      ? { image: await aboutTemplateImageResolver() }
-      : undefined;
+  const templateOptions = page === "executives" ? { image: await aboutTemplateImageResolver() } : undefined;
   const template = buildBlockTemplate(page, templateOptions);
   if (template === null) redirect(pathOf(page));
 

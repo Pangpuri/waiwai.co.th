@@ -11,7 +11,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
-import { blockCoverageGaps, hasBlockTemplate, type BlockCoveragePartId } from "@/lib/blocks/templates";
+import { blockCoverageGaps, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
@@ -177,7 +177,20 @@ export default async function AdminBuilderPage({
         · ยังไม่มีฉบับร่าง ⇒ กดได้เลย · มีฉบับร่างแล้ว ⇒ ต้องติ๊กยืนยันก่อนทับ
         · ด่านจริงอยู่ที่ Server Action (`decideTemplateApply` — ไม่ติ๊ก = ไม่ทำอะไรเลย)
       */}
-      {hasBlockTemplate(page) ? (
+      {isImportedContentPage(page) ? (
+        /*
+          รอบที่ 260 (หนี้ D-255-1): หน้านี้เนื้อหามาจาก "ตัวนำเข้า" (หน้าต้นทาง) ไม่ใช่พจนานุกรม
+          ⇒ **ต้องไม่มีปุ่ม "เริ่มจากเทมเพลต"** เพราะจะทับงานที่นำเข้า/ตรวจแล้วทั้งหน้า
+          ⇒ แสดงคำอธิบายว่าสร้างเนื้อหาด้วยวิธีไหนแทน (ไม่ทิ้งผู้ใช้ให้เดา)
+        */
+        <section
+          className="border-line bg-surface-raised flex flex-col gap-2 rounded-2xl border p-5"
+          data-imported-content=""
+        >
+          <h2 className="text-fg text-lg font-semibold">{strings.importedContentTitle}</h2>
+          <p className="text-fg-muted text-sm">{strings.importedContentBody}</p>
+        </section>
+      ) : hasBlockTemplate(page) ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
           <h2 className="text-fg text-lg font-semibold">
             {draftRow === null ? strings.emptyPage : strings.startFromTemplateReplace}
@@ -225,7 +238,8 @@ export default async function AdminBuilderPage({
         ⇒ แสดง **เฉพาะเมื่อหน้านี้ใช้บล็อกกับเว็บจริงอยู่** (`isLive` อ่านจาก DB) และเป็น **ทิศเดียว** (ปิดเท่านั้น)
         ⚠️ ด่านจริงอยู่ที่ Server Action (`decideRevertLayout`: ไม่ติ๊กยืนยัน = ไม่ทำอะไรเลย)
       */}
-      {hasBlockTemplate(page) && isLive ? (
+      {/* ⚠️ รอบที่ 260: ผูกกับ isBlockBuilderPage (หน้า about ไม่มีเทมเพลตตั้งต้น แต่ต้องกลับไปใช้ดีไซน์เดิมได้) */}
+      {isBlockBuilderPage(page) && isLive ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5" data-layout-revert="">
           <h2 className="text-fg text-lg font-semibold">{strings.layoutRevertTitle}</h2>
           <p className="text-fg-muted text-sm">{strings.layoutRevertHint}</p>

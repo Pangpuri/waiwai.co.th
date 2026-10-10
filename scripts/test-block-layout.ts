@@ -6,7 +6,7 @@ import { documentDiff, LAYOUT_DIFF_BLOCK_TYPE } from "@/lib/blocks/diff";
 import { insertBlockAt, setBlockText, setPageLayout } from "@/lib/blocks/edit";
 import { MAX_OUTLINE_ENTRIES, pageOutline } from "@/lib/blocks/outline";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { buildBlockTemplate, BLOCK_TEMPLATE_PAGE_IDS } from "@/lib/blocks/templates";
+import { TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import {
   BLOCK_SCHEMA_VERSION,
   DEFAULT_PAGE_LAYOUT,
@@ -296,7 +296,8 @@ test("layout: sidebar ที่มีหัวข้อน้อยกว่า 
 /* ── 6) เทมเพลต + ข้อความ ─────────────────────────────────────────────────── */
 
 test("layout: เทมเพลตทุกหน้ามีเลย์เอาต์เริ่มต้นเป็น full (ไม่ตั้งค่ามั่วไว้)", () => {
-  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+  /* รอบที่ 260: ใช้ TEMPLATED_PAGE_IDS — หน้าที่เนื้อหามาจากตัวนำเข้า (about) ไม่มีเทมเพลตตั้งต้น */
+  for (const page of TEMPLATED_PAGE_IDS) {
     const template = buildBlockTemplate(page);
     assert.ok(template !== null);
     assert.equal(template.layout, undefined, `${page}: เทมเพลตต้องไม่ตั้งเลย์เอาต์`);

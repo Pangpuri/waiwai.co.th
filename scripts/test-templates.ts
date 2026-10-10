@@ -10,13 +10,7 @@ import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { HOME_SECTIONS_OWNED_HERE, ownerOfSection } from "@/lib/content/home-section-owners";
 import { HOME_SECTIONS } from "@/lib/content/model";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
-import {
-  BLOCK_COVERAGE_PART_IDS,
-  BLOCK_TEMPLATE_PAGE_IDS,
-  blockCoverageGaps,
-  buildBlockTemplate,
-  hasBlockTemplate,
-} from "@/lib/blocks/templates";
+import { BLOCK_COVERAGE_PART_IDS, BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { JOBS } from "@/features/careers/jobs";
@@ -65,7 +59,16 @@ test("templates: ทะเบียนครบ 9 หน้าเมนู + 6 �
     ],
   );
 
-  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+  /*
+    รอบที่ 260: ทะเบียนนี้ = "หน้าที่มีตัวสร้าง + พรีวิว" (15 หน้า) — **ไม่เท่ากับ "หน้าที่มีเทมเพลตตั้งต้น"**
+    หน้า `about` มีตัวสร้าง/พรีวิว แต่ **ไม่มีเทมเพลตตั้งต้น** (เนื้อหามาจากตัวนำเข้า · หนี้ D-255-1)
+    ⇒ ต้องแยกให้ชัด: `TEMPLATED_PAGE_IDS` = เฉพาะที่มีเทมเพลตจริง
+  */
+  assert.ok((BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes("about"), "about ยังต้องมีตัวสร้าง/พรีวิว");
+  assert.ok(!TEMPLATED_PAGE_IDS.includes("about"), "about ห้ามอยู่ในรายการที่มีเทมเพลตตั้งต้น");
+  assert.equal(TEMPLATED_PAGE_IDS.length, BLOCK_TEMPLATE_PAGE_IDS.length - 1, "ตอนนี้มีหน้าเดียวที่ไม่มีเทมเพลตตั้งต้น");
+
+  for (const page of TEMPLATED_PAGE_IDS) {
     const template = buildBlockTemplate(page);
     assert.ok(template !== null, `${page}: ต้องสร้างเทมเพลตได้`);
     assert.equal(template.page, page, `${page}: ช่อง page ของเอกสารต้องตรงกับหน้าที่ขอ`);
@@ -221,7 +224,8 @@ test("templates: คำเตือนเรื่องส่วนที่ข
 });
 
 test("templates: บล็อกในเทมเพลตมี id ไม่ซ้ำ และทุก id ตรงรูปแบบของโปรเจกต์", () => {
-  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+  /* รอบที่ 260: ไล่เฉพาะหน้าที่มีเทมเพลตตั้งต้นจริง */
+  for (const page of TEMPLATED_PAGE_IDS) {
     const template = buildBlockTemplate(page);
     assert.ok(template !== null);
     if (template === null) continue;
@@ -249,7 +253,9 @@ test("templates: ปุ่มในหลังบ้านใช้ทะเบ
   const actions = sourceOf("app/admin/builder/actions.ts");
   /* รอบที่ 253: ส่ง options (พาธภาพจากคลัง + ลิงก์แผนที่) เข้าเทมเพลตด้วย — ยังต้องมาจากทะเบียนกลาง */
   assert.ok(actions.includes("buildBlockTemplate(page,"), "action ต้องสร้างเทมเพลตตามหน้าจากทะเบียน (พร้อม options)");
-  assert.ok(actions.includes("aboutTemplateImageResolver()"), "หน้าบริษัทต้องใช้พาธภาพจากคลังภาพ");
+  /* รอบที่ 260: about ไม่มีเทมเพลตตั้งต้นแล้ว ⇒ ตัวช่วยภาพจากคลังเหลือใช้กับหน้า "คณะผู้บริหาร" */
+  assert.ok(actions.includes("aboutTemplateImageResolver()"), "หน้าคณะผู้บริหารต้องใช้พาธภาพจากคลังภาพ");
+  assert.ok(actions.includes('page === "executives"'), "ส่งตัวช่วยภาพให้เทมเพลตของหน้า executives");
   assert.ok(actions.includes("hasBlockTemplate(page)"), "ต้องกันหน้าที่ไม่มีเทมเพลต");
   assert.ok(!actions.includes("buildHomeTemplate"), "ห้ามผูกกับเทมเพลตหน้าแรกอย่างเดียวอีก");
   assert.ok(actions.includes("parseBlockDocument(page, template)"), "เทมเพลตต้องผ่าน parse ก่อนบันทึก");
@@ -368,8 +374,8 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   assert.ok(!doc.blocks.some((block) => block.type === "hero"), "ห้ามมีบล็อก hero ในเทมเพลตหน้าแรก");
   assert.ok(!JSON.stringify(doc).includes("ข้อมูลทดสอบ"), "ห้ามมีข้อมูลทดสอบ");
 
-  /* หน้าอื่นยังใช้บล็อก hero ได้ปกติ (ไม่กระทบ) */
-  for (const page of ["about", "contact", "careers"]) {
+  /* หน้าอื่นยังใช้บล็อก hero ได้ปกติ (ไม่กระทบ) — รอบที่ 260: about ไม่มีเทมเพลตตั้งต้นแล้ว จึงตัดออกจากรายการนี้ */
+  for (const page of ["contact", "careers"]) {
     const other = buildBlockTemplate(page as never);
     assert.ok(JSON.stringify(other).includes('"hero"'), `${page} ยังต้องมีบล็อก hero`);
   }

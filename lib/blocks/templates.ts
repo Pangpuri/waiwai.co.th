@@ -1,4 +1,3 @@
-import { buildAboutTemplate } from "@/lib/blocks/about-template";
 import { buildCareersTemplate } from "@/lib/blocks/careers-template";
 import { buildCertificationsTemplate } from "@/lib/blocks/certifications-template";
 import { buildContactTemplate } from "@/lib/blocks/contact-template";
@@ -54,15 +53,22 @@ export type BlockTemplatePageId = (typeof BLOCK_TEMPLATE_PAGE_IDS)[number];
  * (ผู้เรียกอ่าน id จากคลังแล้วส่งตัวช่วยมา · เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์)
  *
  * ⚠️ **ไม่มีตัวเลือก `mapUrl`** — การใส่ `linkHref` โดยไม่มีข้อความบนปุ่ม = ลิงก์ที่มองไม่เห็น
- *    + validator เตือน `map-link-without-label` (ดูเหตุผลใน `about-template.ts`)
+ *    + validator เตือน `map-link-without-label` (บทเรียนจากเทมเพลตหน้า /about ยุคแรก)
  */
 export type TemplateBuildOptions = {
   readonly image?: (key: string) => string;
 };
 
-const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, (options?: TemplateBuildOptions) => BlockDocument | null>> = {
+const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: TemplateBuildOptions) => BlockDocument | null) | null>> = {
   home: buildHomeTemplate,
-  about: buildAboutTemplate,
+  /*
+    ⚠️ รอบที่ 260: `about` **ไม่มีเทมเพลตตั้งต้นแล้ว** (หนี้ D-255-1)
+    เนื้อหาหน้านี้มาจาก **ตัวนำเข้าหน้าต้นทาง** (`npm run about:import` · `lib/about/*`)
+    เทมเพลตเก่า (20 บล็อกที่ประกอบจากพจนานุกรม) ถูกลบทั้งไฟล์ตามมติเจ้าของ 2026-10-09
+    ("ใช้ภาพ ข้อความ และแบ่งบล็อกตามความเหมาะสมจากแหล่งข้อมูลนี้") — เก็บไว้จะเป็นกับดัก:
+    กด "เริ่มจากเทมเพลต" แล้ว **ทับเนื้อหาที่นำเข้าจริงทั้งหน้า**
+  */
+  about: null,
   careers: buildCareersTemplate,
   contact: buildContactTemplate,
   products: buildProductsTemplate,
@@ -78,6 +84,24 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, (options?: Templat
   "product-noodie": () => buildProductDetailTemplate("noodie"),
   "product-rod-ded": () => buildProductDetailTemplate("rod-ded"),
 };
+
+/**
+ * หน้าที่มี **เทมเพลตตั้งต้นจริง** (ตัดหน้าที่เนื้อหามาจากตัวนำเข้าออก — รอบที่ 260)
+ * ใช้กับเครื่องมือ/เทสต์ที่ต้อง "ไล่ทุกเทมเพลต" · **อย่าใช้ `BLOCK_TEMPLATE_PAGE_IDS` ตรง ๆ กับงานแบบนั้น**
+ * (รายการนั้นรวมหน้าที่มีตัวสร้าง+พรีวิวแต่ไม่มีเทมเพลตตั้งต้น เช่น `about`)
+ */
+/**
+ * หน้านี้ **มีหน้าจอตัวสร้าง (builder) + พรีวิว** ไหม — ใช้กับงานที่ไม่เกี่ยวกับเทมเพลต
+ * (เช่น ปุ่ม "กลับไปใช้ดีไซน์เดิม" · ล้างประวัติการเผยแพร่) ⇒ **ห้ามใช้ `hasBlockTemplate` กับงานพวกนี้**
+ * เพราะหน้าที่เนื้อหามาจากตัวนำเข้า (about) ก็ยังต้องกลับไปใช้เลย์เอาต์เดิม/ล้างประวัติได้
+ */
+export function isBlockBuilderPage(page: string): page is BlockTemplatePageId {
+  return (BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page);
+}
+
+export const TEMPLATED_PAGE_IDS: readonly string[] = BLOCK_TEMPLATE_PAGE_IDS.filter(
+  (page) => TEMPLATE_BUILDERS[page] !== null,
+);
 
 /**
  * "ส่วนที่เทมเพลตไม่ครอบคลุม" — รหัสกลาง (ข้อความจริงอยู่ในพจนานุกรมทั้งสองภาษา)
@@ -144,18 +168,40 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
   "product-rod-ded": [],
 };
 
-/** หน้านี้มีเทมเพลตบล็อกให้เริ่มได้ไหม */
-export function hasBlockTemplate(page: string): page is BlockTemplatePageId {
-  return (BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page);
+/**
+ * หน้าที่ **เนื้อหามาจาก "ตัวนำเข้า" ไม่ใช่จากพจนานุกรม** (รอบที่ 260)
+ *
+ * ⚠️ ทำไมต้องแยก: หน้าที่อยู่ในรายการนี้ **ต้องไม่มีปุ่ม "เริ่มจากเทมเพลต"**
+ * เพราะปุ่มนั้นจะเขียนทับเอกสารทั้งหน้าด้วยเทมเพลตตั้งต้น ⇒ งานที่ตรวจ/แก้ไว้หายหมด
+ * (หนี้ D-255-1: เคยมีเทมเพลต /about 20 บล็อกที่ประกอบจากพจนานุกรม กับดักนี้ถูกถอดออกแล้ว)
+ *
+ * วิธีสร้างเนื้อหาของหน้าเหล่านี้: รันสคริปต์นำเข้าของหน้า (ดู `package.json`) แล้วกดเผยแพร่ในหน้าตัวสร้าง
+ */
+export const IMPORTED_CONTENT_PAGES = ["about"] as const;
+
+/** หน้านี้เนื้อหามาจากตัวนำเข้าไหม (ห้ามเสนอ "เริ่มจากเทมเพลต") */
+export function isImportedContentPage(page: string): boolean {
+  return (IMPORTED_CONTENT_PAGES as readonly string[]).includes(page);
 }
 
 /**
- * สร้างเทมเพลตของหน้านั้น (คืน `null` ถ้ายังไม่มีเทมเพลต)
+ * หน้านี้มีเทมเพลตบล็อกให้เริ่มได้ไหม
+ * ⚠️ หน้าที่เนื้อหามาจากตัวนำเข้า = `false` เสมอ (ดู `IMPORTED_CONTENT_PAGES`)
+ */
+export function hasBlockTemplate(page: string): page is BlockTemplatePageId {
+  if (isImportedContentPage(page)) return false;
+  if (!(BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page)) return false;
+  return TEMPLATE_BUILDERS[page as BlockTemplatePageId] !== null;
+}
+
+/**
+ * สร้างเทมเพลตของหน้านั้น (คืน `null` ถ้าหน้านั้นไม่มีเทมเพลตตั้งต้น)
  * ⚠️ เอกสารที่ได้ยัง **ไม่ผ่านการ parse** — ผู้เรียกต้องส่งเข้า `parseBlockDocument` ก่อนเขียนลงฐานข้อมูล
  */
 export function buildBlockTemplate(page: string, options?: TemplateBuildOptions): BlockDocument | null {
   if (!hasBlockTemplate(page)) return null;
-  return TEMPLATE_BUILDERS[page](options);
+  const builder = TEMPLATE_BUILDERS[page];
+  return builder === null ? null : builder(options);
 }
 
 /** รหัสของส่วนที่เทมเพลตของหน้านั้นไม่ครอบคลุม (หน้านอกทะเบียน = ไม่มีข้อมูล) */

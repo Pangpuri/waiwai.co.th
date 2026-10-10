@@ -5,11 +5,8 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { CERTIFICATIONS } from "@/features/about/certifications";
-import { buildAboutTemplate } from "@/lib/blocks/about-template";
+import { buildBlockTemplate, hasBlockTemplate, isImportedContentPage } from "@/lib/blocks/templates";
 import { ABOUT_MEDIA, aboutImagePath, aboutMediaByKey, certificateMediaKey } from "@/lib/blocks/about-media";
-import { parseBlockDocument } from "@/lib/blocks/parse";
-import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
-import { PENDING_PAGE_PATHS } from "@/lib/pages/pending";
 
 /**
  * เทสต์รอบที่ 253 — "ย้ายเนื้อหาบริษัท (/about) เข้า DB + รูปเข้าคลังภาพ"
@@ -20,8 +17,8 @@ import { PENDING_PAGE_PATHS } from "@/lib/pages/pending";
  *   1. **ทะเบียนรูป** — ไฟล์จริงใน `public/` ต้องมี + `sha256` ที่เขียนไว้ต้องตรง (แก้ภาพแล้วต้องนำเข้าใหม่)
  *      และต้องครอบใบรับรองทุกใบใน `CERTIFICATIONS`
  *   2. **ตรรกะเลือกพาธ** — ยังไม่นำเข้า = ถอยไปใช้ `public/` · นำเข้าแล้ว = `/media/<id>` · คีย์ไม่รู้จัก = ไม่เดา
- *   3. **เทมเพลต** — ผ่าน parser + ไม่มี error · ภาพชี้พาธที่ตรวจสอบได้ · ไม่มีลิงก์ไปหน้า "กำลังจัดทำ" ·
- *      ลิงก์ภายในเป็นพาธกลาง (ไม่ฝังภาษา) · ไม่มีลิงก์ที่มองไม่เห็น (`linkHref` ไม่มีข้อความบนปุ่ม)
+ *   3. **กับดักที่ถอดออก (รอบที่ 260)** — หน้า /about ต้องไม่มีปุ่ม "เริ่มจากเทมเพลต" อีก
+ *      (เทมเพลตเก่าจากพจนานุกรมจะทับเนื้อหาที่นำเข้าจากหน้าต้นทาง — หนี้ D-255-1)
  *   4. **เครื่องมือ** — `npm run about:media` ยังอยู่ + อ่านไฟล์ในเครื่อง (ไม่ต่ออินเทอร์เน็ต)
  */
 
@@ -38,55 +35,6 @@ function publicFile(publicPath: string): string {
 
 function sha256OfFile(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
-}
-
-/** รูปแบบข้อมูลของสื่อในเอกสารบล็อก (พอสำหรับเทสต์ — ไม่ต้องพึ่งชนิดของ union ทั้งชุด) */
-type MediaLike = { readonly path: string; readonly altTh: string; readonly altEn: string };
-
-/**
- * ไล่เก็บ "สื่อ" ทุกใบในเอกสารแบบไม่ผูกชนิดบล็อก
- * ⇒ เพิ่มชนิดบล็อกใหม่ที่มีภาพก็ยังถูกตรวจ ไม่ต้องแก้เทสต์
- * (ไม่ใช้ type assertion — ตรวจรูปร่างจากค่าจริง)
- */
-function collectMedia(value: unknown, out: MediaLike[] = []): MediaLike[] {
-  if (Array.isArray(value)) {
-    for (const item of value) collectMedia(item, out);
-    return out;
-  }
-  if (value === null || typeof value !== "object") return out;
-
-  const record: Record<string, unknown> = { ...value };
-  if (
-    typeof record.path === "string" &&
-    typeof record.altTh === "string" &&
-    typeof record.altEn === "string" &&
-    typeof record.hasWatermark === "boolean"
-  ) {
-    out.push({ path: record.path, altTh: record.altTh, altEn: record.altEn });
-  }
-
-  for (const nested of Object.values(record)) collectMedia(nested, out);
-
-  return out;
-}
-
-/** ไล่เก็บลิงก์ของเอกสาร (การ์ด/ปุ่ม/แผนที่) */
-function collectHrefs(value: unknown, out: string[] = []): string[] {
-  if (Array.isArray(value)) {
-    for (const item of value) collectHrefs(item, out);
-    return out;
-  }
-  if (value === null || typeof value !== "object") return out;
-
-  const record: Record<string, unknown> = { ...value };
-  for (const key of ["href", "linkHref"]) {
-    const candidate = record[key];
-    if (typeof candidate === "string" && candidate.trim() !== "") out.push(candidate);
-  }
-
-  for (const nested of Object.values(record)) collectHrefs(nested, out);
-
-  return out;
 }
 
 /* ── 1) ทะเบียนรูป ───────────────────────────────────────────────────────── */
@@ -169,97 +117,26 @@ test("certificateMediaKey: พาธที่ไม่รู้จัก = \"\" 
   assert.notEqual(certificateMediaKey(known.image.src), "");
 });
 
-/* ── 3) เทมเพลต ──────────────────────────────────────────────────────────── */
+/* ── 3) กับดักที่ถอดออก (รอบที่ 260 · หนี้ D-255-1) ───────────────────────────
+   เทมเพลตหน้า /about ยุคแรก (20 บล็อกที่ประกอบจากพจนานุกรม) ถูกลบทั้งไฟล์
+   เพราะกด "เริ่มจากเทมเพลต" แล้วจะ **ทับเนื้อหาที่นำเข้าจากหน้าต้นทางทั้งหน้า**
+   ⇒ ผู้ใช้แก้/ตรวจไปแล้วหายหมด · เทสต์นี้กันไม่ให้กับดักกลับมา
+*/
 
-test("buildAboutTemplate: ผ่าน parser · ไม่มี error · 20 บล็อก (ครบทุกส่วนของหน้าจริง)", () => {
-  const document = buildAboutTemplate();
-  assert.equal(document.page, "about");
-  assert.equal(document.blocks.length, 20, "จำนวนบล็อกต้องตรงกับส่วนต่าง ๆ ของหน้าบริษัทเดิม");
+test("about: ต้องไม่มีเทมเพลตตั้งต้นแล้ว — กันกด \"เริ่มจากเทมเพลต\" ทับงานที่นำเข้า (D-255-1)", () => {
+  assert.equal(isImportedContentPage("about"), true, "about ต้องถูกประกาศว่ามาจากตัวนำเข้า");
+  assert.equal(hasBlockTemplate("about"), false, "ห้ามเสนอปุ่ม 'เริ่มจากเทมเพลต' ให้หน้า /about");
+  assert.equal(buildBlockTemplate("about"), null, "เรียกสร้างเทมเพลต about ต้องได้ null (ไม่ใช่เอกสารทับของเดิม)");
 
-  const parsed = parseBlockDocument("about", document);
-  assert.ok(parsed.ok, "เทมเพลตต้องผ่าน parser (ผู้เรียกใช้ผลนี้ก่อนเขียน DB)");
-  if (!parsed.ok) return;
+  /* หน้าอื่นยังมีเทมเพลตตามเดิม — ต้องไม่เผลอปิดทั้งระบบ */
+  assert.equal(hasBlockTemplate("home"), true);
+  assert.equal(hasBlockTemplate("executives"), true);
+  assert.equal(hasBlockTemplate("careers"), true);
 
-  const issues = validateDocument(parsed.document);
-  assert.deepEqual(documentErrorsOf(issues), [], "เทมเพลตต้องไม่มี error");
-});
-
-test("buildAboutTemplate: ไม่มีลิงก์ที่มองไม่เห็น (linkHref ต้องมีข้อความบนปุ่มเสมอ)", () => {
-  const parsed = parseBlockDocument("about", buildAboutTemplate());
-  assert.ok(parsed.ok);
-  if (!parsed.ok) return;
-
-  const issues = validateDocument(parsed.document);
-  const warnings = documentWarningsOf(issues).map((entry) => entry.code);
   assert.equal(
-    warnings.includes("map-link-without-label"),
+    existsSync(path.join(ROOT, "lib/blocks", "about-template.ts")),
     false,
-    "ห้ามใส่ลิงก์เปิดแผนที่โดยไม่มีข้อความบนปุ่ม — ลิงก์จะไม่แสดงบนหน้าเว็บ (กรอกล่วงหน้าไม่ได้)",
-  );
-});
-
-test("buildAboutTemplate: ไม่มีลิงก์ไปหน้า \"กำลังจัดทำ\" และลิงก์ภายในเป็นพาธกลาง", () => {
-  const document = buildAboutTemplate();
-  const hrefs = collectHrefs(document, []);
-  assert.ok(hrefs.length > 0, "เทมเพลตต้องมีลิงก์จริง (ปุ่มดูใบรับรอง/ลิงก์ต่อ)");
-
-  const pending = new Set<string>(Object.values(PENDING_PAGE_PATHS));
-  for (const href of hrefs) {
-    assert.equal(pending.has(href), false, `ห้ามลิงก์ไปหน้า "กำลังจัดทำ": ${href}`);
-    assert.equal(
-      href.startsWith("/th/") || href.startsWith("/en/"),
-      false,
-      `${href}: ต้องเป็นพาธกลาง (ตัวเรนเดอร์เติมภาษาให้เอง — บทเรียนรอบที่ 101)`,
-    );
-    assert.ok(href.startsWith("/") || /^(https?:|mailto:|tel:|#)/.test(href), `${href}: ลิงก์ต้องมีรูปแบบที่รู้จัก`);
-  }
-});
-
-test("buildAboutTemplate: ภาพทุกใบชี้พาธที่ตรวจสอบได้ (ไม่ตกหล่นเป็นพาธลอย)", () => {
-  const publicPaths = new Set(ABOUT_MEDIA.map((asset) => asset.publicPath));
-
-  /* (ก) ไม่ส่งตัวช่วย = ต้องเป็นพาธใน public/ ที่อยู่ในทะเบียนเท่านั้น */
-  const fallback = collectMedia(buildAboutTemplate(), []);
-  assert.ok(fallback.length > 0, "เทมเพลตต้องมีภาพจริง (แผนที่/ผังผู้บริหาร/ใบรับรอง)");
-  for (const media of fallback) {
-    assert.ok(
-      publicPaths.has(media.path),
-      `${media.path}: ภาพของเทมเพลตต้องอยู่ในทะเบียน ABOUT_MEDIA (ไม่งั้นนำเข้าคลังไม่ครบ)`,
-    );
-    assert.ok(media.altTh.trim() !== "" && media.altEn.trim() !== "", `${media.path}: ภาพต้องมี alt ทั้งสองภาษา`);
-  }
-
-  /* (ข) ส่งตัวช่วยจากคลัง = ทุกใบต้องกลายเป็น /media/<id> (พิสูจน์ว่าไม่ได้ลืมต่อสาย) */
-  const resolved = collectMedia(buildAboutTemplate({ image: (key) => `/media/test-${key}` }), []);
-  assert.equal(resolved.length, fallback.length, "จำนวนภาพต้องเท่าเดิม (เปลี่ยนแค่พาธ)");
-  for (const media of resolved) {
-    assert.ok(media.path.startsWith("/media/"), `${media.path}: ต้องมาจากคลังภาพเมื่อผู้เรียกส่งตัวช่วย`);
-  }
-});
-
-test("buildAboutTemplate: ไทม์ไลน์ต้องพาปีไปด้วย (ไทย = พ.ศ. · อังกฤษ = ค.ศ.)", () => {
-  const document = buildAboutTemplate();
-
-  /* เก็บทุกคู่ข้อความ TH|EN ในเอกสาร */
-  const texts: string[] = [];
-  const walk = (value: unknown): void => {
-    if (Array.isArray(value)) {
-      for (const item of value) walk(item);
-      return;
-    }
-    if (value === null || typeof value !== "object") return;
-    const record: Record<string, unknown> = { ...value };
-    if (typeof record.th === "string" && typeof record.en === "string") texts.push(`${record.th}|${record.en}`);
-    for (const nested of Object.values(record)) walk(nested);
-  };
-  walk(document);
-
-  const foundedTh = texts.find((entry) => entry.includes("ก่อตั้งบริษัท"));
-  assert.ok(foundedTh !== undefined, "ต้องมีการ์ดเหตุการณ์ 'ก่อตั้งบริษัท'");
-  assert.match(
-    foundedTh,
-    /พ\.ศ\. 2515 · .+\|1972 · /,
-    "การ์ดไทม์ไลน์ต้องมีปี (ไทย พ.ศ. 2515 · อังกฤษ 1972) — ห้ามเหลือแต่ชื่อเหตุการณ์",
+    "ไฟล์เทมเพลตเก่า (พจนานุกรม 20 บล็อก) ถูกลบแล้ว — ห้ามสร้างกลับมา",
   );
 });
 

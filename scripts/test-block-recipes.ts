@@ -15,7 +15,7 @@ import {
 } from "@/lib/blocks/edit";
 import { localizedBlockHref } from "@/lib/blocks/href";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
+import { TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import {
   BLOCK_CATALOG,
   BLOCK_TYPES,
@@ -304,7 +304,8 @@ test("recipes: เทมเพลตมีบล็อกเมนูอาห�
 });
 
 test("templates: ทุก href ในเทมเพลตเป็นพาธกลาง (ห้ามผูกภาษา) — บทเรียนรอบที่ 101", () => {
-  for (const page of BLOCK_TEMPLATE_PAGE_IDS) {
+  /* รอบที่ 260: ไล่เฉพาะหน้าที่มีเทมเพลตตั้งต้นจริง */
+  for (const page of TEMPLATED_PAGE_IDS) {
     const template = buildBlockTemplate(page);
     assert.ok(template !== null, `${page}: ต้องมีเทมเพลต`);
     if (template === null) continue;

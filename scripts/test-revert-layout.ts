@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { REVERT_LAYOUT_CONFIRM_VALUE, decideRevertLayout } from "@/lib/blocks/layout-revert";
 
 import { codeOf, rawOf } from "./source-scan.ts";
+import { isBlockBuilderPage } from "@/lib/blocks/templates";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -71,7 +72,14 @@ test("revert-layout: action ต้องตรวจสิทธิ์ · ติ
 test("revert-layout: หน้าจอแสดงเฉพาะเมื่อหน้านี้ใช้บล็อกอยู่ + มีช่องยืนยันที่ค่าตรงกับ action", () => {
   const screen = codeOf("app/admin/builder/[page]/page.tsx");
 
-  assert.ok(screen.includes("hasBlockTemplate(page) && isLive"), "แสดงเฉพาะหน้าที่มีเทมเพลตและใช้บล็อกอยู่จริง");
+  /*
+    ⚠️ รอบที่ 260: เปลี่ยนจาก hasBlockTemplate → isBlockBuilderPage
+    หน้า about ไม่มีเทมเพลตตั้งต้น (เนื้อหาจากตัวนำเข้า) แต่ยังต้องกลับไปใช้ดีไซน์เดิมได้
+  */
+  assert.ok(screen.includes("isBlockBuilderPage(page) && isLive"), "แสดงเฉพาะหน้าที่มีตัวสร้างและใช้บล็อกอยู่จริง");
+  /* ตัวช่วยต้องทำงานจริง: about มีตัวสร้าง (แต่ไม่มีเทมเพลตตั้งต้น) */
+  assert.equal(isBlockBuilderPage("about"), true, "about ต้องนับเป็นหน้าที่มีตัวสร้าง");
+  assert.equal(isBlockBuilderPage("sustainability"), false, "หน้าที่ไม่มีตัวสร้าง (และไม่มีเทมเพลต) ต้องเป็น false");
   assert.ok(screen.includes("revertToCodeLayoutAction"), "ฟอร์มต้องชี้ไปที่ action นี้");
   assert.ok(screen.includes('name="confirm"'), "ต้องมีช่องยืนยัน");
   assert.ok(

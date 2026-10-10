@@ -48,6 +48,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       label: messages.admin.navGroupContent,
       items: [
         { href: "/admin/builder/chrome", label: messages.admin.navChrome },
+        { href: "/admin/builder/mourning", label: messages.admin.navMourning },
         { href: "/admin/hero", label: messages.admin.navHero },
         { href: "/admin/builder/home", label: messages.admin.navHome },
         { href: "/admin/builder/about", label: messages.admin.navAbout },
@@ -57,6 +58,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         { href: "/admin/news", label: messages.admin.navNews },
         { href: "/admin/builder/careers", label: messages.admin.navCareers },
         { href: "/admin/builder/contact", label: messages.admin.navContact },
+        /* รอบที่ 260 (จัดระเบียบเมนู): จอนี้แก้เนื้อหาหน้าแรกแบบฟิลด์ (เลย์เอาต์เดิม) ⇒ อยู่กลุ่ม "เนื้อหาเว็บไซต์" ไม่ใช่ "จัดการข้อมูล" */
+        { href: "/admin/content/home", label: messages.admin.navStructured },
       ],
     },
     {
@@ -68,7 +71,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         { href: "/admin/sort", label: messages.admin.sortNavLabel },
         { href: "/admin/preview-links", label: messages.admin.previewLinkTitle },
         { href: "/admin/trash", label: messages.admin.trashTitle },
-        { href: "/admin/content/home", label: messages.admin.navStructured },
       ],
     },
     {

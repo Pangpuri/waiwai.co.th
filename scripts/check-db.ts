@@ -104,7 +104,7 @@ import {
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { BLOCK_TEMPLATE_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
+import { IMPORTED_CONTENT_PAGES, TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import {
   createAdminUser,
   createDbUserStore,
@@ -1274,8 +1274,12 @@ async function checkChromePresets(): Promise<void> {
  *
  * ⚠️ ล้างทุกอย่างที่สร้างในตอนจบ (แถว draft/published + ประวัติ + audit ของหน้านี้)
  *    และ **ไม่แตะหน้าแรก** (มีข้อมูลจริงของผู้ใช้อยู่)
+ *
+ * ⚠️ รอบที่ 260: ใช้ `TEMPLATED_PAGE_IDS` (เฉพาะหน้าที่มีเทมเพลตตั้งต้นจริง) แล้ว **ตัด `about` ออก**
+ *    เพราะหน้า about เนื้อหามาจาก **ตัวนำเข้า** (`npm run about:import`) ไม่ใช่เทมเพลตพจนานุกรม
+ *    ⇒ ด่านนี้จะ "เขียนทับด้วยเทมเพลต" ซึ่งเป็นสิ่งที่เราถอดกับดักออกไปแล้ว (หนี้ D-255-1)
  */
-const TEMPLATE_TEST_PAGES = BLOCK_TEMPLATE_PAGE_IDS.filter((page) => page !== "home");
+const TEMPLATE_TEST_PAGES = TEMPLATED_PAGE_IDS.filter((page) => page !== "home" && page !== "about");
 const TEMPLATE_TEST_ACTOR = "check-db-template@example.invalid";
 
 /** แถวของเอกสารหน้าที่จะคืนกลับหลังทดสอบ (จำของเดิมไว้แบบครบทุกคอลัมน์) */
@@ -1370,6 +1374,42 @@ async function checkPageTemplates(): Promise<void> {
       const restored = await countWhere("page_document where page = $1", [page]);
       assert.equal(restored, snapshot.rows.length, `${page}: ต้องได้แถวเดิมกลับมาครบ (${snapshot.rows.length})`);
     }
+  }
+
+  /*
+    ── หน้าที่เนื้อหามาจาก "ตัวนำเข้า" (about · รอบที่ 260) ─────────────────────────────
+    ⚠️ **ห้ามเขียนทับด้วยเทมเพลต** (นั่นคือกับดักที่ถอดออกไปแล้ว — หนี้ D-255-1)
+    ⇒ ตรวจแบบ **อ่านอย่างเดียว**: เอกสารที่เผยแพร่อยู่ต้องผ่าน parser + validator 0 error
+    และถ้าหน้านั้นตั้งเป็น "ใช้กับเว็บจริง" ⇒ `loadLiveBlockDocument` ต้องคืนเอกสารจริง
+  */
+  for (const page of IMPORTED_CONTENT_PAGES) {
+    const published = await pool.query<{ document: unknown; is_live: boolean | null }>(
+      `select document, is_live from page_document where page = $1 and status = 'published'`,
+      [page],
+    );
+    const row = published.rows[0];
+    if (row === undefined) {
+      done(`หน้า ${page}: ตัวนำเข้า — ยังไม่มีฉบับเผยแพร่ในเครื่องนี้ (ข้าม)`, "ไม่มีแถว");
+      continue;
+    }
+
+    const parsed = parseBlockDocument(page, row.document);
+    assert.ok(parsed.ok, `${page}: เอกสารที่เผยแพร่ต้องผ่าน parser (${parsed.ok ? "" : parsed.problems.join(", ")})`);
+    if (!parsed.ok) continue;
+    assert.deepEqual(
+      documentErrorsOf(validateDocument(parsed.document)),
+      [],
+      `${page}: เอกสารที่เผยแพร่ต้องไม่มี error`,
+    );
+
+    const live = await loadLiveBlockDocument(page);
+    if (row.is_live === true) {
+      assert.ok(live !== null, `${page}: ตั้ง "ใช้กับเว็บจริง" ไว้ ⇒ ต้องอ่านเอกสารที่เผยแพร่ได้`);
+      assert.equal(live === null ? -1 : countRawBlocks(live), countRawBlocks(parsed.document), `${page}: จำนวนบล็อกต้องตรงกัน`);
+    } else {
+      assert.equal(live, null, `${page}: ยังไม่ตั้ง "ใช้กับเว็บจริง" ⇒ หน้าเว็บใช้เลย์เอาต์เดิม`);
+    }
+    done(`หน้า ${page}: ตัวนำเข้า → เอกสารที่เผยแพร่ถูกต้อง (อ่านอย่างเดียว)`, `${countRawBlocks(parsed.document)} บล็อก`);
   }
 }
 
