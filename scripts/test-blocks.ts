@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { addCard, insertPresetBlock, moveBlockTo, moveCardTo, replaceBlockWithPreset, setBlockVisibility, setCardText } from "@/lib/blocks/edit";
 import { parseBlockDocument } from "@/lib/blocks/parse";
@@ -22,6 +25,9 @@ import {
 import { documentErrorsOf, documentWarningsOf, missingEnglishCount, validateDocument } from "@/lib/blocks/validate";
 
 /** เทสต์ของแกน "บล็อกอิสระ" (ตรรกะล้วน — ไม่ต้องมี DB/React) */
+
+/** รากโปรเจกต์ — ใช้กับเทสต์ที่ "สแกนซอร์ส" (ตัวเรนเดอร์เป็น server component ⇒ เรนเดอร์ใน `node --test` ไม่ได้) */
+const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /**
  * ชนิดข้อมูลจริงเป็น readonly ทั้งหมด (ตั้งใจ — กันการแก้พลาดในโค้ดแอป)
@@ -135,6 +141,46 @@ test("validate: บล็อกที่ยังว่างถูกจับ�
   assert.equal(errors.length, 1);
   assert.equal(errors[0]?.code, "empty-th");
   assert.equal(errors[0]?.path, "blocks[0].text.th");
+});
+
+test("validate: แบนเนอร์มีภาพแต่ไม่มีหัวข้อ = ผ่าน · ไม่มีทั้งคู่ = error (เคสจริง 2026-10-10)", () => {
+  /*
+    เจ้าของลบหัวข้อของแบนเนอร์ (ชื่อเต็มบริษัทอยู่บล็อกถัดไป ⇒ "บริษัท" ซ้ำ) แต่เผยแพร่ไม่ผ่าน
+    เพราะกฎเดิมบังคับ `hero.title` ⇒ แก้เป็น "แบนเนอร์ต้องไม่ว่างเปล่า" (หัวข้อหรือภาพ อย่างน้อยหนึ่ง)
+  */
+  const hero = mutable(createBlock("hero", "b1"));
+  assert.ok(hero.type === "hero");
+  hero.image = { path: "/media/example", altTh: "ภาพแบนเนอร์", altEn: "", hasWatermark: false };
+  assert.equal(documentErrorsOf(validateDocument(docOf([hero]))).length, 0, "มีภาพ = ผ่านแม้ไม่มีหัวข้อ");
+
+  const empty = mutable(createBlock("hero", "b2"));
+  assert.ok(empty.type === "hero");
+  const codes = documentErrorsOf(validateDocument(docOf([empty]))).map((entry) => entry.code);
+  assert.ok(codes.includes("hero-empty"), "ไม่มีหัวข้อและไม่มีภาพ = แบนเนอร์ว่างเปล่า ต้องเป็น error");
+});
+
+test("renderer: แบนเนอร์ไม่มีหัวข้อต้องไม่เรนเดอร์ <h2> เปล่า และทุกเลย์เอาต์ต้องมี h1 (a11y)", () => {
+  /*
+    เคสจริง 2026-10-10: เจ้าของลบหัวข้อของแบนเนอร์ (กันคำซ้ำ) แล้วพบว่า
+    (1) ตัวเรนเดอร์ยังพ่น `<h2></h2>` เปล่า ๆ ออกมา และ (2) หน้าไม่มี `<h1>` เลย (เดิมใส่ให้เฉพาะเลย์เอาต์ sidebar)
+  */
+  const source = readFileSync(path.join(PROJECT_ROOT, "features", "blocks", "block-renderer.tsx"), "utf8");
+
+  const titleAttrs = source.indexOf('editAttrs(editable, "title")');
+  assert.ok(titleAttrs > 0, "ต้องพบจุดเรนเดอร์หัวข้อของแบนเนอร์");
+  const aroundTitle = source.slice(Math.max(0, titleAttrs - 400), titleAttrs);
+  assert.ok(aroundTitle.includes("hasText(block.title)"), "หัวข้อแบนเนอร์ต้องถูกครอบด้วย hasText (ไม่มีข้อความ = ไม่มีแท็ก)");
+
+  assert.ok(
+    source.includes('const pageHeading = heading.trim() === "" ? null : <h1 className="sr-only">{heading}</h1>;'),
+    "ต้องมีตัวแปรกลาง pageHeading สำหรับ h1 ของหน้า",
+  );
+  assert.equal(
+    [...source.matchAll(/\{pageHeading\}/g)].length,
+    3,
+    "ต้องใช้ h1 ในทุกเลย์เอาต์ (sidebar + landing + full) — เดิมมีเฉพาะ sidebar",
+  );
+  assert.ok(!source.includes('heading === "" ? null : <h1'), "ห้ามเหลือการเช็ค h1 แบบเดิม (ใช้เฉพาะ sidebar)");
 });
 
 test("validate: ยังไม่มีคำแปลอังกฤษเป็น 'คำเตือน' ไม่บล็อกการบันทึก", () => {

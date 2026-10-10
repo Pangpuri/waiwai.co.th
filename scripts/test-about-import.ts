@@ -167,7 +167,8 @@ test("about import: ประกอบเอกสาร — hero + richText ต
 
   const [hero, , , , gallery] = document.blocks;
   assert.ok(hero?.type === "hero");
-  assert.equal(hero.title.th, "บริษัท");
+  /* มติเจ้าของ 2026-10-10: แบนเนอร์เป็น **ภาพล้วน** — ห้ามใส่ "บริษัท" ซ้ำกับบล็อกถัดไป */
+  assert.equal(hero.title.th, "", "แบนเนอร์ต้องไม่มีหัวข้อ (ชื่อเต็มของบริษัทอยู่บล็อกถัดไป)");
   assert.ok(hero.image !== null && hero.image.path.startsWith("/media/"), "แบนเนอร์ต้องเป็นพาธคลังภาพ");
   assert.ok(gallery?.type === "gallery");
   assert.equal(gallery.items.length, 2);
@@ -182,16 +183,15 @@ test("about import: ประกอบเอกสาร — hero + richText ต
   assert.ok(parsed.ok, parsed.ok ? "" : parsed.problems.join(" · "));
 });
 
-test("about import: ยังไม่นำเข้ารูป = ไม่ขึ้นกล่องภาพเปล่า (แต่ข้อความครบ)", () => {
+test("about import: ยังไม่นำเข้ารูป = ไม่ขึ้นกล่องว่างเปล่า (ทั้งแบนเนอร์และแกลเลอรี) แต่ข้อความครบ", () => {
   const source = parseAboutPage(FIXTURE);
   const document = buildAboutDocument(source, () => null);
   const types = document.blocks.map((block) => block.type);
   assert.ok(!types.includes("gallery"), "ไม่มีภาพที่ใช้ได้ ⇒ ต้องไม่ใส่บล็อกแกลเลอรี");
+  assert.ok(!types.includes("hero"), "แบนเนอร์เป็นภาพล้วน ⇒ ไม่มีภาพ = ไม่ต้องมีบล็อกที่ว่างเปล่า");
   assert.equal(types.filter((type) => type === "richText").length, 4, "ข้อความทุกส่วนยังอยู่ครบ");
-  const hero = document.blocks[0];
-  assert.ok(hero?.type === "hero");
-  assert.equal(hero.image, null);
   assert.ok(parseBlockDocument("about", document).ok);
+  assert.equal(documentErrorsOf(validateDocument(document)).length, 0, "เอกสารต้องผ่าน validator แม้ไม่มีภาพเลย");
 });
 
 test("about import: กล่องภาพต้องไม่ขยายภาพต้นทาง (มติเจ้าของ 2026-10-10 — \"ลดขนาดภาพให้เหมาะสม\")", () => {

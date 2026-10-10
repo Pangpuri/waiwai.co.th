@@ -311,7 +311,9 @@ test("blocks a11y: ตัวเรนเดอร์ต้องออก <h1> �
   const renderer = readFileSync("features/blocks/block-renderer.tsx", "utf8");
   assert.ok(renderer.includes("heading?: string"), "ตัวเรนเดอร์ต้องรับชื่อหน้าสำหรับ h1");
   assert.ok(/<h1 className="sr-only">\{heading\}<\/h1>/.test(renderer), "ต้องเรนเดอร์ h1 (sr-only) เมื่อมีชื่อหน้า");
-  assert.ok(renderer.includes('heading === ""'), "ไม่ส่งชื่อหน้า = ไม่มี h1 (พฤติกรรมเดิม)");
+  assert.ok(renderer.includes('heading.trim() === ""'), "ไม่ส่งชื่อหน้า/ว่าง = ไม่มี h1 (ไม่สร้าง <h1></h1> เปล่า)");
+  /* รอบที่ 258: เดิม h1 อยู่ในสาขา `sidebar` เท่านั้น ⇒ หน้า `full`/`landing` ไม่มี h1 เลย */
+  assert.equal([...renderer.matchAll(/\{pageHeading\}/g)].length, 3, "h1 ต้องถูกใช้ครบทุกเลย์เอาต์ (sidebar + landing + full)");
 
   /* หน้าที่เคยขาด h1: หน้าแรก + /about (ทั้งคู่เรนเดอร์จากบล็อกได้) */
   for (const file of ["app/[lang]/page.tsx", "app/[lang]/about/page.tsx"]) {

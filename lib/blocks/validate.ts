@@ -94,17 +94,29 @@ function checkHref(href: string, path: string, issues: BlockIssue[]): void {
 
 function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
   switch (block.type) {
-    case "hero":
-      checkText(block.title, `${path}.title`, { required: true, englishRequired: true }, issues);
+    case "hero": {
+      /*
+        ── หัวข้อของแบนเนอร์เปิดหน้า **ไม่บังคับ** (รอบที่ 258 · เคสจริงจากเจ้าของ 2026-10-10) ──────────
+        เจ้าของลบหัวข้อของบล็อกแบนเนอร์ (เพราะชื่อเต็มของบริษัทอยู่บล็อกถัดไปแล้ว ⇒ "บริษัท" ซ้ำสองที่)
+        แต่ **เผยแพร่ไม่ผ่าน** เพราะกฎเดิมบังคับ `hero.title` ต้องมีข้อความไทย ⇒ งานที่แก้หายทั้งที่ตั้งใจถูก
+        ⇒ กฎที่ตรงกับเจตนาจริงคือ **"แบนเนอร์ต้องไม่ว่างเปล่า"** = มีหัวข้อ **หรือ** มีภาพ อย่างน้อยหนึ่งอย่าง
+        ⚠️ `englishRequired: true` ยังอยู่ (มีหัวข้อไทยแล้วควรมี EN — เป็นคำเตือน ไม่บล็อก)
+        ⚠️ `<h1>` ของหน้าไม่ได้มาจากบล็อกนี้ (มาจาก `heading` ของ `BlockDocumentView`) ⇒ ไม่กระทบ a11y
+      */
+      checkText(block.title, `${path}.title`, { required: false, englishRequired: true }, issues);
       checkText(block.subtitle, `${path}.subtitle`, { required: false, englishRequired: false }, issues);
       checkText(block.note, `${path}.note`, { required: false, englishRequired: false }, issues);
       checkText(block.ctaLabel, `${path}.ctaLabel`, { required: false, englishRequired: false }, issues);
       checkMedia(block.image, `${path}.image`, issues);
       checkHref(block.ctaHref, `${path}.ctaHref`, issues);
+      if (block.title.th.trim() === "" && block.image === null) {
+        issues.push(issue("error", "hero-empty", `${path}.title`, "แบนเนอร์ต้องมีหัวข้อหรือภาพอย่างน้อยหนึ่งอย่าง"));
+      }
       if (block.image === null) {
         issues.push(issue("warning", "hero-without-image", `${path}.image`, "แบนเนอร์เปิดหน้าไม่มีภาพ"));
       }
       return;
+    }
 
     case "heading":
       checkText(block.text, `${path}.text`, { required: true, englishRequired: true }, issues);

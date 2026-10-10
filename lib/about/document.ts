@@ -96,21 +96,34 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
   const nextId = (): string => templateBlockId(index++);
   const alt = altTextOf(source.pageTitle);
 
-  /* ── 1) แบนเนอร์หัวหน้า (ต้นทางมีภาพเดียว + ชื่อหน้า) ─────────────────────────── */
+  /* ── 1) แบนเนอร์หัวหน้า — **มีเฉพาะเมื่อมีภาพ** (ต้นทางมีภาพเดียว) ────────────────
+     ⚠️ บล็อกนี้ไม่มีหัวข้อ (มติเจ้าของ) ⇒ ถ้าไม่มีภาพด้วยจะกลายเป็น "แบนเนอร์ว่างเปล่า"
+        ซึ่ง validator ไม่ให้ผ่าน (`hero-empty`) · และการขึ้นกล่องเปล่าไม่มีประโยชน์
+        ⇒ ไม่มีภาพ = ไม่มีบล็อก (หลักเดียวกับแกลเลอรีด้านล่าง) ⇒ เอกสารยังถูกต้องเสมอ
+  */
   const banner = source.bannerUrl === null ? null : resolveImage(source.bannerUrl);
-  blocks.push({
-    id: nextId(),
-    version: TEMPLATE_BLOCK_VERSION,
-    type: "hero",
-    /* ⚠️ `width: "normal"` — ดูเหตุผลที่ `ABOUT_IMAGE_FIT` ด้านบน (ห้ามขยายภาพต้นทาง) */
-    style: templateStyle({ size: "lg", align: "left", width: ABOUT_IMAGE_FIT.heroWidth }),
-    title: { th: source.pageTitle, en: "" },
-    subtitle: { th: "", en: "" },
-    note: { th: "", en: "" },
-    image: banner === null ? null : templateMedia(banner, alt, ""),
-    ctaLabel: { th: "", en: "" },
-    ctaHref: "",
-  });
+  if (banner !== null) {
+    blocks.push({
+      id: nextId(),
+      version: TEMPLATE_BLOCK_VERSION,
+      type: "hero",
+      /* ⚠️ `width: "normal"` — ดูเหตุผลที่ `ABOUT_IMAGE_FIT` ด้านบน (ห้ามขยายภาพต้นทาง) */
+      style: templateStyle({ size: "lg", align: "left", width: ABOUT_IMAGE_FIT.heroWidth }),
+      /*
+        ── ไม่ใส่หัวข้อที่แบนเนอร์ (มติเจ้าของ 2026-10-10) ──────────────────────────────────────
+        บล็อกนี้เป็น **ภาพล้วน** เพราะชื่อเต็มของบริษัทอยู่บล็อกถัดไปแล้ว ⇒ ใส่ "บริษัท" ที่นี่ = ซ้ำสองที่
+        (เจ้าของลบเองแล้วแต่เผยแพร่ไม่ผ่าน เพราะกฎ validator เดิมบังคับ `hero.title` — แก้ที่รากแล้วรอบ 258)
+        ⚠️ `<h1>` ของหน้ามาจาก `heading` ของ `BlockDocumentView` ไม่ใช่บล็อกนี้ ⇒ ไม่กระทบ a11y
+        ⚠️ ยังใช้ `pageTitle` เป็น **คำบรรยายภาพ (alt)** อยู่ (ยังมีข้อมูลจริงของหน้านั้น)
+      */
+      title: { th: "", en: "" },
+      subtitle: { th: "", en: "" },
+      note: { th: "", en: "" },
+      image: templateMedia(banner, alt, ""),
+      ctaLabel: { th: "", en: "" },
+      ctaHref: "",
+    });
+  }
 
   /* ── 2) ส่วนต่าง ๆ + กลุ่มภาพ ตามลำดับที่ต้นทางวางไว้จริง ─────────────────────── */
   let galleryCount = 0;

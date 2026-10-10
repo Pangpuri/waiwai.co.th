@@ -238,9 +238,15 @@ function BlockView({
           <div className={`${container} flex flex-col gap-5`}>
             {visual}
             <div className={`flex flex-col gap-3 ${align}`}>
-              <h2 className={heading} {...editAttrs(editable, "title")}>
-                {text(block.title, language)}
-              </h2>
+              {/*
+                ⚠️ รอบที่ 258: เดิมเรนเดอร์ `<h2>` **เสมอ** ⇒ แบนเนอร์ที่มีแต่ภาพ (ไม่มีหัวข้อ) ได้ `<h2></h2>` เปล่า ๆ
+                ⇒ แก้ให้ตรงกับ `subtitle`/`note` คือ "ไม่มีข้อความ = ไม่มีแท็ก" (เหมือน `richText.heading`)
+              */}
+              {hasText(block.title) ? (
+                <h2 className={heading} {...editAttrs(editable, "title")}>
+                  {text(block.title, language)}
+                </h2>
+              ) : null}
               {hasText(block.subtitle) ? (
                 <p className="text-fg text-lg" {...editAttrs(editable, "subtitle")}>
                   {text(block.subtitle, language)}
@@ -1065,6 +1071,15 @@ export function BlockDocumentView({
     ));
 
   /*
+    ── h1 ของหน้า (a11y · รอบที่ 149 · ขยายรอบที่ 258) ────────────────────────────────────────────
+    หน้าที่เรนเดอร์จากบล็อกไม่มี `<h1>` จากที่อื่นเลย ⇒ ใส่ให้ **ทุกเลย์เอาต์** เป็นข้อความสำหรับ screen reader
+    ⚠️ เดิมใส่เฉพาะเลย์เอาต์ `sidebar` ⇒ หน้า `full` (ค่าเริ่มต้น) กับ `landing` ไม่มี h1 เลย
+       (เจอจริงตอนทำหน้าบริษัท: พอถอดหัวข้อที่แบนเนอร์ออก หน้าเหลือแต่ `<h2>` ⇒ ผิดเกต "1 h1 ต่อหน้า")
+    ⚠️ `heading` ว่าง = ไม่ใส่ (ไม่สร้าง `<h1></h1>` เปล่า ๆ)
+  */
+  const pageHeading = heading.trim() === "" ? null : <h1 className="sr-only">{heading}</h1>;
+
+  /*
     เลย์เอาต์ "มีสารบัญด้านข้าง" (X1.8)
     - สารบัญสร้างจากหัวข้อในบล็อกอัตโนมัติ (`pageOutline`) — ไม่มีข้อมูลซ้ำที่หลุดจากเนื้อหา
     - วาง aside **ก่อน** เนื้อหาใน DOM ⇒ บนมือถือผู้ใช้เห็นสารบัญก่อน (ช่วยหน้าเนื้อหายาว)
@@ -1075,8 +1090,8 @@ export function BlockDocumentView({
 
     return (
       <div className="bg-bg text-fg">
-        {/* h1 ของหน้า (a11y · รอบที่ 149): หน้าที่เรนเดอร์จากบล็อกไม่มี h1 เลย ⇒ ใส่ให้ screen reader อ่านได้ โดยไม่กระทบดีไซน์ */}
-        {heading === "" ? null : <h1 className="sr-only">{heading}</h1>}
+        {/* h1 ของหน้า (a11y) — ตัวแปรกลาง `pageHeading` ด้านบน (ใช้ร่วมทุกเลย์เอาต์ตั้งแต่รอบที่ 258) */}
+        {pageHeading}
         <div className={pageLayoutClass("sidebar")}>
           {outline.length < 2 ? null : (
             <nav aria-label={strings.layout.tocLabel} className={sidebarAsideClass()}>
@@ -1107,6 +1122,7 @@ export function BlockDocumentView({
 
     return (
       <div className="bg-bg text-fg">
+        {pageHeading}
         {first === undefined ? null : renderBlocks([first])}
         {rest.length === 0 ? null : <div className={landingTailClass()}>{renderBlocks(rest)}</div>}
       </div>
@@ -1114,7 +1130,12 @@ export function BlockDocumentView({
   }
 
   /* `full` = ค่าเริ่มต้น (ไม่ระบุเลย์เอาต์) — บล็อกเรียงลงมาที่ความกว้างของแต่ละบล็อก (พฤติกรรมเดิมเป๊ะ) */
-  return <div className="bg-bg text-fg">{renderBlocks(document.blocks)}</div>;
+  return (
+    <div className="bg-bg text-fg">
+      {pageHeading}
+      {renderBlocks(document.blocks)}
+    </div>
+  );
 }
 
 export type { Language as BlockLanguage };
