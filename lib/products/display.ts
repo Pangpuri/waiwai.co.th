@@ -72,3 +72,35 @@ export function productNetWeightOf(product: BilingualProductText, language: Loca
 export function productPackagingOf(product: BilingualProductText, language: Locale): string {
   return bilingualProductText(product.packagingTh, product.packagingEn, language);
 }
+
+/* ── หมวดสินค้า: ชื่อ + โลโก้ (migration 0037 · รอบที่ 254 · มติ D24) ──────────────
+
+   หลังบ้านแก้ "ชื่อหมวด" และ "โลโก้การ์ด" ได้ ⇒ หน้าเว็บต้องเลือกค่าที่ถูกต้อง:
+   - ชื่อ: **ค่าจากฐานข้อมูลมาก่อน** (ตามภาษา) → ว่าง = ถอยไปใช้ค่าในพจนานุกรม
+   - โลโก้: **พาธจากคลังภาพมาก่อน** → null/ว่าง = ถอยไปใช้ไฟล์ใน `public/products/*.png`
+   ⇒ ยังไม่นำเข้า/ยังไม่แก้ = หน้าเว็บหน้าตาเหมือนเดิมเป๊ะ (ไม่มีอะไรเปลี่ยนโดยไม่ตั้งใจ)
+   ⚠️ ตรรกะอยู่ที่เดียว (pure) — ทั้งหน้า `/products` และหน้ารายละเอียดหมวดใช้ตัวเดียวกัน */
+
+/**
+ * ชื่อหมวดที่จะแสดง: DB (ตามภาษา) → ถอยอีกภาษา → ถอยพจนานุกรม
+ * ⚠️ อังกฤษว่าง = ถอยไปใช้ไทย (ธรรมเนียมเดียวกับชื่อสินค้า · `bilingualProductText`)
+ */
+export function categoryNameOf(
+  dbNameTh: string,
+  dbNameEn: string,
+  dictionaryName: string,
+  language: Locale,
+): string {
+  const thai = dbNameTh.trim();
+  const english = dbNameEn.trim();
+  if (language === "en" && english !== "") return english;
+  if (thai !== "") return thai;
+  if (english !== "") return english;
+  return dictionaryName;
+}
+
+/** พาธโลโก้การ์ดหมวด: คลังภาพ (หลังบ้าน) → ถอยไฟล์ใน `public/` */
+export function categoryLogoOf(dbLogoPath: string | null, fallbackSrc: string): string {
+  const fromLibrary = dbLogoPath === null ? "" : dbLogoPath.trim();
+  return fromLibrary !== "" ? fromLibrary : fallbackSrc;
+}

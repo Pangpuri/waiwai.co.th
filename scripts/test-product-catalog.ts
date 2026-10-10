@@ -192,13 +192,26 @@ const validProduct: ProductInput = {
 
 test("model: ข้อมูลที่ถูกต้องผ่าน · ที่ผิดถูกจับครบ", () => {
   assert.deepEqual([...validateProductInput(validProduct)], []);
-  assert.deepEqual([...validateCategoryInput({ id: "quick-zabb", sourceId: "15235", descriptionTh: "ก", descriptionEn: "" })], []);
+  assert.deepEqual(
+    [...validateCategoryInput({ id: "quick-zabb", sourceId: "15235", nameTh: "", nameEn: "", descriptionTh: "ก", descriptionEn: "" })],
+    [],
+  );
+  /* ชื่อหมวดว่างได้ (ถอยพจนานุกรม) แต่ยาวเกินไม่ผ่าน (migration 0037) */
+  assert.deepEqual(
+    [...validateCategoryInput({ id: "quick-zabb", sourceId: "15235", nameTh: "ชื่อหมวดใหม่", nameEn: "", descriptionTh: "", descriptionEn: "" })],
+    [],
+  );
+  assert.ok(
+    validateCategoryInput({ id: "quick-zabb", sourceId: "15235", nameTh: "ก".repeat(301), nameEn: "", descriptionTh: "", descriptionEn: "" }).some(
+      (issue) => issue.code === "too-long" && issue.path === "nameTh",
+    ),
+  );
 
   const bad = validateProductInput({ ...validProduct, id: "product-15136", categoryId: "ไม่รู้จัก", nameTh: "  ", sortOrder: -1, sourceUrl: "https://waiwai.co.th/x" });
   const codes = bad.map((issue) => issue.code).sort();
   assert.deepEqual(codes, ["bad-order", "bad-source-url", "empty-name-th", "id-mismatch", "unknown-category"]);
 
-  assert.ok(validateCategoryInput({ id: "quick-zabb", sourceId: "abc", descriptionTh: "", descriptionEn: "" }).some((issue) => issue.code === "bad-source-id"));
+  assert.ok(validateCategoryInput({ id: "quick-zabb", sourceId: "abc", nameTh: "", nameEn: "", descriptionTh: "", descriptionEn: "" }).some((issue) => issue.code === "bad-source-id"));
   assert.deepEqual([...validateIngredientInput({ nameTh: "แป้งสาลี", nameEn: "Wheat Flour", percentText: "53%" }, 0)], []);
   assert.ok(validateIngredientInput({ nameTh: "", nameEn: "", percentText: "" }, 2).some((issue) => issue.path === "ingredients[2].nameTh"));
 });

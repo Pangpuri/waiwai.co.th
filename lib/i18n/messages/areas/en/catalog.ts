@@ -22,7 +22,6 @@ export const productsPage = {
     intro: "Pick a category to see what is inside it.",
     notice:
       "A sample for the marketing team to review — the images and category names on this page are pending approval, and the product detail pages have not been built yet.",
-    cardCta: "View details",
     items: {
       instantNoodles: {
         name: "Instant noodles",

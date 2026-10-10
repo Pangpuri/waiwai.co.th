@@ -33,7 +33,8 @@ export function buildProductsTemplate(): BlockDocument {
       type: "cards",
       style: templateStyle({ background: "cream" }),
       heading: { th: th.productsPage.eyebrow, en: en.productsPage.eyebrow },
-      body: { th: th.productsPage.cardCta, en: en.productsPage.cardCta },
+      /* รอบที่ 254: ไม่มีข้อความ CTA ใต้การ์ดแล้ว (การ์ดทั้งใบเป็นลิงก์อยู่แล้ว — มติเจ้าของ) */
+      body: { th: "", en: "" },
       columns: 3,
       items: CATALOG_ITEMS.map((item) => ({
         title: {

@@ -313,12 +313,23 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
     usage.push({ kind: "product", target: `product:${row.id}`, detail: row.name_th });
   }
 
-  const categoryRows = await getPool().query<{ id: string }>(
-    `select id from product_category where image_media_id = $1 order by id`,
+  /*
+    หมวดสินค้า — มี 2 ภาพที่อ้างได้: **ภาพหัวหมวด** (`image_media_id`) และ **โลโก้การ์ด** (`logo_media_id` · migration 0037)
+    ⚠️ ทั้งคู่ต้องเห็น ⇒ ผู้ดูแลจะได้ไม่กดลบโลโก้ที่หน้าสินค้ายังใช้อยู่
+  */
+  const categoryRows = await getPool().query<{ id: string; as_logo: boolean }>(
+    `select id, (logo_media_id = $1) as as_logo
+       from product_category
+      where image_media_id = $1 or logo_media_id = $1
+      order by id`,
     [id],
   );
   for (const row of categoryRows.rows) {
-    usage.push({ kind: "product", target: `category:${row.id}`, detail: "category-image" });
+    usage.push({
+      kind: "product",
+      target: `category:${row.id}`,
+      detail: row.as_logo ? "category-logo" : "category-image",
+    });
   }
 
   /*

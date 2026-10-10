@@ -148,7 +148,7 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
   return { status: "saved", reason: null, createdId: productId };
 }
 
-/** บันทึกคำอธิบาย/ภาพของหมวดสินค้า (ชื่อหมวดมาจากโค้ดเสมอ — กันชื่อหลุดจากกัน) */
+/** บันทึกชื่อ/คำอธิบาย/ภาพของหมวดสินค้า (รอบที่ 254: ชื่อ + โลโก้การ์ดแก้ได้จากหลังบ้าน · มติ D24) */
 export async function saveProductCategoryAction(
   _previous: CategorySaveState,
   formData: FormData,
@@ -163,12 +163,22 @@ export async function saveProductCategoryAction(
     {
       id: categoryId,
       sourceId: field(formData, "sourceId"),
+      /* ชื่อหมวด (migration 0037) — ผู้ดูแลกรอกเอง · ว่าง = กลับไปใช้ชื่อจากพจนานุกรม */
+      nameTh: field(formData, "nameTh"),
+      nameEn: field(formData, "nameEn"),
       descriptionTh: field(formData, "descriptionTh"),
       descriptionEn: field(formData, "descriptionEn"),
     },
     user.email,
     mediaIdFromPath(field(formData, "imagePath")),
-    { imageMode: "set" },
+    {
+      /* imageMode/logoMode "set" = ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง (สคริปต์นำเข้าใช้โหมด "keep") */
+      imageMode: "set",
+      logoMediaId: mediaIdFromPath(field(formData, "logoPath")),
+      logoMode: "set",
+      /* กดบันทึก = ค่าที่กรอกต้องชนะ (ล้างชื่อกลับไปใช้พจนานุกรมได้) */
+      nameMode: "replace",
+    },
   );
   await recordAudit({
     action: "product-category-save",

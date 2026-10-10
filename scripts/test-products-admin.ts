@@ -162,7 +162,10 @@ test("products admin: repo กัน source_id ของหมวดถูกล
 
 test("products admin: การเขียนภาพแยก 2 โหมด — นำเข้า 'keep' · หลังบ้าน 'set'", () => {
   assert.ok(repository.includes('export type ImageWriteMode'), "ต้องมีชนิดโหมดการเขียนภาพให้ชัดเจน");
-  assert.ok(repository.includes("coalesce(excluded.image_media_id"), "โหมด keep ต้องคงภาพเดิม (นำเข้าซ้ำไม่ลบภาพที่ผู้ดูแลเลือก)");
+  assert.ok(
+    repository.includes("coalesce(excluded."),
+    "โหมด keep ต้องคงภาพเดิม (นำเข้าซ้ำไม่ลบภาพที่ผู้ดูแลเลือก) — ใช้ร่วมกันทั้งภาพสินค้า/ภาพหมวด/โลโก้หมวด",
+  );
   assert.ok(
     (actions.match(/imageMode: "set"/g) ?? []).length >= 2,
     "หลังบ้านต้องเขียนภาพแบบ set ทั้งสินค้าและหมวด (เลือกล้างภาพได้จริง)",
@@ -326,4 +329,49 @@ test("products admin: พรีวิวต้องเรนเดอร์ท�
     "พรีวิวการ์ดต้องเรนเดอร์ที่ความกว้างการ์ดจริง + โหมดการ์ดเดียว ⇒ ตัวอักษรเท่าหน้าเว็บ",
   );
   assert.ok(readFileSync("app/globals.css", "utf8").includes(".preview-single-card .product-card-grid"), "ต้องมีกฎบังคับกริด 1 คอลัมน์ในการ์ดเดียว");
+});
+
+/* ── รอบที่ 254: หมวดสินค้าแก้ "ชื่อ + โลโก้" ได้จากหลังบ้าน (มติ D24 · หนี้ D-253-3) ── */
+
+test("products admin: ฟอร์มหมวดมีช่องชื่อ (TH/EN) + โลโก้การ์ด + พรีวิวการ์ดจริง", () => {
+  assert.ok(categoryForm.includes('name="nameTh"'), "ต้องมีช่องชื่อหมวดไทย");
+  assert.ok(categoryForm.includes('name="nameEn"'), "ต้องมีช่องชื่อหมวดอังกฤษ");
+  assert.ok(categoryForm.includes('name="logoPath"'), "ต้องมีช่องโลโก้บนการ์ด");
+  assert.ok(categoryForm.includes("adminProductsCategoryNameHint"), "ต้องบอกว่าเว้นว่าง = ใช้ชื่อเดิม");
+  /* พรีวิวต้องใช้การ์ดตัวเดียวกับหน้าเว็บ + ไม่เป็นลิงก์ + ความกว้างการ์ดจริง */
+  assert.ok(categoryForm.includes("ProductCategoryCard"), "พรีวิวต้องใช้ ProductCategoryCard ตัวเดียวกับหน้า /products");
+  assert.ok(categoryForm.includes("href={null}"), "พรีวิวต้องไม่เป็นลิงก์");
+  assert.ok(categoryForm.includes("SITE_CATEGORY_CARD_WIDTH"), "ต้องเรนเดอร์ที่ความกว้างการ์ดจริง (ไม่ย่อทั้งหน้า)");
+  assert.ok(categoryForm.includes("category-card-grid"), "ต้องใช้กริดเดียวกับหน้าเว็บ (มีกฎบังคับ 1 คอลัมน์ในพรีวิว)");
+});
+
+test("products admin: หน้า /products ใช้ชื่อ/โลโก้จากฐานข้อมูลก่อน แล้วถอยค่าในโค้ด", () => {
+  const page = readFileSync("app/[lang]/products/page.tsx", "utf8");
+  assert.ok(page.includes("listProductCategoryCards"), "ต้องอ่านชื่อ/โลโก้จากฐานข้อมูล");
+  assert.ok(page.includes("categoryNameOf(") && page.includes("categoryLogoOf("), "ต้องใช้ตัวช่วยเลือกค่ากลาง (ไม่ประกอบเอง)");
+  assert.ok(page.includes("ProductCategoryCard"), "ใช้การ์ดตัวเดียวกับพรีวิวหลังบ้าน");
+  assert.ok(!page.includes("cardCta"), "ไม่มีข้อความ CTA 'ดูรายละเอียด' แล้ว (รอบที่ 254)");
+});
+
+test("products admin: ชั้นข้อมูลหมวดมีชื่อ/โลโก้ + ตัวนำเข้าแบบ fill-only (ไม่ทับงานคน)", () => {
+  assert.ok(repository.includes("export async function importCategoryLogo"), "ต้องมีตัวนำเข้าโลโก้เข้าหมวด");
+  assert.ok(
+    repository.includes("where id = $1 and logo_media_id is null"),
+    "ตัวนำเข้าโลโก้ต้องเขียนเฉพาะเมื่อยังว่าง ⇒ รันซ้ำไม่ทับโลโก้ที่เจ้าของเปลี่ยน",
+  );
+  assert.ok(repository.includes("export type NameWriteMode") && repository.includes('"keep" | "replace"'), "ต้องมีโหมดเขียนชื่อให้ชัดเจน");
+  assert.ok(actions.includes('nameMode: "replace"'), "หลังบ้านกดบันทึก = ค่าที่กรอกต้องชนะ");
+  assert.ok(actions.includes("logoMode: \"set\""), "หลังบ้านต้องล้างโลโก้ได้จริง (กลับไปใช้ไฟล์ใน public)");
+});
+
+test("products admin: migration 0037 เพิ่มชื่อ/โลโก้หมวดแบบ idempotent + สคริปต์นำเข้าโลโก้", () => {
+  const sql = readFileSync("db/migrations/0037-product-category-name-logo.sql", "utf8");
+  for (const column of ["name_th", "name_en", "logo_media_id"]) {
+    assert.ok(sql.includes(column), `migration ต้องมีคอลัมน์ ${column}`);
+  }
+  assert.ok(sql.includes("add column if not exists"), "ต้องรันซ้ำได้ (idempotent)");
+
+  const importer = readFileSync("scripts/import-products-logos.ts", "utf8");
+  assert.ok(importer.includes("importCategoryLogo("), "สคริปต์ต้องผูกโลโก้เข้ากับหมวด");
+  assert.ok(importer.includes("ensureImportedMedia("), "ต้องใช้ท่อนำเข้ากลาง (dedupe sha256)");
 });

@@ -42,11 +42,13 @@ import {
   deleteProduct,
   deleteProductCategory,
   deleteProductForever,
+  importCategoryLogo,
   listProductCategoriesForAdmin,
   listProductCategoryCards,
   listProductHighlights,
   listProductsByCategory,
   listProductsForAdmin,
+  loadProductCategory,
   loadProductForAdmin,
   replaceProductIngredients,
   setProductTrashed,
@@ -1930,7 +1932,7 @@ async function checkProductCatalog(): Promise<void> {
     });
 
     await upsertProductCategory(
-      { id: PRODUCT_CHECK_CATEGORY, sourceId: "999999", descriptionTh: "คำอธิบายหมวดทดสอบ", descriptionEn: "" },
+      { id: PRODUCT_CHECK_CATEGORY, sourceId: "999999", nameTh: "", nameEn: "", descriptionTh: "คำอธิบายหมวดทดสอบ", descriptionEn: "" },
       PRODUCT_CHECK_ACTOR,
       null,
     );
@@ -2463,7 +2465,7 @@ async function checkProductAdmin(): Promise<void> {
     sortOrder: 5,
   };
 
-  const categoryInput = { id: PRODUCT_ADMIN_CHECK_CATEGORY, sourceId: "444444", descriptionTh: "หมวดหลังบ้าน", descriptionEn: "" };
+  const categoryInput = { id: PRODUCT_ADMIN_CHECK_CATEGORY, sourceId: "444444", nameTh: "", nameEn: "", descriptionTh: "หมวดหลังบ้าน", descriptionEn: "" };
 
   try {
     await insertMedia({
@@ -2555,6 +2557,55 @@ async function checkProductAdmin(): Promise<void> {
     const clearedRow = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
     assert.equal(clearedRow?.imagePath, null, "โหมด set: เลือกไม่ใช้ภาพแล้วต้องล้างได้จริง");
     assert.equal(clearedRow?.sourceId, "444444", "ส่ง sourceId ว่างมาต้องไม่ลบ source id เดิม");
+
+    /* ── รอบที่ 254: ชื่อหมวด + โลโก้การ์ด (มติ D24) ────────────────────────────────
+       หลังบ้าน (nameMode replace + logoMode set) = ค่าที่กรอกต้องชนะ */
+    await upsertProductCategory(
+      { ...categoryInput, nameTh: "ชื่อหมวดใหม่", nameEn: "New category name" },
+      PRODUCT_ADMIN_CHECK_ACTOR,
+      null,
+      { nameMode: "replace", logoMediaId: mediaId, logoMode: "set" },
+    );
+    const namedRow = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(namedRow?.nameTh, "ชื่อหมวดใหม่", "ต้องบันทึกชื่อหมวดไทยได้");
+    assert.equal(namedRow?.nameEn, "New category name", "ต้องบันทึกชื่อหมวดอังกฤษได้");
+    assert.equal(namedRow?.logoPath, `/media/${mediaId}`, "ต้องผูกโลโก้การ์ดได้");
+    assert.equal(namedRow?.logoWidth, 1, "ต้องอ่านขนาดโลโก้จากคลังภาพกลับมา");
+
+    /* ตัวอ่านฝั่งเว็บต้องเห็นชื่อ/โลโก้ด้วย (หน้า /products + /products/<slug> ใช้ 2 ตัวนี้) */
+    const publicCard = (await listProductCategoryCards()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(publicCard?.nameTh, "ชื่อหมวดใหม่", "การ์ดหมวดฝั่งเว็บต้องคืนชื่อจากฐานข้อมูล");
+    assert.equal(publicCard?.logoPath, `/media/${mediaId}`, "การ์ดหมวดฝั่งเว็บต้องคืนโลโก้จากคลังภาพ");
+    const publicDetail = await loadProductCategory(PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(publicDetail?.nameTh, "ชื่อหมวดใหม่");
+    assert.equal(publicDetail?.logoPath, `/media/${mediaId}`);
+    assert.equal(publicDetail?.logoHeight, 1);
+
+    /* นำเข้าซ้ำ (ค่าเริ่มต้น keep) ต้องไม่ทับงานคน — ทั้งชื่อและโลโก้ */
+    await upsertProductCategory(
+      { ...categoryInput, nameTh: "ชื่อจากตัวนำเข้า", nameEn: "Importer name" },
+      PRODUCT_ADMIN_CHECK_ACTOR,
+      null,
+    );
+    const keptNames = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(keptNames?.nameTh, "ชื่อหมวดใหม่", "โหมด keep (ค่าตั้งต้น): ชื่อเดิมต้องอยู่");
+    assert.equal(keptNames?.nameEn, "New category name");
+    assert.equal(keptNames?.logoPath, `/media/${mediaId}`, "ไม่ส่งโลโก้มา = ต้องไม่แตะของเดิม");
+    assert.equal(
+      await importCategoryLogo(PRODUCT_ADMIN_CHECK_CATEGORY, mediaId, PRODUCT_ADMIN_CHECK_ACTOR),
+      false,
+      "importCategoryLogo ต้องเป็น fill-only ⇒ มีโลโก้อยู่แล้วไม่เขียนทับ",
+    );
+
+    /* โหมด set: ล้างโลโก้ได้จริง ⇒ หน้าเว็บถอยไปใช้ไฟล์ใน public */
+    await upsertProductCategory(
+      { ...categoryInput, nameTh: "ชื่อหมวดใหม่", nameEn: "New category name" },
+      PRODUCT_ADMIN_CHECK_ACTOR,
+      null,
+      { nameMode: "replace", logoMediaId: null, logoMode: "set" },
+    );
+    const clearedLogo = (await listProductCategoriesForAdmin()).find((entry) => entry.id === PRODUCT_ADMIN_CHECK_CATEGORY);
+    assert.equal(clearedLogo?.logoPath, null, "โหมด set: เลือกไม่ใช้โลโก้แล้วต้องล้างได้จริง");
 
     /* สินค้า: ล้างภาพได้ และไม่กระทบส่วนผสม */
     await upsertProduct(input, PRODUCT_ADMIN_CHECK_ACTOR, null, { imageMode: "set" });
@@ -3678,7 +3729,7 @@ async function sortOrderOf(id: string): Promise<number> {
 async function checkReorder(): Promise<void> {
   try {
     await upsertProductCategory(
-      { id: REORDER_CHECK_CATEGORY, sourceId: "999990", descriptionTh: "", descriptionEn: "" },
+      { id: REORDER_CHECK_CATEGORY, sourceId: "999990", nameTh: "", nameEn: "", descriptionTh: "", descriptionEn: "" },
       REORDER_CHECK_ACTOR,
       null,
     );

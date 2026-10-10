@@ -770,6 +770,11 @@ html[data-preview-parts="content"] html[data-mourning="shown"] [data-mourning-no
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* พรีวิวหลังบ้าน: การ์ดหมวดสินค้าใบเดียวเต็มความกว้างกรอบ (รอบที่ 254) */
+.preview-single-card .category-card-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /*
   โหมดพรีวิว "เฉพาะ navbar" (รอบที่ 158 · ฟีดแบ็กเจ้าของ)
   "ตอนนี้ไม่ได้โชว์แค่ Navbar หลังจากเข้าโหมด Navbar ดันมี footer โผล่มา"

@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
 import { CATALOG_ITEMS, catalogHref } from "@/features/products/catalog";
+import { ProductCategoryCard } from "@/features/products/ui/category-card";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
+import { categoryLogoOf, categoryNameOf } from "@/lib/products/display";
+import { listProductCategoryCards } from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
 /*
@@ -65,6 +66,14 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
 
   const m = messages.productsPage;
 
+  /*
+    ── ชื่อ + โลโก้หมวดมาจากไหน (รอบที่ 254 · มติ D24) ─────────────────────────────
+    หลังบ้านแก้ชื่อหมวด/โลโก้การ์ดได้ ⇒ เอาค่าจากฐานข้อมูลมาก่อน แล้ว **ถอยไปใช้ค่าในโค้ด/พจนานุกรม**
+    เมื่อยังไม่แก้ (หรือไม่มีฐานข้อมูล — `listProductCategoryCards()` คืน [] ⇒ หน้าตาเหมือนเดิมเป๊ะ)
+  */
+  const categoryCards = await listProductCategoryCards();
+  const cardBySlug = new Map(categoryCards.map((card) => [card.id, card]));
+
   return (
     <>
       <section className="border-b border-line bg-bg-subtle">
@@ -96,37 +105,22 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
       </section>
 
       <section className="container-site py-16 lg:py-24">
-        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* `category-card-grid` = คลาสเดียวกับพรีวิวหลังบ้านใช้บังคับ 1 คอลัมน์ (ดู app/globals.css) */}
+        <ul className="category-card-grid grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {CATALOG_ITEMS.map((item) => {
             const copy = m.items[item.id];
+            const card = cardBySlug.get(item.slug) ?? null;
 
             return (
               <li key={item.id}>
-                <Link
+                <ProductCategoryCard
+                  name={categoryNameOf(card?.nameTh ?? "", card?.nameEn ?? "", copy.name, lang)}
+                  imageSrc={categoryLogoOf(card?.logoPath ?? null, item.image.src)}
+                  imageWidth={card?.logoWidth ?? item.image.width}
+                  imageHeight={card?.logoHeight ?? item.image.height}
+                  imageAlt={copy.imageAlt}
                   href={catalogHref(lang, item.slug)}
-                  className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-line-strong"
-                >
-                  {/* ภาพโลโก้หมวดความกว้างคงที่ — ใช้ object-contain ไม่ครอปภาพ */}
-                  <span className="flex h-44 items-center justify-center rounded-xl border border-line bg-bg-subtle p-4">
-                    <Image
-                      src={item.image.src}
-                      alt={copy.imageAlt}
-                      width={item.image.width}
-                      height={item.image.height}
-                      sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 80vw"
-                      className="h-full w-auto object-contain"
-                    />
-                  </span>
-
-                  <span className="mt-4 font-display text-base font-extrabold text-fg">
-                    {copy.name}
-                  </span>
-
-                  <span className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-accent">
-                    {m.cardCta}
-                    <span aria-hidden="true">→</span>
-                  </span>
-                </Link>
+                />
               </li>
             );
           })}

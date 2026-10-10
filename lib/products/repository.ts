@@ -54,9 +54,18 @@ export type ProductRecord = {
 
 export type ProductCategoryRecord = {
   readonly id: string;
+  /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ใช้พจนานุกรม */
+  readonly nameTh: string;
+  readonly nameEn: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
+  /** ภาพหัวหมวด (หน้ารายละเอียดหมวด) */
   readonly imagePath: string | null;
+  /** โลโก้ที่แสดงบนการ์ด `/products` (migration 0037) — null = ใช้ไฟล์ใน public */
+  readonly logoPath: string | null;
+  /** ขนาดจริงของโลโก้ (จาก `media`) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด */
+  readonly logoWidth: number | null;
+  readonly logoHeight: number | null;
 };
 
 /*
@@ -127,14 +136,32 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
   if (!isDatabaseConfigured()) return null;
   try {
     const result = await readQuery<Record<string, unknown>>(
-      "select id, description_th, description_en, image_media_id from product_category where id = $1 limit 1",
+      `select c.id, c.name_th, c.name_en, c.description_th, c.description_en,
+              c.image_media_id, c.logo_media_id,
+              lm.width as logo_width, lm.height as logo_height
+         from product_category c
+         left join media lm on lm.id = c.logo_media_id
+        where c.id = $1
+        limit 1`,
       [categoryId],
     );
     const row = result.rows[0];
     if (row === undefined) return null;
     const id = text(row.id).trim();
     if (id === "") return null;
-    return { id, descriptionTh: text(row.description_th), descriptionEn: text(row.description_en), imagePath: mediaPath(row.image_media_id) };
+    const dim = (value: unknown): number | null =>
+      typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+    return {
+      id,
+      nameTh: text(row.name_th),
+      nameEn: text(row.name_en),
+      descriptionTh: text(row.description_th),
+      descriptionEn: text(row.description_en),
+      imagePath: mediaPath(row.image_media_id),
+      logoPath: mediaPath(row.logo_media_id),
+      logoWidth: dim(row.logo_width),
+      logoHeight: dim(row.logo_height),
+    };
   } catch {
     return null;
   }
@@ -206,14 +233,21 @@ export async function countProductsByCategory(): Promise<Readonly<Record<string,
  * ⚠️ ลำดับการแสดง **ไม่ได้** มาจากฐานข้อมูล — ผู้เรียกเรียงตาม `CATALOG_ITEMS` ในโค้ด (แหล่งความจริงเดียวของ slug)
  */
 export type ProductCategoryCardRecord = {
-  /** รหัสหมวด = slug ในฐานข้อมูล (ชื่อหมวดของจริงอยู่ในพจนานุกรม — ไม่มีคอลัมน์ name ในตาราง) */
+  /** รหัสหมวด = slug ในฐานข้อมูล */
   readonly id: string;
+  /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ใช้พจนานุกรม */
+  readonly nameTh: string;
+  readonly nameEn: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
-  /** `/media/<id>` หรือ null */
+  /** ภาพหัวหมวด (`/media/<id>`) หรือ null */
   readonly imagePath: string | null;
   readonly imageWidth: number | null;
   readonly imageHeight: number | null;
+  /** โลโก้การ์ด (`/media/<id>`) หรือ null = ใช้ไฟล์ใน public */
+  readonly logoPath: string | null;
+  readonly logoWidth: number | null;
+  readonly logoHeight: number | null;
   readonly productCount: number;
 };
 
@@ -222,25 +256,37 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
   try {
     const result = await readQuery<{
       id: string;
+      nameTh: string;
+      nameEn: string;
       descriptionTh: string;
       descriptionEn: string;
       imageId: string | null;
       imageWidth: number | null;
       imageHeight: number | null;
+      logoId: string | null;
+      logoWidth: number | null;
+      logoHeight: number | null;
       productCount: string;
     }>(
       `select c.id,
+              c.name_th        as "nameTh",
+              c.name_en        as "nameEn",
               c.description_th as "descriptionTh",
               c.description_en as "descriptionEn",
               m.id             as "imageId",
               m.width          as "imageWidth",
               m.height         as "imageHeight",
+              lm.id            as "logoId",
+              lm.width         as "logoWidth",
+              lm.height        as "logoHeight",
               count(p.id)::text as "productCount"
          from product_category c
          left join media m on m.id = c.image_media_id
+         /* โลโก้การ์ด (migration 0037) — ภาพคนละใบกับภาพหัวหมวด */
+         left join media lm on lm.id = c.logo_media_id
          /* ⚠️ รอบที่ 139: ใส่เงื่อนไขถังขยะใน join (ไม่ใช่ where) เพื่อให้หมวดที่ไม่มีสินค้าเหลือยังได้การ์ดอยู่ */
          left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION}
-        group by c.id, m.id, m.width, m.height`,
+        group by c.id, m.id, m.width, m.height, lm.id, lm.width, lm.height`,
     );
 
     const cards: ProductCategoryCardRecord[] = [];
@@ -248,11 +294,16 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
       const count = Number.parseInt(row.productCount, 10);
       cards.push({
         id: row.id,
+        nameTh: row.nameTh,
+        nameEn: row.nameEn,
         descriptionTh: row.descriptionTh,
         descriptionEn: row.descriptionEn,
         imagePath: mediaPath(row.imageId),
         imageWidth: row.imageWidth,
         imageHeight: row.imageHeight,
+        logoPath: mediaPath(row.logoId),
+        logoWidth: row.logoWidth,
+        logoHeight: row.logoHeight,
         productCount: Number.isFinite(count) ? count : 0,
       });
     }
@@ -328,30 +379,96 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
  */
 export type ImageWriteMode = "keep" | "set";
 
-function imageWriteExpression(mode: ImageWriteMode | undefined, table: string): string {
-  if ((mode ?? "keep") === "set") return "excluded.image_media_id";
-  return `coalesce(excluded.image_media_id, ${table}.image_media_id)`;
+function imageWriteExpression(mode: ImageWriteMode | undefined, table: string, column = "image_media_id"): string {
+  if ((mode ?? "keep") === "set") return `excluded.${column}`;
+  return `coalesce(excluded.${column}, ${table}.${column})`;
+}
+
+/**
+ * วิธีเขียน **ชื่อหมวด** (migration 0037 · รอบที่ 254)
+ * - `keep` (ค่าตั้งต้น) — เขียนเฉพาะเมื่อของเดิม **ว่าง** ⇒ สคริปต์นำเข้า/ที่ไม่ได้ตั้งใจแก้ใช้
+ *   ("ไม่ทับงานคน" — รันนำเข้าซ้ำหลังเจ้าของตั้งชื่อแล้ว = ชื่อเดิมอยู่)
+ * - `replace` — เขียนทับตามค่าที่ส่งมาเสมอ ⇒ **หลังบ้านใช้** (กดบันทึก = ค่าที่กรอกต้องชนะ · ล้างชื่อได้)
+ */
+export type NameWriteMode = "keep" | "replace";
+
+function nameWriteExpression(mode: NameWriteMode | undefined, column: string): string {
+  if ((mode ?? "keep") === "replace") return `excluded.${column}`;
+  return `case when product_category.${column} = '' then excluded.${column} else product_category.${column} end`;
 }
 
 export async function upsertProductCategory(
   input: ProductCategoryInput,
   actor: string,
   imageMediaId: string | null,
-  options: { readonly imageMode?: ImageWriteMode } = {},
+  options: {
+    readonly imageMode?: ImageWriteMode;
+    /**
+     * โลโก้การ์ดของหมวด (migration 0037 · รอบที่ 254) — ไม่ส่ง = **ไม่แตะของเดิม**
+     * (ส่ง `null` + `logoMode: "set"` = ล้างโลโก้ ⇒ กลับไปใช้ไฟล์ใน `public/`)
+     */
+    readonly logoMediaId?: string | null;
+    readonly logoMode?: ImageWriteMode;
+    readonly nameMode?: NameWriteMode;
+  } = {},
 ): Promise<void> {
+  /*
+    โลโก้: ไม่ส่งค่า = ส่ง `null` + โหมด "keep" ⇒ `coalesce(null, ของเดิม)` = ไม่เปลี่ยน
+    (ต่างจากชื่อ: ชื่อมีค่าเริ่มต้น '' ในสคีมา จึงใช้ `nameWriteExpression` แยก)
+  */
+  const logoMediaId = options.logoMediaId ?? null;
+  const logoMode = options.logoMode ?? "keep";
+
   await getPool().query(
-    `insert into product_category (id, source_id, description_th, description_en, image_media_id, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, now(), $6)
+    `insert into product_category (id, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, updated_at, updated_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
      on conflict (id) do update set
        /* ค่าว่างต้องไม่ลบ source_id เดิม (แบบฟอร์มหลังบ้านส่งค่านี้ผ่านช่องซ่อน) */
        source_id      = coalesce(nullif(excluded.source_id, ''), product_category.source_id),
+       name_th        = ${nameWriteExpression(options.nameMode, "name_th")},
+       name_en        = ${nameWriteExpression(options.nameMode, "name_en")},
        description_th = excluded.description_th,
        description_en = excluded.description_en,
        image_media_id = ${imageWriteExpression(options.imageMode, "product_category")},
+       logo_media_id  = ${imageWriteExpression(logoMode, "product_category", "logo_media_id")},
        updated_at     = now(),
        updated_by     = excluded.updated_by`,
-    [input.id, input.sourceId, input.descriptionTh, input.descriptionEn, imageMediaId, actor],
+    [
+      input.id,
+      input.sourceId,
+      input.nameTh,
+      input.nameEn,
+      input.descriptionTh,
+      input.descriptionEn,
+      imageMediaId,
+      logoMediaId,
+      actor,
+    ],
   );
+}
+
+/**
+ * นำ **โลโก้การ์ด** ของหมวดเข้าฐานข้อมูล (migration 0037 · รอบที่ 254) — ใช้โดยสคริปต์ `npm run products:logos`
+ *
+ * ⚠️ **ไม่ทับงานคน**: เขียนเฉพาะเมื่อ `logo_media_id` ยังว่าง (fill-only)
+ *    ⇒ รันนำเข้าซ้ำหลังเจ้าของเปลี่ยนโลโก้จากหลังบ้าน = ไม่มีอะไรเปลี่ยน
+ * สร้างแถวหมวดให้ถ้ายังไม่มี (ฐานข้อมูลใหม่ที่ยังไม่รัน `products:import`)
+ * คืน `true` = เขียนจริง · `false` = มีโลโก้อยู่แล้ว/ไม่มีอะไรต้องทำ
+ */
+export async function importCategoryLogo(id: string, logoMediaId: string, actor: string): Promise<boolean> {
+  await getPool().query(
+    `insert into product_category (id, name_th, name_en, updated_at, updated_by)
+       values ($1, '', '', now(), $2)
+     on conflict (id) do nothing`,
+    [id, actor],
+  );
+  const result = await getPool().query(
+    `update product_category
+        set logo_media_id = $2, updated_at = now(), updated_by = $3
+      where id = $1 and logo_media_id is null`,
+    [id, logoMediaId, actor],
+  );
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**
@@ -752,11 +869,19 @@ export type AdminProductCategoryItem = {
   readonly id: string;
   /** id ของหน้าในเว็บเดิม — ต้องส่งกลับตอนบันทึก (ไม่งั้นเขียนทับเป็นค่าว่าง) */
   readonly sourceId: string;
+  /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ยังใช้ชื่อจากพจนานุกรม */
+  readonly nameTh: string;
+  readonly nameEn: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
+  /** ภาพหัวหมวด (หน้ารายละเอียดหมวด) */
   readonly imagePath: string | null;
   readonly imageWidth: number | null;
   readonly imageHeight: number | null;
+  /** โลโก้ที่แสดงบนการ์ด `/products` (migration 0037) — null = ใช้ไฟล์ใน public */
+  readonly logoPath: string | null;
+  readonly logoWidth: number | null;
+  readonly logoHeight: number | null;
   readonly productCount: number;
 };
 
@@ -766,7 +891,7 @@ export type AdminProductCategoryItem = {
  * - คืนเฉพาะแถวที่มีใน DB ⇒ ผู้เรียกต้อง **ประกอบกับ `CATALOG_ITEMS`** เพื่อให้ครบ 6 หมวดเสมอ
  *   (หมวดที่ยังไม่มีแถว = ยังไม่มีคำอธิบาย/ภาพ ⇒ ฟอร์มเริ่มจากช่องว่างได้)
  * - `sourceId` ต้องคืนออกไปให้ฟอร์มส่งกลับ (repository กันค่าว่างเขียนทับอยู่แล้ว แต่ไม่ควรพึ่งชั้นเดียว)
- * - ⚠️ ไม่มีชื่อหมวดในฐานข้อมูล (ชื่อมาจาก `features/products/catalog.ts` = แหล่งความจริงเดียว)
+ * - ⚠️ ชื่อหมวดว่างได้ (migration 0037) = ยังใช้ชื่อจากพจนานุกรม ⇒ ฟอร์มควรแสดงค่าเริ่มต้นจากพจนานุกรม
  */
 export async function listProductCategoriesForAdmin(): Promise<readonly AdminProductCategoryItem[]> {
   if (!isDatabaseConfigured()) return [];
@@ -774,25 +899,37 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
     const result = await getPool().query<{
       id: string;
       sourceId: string | null;
+      nameTh: string;
+      nameEn: string;
       descriptionTh: string;
       descriptionEn: string;
       imageId: string | null;
       imageWidth: number | null;
       imageHeight: number | null;
+      logoId: string | null;
+      logoWidth: number | null;
+      logoHeight: number | null;
       productCount: string;
     }>(
       `select c.id,
               c.source_id       as "sourceId",
+              c.name_th         as "nameTh",
+              c.name_en         as "nameEn",
               c.description_th  as "descriptionTh",
               c.description_en  as "descriptionEn",
               m.id              as "imageId",
               m.width           as "imageWidth",
               m.height          as "imageHeight",
+              lm.id             as "logoId",
+              lm.width          as "logoWidth",
+              lm.height         as "logoHeight",
               count(p.id)::text as "productCount"
          from product_category c
          left join media m on m.id = c.image_media_id
+         left join media lm on lm.id = c.logo_media_id
          left join product p on p.category_id = c.id
-        group by c.id, c.source_id, c.description_th, c.description_en, m.id, m.width, m.height
+        group by c.id, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
+                 m.id, m.width, m.height, lm.id, lm.width, lm.height
         order by c.id`,
     );
 
@@ -801,11 +938,16 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
       return {
         id: row.id,
         sourceId: typeof row.sourceId === "string" ? row.sourceId : "",
+        nameTh: row.nameTh,
+        nameEn: row.nameEn,
         descriptionTh: row.descriptionTh,
         descriptionEn: row.descriptionEn,
         imagePath: mediaPath(row.imageId),
         imageWidth: row.imageWidth,
         imageHeight: row.imageHeight,
+        logoPath: mediaPath(row.logoId),
+        logoWidth: row.logoWidth,
+        logoHeight: row.logoHeight,
         productCount: Number.isFinite(count) ? count : 0,
       };
     });

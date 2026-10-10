@@ -44,6 +44,12 @@ export const SITE_CARD_WIDTH = 395;
  */
 export const SITE_RECIPE_CARD_WIDTH = 389;
 
+/**
+ * ความกว้าง **การ์ดหมวดสินค้า (`/products`) 1 ใบ** เท่าหน้าเว็บจริง (รอบที่ 254)
+ * หน้าสินค้าใช้กริด 3 คอลัมน์ + `gap-6` (24px) เหมือนการ์ดเมนู ⇒ ความกว้างเท่ากันเป๊ะ
+ */
+export const SITE_CATEGORY_CARD_WIDTH = SITE_RECIPE_CARD_WIDTH;
+
 export function PreviewFrame({
   label,
   width = SITE_PREVIEW_WIDTH,

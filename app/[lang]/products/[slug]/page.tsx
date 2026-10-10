@@ -13,6 +13,7 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { loadPageSeo } from "@/lib/pages/repository";
+import { categoryLogoOf, categoryNameOf } from "@/lib/products/display";
 import { listProductsByCategory, loadProductCategory, type ProductCategoryRecord } from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
@@ -78,6 +79,10 @@ export async function generateMetadata({
   const messages = await getMessagesFor(lang);
   const m = messages.productsPage;
 
+  /* ชื่อหมวด: ค่าจากหลังบ้านมาก่อน → ถอยพจนานุกรม (รอบที่ 254 · มติ D24) */
+  const category = await loadProductCategory(item.slug);
+  const displayName = categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", m.items[item.id].name, lang);
+
   return withPageSeo(
     lang,
     `/products/${item.slug}`,
@@ -86,8 +91,8 @@ export async function generateMetadata({
         ชื่อหน้า = ชื่อหมวด + ชื่อหน้าหมวด — ไม่ใช้ข้อความ "ยังไม่เปิดใช้งาน" อีกแล้ว
         (ตั้งแต่รอบที่ 103 หน้านี้มีข้อมูลสินค้าจริงจากฐานข้อมูล ⇒ ข้อความเดิมทำให้เข้าใจผิดในผลค้นหา/แท็บเบราว์เซอร์)
       */
-      title: { absolute: `${m.items[item.id].name} — ${m.title}` },
-      description: introTextOf(messages, await loadProductCategory(item.slug), lang),
+      title: { absolute: `${displayName} — ${m.title}` },
+      description: introTextOf(messages, category, lang),
       /* รอบที่ 170: ไม่บังคับ noindex แล้ว — ถ้าหลังบ้านตั้ง noindex `applySeoToMetadata` จะใส่กลับให้ */
       alternates: buildAlternates(lang, `/products/${item.slug}`),
     },
@@ -126,6 +131,14 @@ export default async function ProductCategoryPage({
   const hasProducts = products.length > 0;
   const intro = introTextOf(messages, category, lang);
 
+  /* ชื่อ + โลโก้หมวด: ค่าจากหลังบ้าน (migration 0037) → ถอยค่าในโค้ด/พจนานุกรม */
+  const displayName = categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", copy.name, lang);
+  const logo = {
+    src: categoryLogoOf(category?.logoPath ?? null, item.image.src),
+    width: category?.logoWidth ?? item.image.width,
+    height: category?.logoHeight ?? item.image.height,
+  };
+
   if (liveDocument !== null) {
     return (
       <>
@@ -144,7 +157,7 @@ export default async function ProductCategoryPage({
             items={[
               { label: messages.nav.home, href: localePath(lang, "/") },
               { label: messages.nav.products, href: localePath(lang, "/products") },
-              { label: copy.name },
+              { label: displayName },
             ]}
           />
 
@@ -154,7 +167,7 @@ export default async function ProductCategoryPage({
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
-            {copy.name}
+            {displayName}
           </h1>
         </div>
       </section>
@@ -162,10 +175,10 @@ export default async function ProductCategoryPage({
       <section className="container-site py-16 lg:py-24">
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
           <Image
-            src={item.image.src}
+            src={logo.src}
             alt={copy.imageAlt}
-            width={item.image.width}
-            height={item.image.height}
+            width={logo.width}
+            height={logo.height}
             sizes="300px"
             className="h-auto w-60 max-w-full"
           />

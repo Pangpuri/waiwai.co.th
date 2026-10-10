@@ -2,6 +2,7 @@ import { CATALOG_ITEMS } from "@/features/products/catalog";
 import type { Language } from "@/lib/content/home-section";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
+import { categoryNameOf } from "@/lib/products/display";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
 
 /**
@@ -87,21 +88,18 @@ export type ProductShowcaseView = {
  * - สินค้าแนะนำ: เอาเฉพาะหมวดที่แสดง · ตัดที่ `featuredPerCategory` ตัวต่อหมวด (รักษาลำดับ)
  */
 /*
-  ชื่อหมวด: **อยู่ในพจนานุกรมเท่านั้น** (ตาราง `product_category` ไม่มีคอลัมน์ชื่อ — มีแค่คำอธิบาย/ภาพ)
-  คีย์ = `CatalogItemId` เดียวกับ `CATALOG_ITEMS` (บทเรียนรอบ 108/210: id ≠ คีย์พจนานุกรมของพื้นที่อื่น)
+  ชื่อหมวด: **ค่าจากหลังบ้านมาก่อน** (migration 0037 · รอบที่ 254) แล้วถอยไปใช้พจนานุกรม
+  คีย์พจนานุกรม = `CatalogItemId` เดียวกับ `CATALOG_ITEMS` (บทเรียนรอบ 108/210: id ≠ คีย์พจนานุกรมของพื้นที่อื่น)
+  ⚠️ id ของหมวดในฐานข้อมูล = slug ("instant-noodles") แต่พจนานุกรมใช้ CatalogItemId ⇒ ต้องแปลงผ่าน `CATALOG_ITEMS`
 */
 type CatalogName = { readonly name?: string };
 const catalogTh = th.productsPage.items as Readonly<Record<string, CatalogName | undefined>>;
 const catalogEn = en.productsPage.items as Readonly<Record<string, CatalogName | undefined>>;
 
-/*
-  ⚠️ บทเรียนจริง (รอบ 211): **id ของหมวดในฐานข้อมูล = slug** ("instant-noodles")
-  แต่พจนานุกรมใช้คีย์ `CatalogItemId` (คนละรูปแบบ) ⇒ ต้องแปลงผ่าน `CATALOG_ITEMS` ก่อนเสมอ
-  (ถ้าค้นด้วย slug ตรง ๆ จะไม่เจอ → ชื่อหมวดกลายเป็น slug แทน — เทสต์จับได้)
-*/
 const catalogIdOfSlug = new Map(CATALOG_ITEMS.map((item) => [item.slug, item.id]));
 
-function categoryNameOf(id: string, language: Language): string {
+/** ชื่อจากพจนานุกรม (ค่า fallback เมื่อหลังบ้านยังไม่ตั้งชื่อ) */
+function dictionaryCategoryName(id: string, language: Language): string {
   const key = catalogIdOfSlug.get(id) ?? id;
   const thai = catalogTh[key]?.name ?? id;
   if (language !== "en") return thai;
@@ -121,7 +119,7 @@ export function productShowcaseView(
 
   const views: readonly ProductShowcaseCategoryView[] = selected.map((row) => ({
     id: row.id,
-    title: categoryNameOf(row.id, language),
+    title: categoryNameOf(row.nameTh, row.nameEn, dictionaryCategoryName(row.id, language), language),
     description: language === "en" && row.descriptionEn.trim() !== "" ? row.descriptionEn : row.descriptionTh,
     image: row.imagePath,
     productCount: row.productCount,

@@ -85,7 +85,6 @@ test("productsPage: ข้อความ 'ตัวอย่างรออน�
       ["title", m.title],
       ["intro", m.intro],
       ["notice", m.notice],
-      ["cardCta", m.cardCta],
       ["detailStub.eyebrow", m.detailStub.eyebrow],
       ["detailStub.title", m.detailStub.title],
       ["detailStub.body", m.detailStub.body],
@@ -105,6 +104,35 @@ test("productsPage: ข้อความ 'ตัวอย่างรออน�
       );
     }
   }
+});
+
+test("การ์ดหมวดสินค้า (/products): ไม่มีข้อความ CTA สีแดงแล้ว (มติเจ้าของ 2026-10-10)", () => {
+  // การ์ดทั้งใบเป็น <Link> อยู่แล้ว ⇒ เคอร์เซอร์บอกได้ว่าคลิกได้ ⇒ ไม่ต้องมีข้อความ CTA ซ้ำ
+  const asRecord = (value: object): Record<string, unknown> =>
+    value as unknown as Record<string, unknown>;
+
+  for (const [locale, messages] of [
+    ["th", th],
+    ["en", en],
+  ] as const) {
+    assert.ok(
+      !("cardCta" in asRecord(messages.productsPage)),
+      `${locale}: พจนานุกรมยังมีคีย์ cardCta อยู่`,
+    );
+  }
+
+  const pageSource = readFileSync(
+    path.join(PROJECT_ROOT, "app", "[lang]", "products", "page.tsx"),
+    "utf8",
+  );
+  assert.ok(!pageSource.includes("cardCta"), "หน้าหมวดสินค้ายังอ้าง cardCta");
+
+  // เทมเพลตบล็อกการ์ดต้องไม่ฝังข้อความ CTA ลงใน body อีก
+  const templateSource = readFileSync(
+    path.join(PROJECT_ROOT, "lib", "blocks", "products-template.ts"),
+    "utf8",
+  );
+  assert.ok(!templateSource.includes("cardCta"), "เทมเพลตยังอ้าง cardCta");
 });
 
 test("productsPage: ชื่อหมวดต้องไม่มีอักขระหลุดหัวท้าย (กัน ':' หลุดเข้าไปในชื่อ)", () => {

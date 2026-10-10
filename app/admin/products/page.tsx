@@ -57,9 +57,13 @@ export default async function AdminProductsPage({
   }));
   const categoryBySlug = new Map(categoryRows.map((row) => [row.id, row]));
 
+  /* ชื่อหมวดที่มีผลจริง: ค่าจากหลังบ้าน (migration 0037) → ถอยพจนานุกรม */
   const categoryName = (slug: string): string => {
     const item = CATALOG_ITEMS.find((entry) => entry.slug === slug);
-    return item === undefined ? slug : messages.productsPage.items[item.id].name;
+    const fallback = item === undefined ? slug : messages.productsPage.items[item.id].name;
+    const row = categoryBySlug.get(slug);
+    if (row === undefined) return fallback;
+    return row.nameTh.trim() !== "" ? row.nameTh : fallback;
   };
 
   const tabs: readonly { readonly id: AdminProductTab; readonly label: string; readonly count: number }[] = [
@@ -251,19 +255,27 @@ export default async function AdminProductsPage({
         <div className="mt-4 flex flex-col gap-4">
           {CATALOG_ITEMS.map((item) => {
             const row = categoryBySlug.get(item.slug);
+            const copy = messages.productsPage.items[item.id];
             return (
               <ProductCategoryForm
                 key={item.slug}
                 strings={m}
                 categoryId={item.slug}
-                categoryName={messages.productsPage.items[item.id].name}
+                categoryName={categoryName(item.slug)}
+                imageAlt={copy.imageAlt}
                 productCount={row?.productCount ?? 0}
                 library={library}
+                fallbackLogo={{ src: item.image.src, width: item.image.width, height: item.image.height }}
                 initial={{
                   sourceId: row?.sourceId ?? "",
+                  nameTh: row?.nameTh ?? "",
+                  nameEn: row?.nameEn ?? "",
                   descriptionTh: row?.descriptionTh ?? "",
                   descriptionEn: row?.descriptionEn ?? "",
                   imagePath: row?.imagePath ?? "",
+                  logoPath: row?.logoPath ?? "",
+                  logoWidth: row?.logoWidth ?? null,
+                  logoHeight: row?.logoHeight ?? null,
                 }}
               />
             );

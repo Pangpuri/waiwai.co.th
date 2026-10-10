@@ -4,6 +4,8 @@ import { test } from "node:test";
 
 import {
   bilingualProductText,
+  categoryLogoOf,
+  categoryNameOf,
   productAllergensOf,
   productDetailsOf,
   productGroupOf,
@@ -110,4 +112,35 @@ test("products display: หน้าเว็บต้องใช้ตัว�
   for (const raw of ["{product.taglineTh}", "{product.detailsTh}", "value={product.netWeightTh}", "value={product.allergensTh}", "value={product.packagingTh}"]) {
     assert.ok(!list.includes(raw), `ห้ามอ่านค่าดิบ ${raw} — ต้องผ่านตัวช่วยกลาง`);
   }
+});
+
+/* ── รอบที่ 254: ชื่อ + โลโก้หมวดสินค้า (มติ D24) ─────────────────────────────── */
+
+test("products display: ชื่อหมวด — DB มาก่อน แล้วถอยพจนานุกรม (TH/EN)", () => {
+  assert.equal(categoryNameOf("ชื่อใหม่", "New name", "ชื่อเดิม", "th"), "ชื่อใหม่");
+  assert.equal(categoryNameOf("ชื่อใหม่", "New name", "ชื่อเดิม", "en"), "New name");
+
+  /* EN ว่าง = ถอยไปใช้ไทย (ธรรมเนียมเดียวกับสินค้า) */
+  assert.equal(categoryNameOf("ชื่อใหม่", "", "ชื่อเดิม", "en"), "ชื่อใหม่");
+  /* ไทยว่างแต่มี EN = ใช้ EN ทั้งสองภาษา (ไม่เหลือบรรทัดว่าง) */
+  assert.equal(categoryNameOf("", "Only EN", "ชื่อเดิม", "th"), "Only EN");
+  assert.equal(categoryNameOf("", "Only EN", "ชื่อเดิม", "en"), "Only EN");
+  /* ทั้งคู่ว่าง = ถอยพจนานุกรม */
+  assert.equal(categoryNameOf("", "", "ชื่อเดิม", "th"), "ชื่อเดิม");
+  assert.equal(categoryNameOf("   ", "  ", "ชื่อเดิม", "en"), "ชื่อเดิม", "ช่องว่างล้วน = ถือว่าไม่มีค่า");
+});
+
+test("products display: โลโก้หมวด — คลังภาพมาก่อน แล้วถอยไฟล์ใน public", () => {
+  assert.equal(categoryLogoOf("/media/abc", "/products/x.png"), "/media/abc");
+  assert.equal(categoryLogoOf(null, "/products/x.png"), "/products/x.png");
+  assert.equal(categoryLogoOf("", "/products/x.png"), "/products/x.png", "พาธว่าง = ถอยไฟล์เดิม");
+  assert.equal(categoryLogoOf("   ", "/products/x.png"), "/products/x.png");
+});
+
+test("products display: หน้า /products + [slug] ต้องใช้ตัวช่วยกลางสำหรับชื่อ/โลโก้หมวด", () => {
+  for (const file of ["app/[lang]/products/page.tsx", "app/[lang]/products/[slug]/page.tsx"]) {
+    const source = readFileSync(file, "utf8");
+    assert.ok(source.includes("categoryNameOf("), `${file} ต้องใช้ categoryNameOf()`);
+  }
+  assert.ok(readFileSync("app/[lang]/products/page.tsx", "utf8").includes("categoryLogoOf("), "หน้าสินค้าต้องใช้ categoryLogoOf()");
 });

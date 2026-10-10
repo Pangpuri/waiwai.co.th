@@ -30,6 +30,7 @@
     "maintenance:status": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/maintenance.ts status",
     "check:actions": "node --import ./scripts/alias-hook.mjs scripts/check-actions.ts",
     "products:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products.ts",
+    "products:logos": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products-logos.ts",
     "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts",
     "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts",
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",

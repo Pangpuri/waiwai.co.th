@@ -165,6 +165,9 @@ async function main(): Promise<void> {
     const categoryIssues = validateCategoryInput({
       id: source.categoryId,
       sourceId: source.sourceId,
+      /* ชื่อหมวดมาจากพจนานุกรม (ค่า fallback) — ตัวนำเข้าไม่เขียนทับชื่อที่เจ้าของตั้งไว้ */
+      nameTh: "",
+      nameEn: "",
       descriptionTh: parsedPage.descriptionTh,
       descriptionEn: "",
     });
@@ -177,9 +180,17 @@ async function main(): Promise<void> {
 
     if (!options.dryRun) {
       await upsertProductCategory(
-        { id: source.categoryId, sourceId: source.sourceId, descriptionTh: parsedPage.descriptionTh, descriptionEn: "" },
+        {
+          id: source.categoryId,
+          sourceId: source.sourceId,
+          nameTh: "",
+          nameEn: "",
+          descriptionTh: parsedPage.descriptionTh,
+          descriptionEn: "",
+        },
         ACTOR,
         categoryImageId,
+        /* ⚠️ ไม่ส่งโลโก้ + ไม่ส่ง nameMode ⇒ "keep" ทั้งคู่ = รันนำเข้าซ้ำไม่ทับงานที่แก้จากหลังบ้าน */
       );
     }
 

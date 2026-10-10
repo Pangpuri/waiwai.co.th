@@ -351,20 +351,27 @@ create index if not exists chrome_preset_trash_idx on chrome_preset (deleted_at)
 
 -- ── สินค้าที่นำเข้าจากเว็บเดิม (S4 · migration 0016) ───────────────────────────
 -- ที่มา: เจ้าของสั่ง 2026-10-05 ให้นำเข้าข้อมูลสินค้าจาก waiwai.co.th (เว็บเดิม) ลงฐานข้อมูล แยกตามหมวด
--- · `product_category` เก็บ **เฉพาะเนื้อหาที่นำเข้า** (คำอธิบาย/ภาพ) — **ชื่อหมวดอยู่ในโค้ด**
---   `features/products/catalog.ts` (เจ้าของยืนยันแล้ว · กันชื่อหลุดจากกัน 2 ที่)
+-- · `product_category` เก็บเนื้อหาของหมวด (คำอธิบาย · ภาพหัวหมวด) + **ชื่อ + โลโก้การ์ดที่แก้จากหลังบ้านได้**
+--   (migration 0037 · รอบที่ 254 · มติ D24) · ชื่อในพจนานุกรม `features/products/catalog.ts` = **ค่า fallback**
+--   เมื่อคอลัมน์ในฐานข้อมูลว่าง ⇒ หน้าเว็บหน้าตาเหมือนเดิมจนกว่าจะมีคนแก้จากหลังบ้าน
 -- · `product.id` = `p<source_id>` ⇒ นำเข้าซ้ำได้แบบ idempotent (`npm run products:import`)
 -- · รูปเก็บในตาราง `media` (มติ D11) · ที่นี่เก็บแค่ id ของภาพ (มติ D9) · `media.sha256` = ลายนิ้วมือไฟล์ (dedupe ตอนนำเข้า)
--- · `product_category.image_media_id` / `product.image_media_id` = on delete set null (ลบภาพในถังขยะแล้วสินค้าไม่หาย)
+-- · `product_category.image_media_id` / `logo_media_id` / `product.image_media_id` = on delete set null (ลบภาพในถังขยะแล้วไม่หาย)
 alter table media add column if not exists sha256 text;
 create index if not exists media_sha256_idx on media (sha256);
 
 create table if not exists product_category (
   id             text        primary key,
   source_id      text,
+  /* ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ใช้พจนานุกรม */
+  name_th        text        not null default '',
+  name_en        text        not null default '',
   description_th text        not null default '',
   description_en text        not null default '',
+  /* ภาพหัวหมวด (หน้ารายละเอียดหมวด) */
   image_media_id text        references media (id) on delete set null,
+  /* โลโก้ที่แสดงบนการ์ด `/products` (migration 0037) — null = ใช้ไฟล์ใน public/products */
+  logo_media_id  text        references media (id) on delete set null,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );

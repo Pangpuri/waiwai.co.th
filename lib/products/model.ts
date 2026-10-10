@@ -18,6 +18,13 @@ export type ProductCategoryInput = {
   readonly id: string;
   /** id ของหน้าในเว็บเดิม (40599, 15235, …) */
   readonly sourceId: string;
+  /**
+   * ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037 · รอบที่ 254 · มติ D24)
+   * ⚠️ ว่างได้ = หน้าเว็บถอยไปใช้ชื่อในพจนานุกรม (`productsPage.items[id].name`)
+   * ⇒ สคริปต์นำเข้าไม่ต้องส่งชื่อ (ส่ง "") · หลังบ้านส่งค่าที่กรอก
+   */
+  readonly nameTh: string;
+  readonly nameEn: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
 };
@@ -75,6 +82,13 @@ export function validateCategoryInput(input: ProductCategoryInput): readonly Imp
   }
   if (!/^\d{3,}$/.test(input.sourceId.trim())) {
     issues.push({ code: "bad-source-id", path: "sourceId", message: `source id ต้องเป็นตัวเลข (ได้ "${input.sourceId}")` });
+  }
+  /* ชื่อว่างได้ (ถอยพจนานุกรม) แต่ยาวเกินไม่ได้ — กันข้อความยาวผิดปกติหลุดเข้าไป */
+  if (input.nameTh.length > MAX_NAME_LENGTH) {
+    issues.push({ code: "too-long", path: "nameTh", message: `ชื่อหมวดไทยยาวเกิน ${MAX_NAME_LENGTH} ตัวอักษร` });
+  }
+  if (input.nameEn.length > MAX_NAME_LENGTH) {
+    issues.push({ code: "too-long", path: "nameEn", message: `ชื่อหมวดอังกฤษยาวเกิน ${MAX_NAME_LENGTH} ตัวอักษร` });
   }
   return issues;
 }

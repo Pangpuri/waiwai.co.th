@@ -25,11 +25,16 @@ import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/pr
 
 const category = (id: string, label: string, extra: Partial<ProductCategoryCardRecord> = {}): ProductCategoryCardRecord => ({
   id,
+  nameTh: "",
+  nameEn: "",
   descriptionTh: `${label} — คำอธิบาย`,
   descriptionEn: "",
   imagePath: `/media/${id}`,
   imageWidth: 500,
   imageHeight: 500,
+  logoPath: null,
+  logoWidth: null,
+  logoHeight: null,
   productCount: 9,
   ...extra,
 });
@@ -97,16 +102,30 @@ test("★ product showcase: ประกอบจากข้อมูลจร�
   assert.deepEqual(productShowcaseView([], [], {}, "th").categories, []);
   /* เลือกหมวดที่ไม่มีอยู่ = ว่าง */
   assert.equal(productShowcaseView(CATEGORIES, HIGHLIGHTS, { categoryIds: ["nope"] }, "th").isEmpty, true);
+
+  /* รอบที่ 254: ชื่อที่ตั้งจากหลังบ้านต้องชนะพจนานุกรม (ทั้ง TH/EN) */
+  const [firstCategory] = CATEGORIES;
+  if (firstCategory !== undefined) {
+    const renamed = productShowcaseView([{ ...firstCategory, nameTh: "ชื่อจากหลังบ้าน", nameEn: "Renamed" }], [], {}, "th");
+    assert.equal(renamed.categories[0]?.title, "ชื่อจากหลังบ้าน", "ชื่อจากฐานข้อมูลต้องชนะพจนานุกรม");
+    const renamedEn = productShowcaseView([{ ...firstCategory, nameTh: "ชื่อจากหลังบ้าน", nameEn: "Renamed" }], [], {}, "en");
+    assert.equal(renamedEn.categories[0]?.title, "Renamed");
+  }
 });
 
-test("★ product showcase: ชื่อหมวดมาจากพจนานุกรม (ตารางไม่มีคอลัมน์ชื่อ) — สัญญากับชั้นข้อมูล", () => {
+test("★ product showcase: ชื่อหมวด — ค่าจากหลังบ้านมาก่อน แล้วถอยพจนานุกรม (สัญญากับชั้นข้อมูล)", () => {
   const repo = readFileSync("lib/products/repository.ts", "utf8");
-  assert.ok(!repo.includes("c.name_th"), "ห้ามอ้างคอลัมน์ที่ไม่มีในตาราง (product_category มีแค่คำอธิบาย/ภาพ)");
-  assert.ok(repo.includes("c.description_th as \"descriptionTh\""), "คำอธิบายของจริงมาจากฐานข้อมูล");
+  assert.ok(repo.includes("c.name_th") && repo.includes('as "nameTh"'), "ต้องอ่านชื่อหมวดจากฐานข้อมูลได้ (migration 0037)");
+  assert.ok(repo.includes('c.description_th as "descriptionTh"'), "คำอธิบายของจริงมาจากฐานข้อมูล");
   const helper = readFileSync("lib/blocks/product-showcase.ts", "utf8");
+  assert.ok(
+    helper.includes('import { categoryNameOf } from "@/lib/products/display"'),
+    "ต้องใช้ตัวช่วยเลือกชื่อกลาง (DB → พจนานุกรม) — ห้ามประกอบเอง",
+  );
+  assert.ok(helper.includes("categoryNameOf(row.nameTh, row.nameEn,"), "ส่งชื่อจากฐานข้อมูลเข้าตัวช่วยกลาง");
   assert.ok(helper.includes("catalogIdOfSlug.get(id)"), "ต้องแปลง id (slug) เป็นคีย์พจนานุกรมก่อนค้น");
-  assert.ok(helper.includes("catalogTh[key]?.name ?? id"), "ชื่อหมวดมาจากพจนานุกรม แล้วถอยไปใช้ id");
-  assert.ok(helper.includes("english.trim() !== \"\" ? english : thai"), "EN ว่าง = ถอยไทย");
+  assert.ok(helper.includes("catalogTh[key]?.name ?? id"), "ชื่อหมวดถอยพจนานุกรม แล้วถอยไปใช้ id");
+  assert.ok(helper.includes('english.trim() !== "" ? english : thai'), "EN ว่าง = ถอยไทย");
   assert.ok(helper.includes("`/products/${row.id}`"), "ลิงก์หมวดต้องเป็นพาธกลางจาก id จริง");
 });
 

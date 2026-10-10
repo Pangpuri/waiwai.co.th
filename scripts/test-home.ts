@@ -37,11 +37,16 @@ function sourceOf(relativePath: string): string {
 
 const categoryRow: ProductCategoryCardRecord = {
   id: "instant-noodles",
+  nameTh: "",
+  nameEn: "",
   descriptionTh: "เริ่มผลิตครั้งแรกเมื่อปี พ.ศ. 2515",
   descriptionEn: "",
   imagePath: "/media/catInstant",
   imageWidth: 500,
   imageHeight: 603,
+  logoPath: null,
+  logoWidth: null,
+  logoHeight: null,
   productCount: 22,
 };
 
