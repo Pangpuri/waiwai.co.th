@@ -401,7 +401,8 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
     ⚠️ ยังไม่นำเข้า = ถอยไปใช้ไฟล์ใน public/ (เทมเพลตยังสร้างได้ หน้าเว็บไม่พัง)
   */
   const templateOptions =
-    page === "about"
+    /* รอบที่ 259: หน้า "คณะผู้บริหาร" ก็ใช้ภาพจากคลังภาพเหมือนกัน (ภาพผังเป็นคีย์ `executives` ในทะเบียน) */
+    page === "about" || page === "executives"
       ? { image: await aboutTemplateImageResolver() }
       : undefined;
   const template = buildBlockTemplate(page, templateOptions);

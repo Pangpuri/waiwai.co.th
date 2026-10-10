@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { blockRenderStringsFor } from "@/features/blocks/render-strings";
 import {
@@ -43,6 +46,9 @@ import {
   type TableBlock,
 } from "@/lib/blocks/types";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
+
+/** รากโปรเจกต์ — ใช้กับเทสต์ที่สแกนซอร์สตัวเรนเดอร์ (เป็น server component ⇒ เรนเดอร์ใน node --test ไม่ได้) */
+const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 /**
  * เทสต์ของ "ชนิดบล็อกใหม่ 4 ชนิด" (รอบที่ 86) — ตาราง · แผนที่ · ฟอร์ม · แกลเลอรี
@@ -542,4 +548,82 @@ test("block-types: แคตตาล็อกและ BLOCK_TYPES มีชน
   }
   assert.ok(MAX_JOB_ITEMS >= 20, "ต้องรองรับตำแหน่งจริง 20 ตำแหน่ง");
   assert.ok(MAX_ROSTER_MEMBERS > 0);
+});
+
+/* ── รอบที่ 259: บล็อก "ภาพใหญ่" (ไม่ครอป · ไม่มีคำบรรยาย) ─────────────────────
+   มติเจ้าของ 2026-10-10: หน้า "คณะผู้บริหาร" แสดงภาพผังภาพเดียว แต่บล็อกภาพเดิมทุกตัว
+   บังคับสัดส่วน 4:3 + object-cover ⇒ ตัดขอบซ้าย/ขวา ~3% ต่อข้าง ซึ่งตัดข้อความในผังขาด
+*/
+
+test("block-types: ภาพใหญ่ — มีใน BLOCK_TYPES + แคตตาล็อก (ป้ายชื่อไทย) + ค่าเริ่มต้นกว้าง", () => {
+  assert.ok((BLOCK_TYPES as readonly string[]).includes("image"));
+  const entry = BLOCK_CATALOG.find((item) => item.type === "image");
+  assert.ok(entry !== undefined, "แคตตาล็อกต้องมีบล็อกภาพใหญ่ (ไม่งั้นเพิ่มในหลังบ้านไม่ได้)");
+  assert.ok(entry.label.trim() !== "" && entry.hint.trim() !== "");
+
+  const block = createBlock("image", "b1");
+  assert.equal(block.type, "image");
+  assert.equal(block.style.width, "wide", "ภาพใหญ่ต้องเริ่มที่ความกว้างระดับกว้าง (ผังอ่านยากถ้าแคบ)");
+  const image = mutable(block);
+  assert.ok(image.type === "image");
+  assert.equal(image.image, null, "เริ่มต้นยังไม่เลือกภาพ (ไม่ให้ค่าปลอม)");
+});
+
+test("block-types: ภาพใหญ่ — parse ไม่เชื่อข้อมูล (URL เต็ม = error · ไม่มี alt = error)", () => {
+  const ok = parseBlockDocument("executives", {
+    page: "executives",
+    blocks: [
+      {
+        id: "b1",
+        version: 2,
+        type: "image",
+        style: { align: "left", width: "wide", spacing: "md", background: "none", size: "md" },
+        image: { path: "/media/abc123", altTh: "ผังคณะผู้บริหาร", altEn: "", hasWatermark: false },
+      },
+    ],
+  });
+  assert.ok(ok.ok, ok.ok ? "" : ok.problems.join(" · "));
+  assert.equal(ok.ok ? ok.document.blocks.length : 0, 1);
+
+  /* มติ D9: ห้ามเก็บ URL เต็ม · มติ D7: ภาพต้องมี alt */
+  const bad = parseBlockDocument("executives", {
+    page: "executives",
+    blocks: [
+      {
+        id: "b1",
+        version: 2,
+        type: "image",
+        style: { align: "left", width: "wide", spacing: "md", background: "none", size: "md" },
+        image: { path: "https://example.com/chart.jpg", altTh: "", altEn: "", hasWatermark: false },
+      },
+    ],
+  });
+  assert.ok(bad.ok);
+  const codes = documentErrorsOf(validateDocument(bad.ok ? bad.document : docOf([]))).map((entry) => entry.code);
+  assert.ok(codes.includes("media-path-is-url"), "ต้องจับ URL เต็ม (มติ D9)");
+  assert.ok(codes.includes("missing-alt"), "ต้องจับภาพที่ไม่มี alt (มติ D7)");
+});
+
+test("block-types: ภาพใหญ่ — ยังไม่เลือกภาพ = คำเตือน (ไม่บล็อกการบันทึก)", () => {
+  const issues = validateDocument(docOf([createBlock("image", "b1")]));
+  assert.equal(documentErrorsOf(issues).length, 0, "ยังไม่เลือกภาพต้องไม่เป็น error (ผู้ใช้วางบล็อกก่อนได้)");
+  assert.ok(documentWarningsOf(issues).some((entry) => entry.code === "image-block-without-image"));
+});
+
+test("block-types: ภาพใหญ่ — ตัวเรนเดอร์ต้องไม่ครอปภาพ (ห้าม aspect/object-cover เด็ดขาด)", () => {
+  /*
+    ⚠️ นี่คือ "เหตุผลที่บล็อกนี้มีอยู่" — ถ้ามีคนเผลอใส่กรอบสัดส่วนหรือ object-cover
+    ภาพผังคณะผู้บริหารจะถูกตัดขอบและชื่อในภาพขาด ⇒ เทสต์นี้ต้องแดงทันที
+  */
+  const renderer = readFileSync(path.join(PROJECT_ROOT, "features", "blocks", "block-renderer.tsx"), "utf8");
+  const start = renderer.indexOf('case "image": {');
+  assert.ok(start > 0, "ต้องพบสาขาเรนเดอร์ของบล็อกภาพใหญ่");
+  const end = renderer.indexOf('case "imageText": {', start);
+  assert.ok(end > start, "ต้องหาจุดสิ้นสุดของสาขาได้");
+  const branch = renderer.slice(start, end);
+
+  assert.ok(branch.includes('case "image"'), "สแกนผิดช่วง");
+  assert.ok(!branch.includes("aspect-"), "บล็อกภาพใหญ่ห้ามมีกรอบสัดส่วน (จะครอปภาพ)");
+  assert.ok(!branch.includes("object-cover"), "บล็อกภาพใหญ่ห้ามใช้ object-cover (จะครอปภาพ)");
+  assert.ok(branch.includes("h-auto w-full"), "ต้องแสดงที่สัดส่วนจริงของไฟล์ (h-auto w-full)");
 });

@@ -295,6 +295,34 @@ function BlockView({
           </div>
         );
 
+      /*
+        ── ภาพใหญ่ (รอบที่ 259) — **ไม่ครอป** ──────────────────────────────────────────────────
+        ⚠️ ห้ามใส่กรอบสัดส่วน (`aspect-*`) หรือ `object-cover` เด็ดขาด — บล็อกนี้มีไว้เพื่อแสดง
+        ผัง/แผนภาพที่มีข้อความชิดขอบ ⇒ `h-auto w-full` = คงสัดส่วนจริงของไฟล์ ไม่ตัดอะไรทิ้ง
+        (บล็อกภาพอื่นบังคับ 4:3 + cover ⇒ ตัดขอบ ~3% ต่อข้าง ซึ่งตัดชื่อในผังคณะผู้บริหารขาด)
+        ไม่มีหัวข้อ/คำบรรยายโดยเจตนา (มติเจ้าของ 2026-10-10: "แค่โชว์ภาพ ภาพเดียว")
+      */
+      case "image": {
+        /*
+          ⚠️ `sizes` ต้องตรงกับกล่องจริง (`wide` = max-w-6xl 1152px − px-4 32px = 1120px)
+          ค่าเริ่มต้นของตัวช่วยคือ 640px ซึ่งเป็นของบล็อก 2 คอลัมน์ ⇒ ใส่ผิดจะทำให้เครื่องมือ
+          ที่ใช้ `srcset` โหลดภาพเล็กเกินไป (ภาพเบลอ) · ตอนนี้ยังเป็น `<img src>` ตรง ๆ (sizes ไม่มีผล)
+          แต่ใส่ค่าให้ถูกไว้ เพื่อไม่ให้กลายเป็นกับดักเมื่อเปลี่ยนไปใช้ `next/image`
+        */
+        const media = image(
+          block.image,
+          language,
+          "border-line bg-bg-subtle h-auto w-full rounded-2xl border",
+          "(min-width: 1152px) 1120px, 100vw",
+        );
+        return (
+          <div className={container}>
+            {/* ยังไม่เลือกภาพ = ไม่มีอะไรเรนเดอร์ (แต่ยังเหลือเปลือกบล็อกให้เลือก/แก้ในหลังบ้านได้) */}
+            {media === null ? null : <span {...editAttrs(editable, "image", { media: true })}>{media}</span>}
+          </div>
+        );
+      }
+
       case "imageText": {
         const media = image(block.image, language, "bg-bg-subtle aspect-[4/3] w-full rounded-2xl object-cover");
         return (

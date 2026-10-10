@@ -118,9 +118,13 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
     ⚠️ และ **ห้ามถอดชื่อจากภาพมาใส่เป็นข้อความเอง** (บทเรียนรอบที่ 22: ตัวอักษรในภาพอ่านเพี้ยนได้)
   */
   assert.deepEqual([...blockCoverageGaps("executives")], [], "executives ต้องไม่เหลือช่องว่าง");
+  /*
+    ⚠️ รอบที่ 259 (มติเจ้าของ 2026-10-10): เปลี่ยนจาก `imageText` → บล็อก `image` ("ภาพใหญ่")
+    เพราะบล็อกภาพอื่นบังคับ 4:3 + `object-cover` ⇒ **ครอปขอบ ~3% ต่อข้าง** ซึ่งตัดข้อความในผังขาด
+  */
   assert.ok(
-    buildExecutivesTemplate().blocks.some((block) => block.type === "imageText"),
-    "เทมเพลต executives ต้องมีภาพผังจริง (ภาพคือแหล่งข้อมูล)",
+    buildExecutivesTemplate().blocks.some((block) => block.type === "image"),
+    "เทมเพลต executives ต้องมีภาพผังจริง (ภาพคือแหล่งข้อมูล) และต้องเป็นบล็อกที่ไม่ครอป",
   );
   assert.ok(
     buildExecutivesTemplate().blocks.every((block) => block.type !== "rosterText"),

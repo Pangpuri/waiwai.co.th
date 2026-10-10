@@ -22,6 +22,8 @@ export const BLOCK_TYPES = [
   "heading",
   "richText",
   "imageText",
+  /* รอบที่ 259 — ภาพใหญ่ (ไม่ครอป · ไม่มีคำบรรยาย) ตามมติเจ้าของ 2026-10-10 */
+  "image",
   "cards",
   "cta",
   "quote",
@@ -223,6 +225,23 @@ export type ImageTextBlock = BlockBase & {
   readonly body: LocalizedValue;
   readonly image: BlockMedia | null;
   readonly side: "left" | "right";
+};
+
+/**
+ * บล็อก **"ภาพใหญ่"** (รอบที่ 259) — ภาพเดียวเต็มความกว้างของบล็อก **ไม่ครอป** และ **ไม่มีคำบรรยาย**
+ *
+ * ## ทำไมต้องมีชนิดใหม่ (ทั้งที่โปรเจกต์มีบล็อกภาพอยู่แล้ว)
+ * บล็อกที่มีภาพทุกตัว (`imageText` · `cards` · `gallery` · `hero`) บังคับ **สัดส่วน 4:3 แล้ว `object-cover`**
+ * ⇒ **ตัดขอบซ้าย/ขวาทิ้ง** (~3% ต่อข้าง) ซึ่งใช้กับ **ผัง/แผนภาพที่มีข้อความชิดขอบ** ไม่ได้
+ * (เคสจริง 2026-10-10: ผังคณะผู้บริหารมีชื่อ-ตำแหน่งชิดขอบล่างซ้าย ⇒ ครอปแล้วข้อความขาด)
+ *
+ * ⇒ บล็อกนี้เรนเดอร์ภาพที่ **สัดส่วนจริงของไฟล์** (`h-auto w-full`) ไม่มีกรอบสัดส่วนบังคับ ⇒ ไม่ตัดอะไรทิ้ง
+ * ⚠️ **ไม่มีฟิลด์หัวข้อ/คำบรรยาย โดยเจตนา** (มติเจ้าของ 2026-10-10: *"แค่โชว์ภาพ ภาพเดียว"*)
+ *    ถ้าต้องการคำบรรยาย ให้ใช้ `imageText` หรือวาง `richText` ต่อท้าย
+ */
+export type ImageBlock = BlockBase & {
+  readonly type: "image";
+  readonly image: BlockMedia | null;
 };
 
 export type CardsBlock = BlockBase & {
@@ -501,6 +520,7 @@ export type Block =
   | HeadingBlock
   | RichTextBlock
   | ImageTextBlock
+  | ImageBlock
   | CardsBlock
   | CtaBlock
   | QuoteBlock
@@ -566,6 +586,8 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "heading", label: "หัวข้อ", hint: "หัวเรื่องสั้น ๆ คั่นกลางหน้า" },
   { type: "richText", label: "ข้อความ", hint: "หัวข้อ + ย่อหน้า (+ ปุ่มถ้าต้องการ)" },
   { type: "imageText", label: "ภาพ + ข้อความ", hint: "ภาพข้างหนึ่ง ข้อความอีกข้าง" },
+  /* รอบที่ 259 — ภาพใหญ่ ไม่ครอป ไม่มีคำบรรยาย (มติเจ้าของ: "แค่โชว์ภาพ") */
+  { type: "image", label: "ภาพใหญ่", hint: "ภาพเดียวเต็มความกว้าง ไม่ครอป (เหมาะกับผัง/แผนภาพ)" },
   { type: "cards", label: "การ์ด", hint: "การ์ด 1-4 คอลัมน์ พร้อมภาพ" },
   { type: "cta", label: "ปุ่มเชิญชวน", hint: "กล่องเน้น + ปุ่ม" },
   { type: "quote", label: "คำกล่าว", hint: "ข้อความอ้างอิง + ผู้กล่าว" },
@@ -633,8 +655,8 @@ export function createBlock(type: BlockType, id: string): Block {
   const style: BlockStyle =
     type === "hero"
       ? { ...DEFAULT_BLOCK_STYLE, size: "lg", width: "full" }
-      : /* ตาราง/แกลเลอรี/กระดานงาน/รายชื่อ/เมนูอาหาร เริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุด/รายการอ่านยากถ้าแคบ */
-        type === "table" || type === "gallery" || type === "jobBoard" || type === "rosterText" || type === "recipeCards"
+      : /* ตาราง/แกลเลอรี/กระดานงาน/รายชื่อ/เมนูอาหาร/ภาพใหญ่ เริ่มที่ "กว้าง" — เนื้อหาแบบตาราง/ภาพชุด/รายการอ่านยากถ้าแคบ */
+        type === "table" || type === "gallery" || type === "jobBoard" || type === "rosterText" || type === "recipeCards" || type === "image"
         ? { ...DEFAULT_BLOCK_STYLE, width: "wide" }
         : { ...DEFAULT_BLOCK_STYLE };
   const base = { id, version: BLOCK_SCHEMA_VERSION, style };
@@ -657,6 +679,9 @@ export function createBlock(type: BlockType, id: string): Block {
       return { ...base, type: "richText", heading: emptyText(), body: emptyText(), ctaLabel: emptyText(), ctaHref: "" };
     case "imageText":
       return { ...base, type: "imageText", heading: emptyText(), body: emptyText(), image: null, side: "right" };
+    /* รอบที่ 259 — ภาพใหญ่ (ไม่มีหัวข้อ/คำบรรยาย โดยเจตนา: "แค่โชว์ภาพ") */
+    case "image":
+      return { ...base, type: "image", image: null };
     case "cards":
       return { ...base, type: "cards", heading: emptyText(), body: emptyText(), columns: 3, items: [] };
     case "cta":

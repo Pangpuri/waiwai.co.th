@@ -138,6 +138,17 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
       }
       return;
 
+    /*
+      ภาพใหญ่ (รอบที่ 259) — มีแค่ภาพ ⇒ กฎเดียวที่ตรวจได้คือ "ต้องมีภาพ + ต้องมี alt"
+      · ยังไม่เลือกภาพ = **คำเตือน** (ไม่บล็อกการบันทึก — ผู้ใช้อาจวางบล็อกไว้ก่อนแล้วค่อยเลือกภาพ)
+    */
+    case "image":
+      checkMedia(block.image, `${path}.image`, issues);
+      if (block.image === null) {
+        issues.push(issue("warning", "image-block-without-image", `${path}.image`, "บล็อกภาพใหญ่ยังไม่ได้เลือกภาพ"));
+      }
+      return;
+
     case "cards":
       checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
       checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);

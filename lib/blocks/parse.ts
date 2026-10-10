@@ -714,6 +714,13 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
         image: readMedia(entry, "image", `${path}.image`, problems),
         side: readChoice(entry, "side", ["left", "right"] as const, "right", `${path}.side`, problems),
       };
+    /* รอบที่ 259 — ภาพใหญ่: มีแค่ภาพ (ไม่มีหัวข้อ/คำบรรยาย ⇒ ไม่มีอะไรให้อ่านเพิ่ม) */
+    case "image":
+      return {
+        ...base,
+        type: "image",
+        image: readMedia(entry, "image", `${path}.image`, problems),
+      };
     case "cards":
       return {
         ...base,

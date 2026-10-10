@@ -62,6 +62,8 @@ function headingTextOf(block: Block): LocalizedValue | null {
       return block.heading;
     case "quote":
     case "divider":
+    /* ภาพใหญ่ (รอบที่ 259) ไม่มีหัวข้อโดยเจตนา ⇒ ไม่ขึ้นสารบัญ */
+    case "image":
     /* แถวเองไม่มีหัวข้อ — บล็อกลูกถูกเดินด้วย walkBlocks อยู่แล้ว */
     case "row":
       return null;

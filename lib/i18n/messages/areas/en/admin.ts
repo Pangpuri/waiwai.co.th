@@ -111,6 +111,8 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   imagePathLabel: "File path",
   /* Hero slides & campaigns (round 184) */
   blockImageLabel: "Image for this block",
+  /* "Big image" block (round 259) — full width, never cropped */
+  blockImageBigHint: "Shown at full width with the file's real aspect ratio (never cropped) — good for diagrams",
   /* Hero slides (round 183 · phase ค) */
   cardImageLabel: "Image for this card",
   backToBlock: "Back to the whole block",

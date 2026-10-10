@@ -1174,6 +1174,19 @@ export function BlockBuilder({
               <SingleField idBase={`${base}-cta-href`} label="cta href" value={block.ctaHref} onChange={(next) => update(setBlockString(document, block.id, "ctaHref", next))} />
             </>
           );
+        /*
+          ภาพใหญ่ (รอบที่ 259) — มีแค่ช่องภาพ (+ alt) ⇒ ไม่มีหัวข้อ/คำบรรยายโดยเจตนา
+          (มติเจ้าของ 2026-10-10: "แค่โชว์ภาพ ภาพเดียว" — ภาพผังคณะผู้บริหาร)
+        */
+        case "image":
+          return (
+            <>
+              <div id={`${base}-image`}>
+                <ImageDrop strings={strings} label={strings.blockImageLabel} value={block.image} onChange={(patch) => update(setBlockImage(document, block.id, patch))} />
+              </div>
+              <p className="text-fg-muted text-xs">{strings.blockImageBigHint}</p>
+            </>
+          );
         case "imageText":
           return (
             <>

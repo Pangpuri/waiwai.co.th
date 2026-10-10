@@ -65,7 +65,9 @@ export default async function ExecutivesPage({ params }: PageProps<"/[lang]/abou
   */
   const liveDocument = await loadLiveBlockDocument("executives");
   if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
+    /* ⚠️ ต้องส่ง `heading` ⇒ ตัวเรนเดอร์ใส่ `<h1 class="sr-only">` ให้ (a11y · รอบที่ 258)
+       ไม่งั้นหน้าที่เรนเดอร์จากบล็อกจะไม่มี h1 เลย (บทเรียนเดียวกับหน้า /about) */
+    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.about.executives.meta.title} />;
   }
 
   const m = messages.about.executives;
