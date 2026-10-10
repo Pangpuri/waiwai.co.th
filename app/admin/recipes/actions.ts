@@ -80,7 +80,12 @@ export async function saveRecipeAction(_previous: RecipeSaveState, formData: For
     videoId: youTubeIdFromInput(videoIdInput) ?? videoIdInput,
     publishedOn,
     sortOrder: readInt(field(formData, "sortOrder")),
-    coverPath: field(formData, "coverPath").trim() === "" ? null : field(formData, "coverPath").trim(),
+    /* ⚠️ รอบที่ 263: ฟิลด์ไม่ถูกส่ง = ไม่ได้แตะช่องภาพปก ⇒ คงภาพเดิม (ดูเหตุผลใน app/admin/news/actions.ts) */
+    coverPath: formData.has("coverPath")
+      ? field(formData, "coverPath").trim() === ""
+        ? null
+        : field(formData, "coverPath").trim()
+      : (existing?.coverPath ?? null),
     status: statusOf(field(formData, "status")),
   };
 

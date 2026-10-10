@@ -15,6 +15,8 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
 import { mediaIdFromPath } from "@/lib/media/usage";
+/* รอบที่ 263 — "ไม่มีคีย์ในฟอร์ม = ไม่ได้แตะภาพ" (ตรรกะ + เทสต์อยู่ที่ `lib/products/media-mode.ts`) */
+import { imageWriteMode } from "@/lib/products/media-mode";
 import { storeImageFile } from "@/lib/media/upload";
 import {
   deleteProductForever,
@@ -130,7 +132,10 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
   if (validateProductInput(input).length > 0) return { status: "error", reason: "title", createdId: null };
 
   /* imageMode "set" = ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง (สคริปต์นำเข้าใช้โหมด "keep") */
-  await upsertProduct(input, user.email, mediaIdFromPath(field(formData, "imagePath")), { imageMode: "set" });
+  /* ⚠️ รอบที่ 263: ฟอร์มไม่ส่ง imagePath = ไม่ได้แตะช่องภาพ ⇒ คงภาพเดิม (ดู `imageWriteMode`) */
+  await upsertProduct(input, user.email, mediaIdFromPath(field(formData, "imagePath")), {
+    imageMode: imageWriteMode(formData, "imagePath"),
+  });
   await replaceProductIngredients(productId, ingredients);
   await recordAudit({
     action: "product-save",
@@ -172,10 +177,13 @@ export async function saveProductCategoryAction(
     user.email,
     mediaIdFromPath(field(formData, "imagePath")),
     {
-      /* imageMode/logoMode "set" = ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง (สคริปต์นำเข้าใช้โหมด "keep") */
-      imageMode: "set",
+      /*
+        imageMode/logoMode "set" = ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง (สคริปต์นำเข้าใช้โหมด "keep")
+        ⚠️ รอบที่ 263: ถ้าฟอร์ม **ไม่ได้ส่งคีย์นั้นมาเลย** = ไม่ได้แตะช่องภาพ ⇒ ใช้ "keep" (ห้ามลบของเดิม)
+      */
+      imageMode: imageWriteMode(formData, "imagePath"),
       logoMediaId: mediaIdFromPath(field(formData, "logoPath")),
-      logoMode: "set",
+      logoMode: imageWriteMode(formData, "logoPath"),
       /* กดบันทึก = ค่าที่กรอกต้องชนะ (ล้างชื่อกลับไปใช้พจนานุกรมได้) */
       nameMode: "replace",
     },

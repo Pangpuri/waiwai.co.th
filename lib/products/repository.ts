@@ -1,4 +1,5 @@
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
+import type { ImageWriteMode } from "@/lib/products/media-mode";
 import { readQuery } from "@/lib/db/read";
 import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
 
@@ -376,8 +377,11 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
  *   (เว็บเดิมมีหมวด/สินค้าที่ไม่มีภาพ ⇒ นำเข้าซ้ำต้องไม่ลบภาพที่ผู้ดูแลเลือกไว้)
  * - `set` — เขียนทับตามค่าที่ส่งมา (`null` = ล้างภาพ) ⇒ ใช้โดย **หน้าจอหลังบ้าน**
  *   (ผู้ดูแลเลือก "ไม่ใช้ภาพ" แล้วต้องลบได้จริง ไม่ใช่เงียบ ๆ คงของเดิมไว้)
+ *
+ * ⚠️ รอบที่ 263: ชนิด + ตัวช่วยเลือกโหมดจากฟอร์ม ย้ายไป `lib/products/media-mode.ts`
+ *    (โมดูลล้วน ⇒ เทสต์ตรรกะ "ฟิลด์หาย = ไม่ลบภาพ" ได้ตรง ๆ) · ที่นี่ re-export ไว้ให้ผู้เรียกเดิมใช้ได้
  */
-export type ImageWriteMode = "keep" | "set";
+export type { ImageWriteMode } from "@/lib/products/media-mode";
 
 function imageWriteExpression(mode: ImageWriteMode | undefined, table: string, column = "image_media_id"): string {
   if ((mode ?? "keep") === "set") return `excluded.${column}`;

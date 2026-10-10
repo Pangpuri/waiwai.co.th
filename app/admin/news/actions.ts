@@ -76,13 +76,21 @@ export async function saveNewsAction(_previous: NewsSaveState, formData: FormDat
     return { status: "error", reason: "body", createdId: null };
   }
 
+  /*
+    ⚠️ รอบที่ 263 (บทเรียน "ภาพหัวหมวดบะหมี่หาย"): ฟอร์มที่ **ไม่ได้ส่งคีย์ `coverPath` มาเลย**
+    = ผู้ใช้ไม่ได้แตะช่องภาพปก ⇒ **ต้องคงภาพเดิม** ไม่ใช่ลบ
+    (โหมดนี้ต่างจาก "ส่งคีย์มาแต่ว่าง" = ผู้ใช้กดลบภาพปกเอง ⇒ ลบได้จริง)
+  */
+  const coverKeyPresent = formData.has("coverPath");
   const coverRaw = field(formData, "coverPath").trim();
+  /* อ่านแถวเดิมเฉพาะกรณี "ฟิลด์หาย" (หายาก) — ไม่ยิงคิวรีเพิ่มในเส้นทางปกติ */
+  const existingCover = coverKeyPresent || id === "" ? null : ((await loadNewsForAdmin(id))?.coverPath ?? null);
   const input: AdminNewsInput = {
     titleTh,
     titleEn: field(formData, "titleEn").trim(),
     excerptTh: field(formData, "excerptTh").trim(),
     excerptEn: field(formData, "excerptEn").trim(),
-    coverPath: coverRaw === "" ? null : coverRaw,
+    coverPath: coverKeyPresent || id === "" ? (coverRaw === "" ? null : coverRaw) : existingCover,
     publishedLocal: parsePublishedLocal(field(formData, "publishedLocal")),
     status: statusOf(field(formData, "status")),
     body,

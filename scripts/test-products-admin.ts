@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { codeOf } from "./source-scan.ts";
 
+/** รากโปรเจกต์ — ใช้กับเทสต์ที่ต้องอ่านไฟล์ migration ตรง ๆ */
+const PROJECT_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+import { imageWriteMode } from "@/lib/products/media-mode";
 import { productIdOfSourceId, validateIngredientInput, validateProductInput, type ProductInput } from "@/lib/products/model";
 
 /**
@@ -152,6 +158,18 @@ test("products admin: จอหมวดต้องมีฟอร์มขอ�
   assert.ok(categoryForm.includes("useActionState(saveProductCategoryAction"), "ฟอร์มหมวดต้องเรียก saveProductCategoryAction");
 });
 
+/**
+ * ตัดเนื้อในของฟังก์ชันที่ชื่อระบุ (จาก `export async function <name>` ถึงบรรทัด `}` ที่คอลัมน์ 0)
+ * ใช้ตรวจว่า "เฉพาะแอ็กชันบันทึกฟอร์ม" เท่านั้นที่ต้องไม่ hardcode โหมดเขียนภาพ
+ * (ส่วนกู้คืนรุ่น/อัปโหลดไฟล์ ตั้งใจใช้ `"set"` เพราะค่านั้นคือค่าที่จะเขียนจริง)
+ */
+function functionBodyOf(source: string, name: string): string {
+  const start = source.indexOf(`export async function ${name}(`);
+  if (start < 0) return "";
+  const end = source.indexOf("\n}", start);
+  return end < 0 ? source.slice(start) : source.slice(start, end);
+}
+
 test("products admin: repo กัน source_id ของหมวดถูกลบด้วยค่าว่าง (ด่านชั้นสอง)", () => {
   assert.ok(
     repository.includes("coalesce(nullif(excluded.source_id, ''), product_category.source_id)"),
@@ -161,15 +179,35 @@ test("products admin: repo กัน source_id ของหมวดถูกล
 });
 
 test("products admin: การเขียนภาพแยก 2 โหมด — นำเข้า 'keep' · หลังบ้าน 'set'", () => {
-  assert.ok(repository.includes('export type ImageWriteMode'), "ต้องมีชนิดโหมดการเขียนภาพให้ชัดเจน");
+  assert.ok(
+    repository.includes('export type { ImageWriteMode } from "@/lib/products/media-mode"'),
+    "ต้องมีชนิดโหมดการเขียนภาพ (รอบที่ 263 ย้ายไป lib/products/media-mode.ts + re-export)",
+  );
+  assert.ok(readFileSync(path.join(PROJECT_ROOT, "lib", "products", "media-mode.ts"), "utf8").includes('export type ImageWriteMode = "keep" | "set"'), "โมดูลกลางต้องประกาศชนิดเอง");
   assert.ok(
     repository.includes("coalesce(excluded."),
     "โหมด keep ต้องคงภาพเดิม (นำเข้าซ้ำไม่ลบภาพที่ผู้ดูแลเลือก) — ใช้ร่วมกันทั้งภาพสินค้า/ภาพหมวด/โลโก้หมวด",
   );
+  /*
+    ⚠️ รอบที่ 263: เดิมเทสต์นี้บังคับให้ **hardcode** `imageMode: "set"` ทั้งสินค้าและหมวด
+    ซึ่งทำให้ "ฟอร์มไม่ได้ส่งฟิลด์ภาพ" ถูกล่ามเป็น "ลบภาพ" ⇒ ภาพหัวหมวดบะหมี่หายจากหน้าแรก
+    ⇒ สัญญาใหม่: ล้างภาพได้เมื่อ **ผู้ใช้สั่ง** (ส่งคีย์มาแต่ว่าง) แต่ **ไม่มีคีย์ = คงภาพเดิม**
+  */
   assert.ok(
-    (actions.match(/imageMode: "set"/g) ?? []).length >= 2,
-    "หลังบ้านต้องเขียนภาพแบบ set ทั้งสินค้าและหมวด (เลือกล้างภาพได้จริง)",
+    actions.includes('imageMode: imageWriteMode(formData, "imagePath")'),
+    "หลังบ้านต้องเลือกโหมดจาก 'ฟอร์มส่งคีย์ภาพมาไหม' (ไม่ hardcode)",
   );
+  for (const name of ["saveProductAction", "saveProductCategoryAction"]) {
+    const body = functionBodyOf(actions, name);
+    assert.ok(body !== "", `${name}: ต้องพบเนื้อฟังก์ชัน`);
+    assert.equal(
+      body.includes('imageMode: "set"'),
+      false,
+      `${name}: ห้าม hardcode imageMode: "set" — ต้องเลือกจาก "ฟอร์มส่งคีย์ภาพมาไหม"`,
+    );
+  }
+  /* ส่วน "กู้คืนรุ่น" ตั้งใจใช้ set (ค่าที่จะเขียนคือค่าจากรุ่นที่กู้) — ไม่ใช่กับดัก */
+  assert.ok(functionBodyOf(actions, "restoreProductRevisionAction").includes('imageMode: "set"'), "กู้คืนรุ่นต้องเขียนภาพจากรุ่นจริง");
 });
 
 test("products admin: หน้าจอหลังบ้านต้องตรวจสิทธิ์ที่หน้าเพจด้วย", () => {
@@ -361,7 +399,10 @@ test("products admin: ชั้นข้อมูลหมวดมีชื่�
   );
   assert.ok(repository.includes("export type NameWriteMode") && repository.includes('"keep" | "replace"'), "ต้องมีโหมดเขียนชื่อให้ชัดเจน");
   assert.ok(actions.includes('nameMode: "replace"'), "หลังบ้านกดบันทึก = ค่าที่กรอกต้องชนะ");
-  assert.ok(actions.includes("logoMode: \"set\""), "หลังบ้านต้องล้างโลโก้ได้จริง (กลับไปใช้ไฟล์ใน public)");
+  assert.ok(
+    actions.includes('logoMode: imageWriteMode(formData, "logoPath")'),
+    "หลังบ้านต้องล้างโลโก้ได้จริงเมื่อผู้ใช้สั่ง — แต่ว่า 'ฟิลด์หาย' ต้องคงโลโก้เดิมไว้ (รอบที่ 263)",
+  );
 });
 
 test("products admin: migration 0037 เพิ่มชื่อ/โลโก้หมวดแบบ idempotent + สคริปต์นำเข้าโลโก้", () => {
@@ -374,4 +415,72 @@ test("products admin: migration 0037 เพิ่มชื่อ/โลโก้
   const importer = readFileSync("scripts/import-products-logos.ts", "utf8");
   assert.ok(importer.includes("importCategoryLogo("), "สคริปต์ต้องผูกโลโก้เข้ากับหมวด");
   assert.ok(importer.includes("ensureImportedMedia("), "ต้องใช้ท่อนำเข้ากลาง (dedupe sha256)");
+});
+
+/**
+ * ★ รอบที่ 263 — **"ฟิลด์ภาพหาย" ต้องไม่ลบภาพเดิม** (เคสจริง 2026-10-10)
+ *
+ * เจ้าของทักว่า *"เนื้อหาหน้าแรกตรงบะหมี่กึ่งสำเร็จรูปหาย"* ⇒ ตรวจแล้วข้อมูลครบ
+ * แต่ `product_category.image_media_id` ของหมวดนั้นกลายเป็น NULL (การ์ดหน้าแรกไม่มีภาพ)
+ *
+ * ต้นเหตุ: ฟอร์มใช้โหมด `"set"` (ส่งค่าว่าง = ลบภาพได้จริง) แต่ตอนนั้นอ่านด้วย `field()`
+ * ที่คืน `""` **ทั้งกรณี "ไม่ได้ส่งฟิลด์" และ "ส่งมาว่าง"** ⇒ POST ที่ไม่แนบฟิลด์ลบภาพทิ้ง
+ *
+ * เทสต์นี้บังคับ 2 อย่าง
+ *   1. แอ็กชันของสินค้า/หมวด **ห้ามเขียนโหมด `"set"` แบบตายตัว** — ต้องเลือกจาก "มีคีย์ในฟอร์มไหม"
+ *   2. มี migration กู้ค่าที่หาย (idempotent + มี `where`)
+ */
+test("★ products-admin: imageWriteMode — 'ไม่มีคีย์' = keep · 'มีคีย์แต่ว่าง' = set (เคสจริง 2026-10-10)", () => {
+  /* (ก) ฟอร์มไม่ได้ส่งคีย์มาเลย (สคริปต์/ฟอร์มไม่ครบ) ⇒ ห้ามแตะภาพเดิม */
+  assert.equal(imageWriteMode(new FormData(), "imagePath"), "keep", "ไม่มีคีย์ = คงภาพเดิม");
+
+  /* (ข) ผู้ใช้กด "ไม่ใช้ภาพ" ⇒ ฟอร์มส่งคีย์มาแต่ว่าง ⇒ ลบได้จริง */
+  const cleared = new FormData();
+  cleared.set("imagePath", "");
+  assert.equal(imageWriteMode(cleared, "imagePath"), "set", "ส่งคีย์ว่าง = ผู้ใช้สั่งลบ");
+
+  /* (ค) เลือกภาพปกติ */
+  const chosen = new FormData();
+  chosen.set("imagePath", "/media/abc");
+  assert.equal(imageWriteMode(chosen, "imagePath"), "set");
+
+  /* (ง) ภาพกับโลโก้แยกกัน — ส่งภาพมาแต่ไม่ส่งโลโก้ = โลโก้ต้องคงเดิม */
+  assert.equal(imageWriteMode(chosen, "logoPath"), "keep", "คีย์อื่นไม่ส่ง ⇒ คงค่าเดิมของช่องนั้น");
+});
+
+test("products-admin: ฟิลด์ภาพไม่ถูกส่ง = ห้ามลบภาพเดิม (ห้าม hardcode imageMode set)", () => {
+  const actions = codeOf("app/admin/products/actions.ts");
+
+  assert.ok(
+    actions.includes('import { imageWriteMode } from "@/lib/products/media-mode"'),
+    "ต้องใช้ตัวช่วยกลางที่แยก 'ไม่ได้ส่งฟิลด์' ออกจาก 'ส่งมาว่าง' (รอบที่ 263)",
+  );
+  /* ตัวฟังก์ชันถูกเทสต์พฤติกรรมจริงอยู่ด้านบน (`imageWriteMode(new FormData(), …) === "keep"`) */
+  assert.ok(readFileSync(path.join(PROJECT_ROOT, "lib", "products", "media-mode.ts"), "utf8").includes('return formData.has(key) ? "set" : "keep";'), "ไม่มีคีย์ = keep (คงภาพเดิม)");
+  for (const name of ["saveProductAction", "saveProductCategoryAction"]) {
+    const body = functionBodyOf(actions, name);
+    assert.ok(body !== "", `${name}: ต้องพบเนื้อฟังก์ชัน`);
+    assert.equal(body.includes('imageMode: "set"'), false, `${name}: ห้าม hardcode imageMode: "set"`);
+  }
+  assert.ok(actions.includes('imageMode: imageWriteMode(formData, "imagePath")'), "สินค้า + หมวดต้องใช้ตัวช่วยนี้");
+  assert.ok(actions.includes('logoMode: imageWriteMode(formData, "logoPath")'), "โลโก้หมวดก็ต้องกันแบบเดียวกัน");
+
+  /* ข่าว/เมนูก็เคยมีท่อเดียวกัน (ฟิลด์หาย = ล้างภาพปก) */
+  for (const file of ["app/admin/news/actions.ts", "app/admin/recipes/actions.ts"]) {
+    const source = codeOf(file);
+    assert.ok(
+      source.includes('formData.has("coverPath")'),
+      `${file}: ต้องเช็คว่าฟอร์มส่งคีย์ coverPath มาไหม ก่อนจะสรุปว่าลบภาพปก`,
+    );
+  }
+});
+
+test("products-admin: migration 0038 กู้ภาพหัวหมวดที่ถูกอ้างอิงหาย (idempotent)", () => {
+  const migration = readFileSync(path.join(PROJECT_ROOT, "db", "migrations", "0038-restore-instant-noodles-category-image.sql"), "utf8");
+
+  assert.ok(migration.includes("idempotent: conditional-update"), "ต้องประกาศกลไก idempotent ตามกติกา");
+  assert.ok(migration.includes("where"), "ต้องมีเงื่อนไข where");
+  assert.ok(migration.includes("c.image_media_id is null"), "แก้เฉพาะแถวที่ยังว่าง ⇒ รันซ้ำไม่มีผล");
+  assert.ok(migration.includes("m.sha256 ="), "หาภาพจากลายนิ้วมือ (ไม่ผูกกับ id ของคลังในเครื่องใดเครื่องหนึ่ง)");
+  assert.ok(!migration.includes("create table") && !migration.includes("add column"), "ไฟล์นี้เป็น migration ซ่อมข้อมูล (ไม่มี DDL)");
 });
