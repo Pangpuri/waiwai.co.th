@@ -192,7 +192,11 @@ export default async function ProductCategoryPage({
   if (liveDocument !== null) {
     return (
       <>
-        <BlockDocumentView document={liveDocument} language={lang} />
+        {/*
+          ⚠️ ต้องส่ง `heading` (a11y · 1 h1 ต่อหน้า) — เอกสารบล็อกไม่มี h1 ในตัวเอง
+          (เคสจริงแบบเดียวกับหน้า /contact รอบ 267) · ตารางสินค้ายังต่อท้ายเสมอ (ไม่ใช่บล็อก)
+        */}
+        <BlockDocumentView document={liveDocument} language={lang} heading={displayName} />
         <ProductListSection products={products} language={lang} strings={listStrings} />
       </>
     );

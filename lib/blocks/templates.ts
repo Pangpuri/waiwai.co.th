@@ -3,8 +3,8 @@ import { buildCertificationsTemplate } from "@/lib/blocks/certifications-templat
 import { buildContactDocument } from "@/lib/contact/document";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
-import { buildProductDetailTemplate } from "@/lib/blocks/product-detail-template";
 import { PRODUCT_DETAIL_PAGE_IDS } from "@/lib/blocks/product-detail";
+import { buildProductDetailDocument, type ProductDetailCategoryValues } from "@/lib/products/detail-document";
 import type { BlockDocument } from "@/lib/blocks/types";
 
 /**
@@ -61,6 +61,11 @@ export type BlockTemplatePageId = (typeof BLOCK_TEMPLATE_PAGE_IDS)[number];
  */
 export type TemplateBuildOptions = {
   readonly image?: (key: string) => string;
+  /**
+   * ค่าจริงจากฐานข้อมูลของหมวดสินค้า (รอบที่ 270) — ใช้กับเทมเพลตหน้า "รายละเอียดหมวดสินค้า"
+   * ผู้เรียก (Server Action) อ่าน DB แล้วส่งตัวช่วยนี้ ⇒ เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์
+   */
+  readonly categoryValues?: (slug: string) => ProductDetailCategoryValues | null;
 };
 
 const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: TemplateBuildOptions) => BlockDocument | null) | null>> = {
@@ -77,12 +82,12 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: Templa
   certifications: buildCertificationsTemplate,
   executives: buildExecutivesTemplate,
   /* หน้ารายละเอียดหมวด — เทมเพลตต่อหมวด (ใช้ชื่อ/ภาพจริง + คำอธิบาย "ยังไม่เปิดใช้งาน" ในพจนานุกรม) */
-  "product-instant-noodles": () => buildProductDetailTemplate("instant-noodles"),
-  "product-dried-vermicelli": () => buildProductDetailTemplate("dried-vermicelli"),
-  "product-serda": () => buildProductDetailTemplate("serda"),
-  "product-quick-zabb": () => buildProductDetailTemplate("quick-zabb"),
-  "product-noodie": () => buildProductDetailTemplate("noodie"),
-  "product-rod-ded": () => buildProductDetailTemplate("rod-ded"),
+  "product-instant-noodles": (options) => buildProductDetailDocument("instant-noodles", options?.categoryValues?.("instant-noodles") ?? null),
+  "product-dried-vermicelli": (options) => buildProductDetailDocument("dried-vermicelli", options?.categoryValues?.("dried-vermicelli") ?? null),
+  "product-serda": (options) => buildProductDetailDocument("serda", options?.categoryValues?.("serda") ?? null),
+  "product-quick-zabb": (options) => buildProductDetailDocument("quick-zabb", options?.categoryValues?.("quick-zabb") ?? null),
+  "product-noodie": (options) => buildProductDetailDocument("noodie", options?.categoryValues?.("noodie") ?? null),
+  "product-rod-ded": (options) => buildProductDetailDocument("rod-ded", options?.categoryValues?.("rod-ded") ?? null),
 };
 
 /**

@@ -13,7 +13,7 @@ import {
   productDetailPathOfPageId,
   productDetailSlugOfPageId,
 } from "@/lib/blocks/product-detail";
-import { buildProductDetailTemplate } from "@/lib/blocks/product-detail-template";
+import { buildProductDetailDocument, type ProductDetailCategoryValues } from "@/lib/products/detail-document";
 import { BLOCK_TEMPLATE_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { LOCALES } from "@/lib/i18n/config";
@@ -22,6 +22,8 @@ import { th } from "@/lib/i18n/messages/th";
 import { EMPTY_PAGE_SEO, type PageRecord } from "@/lib/pages/model";
 import { PAGE_PATHS, isKnownPagePath, isPreviewablePage } from "@/lib/pages/paths";
 import { buildSitemapEntries } from "@/lib/site-settings/sitemap";
+import { findCatalogItem } from "@/features/products/catalog";
+import { publishGoesLive } from "@/lib/blocks/live-scope";
 
 /**
  * เทสต์ S3 ส่วนที่ 2 — หน้ารายละเอียดหมวดสินค้าแก้ได้จากหลังบ้าน (รอบที่ 102)
@@ -89,13 +91,13 @@ test("product-detail: ทุก id มีพาธใน PAGE_PATHS และพ
 /* ── 2) เทมเพลตต่อหมวด ────────────────────────────────────────────────────── */
 
 test("product-detail: slug ที่ไม่รู้จักสร้างเทมเพลตไม่ได้ (กันเขียนทับหน้าอื่น)", () => {
-  assert.equal(buildProductDetailTemplate("not-a-category"), null);
-  assert.equal(buildProductDetailTemplate(""), null);
+  assert.equal(buildProductDetailDocument("not-a-category"), null);
+  assert.equal(buildProductDetailDocument(""), null);
 });
 
 test("product-detail: เทมเพลตต่อหมวด mirror หน้า stub เดิม และผ่าน parser + validator", () => {
   for (const item of CATALOG_ITEMS) {
-    const template = buildProductDetailTemplate(item.slug);
+    const template = buildProductDetailDocument(item.slug);
     assert.ok(template !== null, `${item.slug}: ต้องมีเทมเพลต`);
     if (template === null) continue;
 
@@ -201,4 +203,105 @@ test("product-detail: หน้าที่ซ่อนจากเมนูแ�
     locales: LOCALES,
   });
   assert.equal(noindex.some((entry) => entry.url.includes("/products")), false, "noindex ต้องไม่อยู่ใน sitemap");
+});
+
+/* ── รอบที่ 270 (มติเจ้าของ): เอกสารตั้งต้นใน DB + กดเผยแพร่ขึ้นเว็บ + ค่าเริ่มต้น = เทมเพลต+ค่าจริง ── */
+
+const DETAIL_VALUES: ProductDetailCategoryValues = {
+  slug: "serda",
+  nameTh: "ซือดะ (SERDA)",
+  nameEn: "Serda",
+  descriptionTh: "คำอธิบายจากหลังบ้าน",
+  descriptionEn: "Description from admin",
+  imagePath: "/media/logoTEST",
+  imageWidth: 400,
+  imageHeight: 300,
+  hasProducts: true,
+};
+
+test("product-detail: เอกสารตั้งต้นใช้ 'ค่าจริงจากฐานข้อมูล' ก่อน (ชื่อ/คำอธิบาย/ภาพ) — ว่างจึงถอยพจนานุกรม", () => {
+  const doc = buildProductDetailDocument("serda", DETAIL_VALUES);
+  assert.ok(doc !== null);
+  const hero = doc?.blocks[0];
+  assert.ok(hero !== undefined && hero.type === "hero");
+  if (hero === undefined || hero.type !== "hero") return;
+
+  assert.equal(hero.title.th, "ซือดะ (SERDA)", "ชื่อไทยจาก DB ต้องมาก่อนพจนานุกรม");
+  assert.equal(hero.title.en, "Serda", "ชื่ออังกฤษจาก DB ต้องมาก่อนพจนานุกรม");
+  assert.equal(hero.subtitle.th, "คำอธิบายจากหลังบ้าน");
+  assert.equal(hero.subtitle.en, "Description from admin");
+  assert.equal(hero.image?.path, "/media/logoTEST", "ภาพต้องมาจากคลัง (/media/<id>) — มติ D9");
+  assert.equal(hero.image?.hasWatermark, false, "ภาพจากคลังไม่ใช่ภาพติดลายน้ำ");
+  assert.equal(hero.ctaHref, "/products", "ปุ่มย้อนกลับต้องเป็นพาธกลาง");
+  assert.equal(hero.note.th, th.productsPage.eyebrow, "หมวดที่มีสินค้า ⇒ eyebrow เดียวกับหน้าเว็บจริง");
+
+  /* ค่าใน DB ว่าง = ถอยไปใช้พจนานุกรม/ไฟล์ใน public (หน้าเว็บไม่พัง) */
+  const fallback = buildProductDetailDocument("serda", { ...DETAIL_VALUES, nameTh: "  ", descriptionTh: "", imagePath: null });
+  const fHero = fallback?.blocks[0];
+  assert.ok(fHero !== undefined && fHero.type === "hero");
+  if (fHero === undefined || fHero.type !== "hero") return;
+  assert.equal(fHero.title.th, th.productsPage.items.serda.name);
+  assert.equal(fHero.subtitle.th, th.productsPage.detailStub.body);
+  assert.equal(fHero.image?.path, findCatalogItem("serda")?.image.src);
+
+  /* ไม่มีสินค้าในหมวด = eyebrow ของหน้า stub (ตรงกับหน้าเว็บ) */
+  const noProducts = buildProductDetailDocument("serda", { ...DETAIL_VALUES, hasProducts: false });
+  const nHero = noProducts?.blocks[0];
+  assert.ok(nHero !== undefined && nHero.type === "hero");
+  if (nHero !== undefined && nHero.type === "hero") {
+    assert.equal(nHero.note.th, th.productsPage.detailStub.eyebrow);
+  }
+
+  /* slug ที่ไม่รู้จัก (ไม่มีในโค้ด ไม่มีค่า DB) = null — ห้ามเขียนทับหน้าอื่น */
+  assert.equal(buildProductDetailDocument("not-a-category", null), null);
+});
+
+test("product-detail: เอกสารตั้งต้นทั้ง 6 หน้าผ่าน parser + validator 0 error", () => {
+  for (const pageId of PRODUCT_DETAIL_PAGE_IDS) {
+    const slug = productDetailSlugOfPageId(pageId);
+    assert.ok(slug !== null);
+    const document = buildProductDetailDocument(slug ?? "");
+    assert.ok(document !== null, `${pageId}: ต้องสร้างเอกสารได้`);
+    if (document === null) continue;
+    assert.equal(document.page, pageId, `${pageId}: id ของเอกสารต้องตรงกับหน้าจอ`);
+
+    const parsed = parseBlockDocument(pageId, JSON.parse(JSON.stringify(document)) as unknown);
+    assert.ok(parsed.ok, `${pageId}: ต้องผ่าน parser`);
+    if (!parsed.ok) continue;
+    const errors = documentErrorsOf(validateDocument(parsed.document));
+    assert.equal(errors.length, 0, `${pageId}: ${errors.map((entry) => entry.code).join(", ")}`);
+  }
+});
+
+test("product-detail: กดเผยแพร่ = ขึ้นเว็บทันที (มติเจ้าของรอบ 270) — ทุก id ของหน้า detail", () => {
+  for (const pageId of PRODUCT_DETAIL_PAGE_IDS) {
+    assert.equal(publishGoesLive(pageId), true, `${pageId}: ต้องขึ้นเว็บเมื่อกดเผยแพร่`);
+  }
+  assert.equal(publishGoesLive("news"), false, "หน้าอื่นต้องไม่ถูกเปลี่ยนนโยบายไปด้วย");
+  assert.equal(publishGoesLive("contact"), true, "หน้าติดต่อยังขึ้นเว็บเหมือนเดิม");
+});
+
+test("product-detail: ตัวนำเข้า = ฉบับร่าง + validator ก่อนเขียน + ไม่ทับงานคน + ไม่เผยแพร่เอง", () => {
+  const source = readFileSync(path.join(ROOT, "scripts/import-product-details.ts"), "utf8");
+  assert.ok(source.includes("validateDocument("), "ต้องรัน validator ก่อนเขียน (บทเรียนรอบ 257)");
+  assert.ok(source.includes("parseBlockDocument("), "ต้อง parse ด้วยตัวตรวจกลาง");
+  assert.ok(source.includes('loadDocumentRow(pageId, "draft")'), "ต้องอ่านฉบับร่างเดิมก่อน");
+  assert.ok(source.includes("--force"), "ต้องมีทางเลือก --force");
+  assert.ok(source.includes("saveDraft("), "เขียนด้วย saveDraft (มีประวัติ/ผู้เขียน)");
+  assert.ok(!/publishDraft|setPageLive/.test(source), "ห้ามเผยแพร่เอง — เจ้าของกดจากหลังบ้าน");
+
+  const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as {
+    readonly scripts: Readonly<Record<string, string>>;
+  };
+  assert.ok(
+    pkg.scripts["products:detail-import"]?.includes("scripts/import-product-details.ts"),
+    "ต้องมีสคริปต์ npm run products:detail-import",
+  );
+});
+
+test("product-detail: หน้าที่เรนเดอร์จากบล็อกต้องมี h1 พอดี 1 อัน", () => {
+  const page = readFileSync(path.join(ROOT, "app/[lang]/products/[slug]/page.tsx"), "utf8");
+  assert.ok(page.includes("heading={displayName}"), "ต้องส่ง heading ให้ BlockDocumentView (ไม่งั้นไม่มี h1)");
+  /* ตารางสินค้ายังต่อท้ายเสมอ — ไม่ใช่บล็อก ⇒ สินค้าจริงหายไม่ได้ */
+  assert.ok(page.includes("<ProductListSection"), "ต้องยังเรนเดอร์รายการสินค้าจากฐานข้อมูล");
 });

@@ -1,3 +1,5 @@
+
+import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 /**
  * นโยบาย "กดเผยแพร่ = ขึ้นเว็บทันที" — มติเจ้าของ 2026-10-09 (รอบที่ 240 · ขยายรอบที่ 253)
  *
@@ -35,6 +37,8 @@ export const PUBLISH_GOES_LIVE_PAGES = ["home", "about", "executives", "certific
 
 /** หน้านี้กดเผยแพร่แล้วหน้าเว็บจะเปลี่ยนทันทีหรือไม่ */
 export function publishGoesLive(page: string): boolean {
+  /* รอบที่ 270: หน้า "รายละเอียดหมวดสินค้า" ทั้ง 6 ขึ้นเว็บเมื่อกดเผยแพร่ (มติเจ้าของ) */
+  if (isProductDetailPageId(page)) return true;
   return (PUBLISH_GOES_LIVE_PAGES as readonly string[]).includes(page);
 }
 

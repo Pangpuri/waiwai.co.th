@@ -8,7 +8,9 @@ import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { ABOUT_MEDIA, aboutImagePath } from "@/lib/blocks/about-media";
 import { documentDiff } from "@/lib/blocks/diff";
+import { isProductDetailPageId } from "@/lib/blocks/product-detail";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
+import { loadProductDetailCategoryValues } from "@/lib/products/repository";
 import { buildBlockTemplate, hasBlockTemplate, isBlockBuilderPage } from "@/lib/blocks/templates";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { decideTemplateApply } from "@/lib/blocks/template-apply";
@@ -404,8 +406,15 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
     ℹ️ รอบที่ 260: หน้า `about` ออกจากเส้นทางนี้แล้ว (ใช้ตัวนำเข้า — ไม่มีเทมเพลตตั้งต้น)
   */
   /* รอบที่ 262: หน้า "ใบรับรองมาตรฐาน" ใช้ภาพจากคลังภาพด้วย (คีย์ `cert:<id>` ในทะเบียน) */
-  const templateOptions =
-    page === "executives" || page === "certifications"
+  /*
+    รอบที่ 270: เทมเพลตหน้า "รายละเอียดหมวดสินค้า" ต้องได้ **ชื่อ/คำอธิบาย/โลโก้หมวดจากฐานข้อมูล**
+    (มติเจ้าของ: ค่าเริ่มต้น = เทมเพลต + ค่าจริงจาก DB) ⇒ อ่านหมวดทั้งหมดแล้วส่งตัวช่วยเข้าไป
+    (เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์ · อ่านไม่ได้ = ถอยไปใช้พจนานุกรม/ไฟล์ใน public)
+  */
+  const awaitValues = isProductDetailPageId(page) ? await loadProductDetailCategoryValues() : null;
+  const templateOptions = isProductDetailPageId(page)
+    ? { categoryValues: (slug: string) => (awaitValues ?? new Map()).get(slug) ?? null }
+    : page === "executives" || page === "certifications"
       ? { image: await aboutTemplateImageResolver() }
       : undefined;
   const template = buildBlockTemplate(page, templateOptions);

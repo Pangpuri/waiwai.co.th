@@ -1,3 +1,4 @@
+import type { ProductDetailCategoryValues } from "@/lib/products/detail-document";
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import type { ImageWriteMode } from "@/lib/products/media-mode";
 import { readQuery } from "@/lib/db/read";
@@ -270,6 +271,33 @@ export type ProductCategoryCardRecord = {
   /** ซ่อนจากเว็บ (มติ D25 ข้อ 3) — คิวรีสาธารณะกรองออกให้แล้ว */
   readonly isHidden: boolean;
 };
+
+/**
+ * ค่าจริงของหมวด → **ค่าที่ใช้สร้าง "เอกสารตั้งต้น" ของหน้ารายละเอียดหมวด** (รอบที่ 270)
+ *
+ * ⚠️ ลำดับภาพต้องตรงกับหน้าเว็บจริง (`heroImageOf()` ในหน้า `/products/[slug]`): **โลโก้ก่อน แล้วจึงภาพหัวหมวด**
+ *    ไม่งั้นค่าเริ่มต้นที่ได้จะไม่เหมือนหน้าเว็บที่ผู้ใช้เห็น
+ */
+export function detailCategoryValuesOf(row: AdminProductCategoryItem): ProductDetailCategoryValues {
+  const useLogo = row.logoPath !== null && row.logoPath.trim() !== "";
+  return {
+    slug: row.id,
+    nameTh: row.nameTh,
+    nameEn: row.nameEn,
+    descriptionTh: row.descriptionTh,
+    descriptionEn: row.descriptionEn,
+    imagePath: useLogo ? row.logoPath : row.imagePath,
+    imageWidth: useLogo ? row.logoWidth : row.imageWidth,
+    imageHeight: useLogo ? row.logoHeight : row.imageHeight,
+    hasProducts: row.productCount > 0,
+  };
+}
+
+/** ค่าจริงของทุกหมวด (คีย์ = slug) — ให้ผู้เรียกที่อ่าน DB ได้ (Server Action · ตัวนำเข้า) ส่งเข้าเทมเพลต */
+export async function loadProductDetailCategoryValues(): Promise<ReadonlyMap<string, ProductDetailCategoryValues>> {
+  const rows = await listProductCategoriesForAdmin();
+  return new Map(rows.map((row) => [row.id, detailCategoryValuesOf(row)]));
+}
 
 export async function listProductCategoryCards(): Promise<readonly ProductCategoryCardRecord[]> {
   if (!isDatabaseConfigured()) return [];
