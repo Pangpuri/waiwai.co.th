@@ -24,15 +24,11 @@ export const adminBlockTypes = {
   blockFormKind: "ชนิดฟอร์ม",
   blockFormContact: "แบบฟอร์มติดต่อ",
   blockFormNewsletter: "รับข่าวสาร",
-  blockFormCareers: "สมัครงาน",
   blockFormHint: "ฟอร์มนี้ใช้ระบบจริงของเว็บ — เก็บลงฐานข้อมูล · มีกับดักบอต · ขอยินยอมตาม PDPA แล้ว",
   /* แผนที่ */
   blockMapLink: "ลิงก์เปิดแผนที่ (https://…)",
   blockMapLinkText: "ข้อความบนปุ่ม (ไม่บังคับ)",
   /* กระดานรับสมัครงาน (รอบที่ 88) */
-  blockJobItems: "ตำแหน่ง ({n}/{max})",
-  blockAddJob: "เพิ่มตำแหน่ง",
-  blockRemoveJob: "ลบตำแหน่ง",
   blockJobNumber: "ตำแหน่งที่ {n}",
   blockJobTitle: "ชื่อตำแหน่ง",
   blockJobDepartment: "ฝ่าย (ใช้จัดกลุ่ม)",
@@ -53,7 +49,6 @@ export const adminBlockTypes = {
   blockShowcaseFeatured: "แสดงสินค้าแนะนำ",
   blockShowcaseFeaturedCount: "สินค้าแนะนำกี่ตัวต่อหมวด",
   blockShowcaseHint: "บล็อกนี้ดึงข้อมูลจริงจากฐานข้อมูล (ชื่อหมวด · คำอธิบาย · ภาพ · จำนวน · สินค้าแนะนำ) — ไม่ต้องคีย์เอง",
-  blockJobGrouping: "จัดกลุ่มตามฝ่าย",
   /* รายชื่อคณะผู้บริหาร (รอบที่ 88) */
   blockRosterMembers: "รายชื่อ ({n}/{max})",
   blockAddMember: "เพิ่มรายชื่อ",

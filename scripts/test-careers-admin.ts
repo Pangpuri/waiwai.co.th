@@ -11,7 +11,6 @@ import {
   MAX_JOB_TEXT_LENGTH,
   MAX_JOB_TITLE_LENGTH,
   jobAge,
-  jobBoardItems,
   jobDepartments,
   jobExperience,
   jobQualifications,
@@ -33,7 +32,7 @@ import {
  * ล็อกสิ่งเหล่านี้กันถอยหลัง
  * 1. ตรวจข้อมูล: ชื่อไทยบังคับ · เพศ/อายุ/EN ว่างได้ (มติ D26 ข้อ 4) · เพดานจำนวน/ความยาว
  * 2. การเรียง/ตัวเลข/ฝ่าย (ตัวกรอง + ตัวเลข 3 ช่องบนหน้า /careers)
- * 3. แปลงเป็น `JobBoardItem` ของบล็อก + ถอยภาษา EN → ไทย
+ * 3. ตัวเลือกภาษา (EN ว่าง = ถอยไทย) + ตัวเลข/ฝ่ายที่หน้าเว็บใช้
  * 4. ประตูความปลอดภัยที่ต้องอยู่ในโค้ด (อ่านสาธารณะผ่าน role อ่าน · ประตู SQL · action ตรวจสิทธิ์)
  * 5. ของในถังขยะถูกนับรวมในระบบถังกลาง (ตัวลบอัตโนมัติ 30 วัน = คำสัญญาบนจอต้องจริง)
  */
@@ -175,14 +174,6 @@ test("ประกาศงาน: ถอยภาษา EN → ไทย เม
   assert.equal(jobExperience(bilingual, "en"), "1 year");
 });
 
-test("ประกาศงาน: แปลงเป็นรายการของบล็อก jobBoard ได้ทั้งสองภาษา", () => {
-  const items = jobBoardItems([posting({ id: "a", titleTh: "ก", titleEn: "A", departmentTh: "ฝ่าย", openings: 4 })]);
-  assert.equal(items.length, 1);
-  assert.deepEqual({ ...items[0]?.title }, { th: "ก", en: "A" });
-  assert.equal(items[0]?.openings, 4);
-  assert.equal(items[0]?.id, "a");
-});
-
 /* ── 3) ประตูความปลอดภัยในโค้ด ───────────────────────────────────────────── */
 
 test("ประกาศงาน: คำสั่งอ่านฝั่งเว็บใช้ประตูอ่านอย่างเดียว + มีเงื่อนไข 'เผยแพร่และไม่อยู่ในถัง'", () => {
@@ -286,10 +277,12 @@ test("ประกาศงาน: ของเดิมของหน้า /c
     "features/careers/board.ts",
     "features/careers/jobs.ts",
     "features/careers/ui/job-board.tsx",
-    "lib/blocks/careers-template.ts",
   ]) {
     assert.ok(sourceOf(file).length > 0, `${file} ต้องยังมีอยู่จริง`);
   }
-  const template = codeOf("lib/blocks/careers-template.ts");
-  assert.ok(template.includes("JOBS"), "เทมเพลตยังสร้างกระดานจากข้อมูลตั้งต้นในโค้ด (ทางถอย)");
+  /* รอบที่ 266: ถอดตัวสร้างหน้า careers + เทมเพลต + บล็อก jobBoard ออกแล้ว — ต้องไม่กลับมา */
+  assert.throws(() => sourceOf("lib/blocks/careers-template.ts"), "เทมเพลต careers ต้องถูกลบแล้ว");
+  const registry = codeOf("lib/blocks/templates.ts");
+  assert.ok(!registry.includes("careers"), "ทะเบียนเทมเพลตต้องไม่มี careers");
+  assert.ok(!codeOf("lib/blocks/types.ts").includes("jobBoard"), "ชนิดบล็อก jobBoard ต้องถูกถอดออก");
 });

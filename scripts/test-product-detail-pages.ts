@@ -82,8 +82,8 @@ test("product-detail: ทุก id มีพาธใน PAGE_PATHS และพ
     assert.equal(hasBlockTemplate(pageId), true, `${pageId}: ต้องมีเทมเพลต`);
   }
 
-  /* ทะเบียนเทมเพลตรวม = หน้าเมนู 9 + หน้า detail ทั้งหมด */
-  assert.equal(BLOCK_TEMPLATE_PAGE_IDS.length, 9 + CATALOG_ITEMS.length);
+  /* ทะเบียนเทมเพลตรวม = หน้าเมนู 8 + หน้า detail ทั้งหมด (รอบที่ 266: ตัด careers ออก) */
+  assert.equal(BLOCK_TEMPLATE_PAGE_IDS.length, 8 + CATALOG_ITEMS.length);
 });
 
 /* ── 2) เทมเพลตต่อหมวด ────────────────────────────────────────────────────── */

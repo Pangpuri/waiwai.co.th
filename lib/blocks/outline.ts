@@ -51,7 +51,6 @@ function headingTextOf(block: Block): LocalizedValue | null {
     case "table":
     case "map":
     case "gallery":
-    case "jobBoard":
     case "rosterText":
     case "recipeCards":
     case "productShowcase":

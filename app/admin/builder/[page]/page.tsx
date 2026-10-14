@@ -57,8 +57,6 @@ function coveragePartLabel(
       return strings.coverageForm;
     case "map":
       return strings.coverageMap;
-    case "jobBoard":
-      return strings.coverageJobBoard;
     case "whereToBuy":
       return strings.coverageWhereToBuy;
     case "sampleData":
@@ -96,6 +94,14 @@ export default async function AdminBuilderPage({
   const pages = await listPages(defaultPages(messages));
   const currentPage = pages.find((entry) => entry.id === page);
   if (currentPage === undefined) notFound();
+
+  /*
+    ⚠️ รอบที่ 266: หน้าที่ **ไม่มีเทมเพลตและไม่ได้มาจากตัวนำเข้า** = ไม่มีจอตัวสร้าง
+    (เช่น `careers` ที่เจ้าของสั่งถอดออก เพราะเนื้อหาย้ายไปอยู่ที่จอประกาศรับสมัครงาน `/admin/careers`)
+    ⇒ ตอบ 404 ตรงนี้ **ก่อน** เริ่มเรนเดอร์ เพื่อไม่ให้เหลือทาง "สลับหน้านี้ไปใช้บล็อก" ที่ไม่มีใครอ่านเอกสาร
+    (หน้าอื่นยังเข้าได้ครบ · `about` เข้าได้เพราะมาจากตัวนำเข้า ⇒ กลับไปใช้ดีไซน์เดิมได้)
+  */
+  if (!isBlockBuilderPage(page) && !isImportedContentPage(page)) notFound();
 
   /*
     คลังภาพสำหรับ "เลือกจากคลัง" ในช่องภาพ (รอบที่ 93)

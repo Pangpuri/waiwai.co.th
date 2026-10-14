@@ -128,10 +128,11 @@ test("about: ต้องไม่มีเทมเพลตตั้งต้�
   assert.equal(hasBlockTemplate("about"), false, "ห้ามเสนอปุ่ม 'เริ่มจากเทมเพลต' ให้หน้า /about");
   assert.equal(buildBlockTemplate("about"), null, "เรียกสร้างเทมเพลต about ต้องได้ null (ไม่ใช่เอกสารทับของเดิม)");
 
-  /* หน้าอื่นยังมีเทมเพลตตามเดิม — ต้องไม่เผลอปิดทั้งระบบ */
+  /* หน้าอื่นยังมีเทมเพลตตามเดิม — ต้องไม่เผลอปิดทั้งระบบ
+     (รอบที่ 266: `careers` ไม่มีเทมเพลตแล้วเช่นกัน — เนื้อหาอยู่ที่จอประกาศรับสมัครงาน) */
   assert.equal(hasBlockTemplate("home"), true);
   assert.equal(hasBlockTemplate("executives"), true);
-  assert.equal(hasBlockTemplate("careers"), true);
+  assert.equal(hasBlockTemplate("careers"), false, "careers: ตัวสร้างหน้า/เทมเพลตถูกถอดออกแล้ว (รอบที่ 266)");
 
   assert.equal(
     existsSync(path.join(ROOT, "lib/blocks", "about-template.ts")),

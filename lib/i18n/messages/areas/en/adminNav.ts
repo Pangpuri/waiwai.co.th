@@ -12,7 +12,6 @@ export const enAdminNav = {
   navProducts: "Edit products page",
   navRecipes: "Edit recipes",
   navNews: "Edit news & activities",
-  navCareers: "Edit careers page",
   navContact: "Edit contact page",
   navStructured: "Home page — field editor (legacy layout)",
   /* Round 260: screen that used to be reachable from the overview card only — added to the menu */

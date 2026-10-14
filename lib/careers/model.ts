@@ -1,5 +1,3 @@
-import type { LocalizedValue } from "@/lib/content/types";
-
 /**
  * ตรรกะล้วนของ "ประกาศรับสมัครงาน" (`job_posting`) — รอบที่ 265 · มติเจ้าของ D26
  *
@@ -8,7 +6,8 @@ import type { LocalizedValue } from "@/lib/content/types";
  * พจนานุกรม ⇒ ฝ่ายบุคคลแก้ประกาศเองไม่ได้ · ประกาศรับสมัคร **เปลี่ยนบ่อย** (ที่มาของงานรอบนี้)
  *
  * ภาพรวมการไหล: `job_posting` (ตาราง) → `lib/careers/repository.ts` → เลย์เอาต์หน้า /careers
- * + บล็อก `jobBoard` ที่ตั้ง `source = "database"` (ผ่าน `loadJobBoardData`)
+ * (+ จอหลังบ้าน `/admin/careers` · `/th/careers` ใช้เลย์เอาต์นี้เท่านั้น — ตัวสร้างหน้า/เทมเพลต
+ *  และบล็อก `jobBoard` ถูกถอดออกแล้วในรอบที่ 266)
  */
 
 /** สถานะประกาศ — ตรงกับ check constraint ใน migration 0040 */
@@ -211,26 +210,4 @@ export function jobStats(postings: readonly JobPosting[]): JobStats {
     openings: postings.reduce((sum, posting) => sum + Math.max(0, posting.openings), 0),
     departments: new Set(postings.map((posting) => posting.departmentTh.trim()).filter((name) => name !== "")).size,
   };
-}
-
-/**
- * แปลงแถวฐานข้อมูล → `JobBoardItem` ของบล็อก `jobBoard` (ทั้งสองภาษา)
- * ⇒ บล็อกที่ตั้ง `source = "database"` เรนเดอร์ด้วยตัวเรนเดอร์เดิมได้ทันที (ไม่ต้องมีโค้ดแสดงผลชุดที่สอง)
- */
-export function jobBoardItems(postings: readonly JobPosting[]): readonly {
-  readonly id: string;
-  readonly title: LocalizedValue;
-  readonly department: LocalizedValue;
-  readonly openings: number;
-  readonly qualifications: LocalizedValue;
-  readonly experience: LocalizedValue;
-}[] {
-  return sortJobPostings(postings).map((posting) => ({
-    id: posting.id,
-    title: { th: posting.titleTh, en: posting.titleEn },
-    department: { th: posting.departmentTh, en: posting.departmentEn },
-    openings: posting.openings,
-    qualifications: { th: posting.qualificationsTh, en: posting.qualificationsEn },
-    experience: { th: posting.experienceTh, en: posting.experienceEn },
-  }));
 }

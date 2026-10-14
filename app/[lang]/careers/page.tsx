@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { BlockDocumentView } from "@/features/blocks/block-renderer";
-import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
 import { buildBoard, buildPostingBoard } from "@/features/careers/board";
 import { CAREERS_CONTACT } from "@/features/careers/contact";
@@ -64,16 +62,11 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
   const messages = await getMessages(lang);
 
   /*
-    ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 82) ────────────────────────────────
-    1. ถ้าหลังบ้าน **กดเผยแพร่ (มติ 2026-10-09: หน้าแรกขึ้นเว็บทันที · หน้าอื่นยังไม่ขึ้นเว็บ)** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
-       (ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
-    2. ถ้าไม่ ⇒ ใช้เลย์เอาต์ที่ออกแบบไว้ด้านล่างเหมือนเดิม **ไม่มีการเปลี่ยนแปลงโดยไม่ตั้งใจ**
-    หน้าเว็บยังเปิดได้เสมอ แม้ไม่มีฐานข้อมูล (เดโม) หรือฐานข้อมูลล่ม — ตัวโหลดคืน null ให้เอง
+    ── เนื้อหาของหน้านี้มาจากไหน (รอบที่ 266) ────────────────────────────────────
+    หน้า /careers **ไม่มีตัวสร้างหน้า/เทมเพลตบล็อกแล้ว** (มติเจ้าของ: ตัวสร้างเดิมไม่เคยใช้งาน
+    และเนื้อหาจริงย้ายไปอยู่ที่ "ประกาศรับสมัครงาน" ในฐานข้อมูล + จอ `/admin/careers` — รอบที่ 265)
+    ⇒ หน้านี้เรนเดอร์จากเลย์เอาต์ในโค้ดเสมอ โดยดึง **ตำแหน่งที่เปิดรับจากฐานข้อมูล**
   */
-  const liveDocument = await loadLiveBlockDocument("careers");
-  if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
-  }
 
   const m = messages.careersPage;
 

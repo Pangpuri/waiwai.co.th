@@ -10,10 +10,9 @@ import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { HOME_SECTIONS_OWNED_HERE, ownerOfSection } from "@/lib/content/home-section-owners";
 import { HOME_SECTIONS } from "@/lib/content/model";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
-import { BLOCK_COVERAGE_PART_IDS, BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
+import { BLOCK_COVERAGE_PART_IDS, BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage } from "@/lib/blocks/templates";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
-import { JOBS } from "@/features/careers/jobs";
 import { MAX_BLOCKS_TOTAL } from "@/lib/blocks/types";
 import { PAGE_PATHS, PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
 
@@ -36,13 +35,26 @@ function sourceOf(relativePath: string): string {
 
 /* ── 1) ทะเบียนเทมเพลต ─────────────────────────────────────────────────────── */
 
-test("templates: ทะเบียนครบ 9 หน้าเมนู + 6 หน้ารายละเอียดหมวด และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
+test("templates: หน้าที่ถูกถอดออกจากทะเบียน (careers) ต้องไม่มีจอตัวสร้าง — กันทาง 'กดเผยแพร่ทับ' กลับมา", () => {
+  assert.equal(isBlockBuilderPage("careers"), false, "careers ต้องไม่อยู่ในทะเบียนจอตัวสร้างแล้ว");
+  assert.equal(hasBlockTemplate("careers"), false, "careers ต้องไม่มีเทมเพลตตั้งต้น");
+  assert.equal(buildBlockTemplate("careers"), null);
+  assert.equal(isImportedContentPage("careers"), false, "careers ไม่ได้มาจากตัวนำเข้า ⇒ ต้องไม่เหลือทางเข้า");
+
+  /* จอตัวสร้างต้องกันตัวเองไว้ (404) — ไม่งั้นมีทาง 'สลับหน้าไปใช้บล็อก' ที่ไม่มีใครอ่านเอกสาร */
+  const builder = sourceOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(
+    builder.includes('if (!isBlockBuilderPage(page) && !isImportedContentPage(page)) notFound();'),
+    "จอตัวสร้างต้องปฏิเสธหน้าที่ไม่มีเทมเพลต/ไม่ได้มาจากตัวนำเข้า",
+  );
+});
+
+test("templates: ทะเบียนครบ 8 หน้าเมนู + 6 หน้ารายละเอียดหมวด และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
   assert.deepEqual(
     [...BLOCK_TEMPLATE_PAGE_IDS],
     [
       "home",
       "about",
-      "careers",
       "contact",
       "products",
       "recipes",
@@ -113,7 +125,6 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
     (เปิดแล้วส่วนนั้นหายจากหน้าเว็บจริง) — ถ้าวันหนึ่งทำเป็นบล็อกได้ ค่อยถอดออกจากรายการนี้
   */
   assert.deepEqual([...blockCoverageGaps("contact")], [], "รอบที่ 87: ฟอร์ม + แผนที่เป็นบล็อกแล้ว ⇒ หน้าติดต่อครอบคลุมครบ");
-  assert.deepEqual([...blockCoverageGaps("careers")], [], "รอบที่ 88: กระดานงาน + ฟอร์มเป็นบล็อกแล้ว ⇒ หน้าสมัครงานครอบคลุมครบ");
   assert.deepEqual([...blockCoverageGaps("certifications")], [], "รอบที่ 87: gallery มี lightbox ในตัว ⇒ ครอบคลุมครบ");
   /*
     executives: **ไม่มีช่องว่างแล้ว** — เจ้าของยืนยัน (2026-10-03) ว่าภาพผัง `public/executives/management-team.jpg`
@@ -172,8 +183,6 @@ test("templates: หน้าที่ปิดช่อง coverage ต้อ�
 
   assert.ok(typesOf("contact").includes("form"), "contact: ต้องมีบล็อกฟอร์มติดต่อจริง");
   assert.ok(typesOf("contact").includes("map"), "contact: ต้องมีบล็อกแผนที่ (ภาพ)");
-  assert.ok(typesOf("careers").includes("form"), "careers: ต้องมีบล็อกฟอร์มสมัครงาน");
-  assert.ok(typesOf("careers").includes("jobBoard"), "careers: ต้องมีบล็อกกระดานรับสมัครงาน");
   assert.ok(typesOf("certifications").includes("gallery"), "certifications: ต้องมีบล็อกแกลเลอรี (มี lightbox)");
 
   /* ชนิดฟอร์มต้องตรงกับหน้าของเทมเพลต (กันต่อฟอร์มผิดหน้า) */
@@ -185,23 +194,12 @@ test("templates: หน้าที่ปิดช่อง coverage ต้อ�
     return block.kind;
   };
   assert.equal(formKindOf("contact"), "contact");
-  assert.equal(formKindOf("careers"), "careers");
 
   /* หน้าที่ปิดช่องแล้ว = ต้องไม่มีรายการขาดเหลือ */
-  for (const page of ["contact", "certifications", "careers"]) {
+  for (const page of ["contact", "certifications"]) {
     assert.deepEqual([...blockCoverageGaps(page)], [], `${page}: ปิดช่องครบแล้ว`);
   }
 
-  /* กระดานงานต้องมี "ตำแหน่งจริง" ครบตามข้อมูลบริษัท (ไม่ใช่บล็อกเปล่า/ข้อมูลสมมติ) */
-  const board = buildBlockTemplate("careers")?.blocks.find((entry) => entry.type === "jobBoard");
-  assert.ok(board !== undefined && board.type === "jobBoard", "careers: ต้องมีบล็อกกระดานงาน");
-  assert.equal(board.items.length, JOBS.length, "จำนวนตำแหน่งต้องเท่ากับข้อมูลจริง");
-  assert.equal(new Set(board.items.map((item) => item.id)).size, board.items.length, "id ของตำแหน่งต้องไม่ซ้ำ");
-  for (const item of board.items) {
-    assert.ok(item.title.th.trim() !== "", "ทุกตำแหน่งต้องมีชื่อไทย");
-    assert.ok(item.department.th.trim() !== "", "ทุกตำแหน่งต้องมีฝ่าย");
-    assert.ok(item.openings >= 1, "ตำแหน่งจากข้อมูลจริงต้องมีอัตราอย่างน้อย 1");
-  }
 });
 
 test("templates: คำเตือนเรื่องส่วนที่ขาดต้องแสดงทั้งตอนว่างและข้างสวิตช์ (คอมโพเนนต์กลางตัวเดียว)", () => {
@@ -286,7 +284,6 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
   const menuRouteFiles: Readonly<Record<string, string>> = {
     home: "app/[lang]/page.tsx",
     about: "app/[lang]/about/page.tsx",
-    careers: "app/[lang]/careers/page.tsx",
     contact: "app/[lang]/contact/page.tsx",
     products: "app/[lang]/products/page.tsx",
     recipes: "app/[lang]/recipes/page.tsx",
@@ -375,7 +372,7 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
   assert.ok(!JSON.stringify(doc).includes("ข้อมูลทดสอบ"), "ห้ามมีข้อมูลทดสอบ");
 
   /* หน้าอื่นยังใช้บล็อก hero ได้ปกติ (ไม่กระทบ) — รอบที่ 260: about ไม่มีเทมเพลตตั้งต้นแล้ว จึงตัดออกจากรายการนี้ */
-  for (const page of ["contact", "careers"]) {
+  for (const page of ["contact"]) {
     const other = buildBlockTemplate(page as never);
     assert.ok(JSON.stringify(other).includes('"hero"'), `${page} ยังต้องมีบล็อก hero`);
   }

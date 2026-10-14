@@ -1,4 +1,3 @@
-import { buildCareersTemplate } from "@/lib/blocks/careers-template";
 import { buildCertificationsTemplate } from "@/lib/blocks/certifications-template";
 import { buildContactTemplate } from "@/lib/blocks/contact-template";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
@@ -24,11 +23,13 @@ import type { BlockDocument } from "@/lib/blocks/types";
  * - หน้าที่ไม่มีเทมเพลต = ยังใช้เลย์เอาต์ที่ออกแบบไว้ + หน้าจอเนื้อหาแบบฟิลด์เดิม (ไม่ใช่ข้อผิดพลาด)
  */
 
-/** หน้าเมนูหลักที่มีเทมเพลต (9 หน้าเดิม — S2 รอบที่ 83) */
+/** หน้าเมนูหลักที่มีเทมเพลต (รอบที่ 266: 8 หน้า — ตัด careers ออก) */
 const MENU_TEMPLATE_PAGE_IDS = [
   "home",
   "about",
-  "careers",
+  /* ⚠️ รอบที่ 266: `careers` **ไม่มีเทมเพลต/ไม่มีจอตัวสร้างหน้า** แล้ว (มติเจ้าของ)
+     เหตุผล: เนื้อหาหน้าอยู่ที่ **ประกาศรับสมัครงานในฐานข้อมูล** + จอ `/admin/careers` (รอบที่ 265)
+     ⇒ ตัวสร้างหน้า careers ไม่มีอะไรให้แก้ และเป็นทาง "กดเผยแพร่ทับหน้า" ที่ไม่ต้องการ */
   "contact",
   "products",
   "recipes",
@@ -69,7 +70,6 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: Templa
     กด "เริ่มจากเทมเพลต" แล้ว **ทับเนื้อหาที่นำเข้าจริงทั้งหน้า**
   */
   about: null,
-  careers: buildCareersTemplate,
   contact: buildContactTemplate,
   products: buildProductsTemplate,
   recipes: buildRecipesTemplate,
@@ -117,7 +117,6 @@ export const BLOCK_COVERAGE_PART_IDS = [
   "lightbox",
   "form",
   "map",
-  "jobBoard",
   "sampleData",
   "rosterText",
 ] as const;
@@ -137,8 +136,6 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
     รวม **แกลเลอรีใบรับรองมาตรฐาน 11 ใบ** (ภาพจริงจากคลังภาพ) ⇒ ไม่มีช่องว่างเหลือ
   */
   about: [],
-  /* รอบที่ 88: บล็อก `jobBoard` (ตำแหน่งจริงจาก `JOBS`) ⇒ ครอบคลุมครบ */
-  careers: [],
   /* รอบที่ 87: ฟอร์มติดต่อ + แผนที่ (ภาพ) เป็นบล็อกแล้ว ⇒ ครอบคลุมครบ */
   contact: [],
   /* หน้านี้แสดงเป็นกริดการ์ดสินค้าอยู่แล้ว (`cards`) — ไม่มีแกลเลอรี/lightbox แยก */

@@ -38,14 +38,6 @@ export type GalleryStrings = {
   readonly dialog: string;
 };
 
-/** ข้อความของบล็อก "กระดานรับสมัครงาน" — ยืมป้ายจากพื้นที่ `careers` (ต้นทางเดียว ไม่พิมพ์ซ้ำ) */
-export type JobBoardStrings = {
-  readonly openingsUnit: string;
-  readonly departmentLabel: string;
-  readonly qualificationsLabel: string;
-  readonly experienceLabel: string;
-};
-
 export type FormBlockStrings = {
   readonly contact: {
     readonly fields: ContactFieldStrings;
@@ -76,7 +68,6 @@ export type BlockRenderStrings = {
   readonly gallery: GalleryStrings;
   readonly showcase: ShowcaseStrings;
   readonly form: FormBlockStrings;
-  readonly jobBoard: JobBoardStrings;
   readonly recipe: RecipeStrings;
   readonly layout: LayoutStrings;
 };
@@ -166,15 +157,6 @@ function galleryStringsOf(area: BlocksMessages): GalleryStrings {
   return { open: area.galleryOpen, close: area.galleryClose, dialog: area.galleryDialog };
 }
 
-function jobBoardStringsOf(careers: CareersMessages): JobBoardStrings {
-  return {
-    openingsUnit: careers.openingsUnit,
-    departmentLabel: careers.stats.departments,
-    qualificationsLabel: careers.fields.qualifications,
-    experienceLabel: careers.fields.experience,
-  };
-}
-
 function recipeStringsOf(area: BlocksMessages): RecipeStrings {
   return {
     detailsLabel: area.recipeDetailsLabel,
@@ -189,7 +171,6 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
     return {
       gallery: galleryStringsOf(blocksEn),
       showcase: { categoriesTitle: productsEn.categoriesTitle, featuredTitle: productsEn.featuredTitle },
-      jobBoard: jobBoardStringsOf(careersEn),
       recipe: recipeStringsOf(blocksEn),
       layout: { tocLabel: blocksEn.layoutTocLabel },
       form: {
@@ -203,7 +184,6 @@ export function blockRenderStringsFor(language: "th" | "en"): BlockRenderStrings
   return {
     gallery: galleryStringsOf(blocksTh),
 showcase: { categoriesTitle: productsTh.categoriesTitle, featuredTitle: productsTh.featuredTitle },
-    jobBoard: jobBoardStringsOf(careersTh),
     recipe: recipeStringsOf(blocksTh),
     layout: { tocLabel: blocksTh.layoutTocLabel },
     form: {

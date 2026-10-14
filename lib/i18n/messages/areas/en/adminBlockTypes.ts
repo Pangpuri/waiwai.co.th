@@ -23,15 +23,11 @@ export const adminBlockTypes = {
   blockFormKind: "Form type",
   blockFormContact: "Contact form",
   blockFormNewsletter: "Newsletter form",
-  blockFormCareers: "Job application form",
   blockFormHint: "This uses the site's real form system — stored in the database, bot trap, PDPA consent.",
   /* Map */
   blockMapLink: "Map link (https://…)",
   blockMapLinkText: "Button label (optional)",
   /* Job board (round 88) */
-  blockJobItems: "Positions ({n}/{max})",
-  blockAddJob: "Add position",
-  blockRemoveJob: "Remove position",
   blockJobNumber: "Position {n}",
   blockJobTitle: "Job title",
   blockJobDepartment: "Department (used for grouping)",
@@ -52,7 +48,6 @@ export const adminBlockTypes = {
   blockShowcaseFeatured: "Show featured products",
   blockShowcaseFeaturedCount: "Featured products per category",
   blockShowcaseHint: "This block pulls live data from the database (category name, description, image, count, featured product) — nothing to type in",
-  blockJobGrouping: "Group by department",
   /* Management roster (round 88) */
   blockRosterMembers: "People ({n}/{max})",
   blockAddMember: "Add person",

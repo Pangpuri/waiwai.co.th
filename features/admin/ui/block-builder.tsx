@@ -46,7 +46,6 @@ import {
   addColumn,
   addGalleryItem,
   addHeroSlide,
-  addJobItem,
   addRecipeItem,
   addRosterMember,
   addTableColumn,
@@ -58,7 +57,6 @@ import {
   setHeroSlideFocus,
   setHeroSlideImage,
   setHeroSlideZoom,
-  canAddJobItem,
   canAddRecipeItem,
   canAddRosterMember,
   canAddTableColumn,
@@ -76,7 +74,6 @@ import {
   removeCard,
   removeColumn,
   removeGalleryItem,
-  removeJobItem,
   removeRecipeItem,
   removeRosterMember,
   removeTableColumn,
@@ -94,12 +91,9 @@ import {
   setColumnWidth,
   setGalleryItemCaption,
   setGalleryItemImage,
-  setJobBoardGrouping,
   setProductShowcaseOptions,
   setRecipeShowcaseOptions,
   setNewsShowcaseOptions,
-  setJobItemOpenings,
-  setJobItemText,
   setPageLayout,
   setRecipeColumns,
   setRecipeItemImage,
@@ -121,7 +115,6 @@ import {
   MAX_CARDS,
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
-  MAX_JOB_ITEMS,
   MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
@@ -1815,8 +1808,7 @@ export function BlockBuilder({
                 options={[
                   { value: "contact", label: strings.blockFormContact },
                   { value: "newsletter", label: strings.blockFormNewsletter },
-                  { value: "careers", label: strings.blockFormCareers },
-                ]}
+                  ]}
                 onChange={(next) => update(setBlockChoice(document, block.id, "kind", next))}
               />
               <TextPair
@@ -1903,87 +1895,6 @@ export function BlockBuilder({
             </div>
           );
 
-        /* ── กระดานรับสมัครงาน (รอบที่ 88): ตำแหน่ง + ฝ่าย + อัตรา + คุณสมบัติ ── */
-        case "jobBoard":
-          return (
-            <div className="flex flex-col gap-3">
-              <TextPair
-                idBase={`${base}-heading`}
-                label={`heading (${strings.optionalHint})`}
-                value={block.heading}
-                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
-              />
-              <TextPair
-                idBase={`${base}-body`}
-                label={`body (${strings.optionalHint})`}
-                value={block.body}
-                onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
-              />
-              <label className="text-fg-muted flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={block.groupByDepartment}
-                  onChange={(event) => update(setJobBoardGrouping(document, block.id, event.target.checked))}
-                  className="border-line accent-brand-red size-4 rounded border"
-                />
-                {strings.blockJobGrouping}
-              </label>
-
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-fg-muted text-xs font-semibold">
-                    {fillTemplate(strings.blockJobItems, { n: block.items.length, max: MAX_JOB_ITEMS })}
-                  </p>
-                  <TinyButton
-                    label={strings.blockAddJob}
-                    disabled={!canAddJobItem(document, block.id)}
-                    onClick={() => update(addJobItem(document, block.id))}
-                  />
-                </div>
-
-                {block.items.map((item, index) => (
-                  <div key={item.id} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-fg-muted text-xs font-semibold">{fillTemplate(strings.blockJobNumber, { n: index + 1 })}</p>
-                      <TinyButton label={strings.blockRemoveJob} onClick={() => update(removeJobItem(document, block.id, index))} />
-                    </div>
-                    <TextPair
-                      idBase={`${base}-job-${index}-title`}
-                      label={strings.blockJobTitle}
-                      value={item.title}
-                      onChange={(language, next) => update(setJobItemText(document, block.id, index, "title", language, next))}
-                    />
-                    <TextPair
-                      idBase={`${base}-job-${index}-dept`}
-                      label={strings.blockJobDepartment}
-                      value={item.department}
-                      onChange={(language, next) => update(setJobItemText(document, block.id, index, "department", language, next))}
-                    />
-                    <SingleField
-                      idBase={`${base}-job-${index}-openings`}
-                      label={strings.blockJobOpenings}
-                      value={String(item.openings)}
-                      onChange={(next) => update(setJobItemOpenings(document, block.id, index, Number(next)))}
-                    />
-                    <TextPair
-                      idBase={`${base}-job-${index}-qual`}
-                      label={strings.blockJobQualifications}
-                      value={item.qualifications}
-                      onChange={(language, next) => update(setJobItemText(document, block.id, index, "qualifications", language, next))}
-                    />
-                    <TextPair
-                      idBase={`${base}-job-${index}-exp`}
-                      label={strings.blockJobExperience}
-                      value={item.experience}
-                      onChange={(language, next) => update(setJobItemText(document, block.id, index, "experience", language, next))}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-
-        /* ── รายชื่อคณะผู้บริหาร (รอบที่ 88): ชื่อ–ตำแหน่งเป็นข้อความ + ภาพรายบุคคล (ไม่บังคับ) ── */
         case "rosterText":
           return (
             <div className="flex flex-col gap-3">

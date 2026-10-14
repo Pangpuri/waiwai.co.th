@@ -30,7 +30,6 @@ export const adminTemplate = {
   coverageLightbox: "Full-screen image viewer",
   coverageForm: "Forms (contact / job application)",
   coverageMap: "Location map",
-  coverageJobBoard: "Open positions table",
   coverageWhereToBuy: "\"Where to buy\" section (edit on the home content screen)",
   coverageSampleData: "Sample (mockup) cards",
   coverageRosterText: "Per-person names and titles (currently inside the image)",
