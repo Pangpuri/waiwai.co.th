@@ -114,9 +114,11 @@ const ICONS: Record<MockFigureIcon, ReactNode> = {
 
 type MockFigureProps = {
   /** ป้ายที่บอกผู้ใช้ว่านี่คือภาพตัวอย่าง — มาจากพจนานุกรม (ไม่ hardcode ข้อความ) */
-  readonly badge: string;
+  /** ไม่ส่ง = ไม่มีป้ายบนภาพ (รอบที่ 273: เลิกใช้ป้าย "ภาพตัวอย่าง") */
+  readonly badge?: string;
   /** คำบรรยายใต้ภาพ */
-  readonly caption: string;
+  /** ไม่ส่ง = ไม่มีคำบรรยายใต้ภาพ */
+  readonly caption?: string;
   readonly icon?: MockFigureIcon;
   readonly ratio?: MockFigureRatio;
   readonly tone?: MockFigureTone;
@@ -177,7 +179,9 @@ export function MockFigure({
         </span>
       </div>
 
-      <figcaption className="mt-3 text-xs leading-relaxed text-fg-muted">{caption}</figcaption>
+      {caption === undefined || caption.trim() === "" ? null : (
+        <figcaption className="mt-3 text-xs leading-relaxed text-fg-muted">{caption}</figcaption>
+      )}
     </figure>
   );
 }

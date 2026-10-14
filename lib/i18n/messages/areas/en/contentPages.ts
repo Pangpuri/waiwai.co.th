@@ -27,10 +27,6 @@ export const recipesPage = {
     dbWatch: "Open in YouTube",
     dbPublished: "Published",
     dbNoCover: "No cover image yet",
-    cardTitle: "Test recipe",
-    cardMeta: "XX",
-    figureCaption: "Placeholder image for recipe",
-    figureBadge: "Placeholder image",
 };
 
 export const newsPage = {
@@ -59,8 +55,4 @@ export const newsPage = {
     dbPageLabel: "Pagination",
     dbPublished: "Published",
     dbBackToNews: "Back to all news",
-    cardTitle: "Test news headline",
-    cardMeta: "XX",
-    figureCaption: "Placeholder image for news item",
-    figureBadge: "Placeholder image",
 };

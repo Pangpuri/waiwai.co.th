@@ -60,7 +60,6 @@ export function CompanyAwards({ locale, messages }: CompanyAwardsProps) {
           })}
         </ul>
 
-        <p className="mt-6 max-w-3xl text-xs leading-relaxed text-fg-muted">{m.note}</p>
 
         <Link
           href={localePath(locale, "/about/certifications")}

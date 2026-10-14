@@ -11,7 +11,6 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { CATALOG_ITEMS, catalogHref, catalogSlugs } from "@/features/products/catalog";
-import { HERO_SLIDES } from "@/features/home/slides";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
@@ -243,26 +242,12 @@ test("home: ชื่อสินค้า/หมวดทุกใบมี alt
 
 /* ── 5) Hero: ทำเครื่องหมายภาพรออนุมัติ ───────────────────────────────────── */
 
-test("home: สไลด์ hero ต้องประกาศสถานะอนุมัติ และมีป้ายสองภาษาให้เห็น", () => {
-  assert.ok(HERO_SLIDES.length >= 2);
-  for (const slide of HERO_SLIDES) {
-    assert.ok(
-      ["pending-owner", "watermarked"].includes(slide.reviewStatus),
-      `${slide.id}: ต้องมีสถานะอนุมัติ`,
-    );
-  }
-
-  const slider = sourceOf("features/home/ui/hero-slider.tsx");
-  assert.ok(slider.includes("labels.sampleBadge"), "ต้องมีป้าย 'ภาพตัวอย่างรออนุมัติ'");
-  assert.ok(slider.includes("labels.watermarkBadge"), "ต้องมีป้าย 'ภาพมีลายน้ำ'");
-  assert.ok(slider.includes("data-review-status"), "ต้องมี attribute ให้ตรวจสอบได้");
-
-  const hero = sourceOf("features/home/ui/hero.tsx");
-  assert.ok(hero.includes("sampleBadge: m.sampleImageBadge"));
-
-  for (const messages of [th, en]) {
-    assert.notEqual(messages.hero.sampleImageBadge.trim(), "");
-    assert.notEqual(messages.hero.watermarkedImageBadge.trim(), "");
-    assert.notEqual(messages.products.countLabel.trim(), "");
-  }
+test("home: สไลด์ hero ต้องไม่มีป้าย \"ภาพตัวอย่าง/รออนุมัติ\" แล้ว (มติเจ้าของรอบ 273)", () => {
+  const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
+  assert.ok(!slider.includes("sampleBadge"), "ห้ามมีป้ายตัวอย่างบนสไลด์");
+  assert.ok(!slider.includes("watermarkBadge"), "ห้ามมีป้ายลายน้ำบนสไลด์");
+  assert.ok(!slider.includes("data-review-status"), "ห้ามประกาศสถานะรีวิวบน DOM");
+  const hero = readFileSync("features/home/ui/hero.tsx", "utf8");
+  assert.ok(!hero.includes("sampleImageBadge") && !hero.includes("watermarkedImageBadge"));
+  assert.ok(!hero.includes("texts.note"), "hero ต้องไม่เรนเดอร์หมายเหตุ \"ตัวอย่าง\" อีก");
 });

@@ -6,7 +6,6 @@ import { RecipeVideoList, recipeVideoListStringsOf } from "@/features/recipes/ui
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
-import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
@@ -116,18 +115,7 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
       */}
       {recipes.length > 0 ? (
         <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} />
-      ) : (
-        <section className="container-site py-16 lg:py-24">
-          <MockCardGrid
-            idPrefix="mock-recipe"
-            titlePrefix={m.cardTitle}
-            captionPrefix={m.figureCaption}
-            badge={m.figureBadge}
-            metaLabel={m.cardMeta}
-            icon="recipe"
-          />
-        </section>
-      )}
+      ) : null /* รอบที่ 273: ไม่มีเมนูจริง = ไม่แสดงอะไร (เลิกใช้การ์ดทดสอบ) */}
     </>
   );
 }

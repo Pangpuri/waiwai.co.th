@@ -14,7 +14,6 @@ type CompanyProductsProps = {
  */
 export function CompanyProducts({ messages }: CompanyProductsProps) {
   const m = messages.about.products;
-  const badge = messages.about.media.badge;
 
   return (
     <section className="container-site py-16 lg:py-24">
@@ -23,7 +22,6 @@ export function CompanyProducts({ messages }: CompanyProductsProps) {
       <div className="mt-10 grid gap-6 sm:grid-cols-2">
         <article className="flex h-full flex-col rounded-2xl border border-line bg-surface p-6">
           <MockFigure
-            badge={badge}
             caption={m.domestic.figure}
             icon="product"
             ratio="video"
@@ -37,7 +35,6 @@ export function CompanyProducts({ messages }: CompanyProductsProps) {
 
         <article className="flex h-full flex-col rounded-2xl border border-line bg-surface p-6">
           <MockFigure
-            badge={badge}
             caption={m.export.figure}
             icon="product"
             ratio="video"

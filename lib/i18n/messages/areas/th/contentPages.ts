@@ -6,8 +6,7 @@
  */
 
   /*
-    หน้า /recipes และ /news (รอบที่ 15) — เป็น "หน้าตัวอย่าง" ล้วน ๆ
-    มีแต่โครง layout + การ์ดทดสอบ 6 ใบ (3×2) ไม่มีเนื้อหาจริง
+    หน้า /recipes และ /news — เนื้อหาจริง (เมนู 18 · ข่าว 151) · รอบที่ 273 ถอดการ์ดทดสอบออกทั้งหมด
     ⚠️ รอการอนุมัติจากฝ่ายการตลาด (ดู PRODUCT_ROADMAP.md § 9)
   */
 export const recipesPage = {
@@ -27,10 +26,6 @@ export const recipesPage = {
     dbWatch: "เปิดใน YouTube",
     dbPublished: "เผยแพร่เมื่อ",
     dbNoCover: "ยังไม่มีภาพปก",
-    cardTitle: "เมนูทดสอบ",
-    cardMeta: "XX",
-    figureCaption: "ภาพตัวอย่างเมนู",
-    figureBadge: "ภาพตัวอย่าง",
 };
 
 export const newsPage = {
@@ -59,8 +54,4 @@ export const newsPage = {
     dbPageLabel: "แบ่งหน้า",
     dbPublished: "เผยแพร่เมื่อ",
     dbBackToNews: "กลับไปหน้าข่าวสารทั้งหมด",
-    cardTitle: "หัวข้อข่าวทดสอบ",
-    cardMeta: "XX",
-    figureCaption: "ภาพตัวอย่างข่าว",
-    figureBadge: "ภาพตัวอย่าง",
 };

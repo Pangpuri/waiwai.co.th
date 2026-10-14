@@ -41,10 +41,6 @@ test("พจนานุกรม recipesPage / newsPage: ข้อความ�
         ["eyebrow", m.eyebrow],
         ["title", m.title],
         ["intro", m.intro],
-        ["cardTitle", m.cardTitle],
-        ["cardMeta", m.cardMeta],
-        ["figureCaption", m.figureCaption],
-        ["figureBadge", m.figureBadge],
       ] as const) {
         assert.ok(value.trim().length > 0, `${locale}: ${page}.${name} ว่าง`);
       }
@@ -92,22 +88,30 @@ test("mock pages: ต้องไม่มีป้าย \"ตัวอย่�
   }
 });
 
-test("การ์ดตัวอย่าง: ชื่อการ์ดเป็น 'ป้าย + ลำดับ' ที่แยกใบได้ ไม่ใช่ข้อมูลที่แต่งขึ้น", () => {
-  // คอมโพเนนต์ MockCardGrid ต่อท้ายด้วย " 1" … " 6" — จึงต้องมี " " ปิดท้ายได้ถูกต้อง
-  for (const [locale, messages] of [
-    ["th", th],
-    ["en", en],
+test("การ์ดทดสอบ: หน้าจริงต้องไม่มีการ์ดทดสอบ/MockCardGrid อีก (มติเจ้าของรอบ 273)", () => {
+  for (const file of [
+    "app/[lang]/recipes/page.tsx",
+    "features/news/ui/news-list-page.tsx",
+    "app/[lang]/products/page.tsx",
+  ]) {
+    assert.ok(!io_read(file).includes("MockCardGrid"), `${file}: ต้องไม่ใช้การ์ดทดสอบ`);
+  }
+  /*
+    ⚠️ รอบที่ 273: ตรวจเฉพาะ "ข้อความของหน้าจริง" (recipesPage/newsPage/productsPage)
+    ส่วน `home.recipes.items` / `home.news.items` (ข้อมูล seed ของ EAV หน้าแรก) ยังเป็นข้อความทดสอบ
+    แต่ **ไม่แสดงบนเว็บ** เพราะหน้าแรกอ่านเมนู/ข่าวจริงจากฐานข้อมูล — เป็นหนี้ D-273-1 (ดู ROADMAP § 9)
+  */
+  for (const [locale, page] of [
+    ["th", th.recipesPage],
+    ["en", en.recipesPage],
+    ["th", th.newsPage],
+    ["en", en.newsPage],
   ] as const) {
-    for (const [page, m] of [
-      ["recipesPage", messages.recipesPage],
-      ["newsPage", messages.newsPage],
-    ] as const) {
-      assert.ok(!m.cardTitle.endsWith(" "), `${locale}: ${page}.cardTitle ไม่ควรมีช่องว่างท้าย`);
-      assert.ok(!m.figureCaption.endsWith(" "), `${locale}: ${page}.figureCaption ไม่ควรมีช่องว่างท้าย`);
+    for (const stale of ["ทดสอบ", "ภาพตัวอย่าง", "รอการอนุมัติ", "sample", "pending approval"]) {
+      assert.ok(
+        !JSON.stringify(page).toLowerCase().includes(stale.toLowerCase()),
+        `${locale}: ข้อความของหน้าจริงต้องไม่มีคำว่า ${stale}`,
+      );
     }
   }
-
-  // ป้ายมุมภาพต้องบอกว่าเป็นภาพตัวอย่าง ไม่ใช่คำกลาง ๆ ที่ทำให้เข้าใจว่าเป็นภาพจริง
-  assert.equal(th.recipesPage.figureBadge, "ภาพตัวอย่าง");
-  assert.equal(th.newsPage.figureBadge, "ภาพตัวอย่าง");
 });

@@ -70,7 +70,7 @@ test("home-hero: ค่าจากหลังบ้านทับพจนา
   assert.equal(texts.title, "ความอร่อยที่คนไทยไว้วางใจ");
   assert.equal(texts.titleAccent, "ในทุกมื้อของวัน");
   assert.equal(texts.body, "ไวไวตั้งใจทำบะหมี่กึ่งสำเร็จรูปให้เป็นมื้อที่ง่าย");
-  assert.equal(texts.note, "ภาพและข้อความในหน้านี้เป็นตัวอย่าง");
+  assert.equal(texts.note, "ภาพและข้อความในหน้านี้เป็นตัวอย่าง", "ค่าจากหลังบ้านต้องทับพจนานุกรม");
   assert.equal(texts.ctaLabel, "ดูผลิตภัณฑ์ทั้งหมด");
   assert.equal(texts.ctaHref, "/products");
 });
@@ -112,16 +112,15 @@ test("home-hero: หมายเหตุล้างแล้วต้องห
 test("home-hero: hero ต้องใช้ค่าที่ส่งมา และหน้าจอต้องส่งค่าจากหลังบ้าน", () => {
   const hero = codeOf("features/home/ui/hero.tsx");
   assert.ok(hero.includes("heroTexts ?? heroTextsDefaults(messages)"), "ไม่ส่งค่า = พจนานุกรม (พฤติกรรมเดิม)");
-  for (const field of ["eyebrow", "title", "titleAccent", "body", "note", "ctaLabel", "ctaHref"]) {
+  for (const field of ["eyebrow", "title", "titleAccent", "body", "ctaLabel", "ctaHref"]) {
     assert.ok(hero.includes(`texts.${field}`), `hero ต้องใช้ texts.${field}`);
   }
+  /* รอบที่ 273: เลิกเรนเดอร์หมายเหตุ "ภาพ/ข้อความตัวอย่าง" — ช่องยังอยู่แต่ไม่ขึ้นเว็บ */
+  assert.ok(!hero.includes("texts.note"), "hero ต้องไม่เรนเดอร์ note อีก");
   /* ⚠️ ต้องไม่มีข้อความ hero ที่ยังอ่านจากพจนานุกรมตรง ๆ (นอกจากกลุ่มอื่น เช่น ปุ่มสไลด์/การ์ด) */
   assert.equal(hero.includes("{m.eyebrow}"), false, "ห้ามอ่าน eyebrow จากพจนานุกรมตรง ๆ อีก");
   assert.equal(hero.includes("{m.title}"), false, "ห้ามอ่าน title จากพจนานุกรมตรง ๆ อีก");
   assert.equal(hero.includes("{m.body}"), false, "ห้ามอ่าน body จากพจนานุกรมตรง ๆ อีก");
-  /* ล้างหมายเหตุแล้วซ่อนป้าย */
-  assert.ok(hero.includes('texts.note.trim() === "" ? null'), "หมายเหตุว่าง = ไม่แสดงป้าย");
-
   const page = codeOf("app/[lang]/page.tsx");
   assert.ok(page.includes("heroTextsOf(homeContent, messages, lang)"), "หน้าจอต้องรวมค่าจาก EAV");
   assert.equal((page.match(/texts=\{heroTexts\}/g) ?? []).length, 2, "ต้องส่งทั้งสองสาขา (โหมดบล็อก + เลย์เอาต์โค้ด)");

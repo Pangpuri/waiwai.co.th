@@ -31,6 +31,5 @@ export const adminTemplate = {
   coverageForm: "Forms (contact / job application)",
   coverageMap: "Location map",
   coverageWhereToBuy: "\"Where to buy\" section (edit on the home content screen)",
-  coverageSampleData: "Sample (mockup) cards",
   coverageRosterText: "Per-person names and titles (currently inside the image)",
 };

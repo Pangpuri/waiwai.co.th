@@ -122,7 +122,6 @@ export const BLOCK_COVERAGE_PART_IDS = [
   "lightbox",
   "form",
   "map",
-  "sampleData",
   "rosterText",
 ] as const;
 

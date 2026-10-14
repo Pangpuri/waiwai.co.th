@@ -15,7 +15,6 @@ type CompanyFacilitiesProps = {
  */
 export function CompanyFacilities({ messages }: CompanyFacilitiesProps) {
   const m = messages.about.facilities;
-  const badge = messages.about.media.badge;
 
   return (
     <section className="bg-bg-cream">
@@ -46,21 +45,18 @@ export function CompanyFacilities({ messages }: CompanyFacilitiesProps) {
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
           <MockFigure
             className="lg:col-span-2"
-            badge={badge}
             caption={m.figures.site}
             icon="site"
             ratio="standard"
             tone="yellow"
           />
           <MockFigure
-            badge={badge}
             caption={m.figures.dormitory}
             icon="dormitory"
             ratio="standard"
             tone="cream"
           />
           <MockFigure
-            badge={badge}
             caption={m.figures.treatment}
             icon="water"
             ratio="standard"

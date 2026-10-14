@@ -89,8 +89,6 @@ export function Hero({
             gotoSlide: m.gotoSlide,
             pause: m.pauseSlides,
             play: m.playSlides,
-            sampleBadge: m.sampleImageBadge,
-            watermarkBadge: m.watermarkedImageBadge,
           }}
         />
 
@@ -165,8 +163,10 @@ export function Hero({
             */}
           </div>
 
-          {/* หมายเหตุ: ค่าจากหลังบ้าน · ล้างช่องแล้ว = ซ่อนป้ายจริง (รอบที่ 250) */}
-          {texts.note.trim() === "" ? null : <p className="mt-6 text-xs text-fg-muted">{texts.note}</p>}
+          {/*
+            รอบที่ 273 (มติเจ้าของ: "เราเตรียมออนจริงแล้ว"): **ถอดบรรทัดหมายเหตุ "ภาพ/ข้อความตัวอย่าง" ออก**
+            เดิมช่องนี้มาจากค่าหลังบ้าน (`note`) — ตอนนี้ไม่เรนเดอร์เลย ⇒ ไม่มีข้อความตัวอย่างขึ้นเว็บแม้ช่องจะมีค่า
+          */}
         </div>
       </div>
     </section>

@@ -27,7 +27,6 @@ export function CompanyResearch({ messages }: CompanyResearchProps) {
         </div>
 
         <MockFigure
-          badge={messages.about.media.badge}
           caption={m.figure}
           icon="quality"
           ratio="standard"

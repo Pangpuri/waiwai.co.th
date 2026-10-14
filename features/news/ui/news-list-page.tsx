@@ -5,7 +5,6 @@ import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { NewsFilter, newsFilterStringsOf } from "@/features/news/ui/news-filter";
 import { NewsList, NewsListHeader, NewsPagination, newsListStringsOf } from "@/features/news/ui/news-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
-import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { buildAlternates, localePath, type Locale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -149,18 +148,8 @@ export async function NewsListViewPage({ lang, view }: { readonly lang: Locale; 
         </div>
       </section>
 
-      {listSection ?? (
-        <section className="container-site py-16 lg:py-24">
-          <MockCardGrid
-            idPrefix="mock-news"
-            titlePrefix={m.cardTitle}
-            captionPrefix={m.figureCaption}
-            badge={m.figureBadge}
-            metaLabel={m.cardMeta}
-            icon="news"
-          />
-        </section>
-      )}
+      {/* รอบที่ 273: ไม่มีข่าวจริง = ไม่แสดงอะไร (เลิกใช้การ์ดทดสอบ) */}
+      {listSection}
     </>
   );
 }

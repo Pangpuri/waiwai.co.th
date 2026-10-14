@@ -36,9 +36,7 @@ type HeroSliderLabels = {
   readonly pause: string;
   readonly play: string;
   /** ป้ายบนสไลด์ที่ยังรอเจ้าของอนุมัติ (รอบที่ 108) */
-  readonly sampleBadge: string;
   /** ป้ายบนสไลด์ที่ยังมีลายน้ำของเพจต้นทาง */
-  readonly watermarkBadge: string;
 };
 
 
@@ -86,7 +84,6 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
               key={slide.id}
               data-hero-slide=""
               data-state={isActive ? "active" : "idle"}
-              data-review-status={slide.reviewStatus}
               aria-hidden={!isActive}
               className="absolute inset-0"
             >
@@ -110,7 +107,6 @@ export function HeroSlider({ slides, labels, effect = "fade", intervalMs = HERO_
               */}
               <span className="pointer-events-none absolute top-4 left-4 z-10 inline-flex items-center gap-2 rounded-full bg-overlay/80 px-3 py-1.5 text-xs font-bold text-on-brand">
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-yellow" />
-                {slide.reviewStatus === "watermarked" ? labels.watermarkBadge : labels.sampleBadge}
               </span>
             </div>
           );

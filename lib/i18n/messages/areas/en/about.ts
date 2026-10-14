@@ -16,7 +16,6 @@ export const about = {
     intro:
       "A manufacturer and distributor of instant noodles and dried rice vermicelli under the Wai Wai and Quick trademarks, established in 1972 in Sam Phran district, Nakhon Pathom.",
     note: "The copy on this page is compiled from the company's own information. Every image is a presentation placeholder, not final photography.",
-    heroFigure: "Placeholder: the office and factory buildings",
 
     facts: {
       founded: { label: "Founded" },
@@ -212,7 +211,6 @@ export const about = {
     },
 
     media: {
-      badge: "Placeholder image",
     },
 
     explore: {

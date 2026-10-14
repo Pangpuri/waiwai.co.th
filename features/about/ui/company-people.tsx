@@ -21,7 +21,6 @@ export function CompanyPeople({ messages }: CompanyPeopleProps) {
       </div>
 
       <MockFigure
-        badge={messages.about.media.badge}
         caption={m.figure}
         icon="team"
         ratio="standard"

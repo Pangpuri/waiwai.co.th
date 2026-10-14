@@ -73,8 +73,6 @@ export function AboutHero({ locale, messages }: AboutHeroProps) {
           </div>
 
           <MockFigure
-            badge={m.media.badge}
-            caption={m.heroFigure}
             icon="site"
             ratio="standard"
             tone="yellow"
@@ -82,7 +80,6 @@ export function AboutHero({ locale, messages }: AboutHeroProps) {
         </div>
 
         <p className="mt-8 max-w-3xl rounded-2xl border border-line bg-surface px-4 py-3 text-xs leading-relaxed text-fg-muted">
-          {m.note}
         </p>
       </div>
     </section>

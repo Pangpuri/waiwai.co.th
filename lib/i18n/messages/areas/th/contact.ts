@@ -8,7 +8,7 @@
   /*
     หน้า /contact (ติดต่อเรา) — รอบที่ 17
     ฟอร์มมาจาก `contact/formcontact.txt` · แผนที่มาจาก `contact/*.jpg` (ภาพที่บริษัททำเอง)
-    ⚠️ ฟอร์มยังไม่มีฝั่งรับข้อมูล → แสดงเป็นตัวอย่าง + ปุ่มส่ง disabled (ดู PRODUCT_ROADMAP.md § 9)
+    ℹ️ ฟอร์มเก็บลงฐานข้อมูลแล้ว (รอบ 66/67)
   */
 export const contactPage = {
     meta: {
