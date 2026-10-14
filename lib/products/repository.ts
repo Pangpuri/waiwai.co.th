@@ -1,3 +1,4 @@
+import { productDetailPageId } from "@/lib/blocks/product-detail";
 import type { ProductDetailCategoryValues } from "@/lib/products/detail-document";
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import type { ImageWriteMode } from "@/lib/products/media-mode";
@@ -213,6 +214,35 @@ export async function listPublicCategorySlugs(): Promise<readonly string[]> {
     return result.rows.map((row) => text(row.slug).trim()).filter((slug) => slug !== "");
   } catch {
     return [];
+  }
+}
+
+/**
+ * **พาธจริงของ "หน้ารายละเอียดหมวดสินค้า" ทุกหมวด** (รอบที่ 281 · ปิดหนี้ D-280-1)
+ * คีย์ = id ของหน้าตัวสร้าง (`product-<รหัสภายในหมวด>`) · ค่า = `/products/<ที่อยู่ปัจจุบัน>`
+ *
+ * ทำไมต้องมี: id ของหน้า **ไม่เปลี่ยน** แต่ที่อยู่ (`slug`) เจ้าของแก้ได้
+ * ⇒ ที่เดียวที่รู้ "พาธจริง" ของหน้าเหล่านี้ต้องอ่านจากฐานข้อมูล ไม่ใช่ประกอบจาก id
+ * - ใช้ที่ **sitemap** (ข้ามพาธคงที่ของแถว `page` — กัน URL เก่าซ้ำ) และ **จอตัวสร้าง** (ปุ่มเปิดหน้าเว็บ)
+ * - ⚠️ คืน **ทุกหมวด** (รวมที่ซ่อน) — ผู้เรียกเป็นคนกรองเอง (ตัว builder ต้องเปิดได้แม้หมวดถูกซ่อน)
+ * - อ่านไม่ได้/ไม่มี DB ⇒ คืน `Map` ว่าง (ผู้เรียกถอยไปใช้พาธคงที่ของ 6 หมวดในโค้ด)
+ */
+export async function listProductDetailPagePaths(): Promise<ReadonlyMap<string, string>> {
+  if (!isDatabaseConfigured()) return new Map();
+  try {
+    const result = await readQuery<{ id: string; slug: string }>(
+      `select id, coalesce(nullif(slug, ''), id) as slug from product_category order by id`,
+    );
+    const paths = new Map<string, string>();
+    for (const row of result.rows) {
+      const id = text(row.id).trim();
+      const slug = text(row.slug).trim();
+      if (id === "" || slug === "") continue;
+      paths.set(productDetailPageId(id), `/products/${slug}`);
+    }
+    return paths;
+  } catch {
+    return new Map();
   }
 }
 

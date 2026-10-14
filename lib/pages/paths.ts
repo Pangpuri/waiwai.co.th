@@ -1,5 +1,9 @@
-import { PRODUCT_DETAIL_PAGE_IDS, productDetailPathOfId } from "@/lib/blocks/product-detail";
-import { BLOCK_TEMPLATE_PAGE_IDS } from "@/lib/blocks/templates";
+import {
+  PRODUCT_DETAIL_PAGE_IDS,
+  isProductDetailPageLike,
+  productDetailPathOfId,
+} from "@/lib/blocks/product-detail";
+import { BLOCK_TEMPLATE_PAGE_IDS, isBlockBuilderPage } from "@/lib/blocks/templates";
 
 /**
  * ที่อยู่ (path) ของแต่ละหน้า — **ที่เดียว** ที่รู้ว่า id ของหน้าไปอยู่ตรงไหนของเว็บ
@@ -62,7 +66,7 @@ export function pathForPage(id: string): string {
 export const MENU_HIDDEN_INDEXABLE_PAGE_IDS: readonly string[] = PRODUCT_DETAIL_PAGE_IDS;
 
 export function isKnownPagePath(id: string): boolean {
-  return id in PAGE_PATHS;
+  return id in PAGE_PATHS || isProductDetailPageLike(id);
 }
 
 /**
@@ -71,11 +75,16 @@ export function isKnownPagePath(id: string): boolean {
  * ⭐ S2 (รอบที่ 82): รายการนี้ **derive จากทะเบียนเทมเพลตบล็อก** (`lib/blocks/templates.ts`)
  *    เพราะ "พรีวิวได้" = "มีเอกสารบล็อกให้ดู" ⇒ เพิ่มเทมเพลตหน้าใหม่ที่เดียว แล้วพรีวิว/ลิงก์พรีวิวตามมาเอง
  * ⚠️ หน้าที่ไม่มีเทมเพลต = ยังไม่เปิดพรีวิว (จะเห็นหน้าว่าง ไม่มีประโยชน์)
+ *
+ * 🆕 รอบที่ 281 (ปิดหนี้ D-280-1): **หน้า detail ของหมวดที่สร้างใหม่** ก็นับว่าพรีวิวได้
+ *    (เทมเพลตเดียวใช้ได้ทุกหมวด) ⇒ ตรวจจาก **รูปทรงของ id** ไม่ใช่รายการคงที่
+ *    ⚠️ `PREVIEWABLE_PAGE_IDS` ยังเป็น **baseline คงที่** (ใช้ไล่ทดสอบ/แสดงรายการตั้งต้น)
+ *       — การตัดสินว่า "พรีวิวได้ไหม" ต้องใช้ `isPreviewablePage()` เสมอ
  */
 export const PREVIEWABLE_PAGE_IDS: readonly string[] = BLOCK_TEMPLATE_PAGE_IDS;
 
 export function isPreviewablePage(id: string): boolean {
-  return PREVIEWABLE_PAGE_IDS.includes(id);
+  return isBlockBuilderPage(id);
 }
 
 /**

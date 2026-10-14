@@ -7,7 +7,7 @@ import { NEWS_PER_PAGE, countNews, listNewsSourceIds } from "@/lib/news/reposito
 import { defaultPages } from "@/lib/pages/model";
 import { listPages } from "@/lib/pages/repository";
 import { builtInCategorySlugs } from "@/lib/products/categories";
-import { listPublicCategorySlugs } from "@/lib/products/repository";
+import { listProductDetailPagePaths, listPublicCategorySlugs } from "@/lib/products/repository";
 import {
   buildNewsSitemapEntries,
   buildProductCategorySitemapEntries,
@@ -32,11 +32,12 @@ export const revalidate = 300;
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const messages = await getMessagesFor("th");
-  const [pages, sourceIds, totalNews, categorySlugs] = await Promise.all([
+  const [pages, sourceIds, totalNews, categorySlugs, productDetailPaths] = await Promise.all([
     listPages(defaultPages(messages)),
     listNewsSourceIds(),
     countNews(),
     listPublicCategorySlugs(),
+    listProductDetailPagePaths(),
   ]);
 
   /*
@@ -46,10 +47,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   */
   const productPaths = categorySlugs.length > 0 ? categorySlugs : builtInCategorySlugs();
 
+  /*
+    ⚠️ ต้องข้าม **ทุกแถว `page` ของหน้ารายละเอียดหมวด** ไม่ใช่แค่ 6 ใบในโค้ด (รอบที่ 281)
+    เพราะตั้งแต่รอบนี้ หมวดที่สร้างใหม่ก็มีแถว `page` (`product-<id>`) — ที่อยู่จริงมาจากตารางหมวด
+    ⇒ ถ้าไม่ข้าม จะได้ทั้ง URL ที่ถูก (จากตารางหมวด) และ URL เก่าที่ derive จาก id (จากพาธคงที่)
+  */
+  const productDetailPageIds =
+    productDetailPaths.size > 0 ? [...productDetailPaths.keys()] : [...PRODUCT_DETAIL_PAGE_IDS];
+
   const pageCount = Math.max(1, Math.ceil(totalNews / NEWS_PER_PAGE));
   const entries = [
-    /* ⚠️ ข้ามแถว `page` ของหน้ารายละเอียดหมวด — ที่อยู่มาจากตารางหมวดแทน (กัน URL เก่าซ้ำ) */
-    ...buildSitemapEntries({ siteUrl: SITE.url, pages, locales: LOCALES, skipPageIds: PRODUCT_DETAIL_PAGE_IDS }),
+    ...buildSitemapEntries({ siteUrl: SITE.url, pages, locales: LOCALES, skipPageIds: productDetailPageIds }),
     ...buildProductCategorySitemapEntries({ siteUrl: SITE.url, locales: LOCALES, slugs: productPaths }),
     ...buildNewsSitemapEntries({ siteUrl: SITE.url, locales: LOCALES, sourceIds, pageCount }),
   ];

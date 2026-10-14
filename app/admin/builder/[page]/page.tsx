@@ -11,10 +11,12 @@ import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
 import { blockCoverageGaps, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage, type BlockCoveragePartId } from "@/lib/blocks/templates";
+import { isProductDetailPageLike } from "@/lib/blocks/product-detail";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
+import { listProductDetailPagePaths } from "@/lib/products/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
@@ -155,6 +157,18 @@ export default async function AdminBuilderPage({
       (`publishGoesLive()`) ⇒ จอบอกล่วงหน้าตรงกับสิ่งที่จะเกิดขึ้นจริงเสมอ
   */
   const publishLive = publishGoesLive(page);
+
+  /*
+    ── พาธจริงของหน้า (รอบที่ 281 · ปิดหนี้ D-280-2) ─────────────────────────────────
+    หน้ารายละเอียดหมวดสินค้า: id ของหน้า **ไม่เปลี่ยน** แต่ที่อยู่ (`slug`) เจ้าของแก้ได้
+    ⇒ อ่านพาธจริงจากฐานข้อมูล (`product-<id>` → `/products/<slug>`) แล้วถอยไปใช้พาธคงที่ของ 6 หมวดในโค้ด
+    (หน้าอื่นใช้ `pathForPage()` ตามเดิม — พาธคงที่ในโค้ด)
+  */
+  let livePath = pathForPage(currentPage.id);
+  if (isProductDetailPageLike(page)) {
+    const detailPaths = await listProductDetailPagePaths();
+    livePath = detailPaths.get(page) ?? livePath;
+  }
 
   /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
   const coverage = {
@@ -308,7 +322,7 @@ export default async function AdminBuilderPage({
             revisions={revisions}
             historyNotice={historyNotice}
             storedVersions={storedVersions}
-            previewLiveSrc={localePath("th", pathForPage(currentPage.id))}
+            previewLiveSrc={localePath("th", livePath)}
             coverage={coverage}
             publishLive={publishLive}
             strings={strings}

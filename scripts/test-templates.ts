@@ -289,9 +289,13 @@ test("templates: ปุ่มในหลังบ้านใช้ทะเบ
   assert.ok(page.includes("templateMissingBody"), "หน้าที่ไม่มีเทมเพลตต้องบอกผู้ใช้ตรง ๆ");
 });
 
-test("templates: ตัวเลือกลิงก์พรีวิวครอบทุกหน้าที่พรีวิวได้ (ไม่ใช่แค่หน้าแรก)", () => {
+test("templates: ตัวเลือกลิงก์พรีวิว = รายการกลาง + หน้าที่พรีวิวได้จากตาราง page (รอบที่ 281)", () => {
   const page = sourceOf("app/admin/preview-links/page.tsx");
-  assert.ok(page.includes("PREVIEWABLE_PAGE_IDS.map"), "ตัวเลือกหน้าต้องมาจากรายการกลาง");
+  assert.ok(page.includes("...PREVIEWABLE_PAGE_IDS"), "ตัวเลือกหน้าต้องมาจากรายการกลาง (ทะเบียนเทมเพลต)");
+  assert.ok(
+    page.includes("filter((entry) => isPreviewablePage(entry.id))"),
+    "ต้องเพิ่มหน้าที่พรีวิวได้จากตาราง `page` (หมวดที่สร้างใหม่) — ไม่คีย์รายชื่อซ้ำ",
+  );
   assert.ok(page.includes("listPages("), "ชื่อหน้าต้องมาจากตาราง page (W1)");
   assert.ok(!page.includes("previewLinkPageHome"), "ห้ามเหลือตัวเลือกหน้าแรกแบบตายตัว");
 

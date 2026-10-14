@@ -8,7 +8,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
-import { PREVIEWABLE_PAGE_IDS } from "@/lib/pages/paths";
+import { PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
 import { defaultPages } from "@/lib/pages/model";
 import { listPages } from "@/lib/pages/repository";
 import {
@@ -46,15 +46,24 @@ export default async function AdminPreviewLinksPage() {
   const now = new Date();
 
   /*
-    ตัวเลือก "หน้า" ของลิงก์พรีวิว (S2 · รอบที่ 82)
+    ตัวเลือก "หน้า" ของลิงก์พรีวิว (S2 · รอบที่ 82 · ขยายรอบที่ 281)
     ⚠️ เดิมมีตัวเลือกเดียวคือหน้าแรก ⇒ หน้าอื่นพรีวิวผ่านลิงก์ไม่ได้ ทั้งที่มีเทมเพลตแล้ว
     ⇒ ใช้ชื่อหน้าจากตาราง `page` (W1) ของหน้าที่พรีวิวได้เท่านั้น
+
+    🆕 รอบที่ 281 (ปิดหนี้ D-280-1): เพิ่มหน้า detail ของ **หมวดที่สร้างใหม่** ด้วย
+    · รายการตั้งต้น = `PREVIEWABLE_PAGE_IDS` (ทะเบียนเทมเพลตในโค้ด)
+    · ที่เหลือ = แถว `page` ที่ `isPreviewablePage()` รับ (หมวดใหม่มีแถว `product-<id>` ตั้งแต่รอบนี้)
+    ⇒ **ไม่คีย์รายชื่อซ้ำ** — แหล่งความจริงคือตาราง `page` + กติกากลางตัวเดียว
   */
   const pageRecords = await listPages(defaultPages(messages));
-  const previewablePages = PREVIEWABLE_PAGE_IDS.map((id) => {
-    const record = pageRecords.find((entry) => entry.id === id);
-    return { id, label: record?.nameTh ?? id };
-  });
+  const previewableIds = [
+    ...PREVIEWABLE_PAGE_IDS,
+    ...pageRecords.filter((entry) => isPreviewablePage(entry.id)).map((entry) => entry.id),
+  ];
+  const previewablePages = [...new Set(previewableIds)].map((id) => ({
+    id,
+    label: pageRecords.find((entry) => entry.id === id)?.nameTh ?? id,
+  }));
   const pageLabelOf = (id: string): string => previewablePages.find((entry) => entry.id === id)?.label ?? id;
 
   const rows: PreviewLinkRow[] = links.map((link) => {

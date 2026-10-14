@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
+import { productDetailPageId } from "@/lib/blocks/product-detail";
 import {
   categoryPresetApplyPlan,
   defaultSortOrderOf,
@@ -350,31 +351,57 @@ export type CategoryWriteInput = {
  * สร้างหมวดใหม่ (มติ D25: slug สร้างจากชื่ออังกฤษ · `source_id` ไม่บังคับสำหรับหมวดที่สร้างเอง)
  * คืน `false` = มี id นี้อยู่แล้ว (ไม่ทับของเดิม — ผู้เรียกต้องแจ้งผู้ใช้)
  * ⚠️ รอบที่ 280: ที่อยู่บนเว็บ (`slug`) รับแยกจาก `id` — ไม่ส่ง = ใช้ `id` (URL วันแรกเหมือนเดิม)
+ *
+ * ## 🆕 รอบที่ 281 (ปิดหนี้ D-280-1): หมวดใหม่ได้ **แถว `page` ของหน้าตัวสร้างทันที**
+ * - สร้าง `page` แถว `product-<id>` (`in_menu = false` · `editor = 'blocks'`) ใน **transaction เดียวกับหมวด**
+ *   ⇒ หมวดใหม่มี "หน้าจอตัวสร้างหน้าเว็บ" เหมือน 6 หมวดเดิม (มติ D30 ข้อ 3) โดยไม่ต้องมีสคริปต์เพิ่ม
+ * - ทั้งคู่อยู่ใน transaction เดียว ⇒ ไม่มีสภาพ "มีหมวดแต่ไม่มีหน้า" ให้ตามเก็บ
+ * - ⚠️ `page_document` ไม่มี FK กับ `page` ⇒ การเขียนเอกสารไม่ผูกกัน แต่ **จอตัวสร้างต้องมีแถว `page`**
+ *   (จอใช้ `listPages()` หา `currentPage` — ไม่มีแถว = 404)
  */
 export async function createProductCategoryAdmin(
   input: Omit<CategoryWriteInput, "isHidden">,
   actor: string,
 ): Promise<boolean> {
   const slug = input.slug === undefined || input.slug.trim() === "" ? input.id : input.slug.trim();
-  const result = await getPool().query(
-    `insert into product_category
-       (id, slug, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     values ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, false, now(), $10)
-     on conflict (id) do nothing`,
-    [
-      input.id,
-      slug,
-      input.nameTh,
-      input.nameEn,
-      input.descriptionTh,
-      input.descriptionEn,
-      input.imageMediaId ?? null,
-      input.logoMediaId ?? null,
-      input.sortOrder,
-      actor,
-    ],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const pageId = productDetailPageId(input.id);
+  const nameTh = input.nameTh.trim() === "" ? input.id : input.nameTh.trim();
+
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `insert into product_category
+         (id, slug, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+       values ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, false, now(), $10)
+       on conflict (id) do nothing`,
+      [
+        input.id,
+        slug,
+        input.nameTh,
+        input.nameEn,
+        input.descriptionTh,
+        input.descriptionEn,
+        input.imageMediaId ?? null,
+        input.logoMediaId ?? null,
+        input.sortOrder,
+        actor,
+      ],
+    );
+    const created = (result.rowCount ?? 0) > 0;
+    if (!created) return false;
+
+    /*
+      แถว `page` ของหน้าตัวสร้าง (id = `product-<รหัสภายในหมวด>`)
+      ⚠️ `name_th` ห้ามว่าง (สคีมา not null + validator ของหน้า) ⇒ ถอยไปใช้ id
+      `menu_order` = ต่อท้ายของเดิม (หน้าเหล่านี้ `in_menu = false` ⇒ ลำดับมีผลแค่ในตาราง)
+    */
+    await client.query(
+      `insert into page (id, name_th, name_en, menu_order, in_menu, editor, updated_at, updated_by)
+       select $1, $2, $3, coalesce(max(menu_order), 50) + 1, false, 'blocks', now(), $4 from page
+       on conflict (id) do nothing`,
+      [pageId, nameTh, input.nameEn, actor],
+    );
+    return true;
+  });
 }
 
 /**
@@ -470,8 +497,15 @@ export async function deleteEmptyCategoryAdmin(id: string, builtInSlugs: readonl
       [id, [...builtInSlugs]],
     );
     if ((result.rowCount ?? 0) === 0) return false;
-    /* เอกสารบล็อกของหน้าตัวสร้างของหมวดนี้ (ถ้าเคยมี) — ไม่ต้องค้างไว้ให้เป็นขยะ */
-    await client.query(`delete from page_document where page = $1`, [`product-${id}`]);
+    /*
+      เก็บกวาด "หน้าตัวสร้าง" ของหมวดนี้ให้หมด (รอบที่ 281) — หมวดหายแล้วต้องไม่เหลือหน้าลอย:
+      · `page_document` (ฉบับร่าง/เผยแพร่) · `page_document_revision` (ประวัติ) · `page` (แถวของหน้า)
+      ⚠️ `page_document` ไม่มี FK กับ `page` ⇒ ต้องลบเองทั้งชุด (ไม่มี cascade ให้พึ่ง)
+    */
+    const pageId = productDetailPageId(id);
+    await client.query(`delete from page_document where page = $1`, [pageId]);
+    await client.query(`delete from page_document_revision where page = $1`, [pageId]);
+    await client.query(`delete from page where id = $1`, [pageId]);
     return true;
   });
 }

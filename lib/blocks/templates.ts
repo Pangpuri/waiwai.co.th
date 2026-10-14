@@ -3,7 +3,7 @@ import { buildCertificationsTemplate } from "@/lib/blocks/certifications-templat
 import { buildContactDocument } from "@/lib/contact/document";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
-import { PRODUCT_DETAIL_PAGE_IDS } from "@/lib/blocks/product-detail";
+import { PRODUCT_DETAIL_PAGE_IDS, productDetailCategoryIdOfPageId } from "@/lib/blocks/product-detail";
 import { buildProductDetailDocument, type ProductDetailCategoryValues } from "@/lib/products/detail-document";
 import type { BlockDocument } from "@/lib/blocks/types";
 
@@ -52,6 +52,9 @@ export const BLOCK_TEMPLATE_PAGE_IDS = [...MENU_TEMPLATE_PAGE_IDS, ...PRODUCT_DE
 
 export type BlockTemplatePageId = (typeof BLOCK_TEMPLATE_PAGE_IDS)[number];
 
+/** หน้าเมนูที่มีเทมเพลต (คีย์ของตารางเทมเพลต) */
+export type MenuTemplatePageId = (typeof MENU_TEMPLATE_PAGE_IDS)[number];
+
 /**
  * ตัวเลือกตอนสร้างเทมเพลต (รอบที่ 253) — หน้าที่ใช้ **ภาพจริงจากคลังภาพ** ต้องรู้พาธ `/media/<id>`
  * (ผู้เรียกอ่าน id จากคลังแล้วส่งตัวช่วยมา · เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์)
@@ -64,11 +67,14 @@ export type TemplateBuildOptions = {
   /**
    * ค่าจริงจากฐานข้อมูลของหมวดสินค้า (รอบที่ 270) — ใช้กับเทมเพลตหน้า "รายละเอียดหมวดสินค้า"
    * ผู้เรียก (Server Action) อ่าน DB แล้วส่งตัวช่วยนี้ ⇒ เทมเพลตยังเป็นฟังก์ชันบริสุทธิ์
+   * ⚠️ คีย์คือ **รหัสภายในของหมวด** (`product_category.id`) ไม่ใช่ slug (รอบที่ 280)
    */
-  readonly categoryValues?: (slug: string) => ProductDetailCategoryValues | null;
+  readonly categoryValues?: (categoryId: string) => ProductDetailCategoryValues | null;
 };
 
-const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: TemplateBuildOptions) => BlockDocument | null) | null>> = {
+type TemplateBuilder = (options?: TemplateBuildOptions) => BlockDocument | null;
+
+const MENU_TEMPLATE_BUILDERS: Readonly<Record<MenuTemplatePageId, TemplateBuilder | null>> = {
   home: buildHomeTemplate,
   /*
     ⚠️ รอบที่ 260: `about` **ไม่มีเทมเพลตตั้งต้นแล้ว** (หนี้ D-255-1)
@@ -81,32 +87,56 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: Templa
   contact: buildContactDocument,
   certifications: buildCertificationsTemplate,
   executives: buildExecutivesTemplate,
-  /* หน้ารายละเอียดหมวด — เทมเพลตต่อหมวด (ใช้ชื่อ/ภาพจริง + คำอธิบาย "ยังไม่เปิดใช้งาน" ในพจนานุกรม) */
-  "product-instant-noodles": (options) => buildProductDetailDocument("instant-noodles", options?.categoryValues?.("instant-noodles") ?? null),
-  "product-dried-vermicelli": (options) => buildProductDetailDocument("dried-vermicelli", options?.categoryValues?.("dried-vermicelli") ?? null),
-  "product-serda": (options) => buildProductDetailDocument("serda", options?.categoryValues?.("serda") ?? null),
-  "product-quick-zabb": (options) => buildProductDetailDocument("quick-zabb", options?.categoryValues?.("quick-zabb") ?? null),
-  "product-noodie": (options) => buildProductDetailDocument("noodie", options?.categoryValues?.("noodie") ?? null),
-  "product-rod-ded": (options) => buildProductDetailDocument("rod-ded", options?.categoryValues?.("rod-ded") ?? null),
 };
 
 /**
- * หน้าที่มี **เทมเพลตตั้งต้นจริง** (ตัดหน้าที่เนื้อหามาจากตัวนำเข้าออก — รอบที่ 260)
- * ใช้กับเครื่องมือ/เทสต์ที่ต้อง "ไล่ทุกเทมเพลต" · **อย่าใช้ `BLOCK_TEMPLATE_PAGE_IDS` ตรง ๆ กับงานแบบนั้น**
- * (รายการนั้นรวมหน้าที่มีตัวสร้าง+พรีวิวแต่ไม่มีเทมเพลตตั้งต้น เช่น `about`)
+ * เทมเพลตของ **หน้ารายละเอียดหมวดสินค้า** — ตัวสร้างเดียวใช้ได้ทุกหมวด (รอบที่ 281 · ปิดหนี้ D-280-1)
+ * ก่อนหน้านี้ต้องเขียนทีละหมวดในตาราง ⇒ หมวดที่สร้างใหม่ไม่มีเทมเพลตให้เริ่ม (กดแล้วเงียบ)
+ * ⚠️ ต้องเป็น**ฟังก์ชันบริสุทธิ์** — ค่าจริงจาก DB เข้ามาทาง `options.categoryValues` (ผู้เรียกอ่านมาให้)
+ *
+ * ⚠️ **ห้ามคืน `null` เมื่อไม่รู้จักหมวด** (ต่างจากหน้า detail ของหมวดในโค้ด): ถ้าคืน `null`
+ *    หน้าจอจะโชว์ปุ่ม "เริ่มจากเทมเพลต" (เพราะ `hasBlockTemplate()` = true) แต่กดแล้วไม่มีอะไรเกิดขึ้น
+ *    = กับดักเดียวกับ `careers` ⇒ ที่นี่ถอยไปสร้างแบนเนอร์ด้วย **รหัสหมวด** (ไม่แต่งชื่อขึ้นเอง)
  */
+function buildProductDetailTemplate(page: string, options?: TemplateBuildOptions): BlockDocument | null {
+  const categoryId = productDetailCategoryIdOfPageId(page);
+  if (categoryId === null) return null;
+
+  const values = options?.categoryValues?.(categoryId) ?? null;
+  const document = buildProductDetailDocument(categoryId, values);
+  if (document !== null) return document;
+
+  /* หมวดที่ไม่อยู่ในโค้ด + ยังอ่านค่าจริงไม่ได้ ⇒ เอกสารตั้งต้นที่ใช้รหัสหมวดเป็นชื่อ (ยังแก้ต่อได้) */
+  return buildProductDetailDocument(categoryId, {
+    slug: categoryId,
+    nameTh: categoryId,
+    nameEn: categoryId,
+    descriptionTh: "",
+    descriptionEn: "",
+    imagePath: null,
+    imageWidth: null,
+    imageHeight: null,
+    hasProducts: false,
+  });
+}
+
 /**
  * หน้านี้ **มีหน้าจอตัวสร้าง (builder) + พรีวิว** ไหม — ใช้กับงานที่ไม่เกี่ยวกับเทมเพลต
  * (เช่น ปุ่ม "กลับไปใช้ดีไซน์เดิม" · ล้างประวัติการเผยแพร่) ⇒ **ห้ามใช้ `hasBlockTemplate` กับงานพวกนี้**
  * เพราะหน้าที่เนื้อหามาจากตัวนำเข้า (about) ก็ยังต้องกลับไปใช้เลย์เอาต์เดิม/ล้างประวัติได้
+ *
+ * 🆕 รอบที่ 281: หน้า detail ของ **หมวดที่สร้างใหม่** ก็นับเป็นหน้าที่มีตัวสร้าง
+ *    (ตรวจตาม **รูปทรงของ id** `product-<อะไรก็ได้>` — ไม่จำกัด 6 ใบในโค้ด)
+ *    ⚠️ ผู้เรียกที่ต้องรู้ว่าหมวดนั้นมีจริงไหม ต้องเช็คฐานข้อมูลเอง (เช่น `/admin/builder/[page]`)
  */
-export function isBlockBuilderPage(page: string): page is BlockTemplatePageId {
-  return (BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page);
+export function isBlockBuilderPage(page: string): boolean {
+  return (BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page) || productDetailCategoryIdOfPageId(page) !== null;
 }
 
-export const TEMPLATED_PAGE_IDS: readonly string[] = BLOCK_TEMPLATE_PAGE_IDS.filter(
-  (page) => TEMPLATE_BUILDERS[page] !== null,
-);
+export const TEMPLATED_PAGE_IDS: readonly string[] = [
+  ...MENU_TEMPLATE_PAGE_IDS.filter((page) => MENU_TEMPLATE_BUILDERS[page] !== null),
+  ...PRODUCT_DETAIL_PAGE_IDS,
+];
 
 /**
  * "ส่วนที่เทมเพลตไม่ครอบคลุม" — รหัสกลาง (ข้อความจริงอยู่ในพจนานุกรมทั้งสองภาษา)
@@ -127,7 +157,7 @@ export const BLOCK_COVERAGE_PART_IDS = [
 
 export type BlockCoveragePartId = (typeof BLOCK_COVERAGE_PART_IDS)[number];
 
-const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartId[]>> = {
+const COVERAGE: Readonly<Record<MenuTemplatePageId, readonly BlockCoveragePartId[]>> = {
   /*
     หน้าแรก (รอบที่ 224 · คิวข้อ 5 — **ครบตามหน้าเว็บจริงแล้ว**)
     ครอบคลุม: หัวข้อ/คำโปรยจดหมายข่าว + ฟอร์มจริง · หมวดสินค้า+สินค้าแนะนำ (ไดนามิก) ·
@@ -152,17 +182,6 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
        ถ้าอนาคตต้องการรายชื่อเป็นข้อความ ต้องได้รายชื่อที่ยืนยันแล้วจากเจ้าของก่อน (บล็อก `rosterText` พร้อมใช้)
   */
   executives: [],
-  /*
-    หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — **ไม่ประกาศช่องว่าง**
-    เทมเพลต mirror หน้า stub เดิมครบ: ชื่อหมวด · ภาพ (มี alt) · คำอธิบาย "ยังไม่เปิดใช้งาน" · ปุ่มย้อนกลับ
-    ⇒ เปิดสวิตช์ "ใช้กับหน้าเว็บจริง" แล้วไม่มีส่วนไหนหายไป (เนื้อหารายละเอียดจริงรอเจ้าของเติมเอง)
-  */
-  "product-instant-noodles": [],
-  "product-dried-vermicelli": [],
-  "product-serda": [],
-  "product-quick-zabb": [],
-  "product-noodie": [],
-  "product-rod-ded": [],
 };
 
 /**
@@ -184,11 +203,13 @@ export function isImportedContentPage(page: string): boolean {
 /**
  * หน้านี้มีเทมเพลตบล็อกให้เริ่มได้ไหม
  * ⚠️ หน้าที่เนื้อหามาจากตัวนำเข้า = `false` เสมอ (ดู `IMPORTED_CONTENT_PAGES`)
+ * 🆕 รอบที่ 281: หน้า detail ของหมวดใดก็ได้ = `true` (เทมเพลตเดียวใช้ได้ทุกหมวด)
  */
-export function hasBlockTemplate(page: string): page is BlockTemplatePageId {
+export function hasBlockTemplate(page: string): boolean {
   if (isImportedContentPage(page)) return false;
-  if (!(BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(page)) return false;
-  return TEMPLATE_BUILDERS[page as BlockTemplatePageId] !== null;
+  if (productDetailCategoryIdOfPageId(page) !== null) return true;
+  if (!(MENU_TEMPLATE_PAGE_IDS as readonly string[]).includes(page)) return false;
+  return MENU_TEMPLATE_BUILDERS[page as MenuTemplatePageId] !== null;
 }
 
 /**
@@ -197,11 +218,17 @@ export function hasBlockTemplate(page: string): page is BlockTemplatePageId {
  */
 export function buildBlockTemplate(page: string, options?: TemplateBuildOptions): BlockDocument | null {
   if (!hasBlockTemplate(page)) return null;
-  const builder = TEMPLATE_BUILDERS[page];
+  if (productDetailCategoryIdOfPageId(page) !== null) return buildProductDetailTemplate(page, options);
+  const builder = MENU_TEMPLATE_BUILDERS[page as MenuTemplatePageId];
   return builder === null ? null : builder(options);
 }
 
-/** รหัสของส่วนที่เทมเพลตของหน้านั้นไม่ครอบคลุม (หน้านอกทะเบียน = ไม่มีข้อมูล) */
+/**
+ * รหัสของส่วนที่เทมเพลตของหน้านั้นไม่ครอบคลุม (หน้านอกทะเบียน = ไม่มีข้อมูล)
+ * ℹ️ หน้า detail ของหมวดสินค้า **ไม่ประกาศช่องว่าง** (เทมเพลต mirror หน้าเว็บเดิมครบ) — ทุกหมวดเหมือนกัน
+ */
 export function blockCoverageGaps(page: string): readonly BlockCoveragePartId[] {
-  return hasBlockTemplate(page) ? COVERAGE[page] : [];
+  if (productDetailCategoryIdOfPageId(page) !== null) return [];
+  if (!hasBlockTemplate(page)) return [];
+  return COVERAGE[page as MenuTemplatePageId];
 }

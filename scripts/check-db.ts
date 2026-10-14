@@ -48,6 +48,7 @@ import {
   listProductCategoryCards,
   listProductHighlights,
   listProductsByCategory,
+  listProductDetailPagePaths,
   listProductsForAdmin,
   listPublicCategorySlugs,
   loadProductCategory,
@@ -138,6 +139,7 @@ import {
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { productDetailPageId } from "@/lib/blocks/product-detail";
 import { IMPORTED_CONTENT_PAGES, TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import {
   createAdminUser,
@@ -173,6 +175,7 @@ import {
 import {
   isPageLive,
   listDueSchedules,
+  listRevisions,
   loadDocumentRow,
   publishDraft,
   publishDuePage,
@@ -412,6 +415,9 @@ async function main(): Promise<void> {
   /* 40) ที่อยู่หมวดสินค้า (slug): เปลี่ยนที่อยู่ → ประวัติ → 301 · ลบหมวดว่าง (มติ D30 · รอบที่ 280) */
   await checkCategorySlugRouting();
 
+  /* 41) หน้าตัวสร้างของหมวดใหม่: แถว `page` อัตโนมัติ + เทมเพลต + ลบหมวดเก็บกวาดหน้าหมด (รอบที่ 281) */
+  await checkProductDetailBuilderPage();
+
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
@@ -424,6 +430,25 @@ const RETENTION_TEST_ACTION = "check-db-retention";
 async function countWhere(sql: string, params: readonly unknown[]): Promise<number> {
   const { rows } = await getPool().query<{ n: number }>(`select count(*)::int as n from ${sql}`, [...params]);
   return rows[0]?.n ?? 0;
+}
+
+/**
+ * เก็บกวาด "หมวดทดสอบ" ให้หมด **ทุกตารางที่เกี่ยวข้อง** (รอบที่ 281)
+ *
+ * ⚠️ ทำไมต้องมีตัวช่วยนี้: ตั้งแต่รอบที่ 281 `createProductCategoryAdmin()` สร้าง **แถว `page`**
+ * ของหน้าตัวสร้างให้พร้อมหมวด (มติ D30 ข้อ 3) ⇒ SQL ที่ลบแค่ `product_category` จะเหลือ
+ * **หน้าลอย** ค้างในตาราง `page` ทุกครั้งที่รัน `check:db`
+ * (เจอจริง: `product-check-db-category` ค้าง แล้วถูก migration 0043 เก็บเข้าไปเป็นหน้าเต็มตัว)
+ *
+ * กติกาเดียวกับตัวลบในแอป (`deleteEmptyCategoryAdmin`) — ไม่มี FK ให้พึ่ง ⇒ ลบเองทีละตาราง
+ */
+async function removeTestCategory(id: string): Promise<void> {
+  const pageId = productDetailPageId(id);
+  await getPool().query("delete from page_document_revision where page = $1", [pageId]);
+  await getPool().query("delete from page_document where page = $1", [pageId]);
+  await getPool().query("delete from page where id = $1", [pageId]);
+  await getPool().query("delete from product_category_slug_history where category_id = $1", [id]);
+  await getPool().query("delete from product_category where id = $1", [id]);
 }
 
 /**
@@ -2357,6 +2382,9 @@ const SLUG_CHECK_OLD = "check-db-slug-old";
 const SLUG_CHECK_NEW = "check-db-slug-new";
 const SLUG_CHECK_PRODUCT = "p999997";
 const SLUG_CHECK_ACTOR = "check-db-slug@example.invalid";
+/* ⚠️ ค่าคงที่ของวงจร 41 (หน้าตัวสร้างของหมวดใหม่ · รอบ 281) — ก่อน `await main()` เช่นกัน (TDZ) */
+const BUILDER_CHECK_ID = "check-db-builder-page";
+const BUILDER_CHECK_ACTOR = "check-db-builder-page@example.invalid";
 
 await main();
 
@@ -4388,11 +4416,16 @@ async function checkProductCategories(): Promise<void> {
       "หมวดใหม่ขึ้นเว็บได้ · ซ่อนแล้วหาย · คืนค่าเริ่มต้นตรงชุดถาวร · หมวดจริงไม่ถูกแตะ",
     );
   } finally {
-    /* ไม่มีฟังก์ชันลบหมวดในแอป (มติ D25) ⇒ การทดสอบเก็บกวาดด้วย SQL ตรง ๆ */
-    await getPool().query("delete from product_category where id = $1", [CATEGORY_CHECK_ID]);
+    /* ⚠️ รอบที่ 281: ต้องเก็บกวาด **หน้าตัวสร้าง** ด้วย (การสร้างหมวดทำให้เกิดแถว `page` ให้เอง) */
+    await removeTestCategory(CATEGORY_CHECK_ID);
     if (presetId !== "") await deleteCategoryPreset(presetId);
 
     assert.equal(await countWhere("product_category where id = $1", [CATEGORY_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(
+      await countWhere("page where id = $1", [productDetailPageId(CATEGORY_CHECK_ID)]),
+      0,
+      "ต้องไม่เหลือหน้าตัวสร้างของหมวดทดสอบ (บทเรียนรอบที่ 281)",
+    );
     assert.equal(
       await countWhere("product_category_preset where name = $1", [CATEGORY_PRESET_CHECK_NAME]),
       0,
@@ -4682,8 +4715,7 @@ async function checkCategorySlugRouting(): Promise<void> {
     );
   } finally {
     await deleteProduct(SLUG_CHECK_PRODUCT);
-    await getPool().query("delete from product_category where id = $1", [SLUG_CHECK_ID]);
-    await getPool().query("delete from product_category_slug_history where category_id = $1", [SLUG_CHECK_ID]);
+    await removeTestCategory(SLUG_CHECK_ID);
     await getPool().query("delete from media where id = $1", [mediaId]);
 
     assert.equal(await countWhere("product_category where id = $1", [SLUG_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
@@ -4692,5 +4724,126 @@ async function checkCategorySlugRouting(): Promise<void> {
       0,
       "ต้องไม่เหลือประวัติที่อยู่ทดสอบ",
     );
+  }
+}
+
+/**
+ * 41) **หน้าตัวสร้างของหมวดที่สร้างใหม่** (รอบที่ 281 · ปิดหนี้ D-280-1)
+ *
+ * พิสูจน์ว่า "หมวดใหม่ได้จอตัวสร้างหน้าเว็บอัตโนมัติ" เป็นจริงที่ **ชั้นข้อมูล**:
+ *   1. สร้างหมวด ⇒ มีแถว `page` (`product-<รหัสภายในหมวด>`) เกิดให้อัตโนมัติ (`in_menu = false` · `editor = blocks`)
+ *   2. `listProductDetailPagePaths()` เห็นพาธจริงของหน้า (`/products/<slug>` ไม่ใช่ id) — ใช้ทั้ง sitemap และปุ่มเปิดหน้าเว็บ
+ *   3. เทมเพลตตั้งต้นสร้างได้จริงและ **ผ่าน parser** (ชื่อหน้าในเอกสารตรงกับ id ของหน้า)
+ *   4. ลบหมวดว่าง ⇒ แถว `page`/เอกสาร/ประวัติของหน้า ถูกล้างตาม (ไม่เหลือหน้าลอย)
+ * ⚠️ ค่าคงที่ของวงจรนี้ประกาศไว้ **ก่อน `await main()`** (กัน TDZ — บทเรียนรอบที่ 78)
+ */
+async function checkProductDetailBuilderPage(): Promise<void> {
+  const pageId = productDetailPageId(BUILDER_CHECK_ID);
+  const tempSlug = "check-db-builder-moved";
+
+  try {
+    /* ── 1) สร้างหมวด ⇒ ต้องได้แถว `page` ให้อัตโนมัติ ───────────────────────── */
+    assert.equal(
+      await createProductCategoryAdmin(
+        {
+          id: BUILDER_CHECK_ID,
+          slug: "check-db-builder",
+          nameTh: "หมวดทดสอบหน้าตัวสร้าง",
+          nameEn: "Builder check",
+          descriptionTh: "",
+          descriptionEn: "",
+          sortOrder: 940,
+          imageMediaId: null,
+          logoMediaId: null,
+        },
+        BUILDER_CHECK_ACTOR,
+      ),
+      true,
+      "สร้างหมวดทดสอบต้องสำเร็จ",
+    );
+
+    const pageRow = await getPool().query<{
+      id: string;
+      nameTh: string;
+      inMenu: boolean;
+      editor: string;
+    }>(
+      `select id, name_th as "nameTh", in_menu as "inMenu", editor from page where id = $1`,
+      [pageId],
+    );
+    assert.equal(pageRow.rows.length, 1, "หมวดใหม่ต้องมีแถวหน้าตัวสร้างอัตโนมัติ");
+    assert.equal(pageRow.rows[0]?.nameTh, "หมวดทดสอบหน้าตัวสร้าง", "ชื่อหน้าต้องมาจากชื่อหมวด");
+    assert.equal(pageRow.rows[0]?.inMenu, false, "หน้า detail ต้องไม่โผล่ในเมนู");
+    assert.equal(pageRow.rows[0]?.editor, "blocks", "หน้าตัวสร้างต้องใช้ editor = blocks");
+
+    /* ── 2) พาธจริงของหน้า = ที่อยู่บนเว็บ (ไม่ใช่รหัสภายใน) ───────────────────── */
+    const paths = await listProductDetailPagePaths();
+    assert.equal(paths.get(pageId), "/products/check-db-builder", "พาธจริงต้องมาจาก slug ของหมวด");
+
+    /* เปลี่ยนที่อยู่ ⇒ พาธของหน้าเปลี่ยนตาม แต่ **id ของหน้าไม่เปลี่ยน** */
+    assert.equal(
+      await updateProductCategoryAdmin(
+        {
+          id: BUILDER_CHECK_ID,
+          slug: tempSlug,
+          nameTh: "หมวดทดสอบหน้าตัวสร้าง",
+          nameEn: "Builder check",
+          descriptionTh: "",
+          descriptionEn: "",
+          sortOrder: 940,
+          isHidden: false,
+        },
+        BUILDER_CHECK_ACTOR,
+      ),
+      true,
+      "เปลี่ยนที่อยู่ต้องสำเร็จ",
+    );
+    assert.equal(
+      (await listProductDetailPagePaths()).get(pageId),
+      `/products/${tempSlug}`,
+      "พาธจริงต้องตามที่อยู่ใหม่ (เอกสารยังอยู่ที่ id ของหน้าเดิม)",
+    );
+
+    /* ── 3) เทมเพลตตั้งต้นของหน้าตัวสร้าง (generic ทุกหมวด) ─────────────────── */
+    const document = buildBlockTemplate(pageId, { categoryValues: () => null });
+    assert.ok(document !== null, "หมวดใหม่ต้องสร้างเทมเพลตตั้งต้นได้ (ไม่ใช่ปุ่มที่กดแล้วเงียบ)");
+    assert.equal(document.page, pageId);
+    const parsed = parseBlockDocument(pageId, document);
+    assert.equal(parsed.ok, true, "เทมเพลตต้องผ่าน parser");
+
+    /* ── 4) ลบหมวด ⇒ หน้าตัวสร้าง + เอกสาร + ประวัติ ถูกล้างตาม ─────────────── */
+    await saveDraft(pageId, document, BUILDER_CHECK_ACTOR);
+    assert.equal(await countWhere("page_document where page = $1", [pageId]), 1, "บันทึกฉบับร่างได้จริง");
+    /* เผยแพร่ = เก็บ "ประวัติการเผยแพร่" (ตัวเดียวกับที่ตัว builder ใช้กู้คืน) */
+    await publishDraft(pageId, BUILDER_CHECK_ACTOR, null);
+    assert.ok((await listRevisions(pageId)).length >= 1, "เผยแพร่ต้องเก็บประวัติของหน้า");
+
+    assert.equal(await deleteEmptyCategoryAdmin(BUILDER_CHECK_ID, builtInCategorySlugs()), true, "ลบหมวดว่างต้องสำเร็จ");
+    assert.equal(
+      await countWhere("page where id = $1", [pageId]),
+      0,
+      "ลบหมวดแล้วต้องไม่เหลือแถวหน้าตัวสร้าง (กันหน้าลอย)",
+    );
+    assert.equal(
+      await countWhere("page_document where page = $1", [pageId]),
+      0,
+      "ลบหมวดแล้วต้องไม่เหลือเอกสารบล็อก",
+    );
+    assert.equal(
+      await countWhere("page_document_revision where page = $1", [pageId]),
+      0,
+      "ลบหมวดแล้วต้องไม่เหลือประวัติเอกสาร",
+    );
+    assert.equal((await listProductDetailPagePaths()).has(pageId), false, "พาธของหมวดที่ลบต้องหายจากทะเบียน");
+
+    done(
+      "หน้าตัวสร้างของหมวดใหม่: แถว page อัตโนมัติ + พาธจริงตาม slug + เทมเพลต + ลบแล้วเก็บกวาด",
+      "transaction เดียว · ผ่าน parser · ไม่เหลือหน้าลอย/เอกสาร/ประวัติ",
+    );
+  } finally {
+    await removeTestCategory(BUILDER_CHECK_ID);
+
+    assert.equal(await countWhere("product_category where id = $1", [BUILDER_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(await countWhere("page where id = $1", [pageId]), 0, "ต้องไม่เหลือหน้าทดสอบ");
   }
 }
