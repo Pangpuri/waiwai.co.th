@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-import { reorderCategoriesAction, restoreCategoryDefaultsAction, toggleCategoryHiddenAction } from "./actions";
+import {
+  deleteCategoryAction,
+  reorderCategoriesAction,
+  restoreCategoryDefaultsAction,
+  toggleCategoryHiddenAction,
+} from "./actions";
 import { CategoryCreateForm } from "@/features/admin/ui/category-create-form";
 import { CategoryEditorForm } from "@/features/admin/ui/category-editor-form";
 import { CategoryPresetPanel } from "@/features/admin/ui/category-preset-panel";
@@ -13,6 +18,7 @@ import { listReorderItems } from "@/lib/admin/reorder";
 import { listMedia } from "@/lib/media/repository";
 import {
   MAX_PRODUCT_CATEGORIES,
+  categoryDeletionAllowed,
   isBuiltInCategorySlug,
 } from "@/lib/products/categories";
 import {
@@ -46,10 +52,29 @@ const INPUT_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring rounded-lg border px-2.5 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none";
 const HELP_CLASS = "border-line bg-bg-subtle text-fg-muted rounded-xl border px-3 py-2 text-sm";
 
-export default async function AdminProductCategoriesPage() {
+export default async function AdminProductCategoriesPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
+
+  /* ผลของการลบหมวด (redirect กลับมาพร้อม `?deleted=` / `?error=`) — ฟอร์มธรรมดา ไม่มี JS */
+  const query = await searchParams;
+  const deletedSlug = typeof query["deleted"] === "string" ? query["deleted"] : "";
+  const deleteError = typeof query["error"] === "string" ? query["error"] : "";
+  const deleteMessage =
+    deletedSlug !== ""
+      ? fillTemplate(messages.adminCategories.deleted, { slug: deletedSlug })
+      : deleteError === "delete-built-in"
+        ? messages.adminCategories.deleteBlockedBuiltIn
+        : deleteError === "delete-has-products"
+          ? messages.adminCategories.deleteBlockedProducts
+          : deleteError === ""
+            ? ""
+            : messages.adminCategories.deleteCategoryHint;
 
   const [rows, defaults, presets, media, reorderItems] = await Promise.all([
     listAdminCategories(),
@@ -95,6 +120,18 @@ export default async function AdminProductCategoriesPage() {
           </Link>
         </div>
       </header>
+
+      {/* ผลของการลบหมวด (มาจาก `?deleted=` / `?error=`) — บอกให้ชัดว่าเกิดอะไรขึ้น */}
+      {deleteMessage === "" ? null : (
+        <p
+          role="status"
+          className={`rounded-xl border px-3 py-2 text-sm ${
+            deleteError === "" ? "border-line bg-bg-subtle text-fg" : "border-brand-red text-brand-red bg-surface"
+          }`}
+        >
+          {deleteMessage}
+        </p>
+      )}
 
       {/* สถานะค่าเริ่มต้นถาวร — บอกตรง ๆ ว่าพร้อมใช้หรือยังต้องรันสคริปต์ */}
       <p className={HELP_CLASS}>
@@ -179,6 +216,7 @@ export default async function AdminProductCategoriesPage() {
                   library={library}
                   fallbackLogo={item === undefined ? null : { src: item.image.src, width: item.image.width, height: item.image.height }}
                   initial={{
+                    slug: row.slug,
                     nameTh: row.nameTh,
                     nameEn: row.nameEn,
                     descriptionTh: row.descriptionTh,
@@ -215,6 +253,27 @@ export default async function AdminProductCategoriesPage() {
                 )}
 
                 <span className="text-fg-muted text-[11px]">{m2.restoreConfirm}</span>
+              </div>
+
+              {/*
+                ลบหมวดถาวร (รอบที่ 280 · มติ D30 ข้อ 4) — เฉพาะ **หมวดว่างที่ไม่ใช่หมวดในโค้ด**
+                ⚠️ ประตูจริงอยู่ที่ SQL (`deleteEmptyCategoryAdmin`) · ที่นี่แค่ไม่เสนอปุ่มที่กดแล้วไม่สำเร็จ
+              */}
+              <div className="border-line mt-3 border-t pt-3">
+                {categoryDeletionAllowed({ builtIn, productCount: row.productCount }) ? (
+                  <form action={deleteCategoryAction} className="flex flex-wrap items-center gap-3">
+                    <input type="hidden" name="id" value={row.id} />
+                    <button
+                      type="submit"
+                      className="border-brand-red text-brand-red rounded-lg border px-3 py-1.5 text-sm font-semibold"
+                    >
+                      {m2.deleteCategory}
+                    </button>
+                    <span className="text-fg-muted text-[11px]">{m2.deleteCategoryConfirm}</span>
+                  </form>
+                ) : (
+                  <p className="text-fg-muted text-xs">{builtIn ? m2.deleteBlockedBuiltIn : m2.deleteBlockedProducts}</p>
+                )}
               </div>
             </section>
           );

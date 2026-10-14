@@ -10,11 +10,15 @@ import {
   FALLBACK_CATEGORY_IMAGE_HEIGHT,
   FALLBACK_CATEGORY_IMAGE_WIDTH,
   MAX_PRODUCT_CATEGORIES,
+  categoryDeletionAllowed,
   categoryPresetApplyPlan,
   categoryPresetPayload,
+  categoryRedirectSlug,
   categoryRestoreFields,
+  categorySlugInput,
   categorySlugIssue,
   defaultSortOrderOf,
+  isCategorySlugChange,
   isBuiltInCategorySlug,
   mergeSiteCategories,
   nextCategorySortOrder,
@@ -56,7 +60,9 @@ const builtIn: readonly BuiltInCategoryInfo[] = CATALOG_ITEMS.map((item, index) 
 }));
 
 function row(overrides: Partial<CategoryRow> & { readonly id: string }): CategoryRow {
+  /* ค่าเริ่มต้น: ที่อยู่บนเว็บ = id (แบบเดียวกับข้อมูลที่นำเข้า) — เทสต์เปลี่ยน slug ได้ผ่าน overrides */
   return {
+    slug: overrides.id,
     nameTh: "",
     nameEn: "",
     descriptionTh: "",
@@ -137,6 +143,77 @@ test("หมวด: ตรวจค่าที่แก้ — ความย�
   assert.ok(validateCategoryEdit({ nameTh: "", nameEn: "", descriptionTh: "", descriptionEn: "", sortOrder: 1.5 }).length > 0);
 });
 
+/* ── 1.1) ที่อยู่บนเว็บ (slug) แก้ได้ + 301 (รอบที่ 280 · มติ D30) ─────────────── */
+
+test("หมวด: ช่อง slug จากฟอร์ม — ตัดช่องว่าง/พิมพ์เล็ก · ว่าง = ไม่แตะที่อยู่เดิม", () => {
+  assert.equal(categorySlugInput("  Instant-Noodles  "), "instant-noodles");
+  assert.equal(categorySlugInput("   "), undefined, "ช่องว่าง = ไม่แตะที่อยู่เดิม (ไม่ใช่ลบที่อยู่)");
+  assert.equal(categorySlugInput(""), undefined);
+});
+
+test("หมวด: เปลี่ยน slug จริงไหม (เทียบกับที่อยู่ปัจจุบันแบบไม่สนตัวพิมพ์)", () => {
+  assert.equal(isCategorySlugChange("instant-noodles", "instant-noodles"), false);
+  assert.equal(isCategorySlugChange("Instant-Noodles", "instant-noodles"), false);
+  assert.equal(isCategorySlugChange("instant-noodles", "noodles"), true);
+  assert.equal(isCategorySlugChange("instant-noodles", undefined), false, "ไม่ส่งค่า = ไม่แตะ");
+});
+
+test("หมวด: ตรวจค่าที่แก้ + slug (คำสงวน/ซ้ำ/รูปผิด) — ไม่ส่ง context = ไม่ตรวจ slug", () => {
+  const base = { nameTh: "ก", nameEn: "", descriptionTh: "", descriptionEn: "", sortOrder: 0 };
+
+  assert.deepEqual([...validateCategoryEdit({ ...base, slug: "instant-noodles" })], [], "ไม่มี context = ข้ามการตรวจ slug");
+  assert.deepEqual(
+    [...validateCategoryEdit({ ...base, slug: "instant-noodles" }, { existingSlugs: ["noodie"] })],
+    [],
+    "ไม่ซ้ำ = ผ่าน",
+  );
+  assert.ok(
+    validateCategoryEdit({ ...base, slug: "noodie" }, { existingSlugs: ["noodie"] }).some((issue) => issue.code === "slug-duplicate"),
+    "ซ้ำกับหมวดอื่น = ไม่ผ่าน",
+  );
+  assert.ok(
+    validateCategoryEdit({ ...base, slug: "products" }, { existingSlugs: [] }).some((issue) => issue.code === "slug-reserved"),
+    "คำสงวน = ไม่ผ่าน",
+  );
+  assert.ok(
+    validateCategoryEdit({ ...base, slug: "Instant" }, { existingSlugs: [] }).some((issue) => issue.code === "slug-bad-chars"),
+    "ตัวพิมพ์ใหญ่ = ไม่ผ่าน (ผู้เรียกต้อง normalize ก่อน)",
+  );
+});
+
+test("หมวด: ตัดสินการ 301 จากที่อยู่เก่า (logic ล้วนของหน้า /products/[slug])", () => {
+  const moved = { slug: "noodles", isHidden: false };
+
+  /* ที่อยู่ที่ขอ = ที่อยู่ปัจจุบัน ⇒ ไม่เด้ง */
+  assert.equal(
+    categoryRedirectSlug({ requested: "noodles", current: { slug: "noodles", isHidden: false }, moved: null }),
+    null,
+  );
+  /* ขอด้วยรหัสภายในขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ 301 ไปที่อยู่ปัจจุบัน */
+  assert.equal(
+    categoryRedirectSlug({ requested: "instant-noodles", current: { slug: "noodles", isHidden: false }, moved: null }),
+    "noodles",
+  );
+  /* ที่อยู่เก่าที่อยู่ในประวัติ ⇒ 301 ไปที่อยู่ปัจจุบัน */
+  assert.equal(categoryRedirectSlug({ requested: "instant-noodles", current: null, moved }), "noodles");
+  /* ที่อยู่ไม่รู้จักเลย ⇒ ไม่เด้ง (ปล่อยให้ 404) */
+  assert.equal(categoryRedirectSlug({ requested: "ไม่มีหมวดนี้", current: null, moved: null }), null);
+  /* หมวดถูกซ่อน ⇒ ไม่เด้ง ไม่บอกใบ้ว่ามีอยู่ */
+  assert.equal(
+    categoryRedirectSlug({ requested: "เก่า", current: { slug: "ใหม่", isHidden: true }, moved: null }),
+    null,
+  );
+  assert.equal(categoryRedirectSlug({ requested: "เก่า", current: null, moved: { slug: "ใหม่", isHidden: true } }), null);
+  /* ที่อยู่เก่าชี้กลับที่อยู่ปัจจุบันของตัวเอง ⇒ ไม่ต้องเด้งซ้ำ */
+  assert.equal(categoryRedirectSlug({ requested: "noodles", current: null, moved }), null);
+});
+
+test("หมวด: ลบได้เฉพาะหมวดว่างที่ไม่ใช่หมวดในโค้ด", () => {
+  assert.equal(categoryDeletionAllowed({ builtIn: false, productCount: 0 }), true);
+  assert.equal(categoryDeletionAllowed({ builtIn: false, productCount: 1 }), false, "มีสินค้า = ลบไม่ได้");
+  assert.equal(categoryDeletionAllowed({ builtIn: true, productCount: 0 }), false, "หมวดในโค้ดลบไม่ได้");
+});
+
 /* ── 2) ลำดับ ─────────────────────────────────────────────────────────────── */
 
 test("หมวด: เรียงลำดับ = sort_order → ลำดับในโค้ด → id (นิ่งทุกครั้ง)", () => {
@@ -180,6 +257,26 @@ test("หมวด: ไม่มีข้อมูลในฐานข้อม
     assert.equal(entry.logoSrc, CATALOG_ITEMS.find((item) => item.slug === entry.slug)?.image.src);
     assert.equal(entry.imageAlt, `คำบรรยายภาพ ${String(CATALOG_ITEMS.findIndex((item) => item.slug === entry.slug) + 1)}`);
   }
+});
+
+test("หมวด: เจ้าของเปลี่ยน slug — การ์ดใช้ที่อยู่ใหม่ แต่ id/พจนานุกรมยังผูกของเดิม (รอบที่ 280)", () => {
+  const merged = mergeSiteCategories(builtIn, [row({ id: "instant-noodles", slug: "instant-noodle" })], "th");
+
+  const moved = merged.find((entry) => entry.id === "instant-noodles");
+  assert.ok(moved !== undefined, "ยังต้องเจอหมวดในโค้ดด้วย **รหัสภายใน** (ไม่ใช่ slug)");
+  assert.equal(moved.slug, "instant-noodle", "ที่อยู่บนเว็บ = ค่าที่เจ้าของตั้ง");
+  assert.equal(moved.builtIn, true);
+  assert.equal(moved.nameTh, "ชื่อจากพจนานุกรม 1", "ชื่อยังถอยพจนานุกรมของหมวดเดิมได้");
+
+  /* หมวดใหม่ (ไม่มีในโค้ด) — slug มาจากฐานข้อมูล ไม่ใช่ id */
+  const created = mergeSiteCategories(
+    builtIn,
+    [row({ id: "brand-new", slug: "new-address", nameTh: "ใหม่", imagePath: "/media/x", productCount: 2 })],
+    "th",
+  ).find((entry) => entry.id === "brand-new");
+  assert.ok(created !== undefined);
+  assert.equal(created.slug, "new-address");
+  assert.equal(created.builtIn, false);
 });
 
 test("หมวด: ค่าจากฐานข้อมูลทับค่าในโค้ด (ชื่อ/คำอธิบาย/โลโก้/ภาพ) และถอยค่าภาษาได้", () => {
@@ -412,12 +509,22 @@ test("หมวด: ตารางค่าเริ่มต้นถาวร
   );
 });
 
-test("หมวด: ไม่มี action ลบหมวด (มติ D25 ข้อ 3 = ใช้ 'ซ่อนจากเว็บ' แทน)", () => {
+test("หมวด: ลบถาวรได้เฉพาะหมวดว่างที่ไม่ใช่หมวดในโค้ด (มติ D30 แทน D25 ข้อ 3) · ประตูอยู่ที่ SQL", () => {
   const actions = codeOf("app/admin/product-categories/actions.ts");
-  assert.ok(!/export async function deleteCategory(?:Action)?\b/.test(actions), "ต้องไม่มี action ลบหมวด");
-  assert.ok(!/delete\s+from\s+product_category\b/i.test(actions), "ห้ามลบแถวหมวดจาก action");
-  assert.ok(actions.includes("setCategoryHidden"), "ต้องมี action ซ่อน/แสดง");
+  assert.ok(actions.includes("export async function deleteCategoryAction"), "ต้องมี action ลบหมวด");
+  assert.ok(actions.includes("deleteEmptyCategoryAdmin("), "ต้องเรียกชั้นข้อมูลที่มีประตู SQL (ไม่ลบเอง)");
+  assert.ok(actions.includes("builtInCategorySlugs()"), "ต้องกันหมวดในโค้ด");
+  assert.ok(actions.includes("productCount > 0"), "ต้องกันหมวดที่มีสินค้า");
+  assert.ok(actions.includes("setCategoryHidden"), "ต้องมี action ซ่อน/แสดง (ทางเลือกที่ปลอดภัยกว่า)");
   assert.ok(actions.includes("isHidden"), "ต้องอ่านค่าซ่อนจากฟอร์ม");
+
+  /* ⚠️ ประตูจริงต้องอยู่ใน SQL ไม่ใช่แค่ที่ action (fail-closed) */
+  const repository = codeOf("lib/products/categories-repository.ts");
+  assert.ok(
+    repository.includes("not exists (select 1 from product where product.category_id = product_category.id)"),
+    "ประตู SQL: ลบไม่ได้ถ้ายังมีสินค้า",
+  );
+  assert.ok(repository.includes("id <> all($2::text[])"), "ประตู SQL: ลบหมวดในโค้ดไม่ได้");
 });
 
 test("หมวด: คำสั่งอ่านฝั่งเว็บต้องกรอง is_hidden (หมวดที่ซ่อนต้องไม่หลุดขึ้นเว็บ)", () => {
@@ -430,7 +537,11 @@ test("หมวด: คำสั่งอ่านฝั่งเว็บต้
 
   const detailPage = codeOf("app/[lang]/products/[slug]/page.tsx");
   assert.ok(detailPage.includes("category.isHidden"), "หน้ารายละเอียดต้อง 404 เมื่อหมวดถูกซ่อน");
-  assert.ok(detailPage.includes("productDetailPageId(slug)"), "ต้องโหลดเอกสารบล็อกของ slug นั้น (รองรับหมวดใหม่)");
+  assert.ok(
+    detailPage.includes("productDetailPageId(resolved.key)"),
+    "ต้องโหลดเอกสารบล็อกด้วย **รหัสภายใน** (รองรับหมวดใหม่ + ไม่พังเมื่อเปลี่ยน slug)",
+  );
+  assert.ok(detailPage.includes("resolveCategoryRequest("), "ต้องแก้ที่อยู่ก่อนเรนเดอร์ (ที่อยู่เก่า ⇒ 301)");
 });
 
 test("หมวด: จอหลังบ้านต้องตรวจสิทธิ์ + ไม่มี <form> ซ้อนในช่องภาพ", () => {
@@ -453,13 +564,28 @@ test("หมวด: จอหลังบ้านต้องตรวจสิ
   }
 });
 
-test("หมวด: slug ของหมวดใหม่ล็อก (ไม่มีช่องกรอก slug ในจอหลังบ้าน)", () => {
-  for (const file of ["features/admin/ui/category-create-form.tsx", "features/admin/ui/category-editor-form.tsx"]) {
-    const source = codeOf(file);
-    assert.ok(!/name="slug"/.test(source), `${file} ต้องไม่มีช่องกรอก slug (มติ D25 ข้อ 1)`);
-  }
+test("หมวด: ที่อยู่บนเว็บ (slug) แก้ได้ + มีทางทำ 301 (มติ D30 แทน D25 ข้อ 1)", () => {
+  const editor = codeOf("features/admin/ui/category-editor-form.tsx");
+  assert.ok(editor.includes('name="slug"'), "จอแก้ต้องมีช่องกรอกที่อยู่บนเว็บ");
+  assert.ok(editor.includes("m.slugChangeHint"), "ต้องอธิบายว่าเปลี่ยนที่อยู่แล้วระบบทำ 301 ให้");
+
   const createForm = sourceOf("features/admin/ui/category-create-form.tsx");
   assert.ok(createForm.includes("slugifyCategoryName("), "ฟอร์มเพิ่มหมวดต้องแสดงตัวอย่าง slug ที่ระบบสร้างให้");
+
+  const actions = codeOf("app/admin/product-categories/actions.ts");
+  assert.ok(actions.includes("categorySlugInput("), "action ต้องอ่าน slug จากฟอร์ม");
+  assert.ok(
+    actions.includes("validateCategoryEdit(input, { existingSlugs: otherSlugs })"),
+    "ต้องตรวจ slug ซ้ำกับ **หมวดอื่น** (ตัดตัวเองออก)",
+  );
+
+  /* 301: ชั้นข้อมูลต้องบันทึกประวัติ + หน้ารายละเอียดต้องเด้งเมื่อขอที่อยู่เก่า */
+  const repository = codeOf("lib/products/categories-repository.ts");
+  assert.ok(repository.includes("insert into product_category_slug_history"), "ต้องบันทึกที่อยู่เก่าลงประวัติ");
+  assert.ok(repository.includes("withTransaction"), "เปลี่ยนที่อยู่ + ประวัติ ต้องอยู่ใน transaction เดียว");
+  const detailPage = codeOf("app/[lang]/products/[slug]/page.tsx");
+  assert.ok(detailPage.includes("findCategoryIdByOldSlug("), "ต้องค้นที่อยู่เก่าจากประวัติ");
+  assert.ok(detailPage.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **301** ไปที่อยู่ปัจจุบัน");
 });
 
 test("หมวด: ตัวอ่านของหลังบ้านใช้ getPool (PII/ความลับ) ไม่ใช่ประตูอ่านสาธารณะ", () => {

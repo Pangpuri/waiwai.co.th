@@ -30,8 +30,12 @@ export type HomeImage = {
 };
 
 export type HomeCategoryCard = {
-  /** slug ของหมวด (= `id` ในฐานข้อมูล) — หมวดที่สร้างใหม่จากหลังบ้านไม่มีคีย์พจนานุกรม */
+  /**
+   * **รหัสภายใน** ของหมวด (`product_category.id`) — ใช้เป็น React key และเลือกไอคอน/พจนานุกรม
+   * ⚠️ **ไม่ใช่ที่อยู่บนเว็บ** (รอบที่ 280) — ลิงก์ใช้ `href`/`slug` เท่านั้น
+   */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (แก้ได้) */
   readonly slug: string;
   readonly href: string;
   readonly name: string;
@@ -99,7 +103,8 @@ export function homeCategoryCards(
   }));
 
   return mergeSiteCategories(builtIn, rows, language).map((category) => ({
-    id: category.slug,
+    /* id = รหัสภายใน (ไอคอน/คีย์) · href ใช้ที่อยู่บนเว็บ ⇒ เปลี่ยน slug แล้วการ์ดยังถูก (รอบที่ 280) */
+    id: category.id,
     slug: category.slug,
     href: catalogHref(language, category.slug),
     name: siteCategoryName(category, language),
@@ -125,8 +130,8 @@ export function homeProductHighlights(
 
   const items: HomeProductHighlight[] = [];
   for (const category of categories) {
-    /* ⚠️ `category_id` ในฐานข้อมูล = slug (ไม่ใช่คีย์พจนานุกรม) */
-    const row = byCategory.get(category.slug);
+    /* ⚠️ `product.category_id` อ้าง **รหัสภายใน** ของหมวด — จับคู่ด้วย `category.id` (ไม่ใช่ slug) */
+    const row = byCategory.get(category.id);
     if (row === undefined || row.imagePath === null || row.imageWidth === null || row.imageHeight === null) continue;
 
     const name = pick(row.nameTh, row.nameEn, language);

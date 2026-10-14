@@ -146,7 +146,10 @@ test("product-detail: buildBlockTemplate ของหน้า detail คืน�
 test("product-detail: หน้า /products/[slug] อ่านเอกสารที่เผยแพร่ + เปิด index (รอบที่ 170) + มีทางถอย", () => {
   const source = sourceOf("app/[lang]/products/[slug]/page.tsx");
 
-  assert.ok(source.includes("loadLiveBlockDocument(productDetailPageId(slug))"), "ต้องโหลดเอกสารของหมวดนั้น");
+  assert.ok(
+    source.includes("loadLiveBlockDocument(productDetailPageId(resolved.key))"),
+    "ต้องโหลดเอกสารของหมวดนั้น (ด้วยรหัสภายใน — ไม่พังเมื่อเจ้าของเปลี่ยน slug · รอบที่ 280)",
+  );
   assert.ok(source.includes("<BlockDocumentView"), "ต้องใช้ตัวเรนเดอร์เดียวกับพรีวิว");
   assert.ok(source.includes('export const revalidate = 300;'), "ต้องเป็น ISR เหมือนหน้าอื่นที่อ่าน DB");
   /* รอบที่ 170 (มติเจ้าของ): เปิด index แล้ว — ห้าม hardcode noindex กลับ */
@@ -157,6 +160,10 @@ test("product-detail: หน้า /products/[slug] อ่านเอกสา�
   /* 🆕 รอบที่ 264 (มติ D25): หมวดที่ถูก "ซ่อนจากเว็บ" ต้อง 404 และหมวดใหม่ต้องเปิดได้ */
   assert.ok(source.includes("isVisibleCategory("), "ต้องมีประตูตัดสินว่าเปิดดูได้ไหม (หมวดใหม่/ถูกซ่อน)");
   assert.ok(source.includes("category.isHidden"), "ต้องอ่านสถานะซ่อนจากฐานข้อมูลแล้วตอบ 404");
+  /* 🆕 รอบที่ 280 (มติ D30): ที่อยู่บนเว็บแก้ได้ ⇒ ที่อยู่เก่าต้อง 301 และ prerender ต้องมาจาก DB */
+  assert.ok(source.includes("findCategoryIdByOldSlug("), "ต้องค้นที่อยู่เก่าจากประวัติ slug");
+  assert.ok(source.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **301** ไปที่อยู่ปัจจุบัน");
+  assert.ok(source.includes("listPublicCategorySlugs()"), "generateStaticParams ต้องอ่านที่อยู่จริงจากฐานข้อมูล");
 });
 
 /* ── 4) migration ─────────────────────────────────────────────────────────── */

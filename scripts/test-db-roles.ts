@@ -93,6 +93,14 @@ test("db-roles: role อ่านต้องไม่มีตารางอ�
   assert.deepEqual([...PUBLIC_FORM_TABLES].sort(), ["form_attachment", "form_submission"]);
   assert.ok(PUBLIC_READ_TABLES.includes("page_document"), "หน้าเว็บต้องอ่าน page_document ได้ (ฉบับเผยแพร่)");
   assert.ok(PUBLIC_READ_TABLES.includes("media"), "หน้าเว็บต้องอ่าน media ได้ (เสิร์ฟภาพ)");
+  /*
+    รอบที่ 280: หน้า `/products/<slug>` ต้องอ่านประวัติที่อยู่เพื่อทำ **301** เมื่อเจ้าของเปลี่ยน slug
+    ⚠️ ลืมตารางนี้ = หน้าที่สั่ง 301 จะเงียบ ๆ กลายเป็น 404 (เจอจริงตอนรัน check:db ในรอบนี้)
+  */
+  assert.ok(
+    PUBLIC_READ_TABLES.includes("product_category_slug_history"),
+    "หน้าเว็บต้องอ่านประวัติที่อยู่ของหมวดได้ (ทำ 301)",
+  );
 });
 
 /* ── สแกนซอร์ส: ฟังก์ชันสาธารณะต้องใช้ประตูอ่าน ───────────────────────────── */
@@ -100,7 +108,7 @@ test("db-roles: role อ่านต้องไม่มีตารางอ�
 test("db-roles: ฟังก์ชันที่หน้าเว็บสาธารณะใช้ ต้องอ่านผ่าน `readQuery` (ไม่ใช่ getPool)", () => {
   const cases: readonly (readonly [string, readonly string[]])[] = [
     ["lib/blocks/repository.ts", ["loadDocumentRow", "isPageLive"]],
-    ["lib/products/repository.ts", ["loadProductCategory", "listProductsByCategory", "countProductsByCategory", "listProductCategoryCards", "listProductHighlights"]],
+    ["lib/products/repository.ts", ["loadProductCategory", "listProductsByCategory", "countProductsByCategory", "listProductCategoryCards", "listProductHighlights", "listPublicCategorySlugs", "findCategoryIdByOldSlug"]],
     ["lib/recipes/repository.ts", ["listRecipes"]],
     ["lib/news/repository.ts", ["countNews", "listNews", "loadNewsBySourceId", "listNewsSourceIds"]],
     ["lib/media/repository.ts", ["loadMediaSizes", "getMediaBinary"]],

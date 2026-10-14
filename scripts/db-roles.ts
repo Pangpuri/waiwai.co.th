@@ -40,6 +40,9 @@ export const PUBLIC_READ_TABLES: readonly string[] = [
   "media",
   "product",
   "product_category",
+  /* รอบที่ 280 — ประวัติที่อยู่หมวด (หน้า /products/<slug> ใช้ทำ 301 เมื่อเจ้าของเปลี่ยน slug)
+     ⚠️ ไม่มีข้อมูลอ่อนไหว (แค่คู่ "ที่อยู่เก่า → หมวด") ⇒ ให้สิทธิ์อ่านได้ */
+  "product_category_slug_history",
   "product_ingredient",
   "recipe",
   "news",

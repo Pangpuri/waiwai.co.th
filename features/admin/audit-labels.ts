@@ -59,6 +59,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "product-category-create": "เพิ่มหมวดสินค้า",
     "product-category-hide": "ซ่อน/แสดงหมวดสินค้า",
     "product-category-restore": "คืนค่าเริ่มต้นหมวดสินค้า",
+    /* รอบที่ 280 (มติ D30) — ลบหมวดว่างถาวร · ที่อยู่เก่าถูกล้างพร้อมหมวด */
+    "product-category-delete": "ลบหมวดสินค้าถาวร",
     "product-category-reorder": "จัดลำดับหมวดสินค้า",
     "product-category-preset-save": "บันทึกพรีเซ็ตหมวดสินค้า",
     "product-category-preset-apply": "ใช้พรีเซ็ตหมวดสินค้า",

@@ -23,11 +23,19 @@ export function buildSitemapEntries(options: {
   readonly siteUrl: string;
   readonly pages: readonly PageRecord[];
   readonly locales: readonly Locale[];
+  /**
+   * หน้าที่ **ข้าม** ในลูปนี้ (รอบที่ 280) — ใช้กับหน้ารายละเอียดหมวดสินค้า
+   * เพราะที่อยู่ของมันมาจาก **ตาราง `product_category`** (`buildProductCategorySitemapEntries`)
+   * ไม่ใช่พาธคงที่ในโค้ด ⇒ ถ้าไม่ข้ามจะได้ URL เก่าซ้ำ
+   */
+  readonly skipPageIds?: readonly string[];
 }): readonly SitemapEntry[] {
   const base = options.siteUrl.replace(/\/+$/, "");
   const entries: SitemapEntry[] = [];
+  const skipped = new Set(options.skipPageIds ?? []);
 
   for (const page of options.pages) {
+    if (skipped.has(page.id)) continue;
     /* หน้าที่ไม่ให้จัดทำดัชนี (ตั้งในหลังบ้าน หรือตั้งในโค้ด) = ไม่อยู่ใน sitemap */
     if (page.seo.noindex) continue;
     if (PAGES_ALWAYS_NOINDEX.includes(page.id)) continue;
@@ -59,6 +67,37 @@ export function buildSitemapEntries(options: {
         changeFrequency: "yearly",
         priority: page.priority,
       });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * รายการ sitemap ของ **หน้ารายละเอียดหมวดสินค้า** (รอบที่ 280 · มติ D30 ข้อ 4)
+ *
+ * ทำไมต้องแยกจาก `buildSitemapEntries`
+ * - หน้ารายละเอียดหมวดมีแถวในตาราง `page` (`product-<id>` · `in_menu = false`) แต่ **ที่อยู่จริง
+ *   อยู่ในตาราง `product_category.slug`** ซึ่งเจ้าของแก้ได้ ⇒ พาธคงที่ในโค้ดใช้ไม่ได้อีก
+ * - หมวดที่สร้างใหม่จากหลังบ้าน **ไม่มีแถวในตาราง `page`** ⇒ ถ้าไม่ใส่ที่นี่จะไม่ปรากฏใน sitemap เลย
+ * ⚠️ ตรรกะล้วน (รับ `slugs` เป็นรายการ) — ไฟล์นี้ไม่แตะฐานข้อมูล (ผู้เรียกอ่านมาให้)
+ */
+export function buildProductCategorySitemapEntries(options: {
+  readonly siteUrl: string;
+  readonly locales: readonly Locale[];
+  /** ที่อยู่บนเว็บของหมวดที่ **มองเห็น** (`is_hidden = false`) */
+  readonly slugs: readonly string[];
+}): readonly SitemapEntry[] {
+  const base = options.siteUrl.replace(/\/+$/, "");
+  const entries: SitemapEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of options.slugs) {
+    const slug = raw.trim();
+    if (slug === "" || seen.has(slug)) continue;
+    seen.add(slug);
+    for (const locale of options.locales) {
+      entries.push({ url: `${base}/${locale}/products/${slug}`, changeFrequency: "monthly", priority: 0.6 });
     }
   }
 

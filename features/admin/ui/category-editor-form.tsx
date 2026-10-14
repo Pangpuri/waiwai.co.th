@@ -24,6 +24,8 @@ import type { Messages } from "@/lib/i18n/messages/th";
  */
 
 export type CategoryEditorInitial = {
+  /** ที่อยู่บนเว็บปัจจุบัน (`/products/<slug>`) — แก้ได้ (รอบที่ 280) */
+  readonly slug: string;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly descriptionTh: string;
@@ -62,6 +64,7 @@ export function CategoryEditorForm(props: CategoryEditorFormProps) {
   const m = props.strings;
   const [state, formAction, pending] = useActionState(saveCategoryAction, INITIAL_CATEGORY_FORM_STATE);
 
+  const [slug, setSlug] = useState(props.initial.slug);
   const [nameTh, setNameTh] = useState(props.initial.nameTh);
   const [nameEn, setNameEn] = useState(props.initial.nameEn);
   const [descriptionTh, setDescriptionTh] = useState(props.initial.descriptionTh);
@@ -90,8 +93,27 @@ export function CategoryEditorForm(props: CategoryEditorFormProps) {
         </span>
       </div>
       <p className="text-fg-muted mt-1 text-[11px]">
-        {fillTemplate(m.slugPreview, { slug: props.categoryId })} · {m.slugHint}
+        {fillTemplate(m.slugPreview, { slug: slug.trim() === "" ? props.categoryId : slug.trim() })} · {m.slugHint}
       </p>
+
+      {/* ที่อยู่บนเว็บ — แก้ได้ พร้อมคำอธิบายเรื่อง 301 (รอบที่ 280 · มติ D30) */}
+      <label className="mt-3 block">
+        <span className={LABEL_CLASS}>{m.fieldSlug}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-fg-muted text-sm font-semibold">/products/</span>
+          <input
+            type="text"
+            name="slug"
+            value={slug}
+            onChange={(event) => setSlug(event.target.value)}
+            inputMode="url"
+            autoCapitalize="none"
+            spellCheck={false}
+            className={INPUT_CLASS}
+          />
+        </span>
+        <span className="text-fg-muted mt-1 block text-[11px]">{m.slugChangeHint}</span>
+      </label>
 
       <div className="mt-3 grid gap-4 lg:grid-cols-2">
         <label className="block">
@@ -191,7 +213,7 @@ export function CategoryEditorForm(props: CategoryEditorFormProps) {
           <PreviewFrame
             singleCard
             width={SITE_CATEGORY_CARD_WIDTH}
-            label={fillTemplate(m.slugPreview, { slug: props.categoryId })}
+            label={fillTemplate(m.slugPreview, { slug: slug.trim() === "" ? props.categoryId : slug.trim() })}
           >
             <ul className="category-card-grid grid gap-6 lg:grid-cols-3">
               <li>

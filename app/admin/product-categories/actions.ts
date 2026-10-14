@@ -1,5 +1,7 @@
 "use server";
 
+import { redirect } from "next/navigation";
+
 import {
   type CategoryFormReason,
   type CategoryFormState,
@@ -13,6 +15,8 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import {
+  builtInCategorySlugs,
+  categorySlugInput,
   nextCategorySortOrder,
   parseCategoryPreset,
   slugifyCategoryName,
@@ -24,8 +28,10 @@ import {
   categorySnapshotOf,
   createProductCategoryAdmin,
   deleteCategoryPreset,
+  deleteEmptyCategoryAdmin,
   listAdminCategories,
   listCategoryIds,
+  listCategorySlugs,
   loadCategoryPreset,
   restoreAllCategoriesFromDefault,
   restoreCategoryFromDefault,
@@ -42,8 +48,11 @@ import { imageWriteMode } from "@/lib/products/media-mode";
  * กติกาเดียวกับหลังบ้านส่วนอื่น
  * - ตรวจสิทธิ์ `content` ทุก action · ไม่เชื่อข้อมูลจากเบราว์เซอร์ (ผ่าน validator กลาง)
  * - เขียน audit ทุกครั้งที่เปลี่ยนข้อมูล · บันทึกแล้วสั่ง `refreshPublicSite("page")` ให้เว็บอัปเดตทันที
- * - **ห้ามแก้ slug** (มติ D25 ข้อ 1: slug สร้างจากชื่ออังกฤษครั้งเดียวและล็อกถาวร ⇒ ไม่ต้องมี 301)
- * - **ห้ามลบหมวด** (มติ D25 ข้อ 3: ใช้ "ซ่อนจากเว็บ" แทน) ⇒ ไม่มี action ลบในไฟล์นี้
+ *
+ * 🆕 รอบที่ 280 (มติ D30 — แทนที่มติ D25 ข้อ 1/3)
+ * - **แก้ slug ได้** ⇒ เปลี่ยนแล้วระบบบันทึกประวัติ + ทำ **301** จากที่อยู่เดิม (ชั้นข้อมูลเป็นคนทำ)
+ * - **ลบหมวดได้** แต่เฉพาะ **หมวดว่างที่ไม่ใช่หมวดในโค้ด** (`deleteCategoryAction`)
+ *   ⚠️ ประตูจริงอยู่ที่ SQL · ที่นี่ตรวจซ้ำเพื่อให้ข้อความบนจอตรง (ไม่ใช่เพื่อกันการโจมตี)
  */
 
 const LIST_PATH = "/admin/product-categories";
@@ -76,8 +85,16 @@ export async function saveCategoryAction(
   const id = field(formData, "categoryId");
   if (id === "") return fail("missing");
 
+  /*
+    ที่อยู่บนเว็บ: ตรวจกับ **slug ของหมวดอื่น** (ตัดตัวเองออก) — เปลี่ยนแล้วชั้นข้อมูลจะทำ 301 ให้เอง
+    · ช่องว่าง = ไม่แตะที่อยู่เดิม (ไม่ใช่ "ลบที่อยู่")
+  */
+  const slugInput = categorySlugInput(field(formData, "slug"));
+  const otherSlugs = (await listCategorySlugs()).filter((slug) => slug !== slugInput);
+
   const input = {
     id,
+    slug: slugInput,
     nameTh: field(formData, "nameTh"),
     nameEn: field(formData, "nameEn"),
     descriptionTh: field(formData, "descriptionTh"),
@@ -89,14 +106,25 @@ export async function saveCategoryAction(
     logoMediaId: imageWriteMode(formData, "logoPath") === "set" ? mediaIdFromPath(field(formData, "logoPath")) : undefined,
   };
 
-  if (validateCategoryEdit(input).length > 0) return fail("invalid");
-  if (!(await updateProductCategoryAdmin(input, user.email))) return fail("missing");
+  if (validateCategoryEdit(input, { existingSlugs: otherSlugs }).length > 0) return fail("invalid");
+
+  /*
+    ⚠️ ที่อยู่ใหม่ชนกับหมวดอื่น = unique index โยน error (ทั้ง transaction ย้อนกลับ — ไม่มีที่อยู่ครึ่ง ๆ กลาง ๆ)
+    ⇒ จับไว้แล้วรายงานเป็น "ที่อยู่ซ้ำ" ไม่ปล่อยให้เป็น 500
+  */
+  let saved = false;
+  try {
+    saved = await updateProductCategoryAdmin(input, user.email);
+  } catch {
+    return fail("duplicate");
+  }
+  if (!saved) return fail("missing");
 
   await recordAudit({
     action: "product-category-save",
     actorEmail: user.email,
     target: `category:${id}`,
-    detail: "updated",
+    detail: slugInput !== undefined ? `updated · slug=${slugInput}` : "updated",
   });
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");
@@ -172,6 +200,37 @@ export async function toggleCategoryHiddenAction(formData: FormData): Promise<vo
   });
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");
+}
+
+/**
+ * **ลบหมวดถาวร** (รอบที่ 280 · มติ D30 ข้อ 4) — เฉพาะหมวดที่ **ว่างเปล่าและไม่ใช่หมวดในโค้ด**
+ *
+ * ⚠️ **ประตูจริงอยู่ที่ SQL** (`deleteEmptyCategoryAdmin` — `exists product` + `id <> all(builtIn)`)
+ *   ที่นี่ตรวจซ้ำเพื่อให้ข้อความบนจอตรงสาเหตุ (ไม่ใช่ด่านกันการโจมตี)
+ * ลบสำเร็จ/ไม่สำเร็จ ⇒ **redirect กลับหน้าจอพร้อมข้อความ** (ฟอร์มธรรมดา ไม่ต้องมี JS)
+ */
+export async function deleteCategoryAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const id = field(formData, "id");
+  if (id === "" || !isDatabaseConfigured()) return;
+
+  const row = (await listAdminCategories()).find((entry) => entry.id === id);
+  if (row === undefined) redirect(`${LIST_PATH}?error=delete-missing`);
+  if (builtInCategorySlugs().includes(id)) redirect(`${LIST_PATH}?error=delete-built-in`);
+  if (row.productCount > 0) redirect(`${LIST_PATH}?error=delete-has-products`);
+
+  const deleted = await deleteEmptyCategoryAdmin(id, builtInCategorySlugs());
+  if (!deleted) redirect(`${LIST_PATH}?error=delete-blocked`);
+
+  await recordAudit({
+    action: "product-category-delete",
+    actorEmail: user.email,
+    target: `category:${id}`,
+    detail: `slug=${row.slug}`,
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  redirect(`${LIST_PATH}?deleted=${encodeURIComponent(row.slug)}`);
 }
 
 /**

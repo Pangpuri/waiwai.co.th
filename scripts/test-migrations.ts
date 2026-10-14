@@ -23,6 +23,8 @@ const file = (id: string, name: string, sql: string): MigrationFile => ({ id, na
  * migration ไฟล์นี้ "กันรันซ้ำ" ไหม — กลไกที่ยอมรับ
  * · DDL ที่มี `if not exists` / `create or replace`
  * · **`drop … if exists`** (ถอดของ · รอบที่ 194) — รันซ้ำไม่มีผล
+ *   ⚠️ รอบที่ 280: รวม `drop constraint if exists` ด้วย (migration 0041 ปลด check แล้วสร้างใหม่
+ *   ให้ครอบ kind `job` — เคสจริงที่ด่านนี้เคยแดงค้างตั้งแต่รอบ 278)
  * · `on conflict …` (upsert)
  * · คอมเมนต์ `idempotent: conditional-update` + ต้องมี `where` (migration ซ่อมข้อมูล)
  */
@@ -32,7 +34,7 @@ function hasIdempotencyGuard(sql: string): boolean {
     sql.includes("add column if not exists") ||
     sql.includes("create or replace") ||
     sql.includes("on conflict") ||
-    /drop\s+(table|index|view)\s+if\s+exists/i.test(sql) ||
+    /drop\s+(table|index|view|constraint)\s+if\s+exists/i.test(sql) ||
     (sql.includes("idempotent: conditional-update") && sql.includes("where"))
   );
 }
@@ -45,6 +47,11 @@ test("hasIdempotencyGuard: รู้จักกลไกกันรันซ�
   assert.equal(hasIdempotencyGuard("/* idempotent: conditional-update */ update t set x = 1 where x is null;"), true);
   assert.equal(hasIdempotencyGuard("drop table if exists hero_slide_card;"), true, "ถอดตารางแบบมี if exists = รันซ้ำได้");
   assert.equal(hasIdempotencyGuard("drop index if exists some_idx;"), true);
+  assert.equal(
+    hasIdempotencyGuard("alter table t drop constraint if exists t_kind_check;\nalter table t add constraint t_kind_check check (kind in ('a','b'));"),
+    true,
+    "ปลด constraint เดิมแบบมี if exists = รันซ้ำได้ (migration 0041)",
+  );
 
   /* edge case: ของที่รันซ้ำแล้วพัง ต้องไม่ถูกนับว่ามี guard */
   assert.equal(hasIdempotencyGuard("drop table hero_slide_card;"), false, "drop ไม่มี if exists = ครั้งที่สองพัง");

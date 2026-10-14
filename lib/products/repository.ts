@@ -57,7 +57,10 @@ export type ProductRecord = {
 };
 
 export type ProductCategoryRecord = {
+  /** รหัสภายใน (`product_category.id`) — ใช้หาสินค้า/เอกสารบล็อก · **ไม่เปลี่ยน** */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (แก้ได้ · รอบที่ 280) */
+  readonly slug: string;
   /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ใช้พจนานุกรม */
   readonly nameTh: string;
   readonly nameEn: string;
@@ -143,21 +146,28 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
 /**
  * หมวดสินค้า (คำอธิบาย/ภาพที่นำเข้า) — คืน null ถ้าไม่รู้จัก/อ่านไม่ได้
  * ⚠️ ชื่อหมวดไม่ได้อยู่ที่นี่ — อยู่ที่ `features/products/catalog.ts` (แหล่งเดียว)
+ *
+ * ## อาร์กิวเมนต์รับได้ทั้ง 2 อย่าง (รอบที่ 280)
+ * - **slug** = ที่อยู่บนเว็บปัจจุบัน (`/products/<slug>`) — ทางหลัก
+ * - **id** = รหัสภายใน — ทางถอยของข้อมูลเก่า/ลิงก์ที่ยังชี้ id (ก่อนเจ้าของเปลี่ยน slug)
+ * ⚠️ ถ้าซ้ำกันให้ **slug ชนะ** (`order by (c.slug = $1) desc`) — ป้องกันหมวดหนึ่งยึด id อีกหมวด
  */
-export async function loadProductCategory(categoryId: string): Promise<ProductCategoryRecord | null> {
-  if (!isDatabaseConfigured()) return null;
+export async function loadProductCategory(categoryIdOrSlug: string): Promise<ProductCategoryRecord | null> {
+  const value = categoryIdOrSlug.trim();
+  if (!isDatabaseConfigured() || value === "") return null;
   try {
     const result = await readQuery<Record<string, unknown>>(
-      `select c.id, c.name_th, c.name_en, c.description_th, c.description_en,
+      `select c.id, c.slug, c.name_th, c.name_en, c.description_th, c.description_en,
               c.image_media_id, c.logo_media_id, c.is_hidden,
               im.width  as image_width,  im.height  as image_height,
               lm.width as logo_width, lm.height as logo_height
          from product_category c
          left join media im on im.id = c.image_media_id
          left join media lm on lm.id = c.logo_media_id
-        where c.id = $1
+        where (c.slug = $1 or c.id = $1)
+        order by (c.slug = $1) desc
         limit 1`,
-      [categoryId],
+      [value],
     );
     const row = result.rows[0];
     if (row === undefined) return null;
@@ -165,8 +175,10 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
     if (id === "") return null;
     const dim = (value: unknown): number | null =>
       typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+    const slug = text(row.slug).trim();
     return {
       id,
+      slug: slug === "" ? id : slug,
       nameTh: text(row.name_th),
       nameEn: text(row.name_en),
       descriptionTh: text(row.description_th),
@@ -184,9 +196,54 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
   }
 }
 
-/** สินค้าในหมวด (เรียงตามลำดับที่นำเข้า) พร้อมส่วนผสม — คืน `[]` เสมอถ้าอ่านไม่ได้ */
-export async function listProductsByCategory(categoryId: string): Promise<readonly ProductRecord[]> {
+/**
+ * **ที่อยู่บนเว็บของหมวดที่มองเห็น** (รอบที่ 280) — ใช้ทำ `generateStaticParams` + sitemap
+ * ⇒ หมวดใหม่/หมวดที่เปลี่ยน slug ปรากฏที่อยู่ใหม่เอง โดยไม่ต้องแก้โค้ดหรือ build ใหม่
+ * คืน `[]` ถ้าอ่านไม่ได้ (ผู้เรียกถอยไปใช้ค่าในโค้ด)
+ */
+export async function listPublicCategorySlugs(): Promise<readonly string[]> {
   if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await readQuery<{ slug: string }>(
+      `select coalesce(nullif(c.slug, ''), c.id) as slug
+         from product_category c
+        where c.is_hidden = false
+        order by c.sort_order, c.id`,
+    );
+    return result.rows.map((row) => text(row.slug).trim()).filter((slug) => slug !== "");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * หา **id ภายใน** ของหมวดจากที่อยู่เก่า (ประวัติ slug) — ใช้ทำ **301** (รอบที่ 280)
+ * ⚠️ อ่านผ่านประตูอ่านอย่างเดียว (`readQuery`) · ตารางนี้อยู่ใน `PUBLIC_READ_TABLES` แล้ว
+ * คืน `null` = ไม่เคยมีที่อยู่นี้ (ผู้เรียกต้อง 404 ต่อ — ห้ามเดา)
+ */
+export async function findCategoryIdByOldSlug(slug: string): Promise<string | null> {
+  const value = slug.trim();
+  if (!isDatabaseConfigured() || value === "") return null;
+  try {
+    const result = await readQuery<{ categoryId: string }>(
+      `select category_id as "categoryId" from product_category_slug_history where slug = $1 limit 1`,
+      [value],
+    );
+    const id = text(result.rows[0]?.categoryId).trim();
+    return id === "" ? null : id;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * สินค้าในหมวด (เรียงตามลำดับที่นำเข้า) พร้อมส่วนผสม — คืน `[]` เสมอถ้าอ่านไม่ได้
+ * ⚠️ รอบที่ 280: รับ **slug หรือ id ของหมวด** (join `product_category` แล้วเทียบทั้งสองช่อง)
+ *    ⇒ หน้าที่เปิดด้วย slug ที่เปลี่ยนไปแล้วยังได้สินค้าครบ
+ */
+export async function listProductsByCategory(categoryIdOrSlug: string): Promise<readonly ProductRecord[]> {
+  const value = categoryIdOrSlug.trim();
+  if (!isDatabaseConfigured() || value === "") return [];
   try {
     const result = await readQuery<Record<string, unknown>>(
       `select ${PRODUCT_COLUMNS},
@@ -200,13 +257,14 @@ export async function listProductsByCategory(categoryId: string): Promise<readon
                 '[]'::json
               ) as ingredients
          from product p
+         join product_category c on c.id = p.category_id
          left join product_ingredient i on i.product_id = p.id
          left join media m on m.id = p.image_media_id
-        where p.category_id = $1
+        where (c.slug = $1 or c.id = $1)
           and ${PUBLIC_PRODUCT_CONDITION}
         group by p.id
         order by p.sort_order, p.id`,
-      [categoryId],
+      [value],
     );
 
     const items: ProductRecord[] = [];
@@ -250,8 +308,10 @@ export async function countProductsByCategory(): Promise<Readonly<Record<string,
  * ⚠️ ลำดับการแสดง **ไม่ได้** มาจากฐานข้อมูล — ผู้เรียกเรียงตาม `CATALOG_ITEMS` ในโค้ด (แหล่งความจริงเดียวของ slug)
  */
 export type ProductCategoryCardRecord = {
-  /** รหัสหมวด = slug ในฐานข้อมูล */
+  /** รหัสภายในของหมวด (`product_category.id`) — ใช้ผูกกับสินค้า/พจนานุกรม · **ไม่ใช่ URL** */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (รอบที่ 280) — **ใช้สร้างลิงก์การ์ด** */
+  readonly slug: string;
   /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ใช้พจนานุกรม */
   readonly nameTh: string;
   readonly nameEn: string;
@@ -281,7 +341,7 @@ export type ProductCategoryCardRecord = {
 export function detailCategoryValuesOf(row: AdminProductCategoryItem): ProductDetailCategoryValues {
   const useLogo = row.logoPath !== null && row.logoPath.trim() !== "";
   return {
-    slug: row.id,
+    slug: row.slug,
     nameTh: row.nameTh,
     nameEn: row.nameEn,
     descriptionTh: row.descriptionTh,
@@ -304,6 +364,7 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
   try {
     const result = await readQuery<{
       id: string;
+      slug: string;
       nameTh: string;
       nameEn: string;
       descriptionTh: string;
@@ -319,6 +380,7 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
       isHidden: boolean;
     }>(
       `select c.id,
+              coalesce(nullif(c.slug, ''), c.id) as "slug",
               c.name_th        as "nameTh",
               c.name_en        as "nameEn",
               c.description_th as "descriptionTh",
@@ -348,6 +410,7 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
       const count = Number.parseInt(row.productCount, 10);
       cards.push({
         id: row.id,
+        slug: row.slug !== "" ? row.slug : row.id,
         nameTh: row.nameTh,
         nameEn: row.nameEn,
         descriptionTh: row.descriptionTh,
@@ -479,8 +542,9 @@ export async function upsertProductCategory(
   const logoMode = options.logoMode ?? "keep";
 
   await getPool().query(
-    `insert into product_category (id, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $10, now(), $9)
+    `insert into product_category (id, slug, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, updated_at, updated_by)
+       /* slug เริ่มต้น = id (URL วันแรกเหมือนเดิม · รอบที่ 279/280) — สาขา on conflict ไม่แตะ slug */
+       values ($1, $1, $2, $3, $4, $5, $6, $7, $8, $10, now(), $9)
      on conflict (id) do update set
        /* ค่าว่างต้องไม่ลบ source_id เดิม (แบบฟอร์มหลังบ้านส่งค่านี้ผ่านช่องซ่อน) */
        source_id      = coalesce(nullif(excluded.source_id, ''), product_category.source_id),
@@ -521,8 +585,8 @@ export async function upsertProductCategory(
  */
 export async function importCategoryLogo(id: string, logoMediaId: string, actor: string): Promise<boolean> {
   await getPool().query(
-    `insert into product_category (id, name_th, name_en, sort_order, updated_at, updated_by)
-       values ($1, '', '', $3, now(), $2)
+    `insert into product_category (id, slug, name_th, name_en, sort_order, updated_at, updated_by)
+       values ($1, $1, '', '', $3, now(), $2)
      on conflict (id) do nothing`,
     [id, actor, defaultSortOrderOf(id)],
   );
@@ -929,8 +993,10 @@ export async function loadProductForAdmin(id: string): Promise<AdminProductDetai
 }
 
 export type AdminProductCategoryItem = {
-  /** slug ของหมวด (ตรงกับ `CATALOG_ITEMS` ในโค้ด) */
+  /** รหัสภายในของหมวด (`product_category.id`) — ตรงกับ `CATALOG_ITEMS` ในโค้ดสำหรับหมวดเดิม */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (แก้ได้ · รอบที่ 280) */
+  readonly slug: string;
   /** id ของหน้าในเว็บเดิม — ต้องส่งกลับตอนบันทึก (ไม่งั้นเขียนทับเป็นค่าว่าง) */
   readonly sourceId: string;
   /** ชื่อหมวดที่แก้จากหลังบ้าน (migration 0037) — ว่าง = ยังใช้ชื่อจากพจนานุกรม */
@@ -962,6 +1028,7 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
   try {
     const result = await getPool().query<{
       id: string;
+      slug: string;
       sourceId: string | null;
       nameTh: string;
       nameEn: string;
@@ -976,6 +1043,7 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
       productCount: string;
     }>(
       `select c.id,
+              coalesce(nullif(c.slug, ''), c.id) as "slug",
               c.source_id       as "sourceId",
               c.name_th         as "nameTh",
               c.name_en         as "nameEn",
@@ -992,7 +1060,7 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
          left join media m on m.id = c.image_media_id
          left join media lm on lm.id = c.logo_media_id
          left join product p on p.category_id = c.id
-        group by c.id, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
+        group by c.id, c.slug, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
                  m.id, m.width, m.height, lm.id, lm.width, lm.height
         order by c.id`,
     );
@@ -1001,6 +1069,7 @@ export async function listProductCategoriesForAdmin(): Promise<readonly AdminPro
       const count = Number.parseInt(row.productCount, 10);
       return {
         id: row.id,
+        slug: row.slug !== "" ? row.slug : row.id,
         sourceId: typeof row.sourceId === "string" ? row.sourceId : "",
         nameTh: row.nameTh,
         nameEn: row.nameEn,

@@ -25,6 +25,8 @@ import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/pr
 
 const category = (id: string, label: string, extra: Partial<ProductCategoryCardRecord> = {}): ProductCategoryCardRecord => ({
   id,
+  /* ที่อยู่บนเว็บ = id เว้นแต่เทสต์จะส่งค่ามาเอง (รอบที่ 280) */
+  slug: id,
   nameTh: "",
   nameEn: "",
   descriptionTh: `${label} — คำอธิบาย`,
@@ -128,7 +130,9 @@ test("★ product showcase: ชื่อหมวด — ค่าจากห�
   assert.ok(helper.includes("catalogIdOfSlug.get(id)"), "ต้องแปลง id (slug) เป็นคีย์พจนานุกรมก่อนค้น");
   assert.ok(helper.includes("catalogTh[key]?.name ?? id"), "ชื่อหมวดถอยพจนานุกรม แล้วถอยไปใช้ id");
   assert.ok(helper.includes('english.trim() !== "" ? english : thai'), "EN ว่าง = ถอยไทย");
-  assert.ok(helper.includes("`/products/${row.id}`"), "ลิงก์หมวดต้องเป็นพาธกลางจาก id จริง");
+  /* รอบที่ 280: ลิงก์ใช้ **ที่อยู่บนเว็บ** (`slug`) ส่วน `id` ยังเป็นรหัสภายใน (ผูกกับ categoryIds) */
+  assert.ok(helper.includes("`/products/${row.slug}`"), "ลิงก์หมวดต้องใช้ที่อยู่บนเว็บ (slug)");
+  assert.ok(helper.includes("categoryId: row.categoryId"), "สินค้าแนะนำยังผูกกับรหัสภายในของหมวด");
 });
 
 test("★ product showcase: ลงทะเบียนเป็นชนิดบล็อกของจริง (parse/บีบค่าจากเอกสาร)", () => {

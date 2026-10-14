@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { catalogSlugs, findCatalogItem, type CatalogItem } from "@/features/products/catalog";
@@ -13,9 +13,19 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { loadPageSeo } from "@/lib/pages/repository";
-import { FALLBACK_CATEGORY_IMAGE_HEIGHT, FALLBACK_CATEGORY_IMAGE_WIDTH } from "@/lib/products/categories";
+import {
+  FALLBACK_CATEGORY_IMAGE_HEIGHT,
+  FALLBACK_CATEGORY_IMAGE_WIDTH,
+  categoryRedirectSlug,
+} from "@/lib/products/categories";
 import { categoryNameOf } from "@/lib/products/display";
-import { listProductsByCategory, loadProductCategory, type ProductCategoryRecord } from "@/lib/products/repository";
+import {
+  findCategoryIdByOldSlug,
+  listProductsByCategory,
+  listPublicCategorySlugs,
+  loadProductCategory,
+  type ProductCategoryRecord,
+} from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
 /**
@@ -54,9 +64,16 @@ import { withPageSeo } from "@/lib/seo/page-seo";
 */
 export const revalidate = 300;
 
-export function generateStaticParams() {
-  /* prerender หมวดในโค้ดก่อน · หมวดที่สร้างใหม่ถูกสร้างตอนขอครั้งแรก (dynamicParams = true) */
-  return catalogSlugs().map((slug) => ({ slug }));
+export async function generateStaticParams() {
+  /*
+    prerender ทุกหมวดที่มองเห็นตาม **ที่อยู่จริงในฐานข้อมูล** (รอบที่ 280)
+    · หมวดที่สร้างใหม่/เปลี่ยน slug ⇒ prerender ที่อยู่ใหม่เองโดยไม่ต้องแก้โค้ด
+    · ไม่มีฐานข้อมูล/อ่านไม่ได้ ⇒ ถอยไปใช้ 6 หมวดในโค้ด (หน้าเว็บยังเปิดได้)
+    · ที่อยู่เก่า/ที่ยังไม่ prerender ถูกสร้างตอนขอครั้งแรก (`dynamicParams` = true — ห้ามปิด ที่นี่)
+  */
+  const slugs = await listPublicCategorySlugs();
+  const list = slugs.length > 0 ? slugs : catalogSlugs();
+  return list.map((slug) => ({ slug }));
 }
 
 /**
@@ -73,20 +90,23 @@ function introTextOf(messages: Messages, category: ProductCategoryRecord | null,
   return messages.productsPage.detailStub.body;
 }
 
-/** ชื่อจากพจนานุกรมของหมวดในโค้ด — หมวดที่สร้างใหม่ไม่มีคีย์ ⇒ คืน slug (แต่ค่าจาก DB ทับอยู่แล้ว) */
-function dictionaryNameOf(item: CatalogItem | undefined, slug: string, m: Messages["productsPage"]): string {
-  return item === undefined ? slug : m.items[item.id].name;
+/** ชื่อจากพจนานุกรมของหมวดในโค้ด — หมวดที่สร้างใหม่ไม่มีคีย์ ⇒ คืนรหัสภายใน (แต่ค่าจจาก DB ทับอยู่แล้ว) */
+function dictionaryNameOf(item: CatalogItem | undefined, fallback: string, m: Messages["productsPage"]): string {
+  return item === undefined ? fallback : m.items[item.id].name;
 }
 
-/** ชื่อหมวดที่แสดงจริง: DB (ตามภาษา) → ถอยพจนานุกรม (หมวดในโค้ด) → ถอย slug */
+/**
+ * ชื่อหมวดที่แสดงจริง: DB (ตามภาษา) → ถอยพจนานุกรม (หมวดในโค้ด) → ถอยรหัสภายใน
+ * ⚠️ พจนานุกรมผูกกับ **`id` ภายใน** ไม่ใช่ slug (รอบที่ 280 — เจ้าของเปลี่ยน slug ได้)
+ */
 function displayNameOf(
   item: CatalogItem | undefined,
   category: ProductCategoryRecord | null,
-  slug: string,
+  fallbackKey: string,
   language: "th" | "en",
   m: Messages["productsPage"],
 ): string {
-  return categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", dictionaryNameOf(item, slug, m), language);
+  return categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", dictionaryNameOf(item, fallbackKey, m), language);
 }
 
 /** ภาพที่แสดงในหน้ารายละเอียด: โลโก้จากคลัง → ภาพหัวหมวดจากคลัง → ไฟล์ใน `public/` (เฉพาะหมวดในโค้ด) */
@@ -120,21 +140,58 @@ function isVisibleCategory(item: CatalogItem | undefined, category: ProductCateg
   return item !== undefined || category !== null;
 }
 
+/**
+ * ผลลัพธ์ของการแก้ที่อยู่ `/products/<requested>` (รอบที่ 280)
+ * - `category` = หมวดที่เจอด้วย **ที่อยู่ปัจจุบันหรือรหัสภายใน**
+ * - `moved` = หมวดที่เจอจาก **ประวัติที่อยู่ (301)** — ไม่ใช่ที่อยู่ปัจจุบันแล้ว
+ * - `key` = คีย์ที่ใช้หาพจนานุกรม/เอกสารบล็อก = **รหัสภายใน** ของหมวดที่แสดง
+ * - `redirectTo` = slug ที่ต้อง **301** ไป (null = แสดงหน้านี้ต่อ/404)
+ */
+async function resolveCategoryRequest(
+  requested: string,
+): Promise<{
+  readonly category: ProductCategoryRecord | null;
+  readonly moved: ProductCategoryRecord | null;
+  readonly key: string;
+  readonly redirectTo: string | null;
+}> {
+  const category = await loadProductCategory(requested);
+  /* ไม่เจอด้วยที่อยู่ปัจจุบัน/รหัสภายใน และไม่ใช่หมวดในโค้ด ⇒ ลองหาที่อยู่เก่า */
+  let moved: ProductCategoryRecord | null = null;
+  if (category === null && findCatalogItem(requested) === undefined) {
+    const previousId = await findCategoryIdByOldSlug(requested);
+    if (previousId !== null) moved = await loadProductCategory(previousId);
+  }
+
+  const redirectTo = categoryRedirectSlug({
+    requested,
+    current: category === null ? null : { slug: category.slug, isHidden: category.isHidden },
+    moved: moved === null ? null : { slug: moved.slug, isHidden: moved.isHidden },
+  });
+
+  const key = (category ?? moved)?.id ?? requested;
+  return { category, moved, key, redirectTo };
+}
+
 export async function generateMetadata({
   params,
 }: PageProps<"/[lang]/products/[slug]">): Promise<Metadata> {
   const { lang, slug } = await params;
   if (!isLocale(lang)) return {};
 
-  const item = findCatalogItem(slug);
+  /*
+    ⚠️ metadata **ห้ามสั่ง 301** (การเด้งเป็นหน้าที่ของหน้าจอ) — ที่นี่แค่ "รู้จักไหม"
+    · ไม่เจอ ⇒ คืน {} ปล่อยให้หน้าจอตัดสิน (เด้ง/404 เอง)
+  */
   const category = await loadProductCategory(slug);
+  const item = findCatalogItem(category?.id ?? slug);
   if (!isVisibleCategory(item, category)) return {};
 
   const messages = await getMessagesFor(lang);
   const m = messages.productsPage;
 
-  /* ชื่อหมวด: ค่าจากหลังบ้านมาก่อน → ถอยพจนานุกรม (หมวดในโค้ด) */
-  const displayName = displayNameOf(item, category, slug, lang, m);
+  /* ชื่อหมวด: ค่าจากหลังบ้านมาก่อน → ถอยพจนานุกรม (หมวดในโค้ด — ผูกกับ id ภายใน) */
+  const displayName = displayNameOf(item, category, category?.id ?? slug, lang, m);
 
   return withPageSeo(
     lang,
@@ -147,9 +204,9 @@ export async function generateMetadata({
       title: { absolute: `${displayName} — ${m.title}` },
       description: introTextOf(messages, category, lang),
       /* รอบที่ 170: ไม่บังคับ noindex แล้ว — ถ้าหลังบ้านตั้ง noindex `applySeoToMetadata` จะใส่กลับให้ */
-      alternates: buildAlternates(lang, `/products/${slug}`),
+      alternates: buildAlternates(lang, `/products/${category?.slug ?? slug}`),
     },
-    () => loadPageSeo(productDetailPageId(slug)),
+    () => loadPageSeo(productDetailPageId(category?.id ?? slug)),
   );
 }
 
@@ -160,10 +217,25 @@ export default async function ProductCategoryPage({
 
   if (!isLocale(lang)) notFound();
 
-  const item = findCatalogItem(slug);
-  const category = await loadProductCategory(slug);
+  /*
+    ── ① แก้ที่อยู่ (รอบที่ 280 · มติ D30) ────────────────────────────────────────
+    · ที่อยู่ที่ขอ = ที่อยู่ปัจจุบัน/รหัสภายในของหมวด ⇒ แสดงต่อ (แต่ถ้าขอด้วย **รหัสภายใน**
+      ขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ **301** ไปที่อยู่ปัจจุบัน เพื่อไม่ให้มี 2 URL ของหน้าเดียวกัน)
+    · ที่อยู่ที่ขอ = **ที่อยู่เก่า** ที่อยู่ในประวัติ ⇒ **301** ไปที่อยู่ปัจจุบัน
+    · ไม่รู้จักเลย ⇒ 404 (ด้านล่าง)
+  */
+  const resolved = await resolveCategoryRequest(slug);
+  if (resolved.redirectTo !== null) {
+    permanentRedirect(localePath(lang, `/products/${resolved.redirectTo}`));
+  }
+
+  const category = resolved.category ?? resolved.moved;
+  const item = findCatalogItem(resolved.key);
   /* หมวดที่ไม่รู้จัก หรือถูก "ซ่อนจากเว็บ" ⇒ 404 (ไม่ใช่ 200 ที่เนื้อหาว่าง) — มติ D25 ข้อ 3 */
-  if (!isVisibleCategory(item, category)) notFound();
+  if (!isVisibleCategory(item, category) || (category !== null && category.isHidden)) notFound();
+
+  /* ที่อยู่ปัจจุบัน (ใช้เป็นพาธ canonical/ลิงก์ภายใน) — ไม่มีแถวใน DB ⇒ ใช้ที่อยู่ที่ขอ */
+  const canonicalSlug = category?.slug ?? slug;
 
   /*
     ── เนื้อหาของหน้านี้มาจาก 2 ทาง ──────────────────────────────────────────────
@@ -175,9 +247,10 @@ export default async function ProductCategoryPage({
   const messages = await getMessages(lang);
   const m = messages.productsPage;
 
+  /* เอกสารบล็อก/สินค้า อ้างด้วย **รหัสภายใน** และ **ที่อยู่ปัจจุบัน** (ไม่ใช่ที่อยู่เก่าที่ขอมา) */
   const [liveDocument, products] = await Promise.all([
-    loadLiveBlockDocument(productDetailPageId(slug)),
-    listProductsByCategory(slug),
+    loadLiveBlockDocument(productDetailPageId(resolved.key)),
+    listProductsByCategory(canonicalSlug),
   ]);
 
   const listStrings = productListStringsOf(m);
@@ -185,7 +258,7 @@ export default async function ProductCategoryPage({
   const intro = introTextOf(messages, category, lang);
 
   /* ชื่อ + ภาพหมวด: ค่าจากหลังบ้าน (migration 0037/0039) → ถอยค่าในโค้ด/พจนานุกรม */
-  const displayName = displayNameOf(item, category, slug, lang, m);
+  const displayName = displayNameOf(item, category, resolved.key, lang, m);
   const imageAlt = item === undefined ? displayName : m.items[item.id].imageAlt;
   const heroImage = heroImageOf(item, category);
 

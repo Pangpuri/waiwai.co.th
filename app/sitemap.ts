@@ -1,11 +1,18 @@
 import type { MetadataRoute } from "next";
 
+import { PRODUCT_DETAIL_PAGE_IDS } from "@/lib/blocks/product-detail";
 import { LOCALES } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { NEWS_PER_PAGE, countNews, listNewsSourceIds } from "@/lib/news/repository";
 import { defaultPages } from "@/lib/pages/model";
 import { listPages } from "@/lib/pages/repository";
-import { buildNewsSitemapEntries, buildSitemapEntries } from "@/lib/site-settings/sitemap";
+import { builtInCategorySlugs } from "@/lib/products/categories";
+import { listPublicCategorySlugs } from "@/lib/products/repository";
+import {
+  buildNewsSitemapEntries,
+  buildProductCategorySitemapEntries,
+  buildSitemapEntries,
+} from "@/lib/site-settings/sitemap";
 import { SITE } from "@/lib/site";
 
 /*
@@ -25,15 +32,25 @@ export const revalidate = 300;
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const messages = await getMessagesFor("th");
-  const [pages, sourceIds, totalNews] = await Promise.all([
+  const [pages, sourceIds, totalNews, categorySlugs] = await Promise.all([
     listPages(defaultPages(messages)),
     listNewsSourceIds(),
     countNews(),
+    listPublicCategorySlugs(),
   ]);
+
+  /*
+    ที่อยู่หมวดสินค้า (รอบที่ 280 · มติ D30): อ่านจาก **ตาราง `product_category`** ไม่ใช่พาธคงที่ในโค้ด
+    · หมวดที่ถูก "ซ่อน" ไม่ถูกส่งมาแล้ว (`listPublicCategorySlugs` กรองที่ SQL)
+    · ไม่มีฐานข้อมูล/อ่านไม่ได้ ⇒ ถอยไปใช้ 6 หมวดในโค้ด (sitemap ไม่ว่างผิดปกติ)
+  */
+  const productPaths = categorySlugs.length > 0 ? categorySlugs : builtInCategorySlugs();
 
   const pageCount = Math.max(1, Math.ceil(totalNews / NEWS_PER_PAGE));
   const entries = [
-    ...buildSitemapEntries({ siteUrl: SITE.url, pages, locales: LOCALES }),
+    /* ⚠️ ข้ามแถว `page` ของหน้ารายละเอียดหมวด — ที่อยู่มาจากตารางหมวดแทน (กัน URL เก่าซ้ำ) */
+    ...buildSitemapEntries({ siteUrl: SITE.url, pages, locales: LOCALES, skipPageIds: PRODUCT_DETAIL_PAGE_IDS }),
+    ...buildProductCategorySitemapEntries({ siteUrl: SITE.url, locales: LOCALES, slugs: productPaths }),
     ...buildNewsSitemapEntries({ siteUrl: SITE.url, locales: LOCALES, sourceIds, pageCount }),
   ];
 

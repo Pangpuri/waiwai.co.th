@@ -15,7 +15,12 @@ import {
   siteSettingsErrorsOf,
   validateSiteSettings,
 } from "@/lib/site-settings/model";
-import { buildNewsSitemapEntries, buildRobots, buildSitemapEntries } from "@/lib/site-settings/sitemap";
+import {
+  buildNewsSitemapEntries,
+  buildProductCategorySitemapEntries,
+  buildRobots,
+  buildSitemapEntries,
+} from "@/lib/site-settings/sitemap";
 
 /** เทสต์ตั้งค่าส่วนกลาง + sitemap/robots (X1.3 + X1.4) — ตรรกะล้วน */
 
@@ -102,6 +107,32 @@ test("buildSitemapEntries: มีทั้ง 2 ภาษา · ตัดหน�
 
   const hidden = buildSitemapEntries({ siteUrl: SITE.url, pages: pages.map((p) => (p.id === "careers" ? { ...p, inMenu: false } : p)), locales: LOCALES });
   assert.equal(hidden.some((entry) => entry.url.includes("/careers")), false);
+});
+
+test("buildProductCategorySitemapEntries: ที่อยู่หมวดมาจากฐานข้อมูล + ข้ามแถว page ที่พาธคงที่ (รอบที่ 280)", () => {
+  /* ที่อยู่ที่เจ้าของแก้ (ไม่ตรงกับ id) ต้องออกใน sitemap ตามที่แก้ */
+  const entries = buildProductCategorySitemapEntries({
+    siteUrl: "https://example.test/",
+    locales: LOCALES,
+    slugs: ["instant-noodles", "instant-noodle", "instant-noodle", "  "],
+  });
+  assert.equal(entries.length, 2 * LOCALES.length, "ตัดที่อยู่ซ้ำ/ว่างออก แล้วคูณจำนวนภาษา");
+  assert.ok(entries.some((entry) => entry.url === "https://example.test/th/products/instant-noodle"));
+  assert.ok(entries.some((entry) => entry.url === "https://example.test/en/products/instant-noodles"));
+  assert.equal(entries.find((entry) => entry.url.includes("/th/"))?.changeFrequency, "monthly");
+
+  /* `skipPageIds` = ตัดหน้ารายละเอียดหมวด (ที่พาธคงที่ในโค้ด) ออกจากลูปเดิม ⇒ ไม่มี URL ซ้ำ */
+  const pages = defaultPages(th);
+  const skipped = buildSitemapEntries({
+    siteUrl: SITE.url,
+    pages,
+    locales: LOCALES,
+    skipPageIds: ["product-instant-noodles"],
+  });
+  assert.equal(skipped.some((entry) => entry.url.includes("/products/instant-noodles")), false);
+
+  /* ไม่ส่ง slugs = ไม่มีอะไรออก (ไม่แต่งที่อยู่ขึ้นเอง) */
+  assert.deepEqual(buildProductCategorySitemapEntries({ siteUrl: SITE.url, locales: LOCALES, slugs: [] }), []);
 });
 
 test("buildNewsSitemapEntries: ข่าวรายชิ้น + หน้าจัดหน้า ครบทั้ง 2 ภาษา", () => {

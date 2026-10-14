@@ -42,12 +42,14 @@ import {
   deleteProduct,
   deleteProductCategory,
   deleteProductForever,
+  findCategoryIdByOldSlug,
   importCategoryLogo,
   listProductCategoriesForAdmin,
   listProductCategoryCards,
   listProductHighlights,
   listProductsByCategory,
   listProductsForAdmin,
+  listPublicCategorySlugs,
   loadProductCategory,
   loadProductForAdmin,
   replaceProductIngredients,
@@ -55,16 +57,18 @@ import {
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
-/* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/พรีเซ็ต (มติ D25 · รอบที่ 264) */
-import { categoryPresetPayload } from "@/lib/products/categories";
+/* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/พรีเซ็ต (มติ D25 · รอบ 264) + ที่อยู่/ลบว่าง (มติ D30 · รอบ 280) */
+import { builtInCategorySlugs, categoryPresetPayload } from "@/lib/products/categories";
 import {
   applyCategoryPreset,
   createProductCategoryAdmin,
   deleteCategoryPreset,
+  deleteEmptyCategoryAdmin,
   listAdminCategories,
   listCategoryDefaults,
   listCategoryIds,
   listCategoryPresets,
+  listCategorySlugs,
   loadAdminCategory,
   restoreCategoryFromDefault,
   saveCategoryPreset,
@@ -404,6 +408,9 @@ async function main(): Promise<void> {
 
   /* 39) ประกาศรับสมัครงาน: ร่าง/เผยแพร่/ถังขยะ + นำเข้าไม่ทับงานคน (มติ D26 · รอบที่ 265) */
   await checkJobPostings();
+
+  /* 40) ที่อยู่หมวดสินค้า (slug): เปลี่ยนที่อยู่ → ประวัติ → 301 · ลบหมวดว่าง (มติ D30 · รอบที่ 280) */
+  await checkCategorySlugRouting();
 
   await closePool();
 
@@ -2344,6 +2351,12 @@ const JOB_CHECK_ID = "check-db-job";
 const JOB_CHECK_ID_2 = "check-db-job-2";
 const JOB_CHECK_ACTOR = "check-db-job@example.invalid";
 const JOB_CHECK_IMPORTER = "check-db-job-import";
+/* ⚠️ ค่าคงที่ของวงจร 40 (ที่อยู่หมวด + ลบหมวดว่าง · มติ D30 · รอบ 280) — ก่อน `await main()` เช่นกัน */
+const SLUG_CHECK_ID = "check-db-slug";
+const SLUG_CHECK_OLD = "check-db-slug-old";
+const SLUG_CHECK_NEW = "check-db-slug-new";
+const SLUG_CHECK_PRODUCT = "p999997";
+const SLUG_CHECK_ACTOR = "check-db-slug@example.invalid";
 
 await main();
 
@@ -4500,6 +4513,184 @@ async function checkJobPostings(): Promise<void> {
       await countWhere("job_posting where id = any($1::text[])", [[JOB_CHECK_ID, JOB_CHECK_ID_2]]),
       0,
       "ต้องไม่เหลือประกาศทดสอบ",
+    );
+  }
+}
+
+/**
+ * 40) **ที่อยู่หมวดสินค้า (slug) + ลบหมวดว่าง** (มติเจ้าของ D30 · รอบที่ 280)
+ *
+ * พิสูจน์ว่า "เปลี่ยนที่อยู่แล้วลิงก์เก่าไม่เสีย" เป็นจริงที่ **ชั้นข้อมูล + SQL** ไม่ใช่แค่ที่หน้าจอ:
+ *   1. สร้างหมวดทดสอบ (ที่อยู่ = id) → ขึ้นหน้าเว็บที่ที่อยู่เดิม
+ *   2. เปลี่ยนที่อยู่ ⇒ ที่อยู่ใหม่ใช้ได้ · ที่อยู่เก่า **ไม่ใช่หมวดแล้ว** แต่ **หาได้จากประวัติ** (รากของ 301)
+ *   3. เปลี่ยนกลับ ⇒ ประวัติที่ชี้ที่อยู่ปัจจุบันถูกล้าง (ไม่มี 301 วนกลับตัวเอง)
+ *   4. ประตูลบถาวร: หมวดในโค้ดลบไม่ได้ · หมวดที่มีสินค้าลบไม่ได้ · หมวดว่างลบได้ → ประวัติถูกล้างตาม (cascade)
+ * ⚠️ ค่าคงที่ของวงจรนี้ประกาศไว้ **ก่อน `await main()`** (กัน TDZ — บทเรียนรอบที่ 78)
+ */
+
+async function checkCategorySlugRouting(): Promise<void> {
+  const mediaId = newMediaId();
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  try {
+    /*
+      ── 1) สร้างหมวดทดสอบ ────────────────────────────────────────────────────────
+      ที่อยู่ตั้งต้น = `SLUG_CHECK_OLD` ซึ่ง **ไม่เท่ากับ id** ⇒ ทำให้เห็นชัดว่า "ที่อยู่เก่า" ต้องค้นเจอ
+      ผ่าน **ประวัติ** เท่านั้น (ไม่ใช่เพราะบังเอิญ id ตรงกัน)
+    */
+    assert.equal(
+      await createProductCategoryAdmin(
+        {
+          id: SLUG_CHECK_ID,
+          slug: SLUG_CHECK_OLD,
+          nameTh: "หมวดทดสอบที่อยู่",
+          nameEn: "Slug check",
+          descriptionTh: "",
+          descriptionEn: "",
+          sortOrder: 930,
+          imageMediaId: null,
+          logoMediaId: null,
+        },
+        SLUG_CHECK_ACTOR,
+      ),
+      true,
+      "สร้างหมวดทดสอบต้องสำเร็จ",
+    );
+    const created = await loadAdminCategory(SLUG_CHECK_ID);
+    assert.equal(created?.slug, SLUG_CHECK_OLD, "ที่อยู่ที่ตั้งไว้ต้องถูกบันทึกจริง");
+    assert.equal((await loadProductCategory(SLUG_CHECK_OLD))?.id, SLUG_CHECK_ID, "ที่อยู่ตั้งต้นต้องเปิดหมวดได้");
+    assert.ok((await listCategorySlugs()).includes(SLUG_CHECK_OLD), "ตัวอ่านที่อยู่ต้องเห็นหมวดทดสอบ");
+    assert.equal(await findCategoryIdByOldSlug(SLUG_CHECK_OLD), null, "ยังไม่เปลี่ยนที่อยู่ = ไม่มีประวัติ");
+
+    /* ── 2) เปลี่ยนที่อยู่ ⇒ ประวัติเก็บที่อยู่เก่าไว้ (รากของ 301) ─────────────── */
+    const rename = (slug: string): Promise<boolean> =>
+      updateProductCategoryAdmin(
+        {
+          id: SLUG_CHECK_ID,
+          slug,
+          nameTh: "หมวดทดสอบที่อยู่",
+          nameEn: "Slug check",
+          descriptionTh: "",
+          descriptionEn: "",
+          sortOrder: 930,
+          isHidden: false,
+        },
+        SLUG_CHECK_ACTOR,
+      );
+
+    assert.equal(await rename(SLUG_CHECK_NEW), true, "เปลี่ยนที่อยู่ต้องสำเร็จ");
+    assert.equal((await loadAdminCategory(SLUG_CHECK_ID))?.slug, SLUG_CHECK_NEW, "อ่านกลับต้องได้ที่อยู่ใหม่");
+    assert.equal(await findCategoryIdByOldSlug(SLUG_CHECK_NEW), null, "ที่อยู่ใหม่ต้องไม่ค้างในประวัติ");
+
+    const slugsAfterRename = await listPublicCategorySlugs();
+    assert.ok(slugsAfterRename.includes(SLUG_CHECK_NEW), "ที่อยู่ใหม่ต้องอยู่ในรายการสาธารณะ (sitemap/prerender)");
+    assert.equal(slugsAfterRename.includes(SLUG_CHECK_OLD), false, "ที่อยู่เก่าต้องหลุดจากรายการสาธารณะ");
+
+    /* ที่อยู่ใหม่เปิดได้ · ที่อยู่เก่าไม่ใช่หมวดแล้ว แต่ **หาเจอจากประวัติ** ⇒ หน้าที่จะสั่ง 301 */
+    assert.equal((await loadProductCategory(SLUG_CHECK_NEW))?.id, SLUG_CHECK_ID, "ที่อยู่ใหม่ต้องเปิดหมวดได้");
+    assert.equal(await loadProductCategory(SLUG_CHECK_OLD), null, "ที่อยู่เก่าต้องไม่เปิดหมวดตรง ๆ แล้ว");
+    assert.equal(await findCategoryIdByOldSlug(SLUG_CHECK_OLD), SLUG_CHECK_ID, "ที่อยู่เก่าต้องหาเจอในประวัติ → 301");
+
+    /* ── 3) เปลี่ยนที่อยู่ซ้ำ ⇒ ประวัติที่ชี้ที่อยู่ปัจจุบันถูกล้าง ───────────────── */
+    assert.equal(await rename(SLUG_CHECK_OLD), true, "เปลี่ยนที่อยู่ครั้งที่สองต้องสำเร็จ");
+    assert.equal(
+      await findCategoryIdByOldSlug(SLUG_CHECK_OLD),
+      null,
+      "ที่อยู่ที่กลายเป็นที่อยู่ปัจจุบันต้องถูกล้างจากประวัติ (กัน 301 วนกลับตัวเอง)",
+    );
+    assert.equal(await findCategoryIdByOldSlug(SLUG_CHECK_NEW), SLUG_CHECK_ID, "ที่อยู่ก่อนหน้าต้องเข้าประวัติแทน");
+
+    /* ── 4) ประตูลบถาวร (fail-closed ที่ SQL) ───────────────────────────────────── */
+    const builtIn = builtInCategorySlugs();
+    const builtInId = builtIn[0];
+    assert.ok(builtInId !== undefined);
+    assert.equal(
+      await deleteEmptyCategoryAdmin(builtInId, builtIn),
+      false,
+      "หมวดในโค้ดลบไม่ได้ แม้จะว่าง (ประตู SQL)",
+    );
+    assert.equal(await loadAdminCategory(builtInId) !== null, true, "หมวดในโค้ดต้องยังอยู่");
+
+    /* หมวดที่มีสินค้า ⇒ ลบไม่ได้ (แม้ไม่ใช่หมวดในโค้ด) */
+    await insertMedia({
+      id: mediaId,
+      filename: "check-db-slug.png",
+      mime: "image/png",
+      sizeBytes: png.length,
+      width: 1,
+      height: 1,
+      data: png,
+      altTh: "สินค้าทดสอบที่อยู่",
+      altEn: "Slug check product",
+      createdBy: SLUG_CHECK_ACTOR,
+    });
+    await upsertProduct(
+      {
+        id: SLUG_CHECK_PRODUCT,
+        categoryId: SLUG_CHECK_ID,
+        sourceId: "999997",
+        sourceUrl: "/th/pages/999997-slug",
+        nameTh: "สินค้าทดสอบที่อยู่",
+        nameEn: "Slug check product",
+        groupTh: "",
+        groupEn: "",
+        taglineTh: "",
+        taglineEn: "",
+        detailsTh: "",
+        detailsEn: "",
+        allergensTh: "",
+        allergensEn: "",
+        netWeightTh: "",
+        netWeightEn: "",
+        fdaNumber: "",
+        packagingTh: "",
+        packagingEn: "",
+        sortOrder: 1,
+      },
+      SLUG_CHECK_ACTOR,
+      mediaId,
+    );
+    /* อ่านด้วย **ที่อยู่บนเว็บ** (ไม่ใช่ id) ต้องเจอสินค้า — พิสูจน์ว่า join ของคำสั่งอ่านใช้ slug ได้จริง */
+    assert.equal(
+      (await listProductsByCategory(SLUG_CHECK_OLD)).length,
+      1,
+      "คำสั่งอ่านสินค้าต้องรับที่อยู่บนเว็บของหมวดได้ (ไม่ใช่แค่ id)",
+    );
+    assert.equal(
+      await deleteEmptyCategoryAdmin(SLUG_CHECK_ID, builtIn),
+      false,
+      "หมวดที่มีสินค้าลบไม่ได้ (ประตู SQL)",
+    );
+
+    /* ลบสินค้าออก ⇒ หมวดว่างลบได้จริง และประวัติที่อยู่ถูกล้างตาม (on delete cascade) */
+    await deleteProduct(SLUG_CHECK_PRODUCT);
+    assert.equal(await deleteEmptyCategoryAdmin(SLUG_CHECK_ID, builtIn), true, "หมวดว่างต้องลบได้");
+    assert.equal(await deleteEmptyCategoryAdmin(SLUG_CHECK_ID, builtIn), false, "ลบซ้ำต้องไม่สำเร็จ");
+    assert.equal(await loadAdminCategory(SLUG_CHECK_ID), null, "ลบแล้วต้องหายจากรายการหลังบ้าน");
+    assert.equal(
+      await findCategoryIdByOldSlug(SLUG_CHECK_OLD),
+      null,
+      "ประวัติที่อยู่ของหมวดที่ถูกลบต้องถูกล้าง (FK on delete cascade)",
+    );
+
+    done(
+      "ที่อยู่หมวด (slug): เปลี่ยนที่อยู่ → ประวัติ → 301 · ลบหมวดว่าง",
+      "ที่อยู่เก่าเข้าประวัติ · ที่อยู่ปัจจุบันถูกล้างจากประวัติ · ประตูลบ (หมวดในโค้ด/มีสินค้า) อยู่ที่ SQL",
+    );
+  } finally {
+    await deleteProduct(SLUG_CHECK_PRODUCT);
+    await getPool().query("delete from product_category where id = $1", [SLUG_CHECK_ID]);
+    await getPool().query("delete from product_category_slug_history where category_id = $1", [SLUG_CHECK_ID]);
+    await getPool().query("delete from media where id = $1", [mediaId]);
+
+    assert.equal(await countWhere("product_category where id = $1", [SLUG_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(
+      await countWhere("product_category_slug_history where category_id = $1", [SLUG_CHECK_ID]),
+      0,
+      "ต้องไม่เหลือประวัติที่อยู่ทดสอบ",
     );
   }
 }

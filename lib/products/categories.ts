@@ -7,7 +7,8 @@ import { CATALOG_ITEMS } from "@/features/products/catalog";
  * เจ้าของสั่ง *"ต้องมีหน้าหมวดสินค้า … เก็บรูปไว้ในฐานข้อมูลเป็นรูปค่าเริ่มต้น และโครงสร้างตามหน้าบ้าน
  * เป็นค่าเริ่มต้น … สามารถปรับเปลี่ยนรูปได้ เพิ่มหมวดได้ … และสามารถคืนค่าเริ่มต้นได้ เพราะฉะนั้น
  * ค่าเริ่มต้นจะเก็บถาวรเสมอ เก็บพรัซเซ็ตได้"* ⇒ ถามข้อตัดสิน 5 ข้อ แล้วได้มติ:
- *  1. **slug ของหมวดใหม่** = สร้างอัตโนมัติจากชื่ออังกฤษ และ **ล็อกแก้ทีหลัง** ⇒ ไม่ต้องมีระบบ 301 รอบนี้
+ *  1. **slug ของหมวด** = สร้างอัตโนมัติจากชื่ออังกฤษ ⚠️ **แก้ไข:** มติ D30 (รอบที่ 279/280) เปิดให้แก้ทีหลัง
+ *     พร้อมระบบ **301** จากที่อยู่เก่า (เดิมรอบที่ 264 ล็อกถาวร ⇒ ไม่มี 301)
  *  2. **เพดานจำนวน** = **ไม่เกิน `MAX_PRODUCT_CATEGORIES` (12) หมวด**
  *  3. **ลบหมวด** = **ยังไม่ให้ลบ** — ใช้ **"ซ่อนจากเว็บ"** (`is_hidden`) แทน (ไม่มีข้อมูลตกงาน)
  *  4. **"ค่าเริ่มต้น"** = ชุด ณ วันนี้ (6 หมวดในโค้ด) **ล็อกถาวร** ⇒ UI แก้ไม่ได้ · กดคืนค่าได้เสมอ
@@ -18,7 +19,14 @@ import { CATALOG_ITEMS } from "@/features/products/catalog";
  *   ⇒ เป็น baseline ที่ UI แก้ไม่ได้จริง ๆ · ตาราง `product_category_default` เก็บ **สำเนาชุด ณ วันนี้**
  *     (รวมพาธภาพที่นำเข้าคลังแล้ว) เพื่อให้ "คืนค่าเริ่มต้น" ทำงานได้แม้ค่าปัจจุบันถูกแก้ไปแล้ว
  * - **ห้ามให้ตรรกะนี้แตะ DB** — ชั้นข้อมูล (`repository`) เป็นคนอ่าน/เขียน · ที่นี่ตัดสินใจเท่านั้น
- * - slug ของหมวด = `id` ในฐานข้อมูล (`product_category.id`) = ส่วนท้ายของ URL `/products/<slug>`
+ *
+ * ## ที่อยู่บนเว็บ: `id` (ภายใน) กับ `slug` (URL) — รอบที่ 279/280 · มติ D30
+ * - `product_category.id` = **รหัสภายใน** ที่ตารางอื่นอ้างอยู่ (`product.category_id`, ค่าเริ่มต้น, พรีเซ็ต,
+ *   id ของหน้าตัวสร้าง) ⇒ **ไม่เปลี่ยนตลอดชีพ**
+ * - `product_category.slug` = **ที่อยู่บนเว็บ** (`/products/<slug>`) ที่แก้ได้ ⇒ เปลี่ยนแล้วระบบทำ **301**
+ *   จากที่อยู่เก่าให้ (ประวัติอยู่ใน `product_category_slug_history`)
+ * - หมวดที่นำเข้าจากเว็บเดิม/สร้างใหม่: `slug = id` ตอนเกิด ⇒ URL วันแรกเหมือนเดิมเสมอ
+ * - ⚠️ ชื่อ/คำอธิบายยังผูกกับ `id` (คีย์พจนานุกรม = `id`) · อย่าใช้ `slug` ไปหาคีย์พจนานุกรม
  */
 
 /** เพดานจำนวนหมวด (มติ D25 ข้อ 2) — validator ปฏิเสธการเพิ่มเมื่อถึงเพดาน */
@@ -188,20 +196,35 @@ export type SortableCategory = {
   readonly sortOrder: number;
 };
 
-/** ค่าที่แก้ได้ของหมวด (ไม่รวม slug — ล็อกตามมติ D25 ข้อ 1) */
+/**
+ * ค่าที่แก้ได้ของหมวด
+ *
+ * ℹ️ รอบที่ 280 (มติ D30): **`slug` กลายเป็นค่าที่แก้ได้** — พร้อมบันทึกประวัติและทำ 301
+ *    (เดิมมติ D25 ข้อ 1 ล็อก slug ถาวร) ⇒ ฟิลด์ `slug` เป็น **ทางเลือก**: ไม่ส่ง = ไม่แตะที่อยู่เดิม
+ */
 export type CategoryEditFields = {
   readonly nameTh: string;
   readonly nameEn: string;
   readonly descriptionTh: string;
   readonly descriptionEn: string;
   readonly sortOrder: number;
+  /**
+   * ที่อยู่บนเว็บใหม่ — ไม่ส่ง (`undefined`) = **ไม่แตะ slug เดิม**
+   * ⚠️ ค่าที่ส่งต้องผ่าน `categorySlugIssue()` (ผู้เรียกต้องตัด slug ของตัวเองออกจาก `existing` ก่อน)
+   */
+  readonly slug?: string;
 };
 
 /**
  * ตรวจค่าที่แก้ของหมวดก่อนเขียนลงฐานข้อมูล (ใช้ทั้งตอนแก้และตอนสร้าง)
- * ⚠️ **ไม่ตรวจ slug** — slug สร้างจากชื่ออังกฤษครั้งเดียวและล็อกถาวร (เลี่ยงลิงก์เสีย/ต้องมี 301)
+ *
+ * @param context `existingSlugs` = slug ของหมวด **อื่น** ที่มีอยู่แล้ว (ใช้ตรวจ slug ซ้ำ)
+ *   · ไม่ส่งมา = ไม่ตรวจ slug (ผู้เรียกที่ไม่รองรับการแก้ slug)
  */
-export function validateCategoryEdit(input: CategoryEditFields): readonly CategoryIssue[] {
+export function validateCategoryEdit(
+  input: CategoryEditFields,
+  context?: { readonly existingSlugs: readonly string[] },
+): readonly CategoryIssue[] {
   const issues: CategoryIssue[] = [];
   if (input.nameTh.length > MAX_CATEGORY_NAME_LENGTH) {
     issues.push({ code: "too-long", path: "nameTh", message: `ชื่อหมวดไทยยาวเกิน ${MAX_CATEGORY_NAME_LENGTH} ตัวอักษร` });
@@ -218,7 +241,83 @@ export function validateCategoryEdit(input: CategoryEditFields): readonly Catego
   if (!Number.isInteger(input.sortOrder) || input.sortOrder < 0) {
     issues.push({ code: "bad-order", path: "sortOrder", message: "ลำดับต้องเป็นจำนวนเต็ม ≥ 0" });
   }
+  if (input.slug !== undefined && context !== undefined) {
+    const slugIssue = categorySlugIssue(input.slug, context.existingSlugs);
+    if (slugIssue !== null) {
+      issues.push({
+        code: `slug-${slugIssue}`,
+        path: "slug",
+        message:
+          slugIssue === "empty"
+            ? "ที่อยู่บนเว็บ (slug) ห้ามว่าง"
+            : slugIssue === "duplicate"
+              ? `มีหมวดอื่นใช้ที่อยู่ \"${input.slug}\" อยู่แล้ว`
+              : slugIssue === "reserved"
+                ? `คำว่า \"${input.slug}\" สงวนไว้สำหรับเส้นทางอื่นของเว็บ`
+                : `ที่อยู่บนเว็บไม่ถูกต้อง (\"${input.slug}\")`,
+      });
+    }
+  }
   return issues;
+}
+
+/**
+ * ค่าที่ผู้ใช้กรอกในช่อง slug → ค่าที่จะเขียนจริง
+ * - ตัดช่องว่าง + ตัวพิมพ์เล็ก (ผู้ใช้วางลิงก์/พิมพ์ตัวใหญ่ได้ ไม่ควรพัง)
+ * - คืน `undefined` = **ไม่แตะที่อยู่เดิม** (ช่องว่าง)
+ * ⚠️ ไม่ได้ตรวจความถูกต้อง — ผู้เรียกต้องส่งผ่าน `validateCategoryEdit` ก่อน
+ */
+export function categorySlugInput(value: string): string | undefined {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "" ? undefined : normalized;
+}
+
+/** เปลี่ยน slug จริงไหม (ที่อยู่เดิม = ค่าที่มีผลอยู่ · ที่อยู่ใหม่ = ค่าที่จะเขียน) */
+export function isCategorySlugChange(currentSlug: string, nextSlug: string | undefined): boolean {
+  if (nextSlug === undefined) return false;
+  return nextSlug !== currentSlug.trim().toLowerCase();
+}
+
+/**
+ * ตัดสินว่าคำขอ `/products/<requested>` ต้อง **301** ไปที่อยู่ใหม่ไหม (รอบที่ 280 · มติ D30)
+ *
+ * @param current หมวดที่เจอด้วยที่อยู่ปัจจุบันหรือรหัสภายใน (`null` = ไม่เจอ)
+ * @param moved หมวดที่เจอจากประวัติที่อยู่ (`null` = ที่อยู่นี้ไม่เคยมี)
+ * @returns slug ปลายทาง · `null` = ไม่ต้องเด้ง (แสดงหน้านี้ต่อ หรือปล่อยให้ผู้เรียก 404)
+ *
+ * กติกา
+ * - เจอหมวดแต่ที่อยู่ที่ขอ **ไม่ใช่ที่อยู่ปัจจุบัน** (เช่นลิงก์เก่าที่ชี้ `id`) ⇒ เด้งไปที่อยู่ปัจจุบัน
+ * - หมวดที่ **ถูกซ่อน** = ไม่เด้ง (ปล่อยให้ 404 — ไม่บอกใบ้ว่ามีอยู่)
+ * - เจอได้แค่จากประวัติ ⇒ เด้งไปที่อยู่ปัจจุบันของหมวดนั้น (นี่คือหัวใจของ 301)
+ */
+export function categoryRedirectSlug(options: {
+  readonly requested: string;
+  readonly current: { readonly slug: string; readonly isHidden: boolean } | null;
+  readonly moved: { readonly slug: string; readonly isHidden: boolean } | null;
+}): string | null {
+  const requested = options.requested.trim();
+  if (options.current !== null) {
+    if (options.current.isHidden) return null;
+    const slug = options.current.slug.trim();
+    return slug === "" || slug === requested ? null : slug;
+  }
+  if (options.moved === null || options.moved.isHidden) return null;
+  const slug = options.moved.slug.trim();
+  return slug === "" || slug === requested ? null : slug;
+}
+
+/**
+ * ลบหมวดนี้ได้ไหม (มติ D30 ข้อ 4) — **ประตูจริงอยู่ที่ SQL** (`deleteEmptyCategoryAdmin`)
+ * เงื่อนไข 2 ข้อ
+ * 1. **ไม่มีสินค้าเลย** (`productCount === 0`) — หมวดที่มีสินค้าใช้ "ซ่อนจากเว็บ" เท่านั้น
+ * 2. **ไม่ใช่หมวดในโค้ด 6 ใบ** — หมวดเหล่านั้นมีแถวในตาราง `page`/หน้าตัวสร้าง/เทมเพลตผูกอยู่
+ *    ⇒ ลบแล้วโครงเว็บหลักพัง (ใช้ "ซ่อน" แทน)
+ */
+export function categoryDeletionAllowed(input: {
+  readonly builtIn: boolean;
+  readonly productCount: number;
+}): boolean {
+  return !input.builtIn && input.productCount === 0;
 }
 
 /** เทียบลำดับของหมวด 2 รายการ — `sort_order` → ลำดับในโค้ด → id (นิ่งทุกครั้ง) */
@@ -263,7 +362,10 @@ export type BuiltInCategoryInfo = {
 
 /** แถวหมวดจากฐานข้อมูล (ค่าที่ผู้ดูแลแก้) */
 export type CategoryRow = {
+  /** รหัสภายใน (ไม่เปลี่ยน) */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (แก้ได้) */
+  readonly slug: string;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly descriptionTh: string;
@@ -281,6 +383,9 @@ export type CategoryRow = {
 
 /** หมวด 1 รายการที่หน้าบ้านใช้แสดง (การ์ด/หน้ารายละเอียด) — ค่าที่ "มีผลจริง" แล้ว */
 export type SiteCategory = {
+  /** รหัสภายใน (`product_category.id`) — ใช้หาสินค้า/พจนานุกรม · **ห้ามใช้เป็น URL** */
+  readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` */
   readonly slug: string;
   /** true = หมวดในโค้ด (ค่าเริ่มต้นแก้ไม่ได้) */
   readonly builtIn: boolean;
@@ -321,6 +426,8 @@ function size(value: number | null | undefined, fallback: number): number {
  * - หมวดที่สร้างใหม่ (ไม่อยู่ในโค้ด) ต้องมี **ชื่อไทย** จึงแสดง (ไม่มีชื่อ = ข้าม ไม่ทำให้หน้าพัง)
  * - ภาพ: ใช้ `logoPath`/`imagePath` จากคลังภาพ (DB) ก่อน → ถอยไฟล์ใน `public/` (เฉพาะหมวดในโค้ด)
  * - ชื่อ/คำอธิบาย: DB → ถอยพจนานุกรม (เฉพาะหมวดในโค้ด) — ผู้เรียกเลือกภาษาด้วย `language`
+ * - **ที่อยู่ (`slug`)**: แถว DB มาก่อน → ไม่มีก็ใช้ `id` (รอบที่ 280) · **จับคู่กับหมวดในโค้ดด้วย `id`** เสมอ
+ *   (⚠️ ห้ามจับคู่ด้วย slug — เจ้าของเปลี่ยน slug ได้ แล้วการ์ดจะหลุดจากพจนานุกรม)
  */
 export function mergeSiteCategories(
   builtIn: readonly BuiltInCategoryInfo[],
@@ -339,7 +446,8 @@ export function mergeSiteCategories(
     const logo = row?.logoPath ?? null;
 
     merged.push({
-      slug: item.slug,
+      id: item.slug,
+      slug: row?.slug.trim() !== "" && row?.slug !== undefined ? row.slug.trim() : item.slug,
       builtIn: true,
       nameTh,
       nameEn,
@@ -368,7 +476,8 @@ export function mergeSiteCategories(
     if (logoSrc === "") continue; // ไม่มีการ์ดที่ไม่มีภาพ (กันการ์ดว่างบนหน้าเว็บ)
 
     merged.push({
-      slug: row.id,
+      id: row.id,
+      slug: row.slug.trim() !== "" ? row.slug.trim() : row.id,
       builtIn: false,
       nameTh,
       nameEn,
@@ -386,7 +495,8 @@ export function mergeSiteCategories(
     });
   }
 
-  return [...merged].sort((a, b) => compareCategoryOrder(a.slug, a.sortOrder, b.slug, b.sortOrder));
+  /* ⚠️ เรียงด้วย **id ภายใน** (ไม่ใช่ slug) — ลำดับต้องไม่เปลี่ยนตามที่อยู่บนเว็บ */
+  return [...merged].sort((a, b) => compareCategoryOrder(a.id, a.sortOrder, b.id, b.sortOrder));
 }
 
 /** ข้อความตามภาษาของหมวดที่รวมแล้ว (ใช้ทั้งหน้าแรกและหน้า `/products/<slug>`) */

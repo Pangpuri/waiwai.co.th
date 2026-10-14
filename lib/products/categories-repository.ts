@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { getPool, isDatabaseConfigured } from "@/db/pool";
+import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import {
   categoryPresetApplyPlan,
   defaultSortOrderOf,
@@ -24,8 +24,10 @@ import {
  */
 
 export type AdminCategoryRow = {
-  /** slug ของหมวด (= `id` ใน DB = ส่วนท้าย URL `/products/<slug>`) */
+  /** รหัสภายในของหมวด (`product_category.id`) — ไม่เปลี่ยนตลอดชีพ */
   readonly id: string;
+  /** ที่อยู่บนเว็บ `/products/<slug>` (แก้ได้ · รอบที่ 280) */
+  readonly slug: string;
   readonly sourceId: string;
   readonly nameTh: string;
   readonly nameEn: string;
@@ -75,6 +77,7 @@ function toIsoStamp(value: unknown): string {
 }
 
 const ADMIN_CATEGORY_COLUMNS = `c.id,
+  c.slug,
   c.source_id       as "sourceId",
   c.name_th         as "nameTh",
   c.name_en         as "nameEn",
@@ -94,8 +97,11 @@ const ADMIN_CATEGORY_COLUMNS = `c.id,
 
 function toAdminCategoryRow(row: Record<string, unknown>): AdminCategoryRow {
   const count = Number.parseInt(text(row.productCount), 10);
+  const id = text(row.id);
   return {
-    id: text(row.id),
+    id,
+    /* slug ว่าง (ข้อมูลเก่าก่อน migration 0042) ⇒ ถอยไปใช้ id — ที่อยู่เดิมไม่เปลี่ยน */
+    slug: text(row.slug).trim() !== "" ? text(row.slug).trim() : id,
     sourceId: text(row.sourceId),
     nameTh: text(row.nameTh),
     nameEn: text(row.nameEn),
@@ -125,7 +131,7 @@ export async function listAdminCategories(): Promise<readonly AdminCategoryRow[]
          left join media m on m.id = c.image_media_id
          left join media lm on lm.id = c.logo_media_id
          left join product p on p.category_id = c.id
-        group by c.id, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
+        group by c.id, c.slug, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
                  m.id, m.width, m.height, lm.id, lm.width, lm.height,
                  c.sort_order, c.is_hidden, c.updated_at, c.updated_by`,
     );
@@ -146,7 +152,7 @@ export async function loadAdminCategory(id: string): Promise<AdminCategoryRow | 
          left join media lm on lm.id = c.logo_media_id
          left join product p on p.category_id = c.id
         where c.id = $1
-        group by c.id, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
+        group by c.id, c.slug, c.source_id, c.name_th, c.name_en, c.description_th, c.description_en,
                  m.id, m.width, m.height, lm.id, lm.width, lm.height,
                  c.sort_order, c.is_hidden, c.updated_at, c.updated_by`,
       [id],
@@ -158,7 +164,7 @@ export async function loadAdminCategory(id: string): Promise<AdminCategoryRow | 
   }
 }
 
-/** รายชื่อ id ของหมวดที่มีอยู่ (ใช้ตรวจ slug ซ้ำ/เพดานจำนวน) */
+/** รายชื่อ id ของหมวดที่มีอยู่ (ใช้ตรวจเพดานจำนวน/พรีเซ็ต) */
 export async function listCategoryIds(): Promise<readonly string[]> {
   if (!isDatabaseConfigured()) return [];
   try {
@@ -168,6 +174,28 @@ export async function listCategoryIds(): Promise<readonly string[]> {
     return [];
   }
 }
+
+/**
+ * รายชื่อ **ที่อยู่บนเว็บ** ของทุกหมวด (รอบที่ 280) — ใช้ตรวจ slug ซ้ำและทำ sitemap
+ * คืน `[]` ถ้าอ่านไม่ได้ (ผู้เรียกถอยไปใช้ค่าในโค้ด)
+ */
+export async function listCategorySlugs(): Promise<readonly string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await getPool().query<{ slug: string }>(
+      `select coalesce(nullif(slug, ''), id) as slug from product_category order by id`,
+    );
+    return result.rows.map((row) => text(row.slug)).filter((slug) => slug !== "");
+  } catch {
+    return [];
+  }
+}
+
+/*
+  ⚠️ การค้น "ที่อยู่เก่า → หมวด" (ใช้ทำ 301) อยู่ที่ `lib/products/repository.ts`
+     (`findCategoryIdByOldSlug`) — เพราะเป็น **การอ่านของหน้าเว็บสาธารณะ** ต้องผ่านประตูอ่านอย่างเดียว
+     ไม่ใช่ `getPool()` ของหลังบ้าน (มติ D23 · least privilege)
+*/
 
 /* ── ค่าเริ่มต้นถาวร (immutable) ─────────────────────────────────────────────── */
 
@@ -253,8 +281,8 @@ export async function insertCategoryDefaults(
 export async function restoreCategoryFromDefault(id: string, actor: string): Promise<boolean> {
   const result = await getPool().query(
     `insert into product_category
-       (id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     select d.id, d.name_th, d.name_en, d.description_th, d.description_en,
+       (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+     select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
             d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $2
        from product_category_default d
       where d.id = $1
@@ -278,8 +306,8 @@ export async function restoreCategoryFromDefault(id: string, actor: string): Pro
 export async function restoreAllCategoriesFromDefault(actor: string): Promise<number> {
   const result = await getPool().query(
     `insert into product_category
-       (id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     select d.id, d.name_th, d.name_en, d.description_th, d.description_en,
+       (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+     select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
             d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $1
        from product_category_default d
      on conflict (id) do update set
@@ -308,6 +336,11 @@ export type CategoryWriteInput = {
   readonly descriptionEn: string;
   readonly sortOrder: number;
   readonly isHidden: boolean;
+  /**
+   * ที่อยู่บนเว็บใหม่ (รอบที่ 280) — `undefined` = **ไม่แตะ slug เดิม**
+   * ⚠️ ส่งค่ามา = ต้องไม่ว่างและไม่ซ้ำ (ผู้เรียกตรวจด้วย `validateCategoryEdit` ก่อนแล้ว)
+   */
+  readonly slug?: string;
   /** `undefined` = ไม่แตะภาพ (คนละเรื่องกับ `null` = ลบภาพ) */
   readonly imageMediaId?: string | null;
   readonly logoMediaId?: string | null;
@@ -316,18 +349,21 @@ export type CategoryWriteInput = {
 /**
  * สร้างหมวดใหม่ (มติ D25: slug สร้างจากชื่ออังกฤษ · `source_id` ไม่บังคับสำหรับหมวดที่สร้างเอง)
  * คืน `false` = มี id นี้อยู่แล้ว (ไม่ทับของเดิม — ผู้เรียกต้องแจ้งผู้ใช้)
+ * ⚠️ รอบที่ 280: ที่อยู่บนเว็บ (`slug`) รับแยกจาก `id` — ไม่ส่ง = ใช้ `id` (URL วันแรกเหมือนเดิม)
  */
 export async function createProductCategoryAdmin(
   input: Omit<CategoryWriteInput, "isHidden">,
   actor: string,
 ): Promise<boolean> {
+  const slug = input.slug === undefined || input.slug.trim() === "" ? input.id : input.slug.trim();
   const result = await getPool().query(
     `insert into product_category
-       (id, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     values ($1, '', $2, $3, $4, $5, $6, $7, $8, false, now(), $9)
+       (id, slug, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+     values ($1, $2, '', $3, $4, $5, $6, $7, $8, $9, false, now(), $10)
      on conflict (id) do nothing`,
     [
       input.id,
+      slug,
       input.nameTh,
       input.nameEn,
       input.descriptionTh,
@@ -345,39 +381,99 @@ export async function createProductCategoryAdmin(
  * บันทึกค่าหมวด (เฉพาะแถวที่มีอยู่) — คืน `false` ถ้าไม่พบหมวด
  * ⚠️ ใช้ `undefined` = ไม่แตะภาพ · `null` = ลบภาพ (ถอยไปใช้ไฟล์ใน `public/` หรือไม่มีภาพ)
  *    ⇒ กันเคสจริงรอบที่ 263 (POST ที่ไม่ส่งฟิลด์แล้วเผลอลบภาพ) ด้วยการแยก `undefined`/`null` ให้ชัด
+ *
+ * ## เปลี่ยนที่อยู่บนเว็บ (slug) — รอบที่ 280 · มติ D30
+ * ส่ง `slug` มา ⇒ ทั้งชุดอยู่ใน **transaction เดียว** กับประวัติ:
+ * 1. `insert into product_category_slug_history` ที่อยู่ **เก่า** (ก่อนแก้) → ใช้ทำ 301
+ * 2. `update … set slug = ใหม่`
+ * 3. ลบประวัติที่ชี้ที่อยู่ **ใหม่** ของหมวดเดียวกัน (ถ้าเคยใช้) — ที่อยู่นั้นกลับมาเป็นของหมวดนี้ตรง ๆ
+ * ⚠️ ที่อยู่ใหม่ชนกับหมวดอื่น = unique index โยน error ⇒ **ทั้ง transaction ย้อนกลับ** (ไม่มีที่อยู่ครึ่ง ๆ กลาง ๆ)
  */
 export async function updateProductCategoryAdmin(input: CategoryWriteInput, actor: string): Promise<boolean> {
   const touchImage = input.imageMediaId !== undefined;
   const touchLogo = input.logoMediaId !== undefined;
-  const result = await getPool().query(
-    `update product_category
+  const nextSlug = input.slug === undefined ? undefined : input.slug.trim().toLowerCase();
+  const renameSlug = nextSlug !== undefined && nextSlug !== "";
+
+  /*
+    ที่อยู่เก่า → ประวัติ (ก่อนแก้) · `on conflict` = ที่อยู่นี้เคยชี้ที่อื่น ⇒ ย้ายมาเป็นของหมวดนี้
+    เงื่อนไข `slug is distinct from $2` กันบันทึกค่าที่อยู่เดิมซ้ำเข้าไปในประวัติ
+  */
+  const insertHistorySql = `insert into product_category_slug_history (slug, category_id, created_at, created_by)
+     select slug, id, now(), $3 from product_category where id = $1 and slug is distinct from $2
+     on conflict (slug) do update
+       set category_id = excluded.category_id, created_at = now(), created_by = excluded.created_by`;
+
+  const updateSql = `update product_category
         set name_th        = $2,
             name_en        = $3,
             description_th = $4,
             description_en = $5,
             sort_order     = $6,
             is_hidden      = $7,
+            slug           = case when $13::boolean then $14::text else slug end,
             image_media_id = case when $8::boolean then $9::text else image_media_id end,
             logo_media_id  = case when $10::boolean then $11::text else logo_media_id end,
             updated_at     = now(),
             updated_by     = $12
-      where id = $1`,
-    [
-      input.id,
-      input.nameTh,
-      input.nameEn,
-      input.descriptionTh,
-      input.descriptionEn,
-      input.sortOrder,
-      input.isHidden,
-      touchImage,
-      input.imageMediaId ?? null,
-      touchLogo,
-      input.logoMediaId ?? null,
-      actor,
-    ],
-  );
-  return (result.rowCount ?? 0) > 0;
+      where id = $1`;
+  const updateParams = [
+    input.id,
+    input.nameTh,
+    input.nameEn,
+    input.descriptionTh,
+    input.descriptionEn,
+    input.sortOrder,
+    input.isHidden,
+    touchImage,
+    input.imageMediaId ?? null,
+    touchLogo,
+    input.logoMediaId ?? null,
+    actor,
+    renameSlug,
+    nextSlug ?? null,
+  ];
+
+  /* ที่อยู่ใหม่ = ของหมวดนี้แล้ว ⇒ ประวัติที่ชี้ที่อยู่นี้ไม่จำเป็นอีก (กัน 301 วนกลับตัวเอง) */
+  const deleteHistorySql = `delete from product_category_slug_history where category_id = $1 and slug = $2`;
+
+  if (!renameSlug) {
+    const result = await getPool().query(updateSql, updateParams);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  return withTransaction(async (client) => {
+    await client.query(insertHistorySql, [input.id, nextSlug, actor]);
+    const result = await client.query(updateSql, updateParams);
+    await client.query(deleteHistorySql, [input.id, nextSlug]);
+    return (result.rowCount ?? 0) > 0;
+  });
+}
+
+/**
+ * **ลบหมวดถาวร** (มติ D30 ข้อ 4 · รอบที่ 280) — ใช้เฉพาะหมวดที่ **ว่างเปล่าและไม่ใช่หมวดในโค้ด**
+ *
+ * ⚠️ **ประตูอยู่ที่ SQL เองทั้งสองข้อ** (fail-closed — แม้ action ถูกเรียกตรง ๆ):
+ *   1. `not exists (select … from product …)` ⇒ มีสินค้า 1 ชิ้นก็ลบไม่ได้
+ *   2. `id <> all($2::text[])` ⇒ หมวดในโค้ด 6 ใบ (`builtInSlugs` จากผู้เรียก) ลบไม่ได้
+ * ลบ **ประวัติ slug** (FK `on delete cascade`) และ **เอกสารตัวสร้างหน้า** (`page_document` ของ `product-<id>`)
+ * ใน transaction เดียว · คืน `true` = ลบจริง
+ */
+export async function deleteEmptyCategoryAdmin(id: string, builtInSlugs: readonly string[]): Promise<boolean> {
+  if (id.trim() === "") return false;
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `delete from product_category
+        where id = $1
+          and id <> all($2::text[])
+          and not exists (select 1 from product where product.category_id = product_category.id)`,
+      [id, [...builtInSlugs]],
+    );
+    if ((result.rowCount ?? 0) === 0) return false;
+    /* เอกสารบล็อกของหน้าตัวสร้างของหมวดนี้ (ถ้าเคยมี) — ไม่ต้องค้างไว้ให้เป็นขยะ */
+    await client.query(`delete from page_document where page = $1`, [`product-${id}`]);
+    return true;
+  });
 }
 
 /** ซ่อน/แสดงหมวดบนเว็บ (มติ D25 ข้อ 3 — "ซ่อน" แทน "ลบ") · คืน `false` ถ้าไม่พบหมวด */

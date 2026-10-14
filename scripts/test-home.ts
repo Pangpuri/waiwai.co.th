@@ -36,6 +36,7 @@ function sourceOf(relativePath: string): string {
 
 const categoryRow: ProductCategoryCardRecord = {
   id: "instant-noodles",
+  slug: "instant-noodles",
   nameTh: "",
   nameEn: "",
   descriptionTh: "เริ่มผลิตครั้งแรกเมื่อปี พ.ศ. 2515",

@@ -118,12 +118,13 @@ export function productShowcaseView(
     options.categoryIds.length === 0 ? categories : categories.filter((row) => options.categoryIds.includes(row.id));
 
   const views: readonly ProductShowcaseCategoryView[] = selected.map((row) => ({
+    /* id = รหัสภายใน (ผูกกับ `categoryIds` ที่เลือกในบล็อก) · href = ที่อยู่บนเว็บ (รอบที่ 280) */
     id: row.id,
     title: categoryNameOf(row.nameTh, row.nameEn, dictionaryCategoryName(row.id, language), language),
     description: language === "en" && row.descriptionEn.trim() !== "" ? row.descriptionEn : row.descriptionTh,
     image: row.imagePath,
     productCount: row.productCount,
-    href: `/products/${row.id}`,
+    href: `/products/${row.slug}`,
   }));
 
   const featuredViews: ProductShowcaseFeaturedView[] = options.showFeatured
@@ -136,7 +137,7 @@ export function productShowcaseView(
             categoryId: row.categoryId,
             title: language === "en" && row.nameEn.trim() !== "" ? row.nameEn : row.nameTh,
             image: row.imagePath,
-            href: `/products/${category.id}`,
+            href: `/products/${category.slug}`,
           })),
       )
     : [];

@@ -32,6 +32,8 @@ export type AuditAction =
   | "product-category-create"
   | "product-category-hide"
   | "product-category-restore"
+  /* ลบหมวดว่างถาวร (มติ D30 · รอบที่ 280) */
+  | "product-category-delete"
   | "product-category-reorder"
   | "product-category-preset-save"
   | "product-category-preset-apply"
