@@ -37,6 +37,8 @@ function parseArgs(argv: readonly string[]): Options {
   let strict = false;
   for (const arg of argv) {
     if (arg === "--json") json = true;
+    /* `check:target` ยิงปลายทางเสมอ ⇒ รับ `--target` ไว้ได้ (กันผู้ใช้พิมพ์ตามคำสั่งอื่นแล้ว 500) */
+    else if (arg === "--target") continue;
     else if (arg === "--strict") strict = true;
     else if (arg.trim() !== "") throw new Error(`ไม่รู้จักตัวเลือก: ${arg}`);
   }

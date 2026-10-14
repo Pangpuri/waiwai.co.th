@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { codeOf } from "./source-scan.ts";
-import { selectTargetUrl, targetBanner } from "./target-env.ts";
+import { localBanner, selectTargetUrl, targetBanner, targetRequested } from "./target-env.ts";
 
 /**
  * เทสต์ "ธง `--target`" ของสคริปต์ที่ต้องยิงฐานข้อมูลปลายทาง (รอบที่ 282)
@@ -57,7 +57,7 @@ test("--target: คำสั่ง migration/role ใช้ตัวช่วย
     ["scripts/db-roles.ts", "db:roles"],
   ] as const) {
     const source = codeOf(file);
-    assert.ok(source.includes('process.argv.includes("--target")'), `${label}: ต้องมีธง --target`);
+    assert.ok(source.includes("targetRequested(process.argv.slice(2), process.env)"), `${label}: ต้องตรวจเจตนาผู้ใช้`);
     assert.ok(source.includes("selectTargetUrl(process.env)"), `${label}: ต้องใช้ตัวช่วยกลางเลือกปลายทาง`);
     assert.ok(
       source.includes('process.env["DATABASE_URL"] = selection.url'),
@@ -74,8 +74,54 @@ test("--target: ค่าเริ่มต้น (ไม่ใส่ธง) ย
   const source = codeOf("scripts/target-env.ts");
   assert.ok(!source.includes("process.env"), "ตัวช่วยต้องเป็นตรรกะล้วน (ผู้เรียกเป็นคนตั้งค่า)");
   const migrate = codeOf("scripts/migrate.ts");
-  assert.ok(
-    migrate.includes('if (process.argv.includes("--target"))'),
-    "การเปลี่ยนปลายทางต้องอยู่ในเงื่อนไขของธงเท่านั้น",
-  );
+  assert.ok(migrate.includes("if (wantsTarget.requested) {"), "การเปลี่ยนปลายทางต้องอยู่ในเงื่อนไขของธงเท่านั้น");
+});
+
+/* ── กับดัก npm กลืนธง (เคสจริง 2026-10-14 · รอบที่ 284) ─────────────────────── */
+
+test("--target: อ่านเจตนาผู้ใช้ได้ทั้ง `-- --target` และ `--target` ที่ npm กลืน", () => {
+  /* รูปแบบที่ถูก */
+  const argvForm = targetRequested(["--target"], {});
+  assert.equal(argvForm.requested, true);
+  assert.equal(argvForm.viaNpmConfig, false, "มาจาก argv = รูปแบบถูก ไม่ต้องเตือน");
+
+  /*
+    รูปแบบที่ผู้ใช้พิมพ์ตก `--` — npm ตีเป็น config ของตัวเองแล้วตั้ง `npm_config_target=true`
+    (วัดจริง: argv ว่างเปล่า) ⇒ ต้องอ่านเจตนาให้ได้ ไม่งั้นงานจะวิ่งไปผิดฐานข้อมูลแบบเงียบ
+  */
+  const npmForm = targetRequested([], { npm_config_target: "true" });
+  assert.equal(npmForm.requested, true, "ต้องถือว่าผู้ใช้สั่งปลายทาง");
+  assert.equal(npmForm.viaNpmConfig, true, "ต้องรู้ว่ามาทาง npm ⇒ พิมพ์คำเตือนให้แก้");
+
+  assert.equal(targetRequested([], {}).requested, false, "ไม่สั่ง = ไม่ใช้ปลายทาง");
+  assert.equal(targetRequested([], { npm_config_target: "false" }).requested, false, "ค่า false = ไม่ใช้ปลายทาง");
+  assert.equal(targetRequested(["--status"], {}).requested, false, "ธงอื่นต้องไม่ถูกตีเป็น --target");
+
+  /* argv ชนะเสมอ (ไม่ต้องเตือนซ้ำเมื่อพิมพ์ถูก) */
+  const both = targetRequested(["--target"], { npm_config_target: "true" });
+  assert.equal(both.requested, true);
+  assert.equal(both.viaNpmConfig, false);
+});
+
+test("--target: ไม่สั่งธงต้องบอกชัดว่าใช้ฐานข้อมูล 'ในเครื่อง' (กันเข้าใจว่ารันปลายทางแล้ว)", () => {
+  const line = localBanner("postgres://waiwai@localhost:55432/waiwai");
+  assert.ok(line.includes("ในเครื่อง"), line);
+  assert.ok(line.includes("localhost"), line);
+  assert.ok(line.includes("ไม่ได้สั่ง"), "ต้องบอกเหตุผลว่าทำไมถึงไม่ใช่ปลายทาง");
+
+  for (const file of ["scripts/migrate.ts", "scripts/db-roles.ts"]) {
+    const source = codeOf(file);
+    assert.ok(source.includes("targetRequested(process.argv.slice(2), process.env)"), `${file}: ต้องใช้ตัวตรวจเจตนา`);
+    assert.ok(source.includes("localBanner("), `${file}: ต้องบอกปลายทางเมื่อไม่ได้สั่งธง`);
+    assert.ok(source.includes("NPM_SWALLOWED_TARGET_WARNING"), `${file}: ต้องเตือนเมื่อ npm กลืนธง`);
+    assert.equal(
+      /process\.argv\.includes\("--target"\)/.test(source),
+      false,
+      `${file}: ห้ามกลับไปเช็ค argv ตรง ๆ (จะพลาดรูปแบบที่ npm กลืน)`,
+    );
+  }
+
+  /* เครื่องมือที่ยิงปลายทางเสมอ ต้องรับ `--target` ที่ผู้ใช้เผลอพิมพ์ได้ (ห้าม throw) */
+  const check = codeOf("scripts/check-target.ts");
+  assert.ok(check.includes('arg === "--target"'), "check:target ต้องรับธง --target ได้");
 });

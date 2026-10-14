@@ -58,3 +58,40 @@ export function targetBanner(selection: Extract<TargetSelection, { ok: true }>):
   const suffix = selection.convertedFromPooler ? " (แปลงจาก pooler เป็น endpoint ตรงแล้ว)" : "";
   return `ℹ️  ปลายทาง: ${selection.host}${suffix}`;
 }
+
+/**
+ * ฐานข้อมูล **ในเครื่อง** — ใช้พิมพ์บอกเมื่อไม่ได้สั่ง `--target`
+ *
+ * ⚠️ ทำไมต้องพิมพ์ทุกครั้ง: เคสจริง 2026-10-14 (รอบที่ 284) — เจ้าของสั่ง
+ * `npm run db:migrate --target` แล้ว **เข้าใจว่างานเสร็จ** เพราะสคริปต์ขึ้น "ไม่มีอะไรต้องรัน"
+ * แต่ของจริงคือ **npm กลืนธง `--target`** (ต้องมี `--` คั่น) ⇒ มันรันกับ Docker ในเครื่อง
+ * (ที่ครบอยู่แล้ว) แล้วเงียบ ๆ ⇒ ถ้าเครื่องมือ **บอกปลายทางทุกครั้ง** อาการนี้จะเห็นทันที
+ */
+export function localBanner(url: string | undefined): string {
+  const host = url === undefined ? "" : (hostOf(url) ?? "");
+  return `ℹ️  ฐานข้อมูล: ในเครื่องนี้${host === "" ? "" : ` (${host})`} — ไม่ได้สั่ง --target`;
+}
+
+/**
+ * ผู้ใช้ "สั่งใช้ปลายทาง" ไหม — และสั่งด้วยรูปแบบไหน
+ *
+ * ## กับดักจริงที่ต้องรองรับ (รอบที่ 284)
+ * `npm run <script> --target` **ไม่ส่ง `--target` ถึงสคริปต์** — npm ตีความเป็น config ของตัวเอง
+ * แล้วตั้ง env `npm_config_target=true` ให้ (วัดจริง: `argv = []` แต่มี `npm_config_target`)
+ * ⇒ ตัวตรวจต้องอ่านทั้งสองทาง ไม่งั้น "คำสั่งที่พิมพ์ผิดนิดเดียว" จะกลายเป็นงานที่ **เงียบและผิดปลายทาง**
+ *
+ * รูปแบบที่ถูกคือ `npm run <script> -- --target` (`argv = ["--target"]`)
+ */
+export function targetRequested(
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): { readonly requested: boolean; readonly viaNpmConfig: boolean } {
+  const inArgv = argv.includes("--target");
+  const npmValue = (env["npm_config_target"] ?? "").trim().toLowerCase();
+  const viaNpmConfig = !inArgv && npmValue !== "" && npmValue !== "false";
+  return { requested: inArgv || viaNpmConfig, viaNpmConfig };
+}
+
+/** คำเตือนเมื่อธงถูก npm กลืน (ผู้ใช้พิมพ์ตก `--`) — ยังทำงานให้ตามเจตนา แต่ต้องบอกให้แก้ */
+export const NPM_SWALLOWED_TARGET_WARNING =
+  "⚠️ npm กลืนธง --target (ต้องมี `--` คั่น) — รอบนี้ใช้ปลายทางให้ตามเจตนาแล้ว · ครั้งหน้าพิมพ์ `npm run … -- --target`";

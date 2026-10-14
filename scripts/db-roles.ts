@@ -1,7 +1,13 @@
 import { pathToFileURL } from "node:url";
 
 import { generatePassword } from "@/lib/auth/credentials";
-import { selectTargetUrl, targetBanner } from "./target-env.ts";
+import {
+  NPM_SWALLOWED_TARGET_WARNING,
+  localBanner,
+  selectTargetUrl,
+  targetBanner,
+  targetRequested,
+} from "./target-env.ts";
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 
 /**
@@ -175,7 +181,8 @@ async function main(): Promise<void> {
     ⚠️ role อยู่ในฐานข้อมูลนั้น ๆ ⇒ การตั้ง least privilege บนโฮสต์จริงต้องรันธงนี้
        แล้วเอาค่า PUBLIC_DATABASE_URL/FORM_DATABASE_URL ที่พิมพ์ได้ไปวางใน env ของโฮสต์
   */
-  if (process.argv.includes("--target")) {
+  const wantsTarget = targetRequested(process.argv.slice(2), process.env);
+  if (wantsTarget.requested) {
     const selection = selectTargetUrl(process.env);
     if (!selection.ok) {
       process.stderr.write(`✗ ${selection.message}\n`);
@@ -183,6 +190,11 @@ async function main(): Promise<void> {
     }
     process.env["DATABASE_URL"] = selection.url;
     process.stdout.write(`${targetBanner(selection)}\n`);
+    /* npm กลืน `--target` เมื่อผู้ใช้พิมพ์ตก `--` (เคสจริงรอบที่ 284) */
+    if (wantsTarget.viaNpmConfig) process.stdout.write(`${NPM_SWALLOWED_TARGET_WARNING}\n`);
+  } else {
+    /* บอกปลายทางทุกครั้ง — "ในเครื่อง" ต้องเห็นชัด ไม่ให้เข้าใจว่ารันปลายทางแล้ว */
+    process.stdout.write(`${localBanner(process.env["DATABASE_URL"])}\n`);
   }
 
   if (!isDatabaseConfigured()) {

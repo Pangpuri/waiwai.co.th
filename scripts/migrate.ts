@@ -1,7 +1,13 @@
 
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 import { loadMigrationFiles } from "./migration-files.ts";
-import { selectTargetUrl, targetBanner } from "./target-env.ts";
+import {
+  NPM_SWALLOWED_TARGET_WARNING,
+  localBanner,
+  selectTargetUrl,
+  targetBanner,
+  targetRequested,
+} from "./target-env.ts";
 import { checksumOf, describePlan, planMigrations } from "@/lib/db/migrations";
 
 /**
@@ -46,7 +52,8 @@ async function main(): Promise<void> {
     ⚠️ ต้องเลือกโดยเจตนา (ไม่ใช่ค่าเริ่มต้น) และผ่านด่านของ `selectTargetUrl()`
        (ห้ามชี้เครื่องตัวเอง · ห้ามซ้ำกับ DATABASE_URL ของ dev · ตัด `-pooler` ให้เอง)
   */
-  if (process.argv.includes("--target")) {
+  const wantsTarget = targetRequested(process.argv.slice(2), process.env);
+  if (wantsTarget.requested) {
     const selection = selectTargetUrl(process.env);
     if (!selection.ok) {
       console.error(`✗ ${selection.message}`);
@@ -55,6 +62,11 @@ async function main(): Promise<void> {
     }
     process.env["DATABASE_URL"] = selection.url;
     console.log(targetBanner(selection));
+    /* npm กลืน `--target` เมื่อผู้ใช้พิมพ์ตก `--` — เตือนให้แก้ แต่ยังทำตามเจตนา (รอบที่ 284) */
+    if (wantsTarget.viaNpmConfig) console.log(NPM_SWALLOWED_TARGET_WARNING);
+  } else {
+    /* บอกปลายทางทุกครั้ง — กันเคส "นึกว่ารันปลายทางแล้ว" (เคสจริง 2026-10-14) */
+    console.log(localBanner(process.env["DATABASE_URL"]));
   }
 
   if (!isDatabaseConfigured()) {
