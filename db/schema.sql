@@ -383,6 +383,20 @@ create table if not exists product_category (
   updated_by     text
 );
 
+create unique index if not exists product_category_slug_key on product_category (slug);
+
+/* รอบที่ 279 (D30): ประวัติ slug เดิม → ใช้ทำ 301 เมื่อเปลี่ยนที่อยู่ของหมวด */
+create table if not exists product_category_slug_history (
+  slug        text        primary key,
+  category_id text        not null references product_category (id) on delete cascade,
+  created_at  timestamp with time zone not null default now(),
+  created_by  text        not null default ''
+);
+
+create index if not exists product_category_slug_history_category_idx
+  on product_category_slug_history (category_id, created_at desc);
+
+
 create index if not exists product_category_order_idx on product_category (sort_order, id);
 
 -- ค่าเริ่มต้นถาวรของหมวด (migration 0039 · มติ D25 ข้อ 4)
