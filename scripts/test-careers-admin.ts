@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { jobTitleByTopic } from "@/lib/careers/model";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -303,4 +304,28 @@ test("ประกาศงาน: ของเดิมของหน้า /c
   const registry = codeOf("lib/blocks/templates.ts");
   assert.ok(!registry.includes("careers"), "ทะเบียนเทมเพลตต้องไม่มี careers");
   assert.ok(!codeOf("lib/blocks/types.ts").includes("jobBoard"), "ชนิดบล็อก jobBoard ต้องถูกถอดออก");
+});
+
+/* ── รอบที่ 276 (ปิดหนี้ D-265-2): ใบสมัครเก็บ "ชื่อตำแหน่ง" ที่อ่านรู้เรื่อง ───────────── */
+
+test("careers: ใบสมัครส่ง 'ชื่อตำแหน่ง' เป็นค่า topic + แปลงค่าเก่า (รหัส) ได้", () => {
+  const fields = readFileSync("features/forms/ui/form-fields.tsx", "utf8");
+  assert.ok(
+    fields.includes("value={position.title}"),
+    "ตัวเลือกตำแหน่งต้องส่งชื่อตำแหน่ง (ไม่ใช่รหัส) — กล่องข้อความ/CSV ต้องอ่านรู้เรื่อง",
+  );
+  assert.ok(!/value=\{position\.id\}/.test(fields), "ห้ามส่งรหัสเป็นค่า topic อีก");
+
+  /* ตัวแปลงค่าเก่า → ชื่อ (pure) */
+  const titles = new Map([["j1700000000000", "พนักงานผลิต"], ["production", "ฝ่ายผลิต"]]);
+  assert.equal(jobTitleByTopic("j1700000000000", titles), "พนักงานผลิต", "รหัสใหม่ต้องแปลงเป็นชื่อ");
+  assert.equal(jobTitleByTopic("production", titles), "ฝ่ายผลิต", "คีย์พจนานุกรมเดิมต้องแปลงได้");
+  assert.equal(jobTitleByTopic("พนักงานขาย", titles), "พนักงานขาย", "ค่าที่เป็นชื่ออยู่แล้วต้องคงเดิม");
+  assert.equal(jobTitleByTopic("ไม่รู้จัก", titles), "ไม่รู้จัก", "หาไม่เจอ = คงค่าเดิม (ห้ามแต่งขึ้นเอง)");
+  assert.equal(jobTitleByTopic("   ", titles), "", "ว่าง = ว่าง");
+
+  /* หน้าจอหลังบ้านต้องใช้ตัวแปลงนี้ทั้งกล่องข้อความและ CSV */
+  for (const file of ["app/admin/inbox/page.tsx", "app/admin/inbox/export/route.ts"]) {
+    assert.ok(readFileSync(file, "utf8").includes("jobTitleByTopic"), `${file}: ต้องแปลงค่า topic ก่อนแสดง`);
+  }
 });

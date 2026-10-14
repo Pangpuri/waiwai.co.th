@@ -224,3 +224,21 @@ export function jobStats(postings: readonly JobPosting[]): JobStats {
     departments: new Set(postings.map((posting) => posting.departmentTh.trim()).filter((name) => name !== "")).size,
   };
 }
+
+/**
+ * ปิดหนี้ D-265-2 (รอบที่ 276): ค่า `topic` ของใบสมัครเคยเป็น **รหัสตำแหน่ง**
+ * (`j<เวลา>` ของประกาศใหม่ หรือคีย์พจนานุกรมของ 20 ตำแหน่งเดิม) ⇒ HR อ่านไม่รู้เรื่อง
+ *
+ * - ใบสมัครใหม่: ฟอร์มส่ง **ชื่อตำแหน่ง** มาแล้ว ⇒ ฟังก์ชันนี้คืนค่าเดิม
+ * - ใบสมัครเก่า: ถ้าค่าตรงกับ id ของประกาศที่ยังอยู่ในฐานข้อมูล ⇒ คืนชื่อ (ไทยก่อน ถ้าว่างใช้ EN)
+ * - หาไม่เจอ/ว่าง: คืนค่าเดิม (ห้ามแต่งขึ้นเอง)
+ */
+export function jobTitleByTopic(
+  topic: string,
+  titleById: ReadonlyMap<string, string>,
+): string {
+  const value = topic.trim();
+  if (value === "") return "";
+  const title = titleById.get(value)?.trim() ?? "";
+  return title === "" ? value : title;
+}

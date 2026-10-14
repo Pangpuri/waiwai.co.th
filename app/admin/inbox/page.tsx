@@ -9,6 +9,8 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { erasureIsEmpty, erasureTotal, isPlausibleEmail } from "@/lib/privacy/erasure";
 import { erasurePreview } from "@/lib/privacy/repository";
+import { jobTitleByTopic, jobTitle } from "@/lib/careers/model";
+import { listJobPostingsForAdmin } from "@/lib/careers/repository";
 
 /**
  * กล่องข้อความหลังบ้าน (X1.9) — ผู้ติดต่อ/ผู้สมัครจากฟอร์มหน้าเว็บ
@@ -57,6 +59,16 @@ export default async function AdminInboxPage({
   const preview = eraseCheckOk && !eraseDbMissing ? await erasurePreview(eraseEmail) : null;
 
   const rows = await listSubmissions({ status, form: formFilter, limit: 100 });
+  /*
+    รอบที่ 276 (ปิดหนี้ D-265-2): ใบสมัคร **เก่า** เก็บค่า `topic` เป็นรหัสตำแหน่ง (`j<เวลา>`/คีย์พจนานุกรม)
+    ⇒ โหลดรายชื่อประกาศทั้งหมด (รวมในถัง) มาทำพจนานุกรม id → ชื่อ เพื่อแสดงชื่อที่อ่านรู้เรื่องให้เจ้าหน้าที่
+  */
+  const jobTitlesById: ReadonlyMap<string, string> = new Map(
+    (await listJobPostingsForAdmin()).map((posting) => {
+      const th = jobTitle(posting, "th").trim();
+      return [posting.id, th === "" ? jobTitle(posting, "en") : th] as const;
+    }),
+  );
   const counts = await countSubmissionsByStatus();
 
   /* ไฟล์แนบ (เรซูเม่) แยกอ่านต่อแถว — มีเฉพาะใบสมัครงาน */
@@ -124,7 +136,10 @@ export default async function AdminInboxPage({
                   {strings.inboxContactInfo}: {row.email}
                   {row.phone === "" ? "" : ` · ${row.phone}`}
                 </span>
-                {row.topic === "" ? null : <span className="text-fg-muted text-xs">{row.topic}</span>}
+                {row.topic === "" ? null : (
+                  /* รอบที่ 276: ใบสมัครเก่าเก็บรหัส — แสดงชื่อตำแหน่งที่อ่านรู้เรื่องให้เจ้าหน้าที่ */
+                  <span className="text-fg-muted text-xs">{jobTitleByTopic(row.topic, jobTitlesById)}</span>
+                )}
               </div>
 
               {row.subject === "" ? null : <p className="text-fg text-sm font-semibold">{row.subject}</p>}

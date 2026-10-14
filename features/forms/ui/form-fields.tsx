@@ -190,8 +190,13 @@ export function CareerFormFields({ strings }: { readonly strings: CareerFieldStr
           <option value="" disabled>
             {strings.positionPlaceholder}
           </option>
+          {/*
+            ⚠️ รอบที่ 276 (มติเจ้าของ · ปิดหนี้ D-265-2): ส่ง **ชื่อตำแหน่ง** เป็นค่า (`topic`) ไม่ใช่รหัส
+            เดิมเก็บ `j<เวลา>`/คีย์พจนานุกรม ⇒ กล่องข้อความ/CSV อ่านไม่รู้เรื่อง
+            (ฝั่งเซิร์ฟเวอร์ตรวจแค่ "ต้องมีค่า + ความยาว" ⇒ เปลี่ยนได้โดยไม่กระทบข้อมูลเดิม)
+          */}
           {positions.map((position) => (
-            <option key={position.id} value={position.id}>
+            <option key={position.id} value={position.title}>
               {position.title}
             </option>
           ))}
