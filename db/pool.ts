@@ -27,6 +27,10 @@ type PoolGlobal = typeof globalThis & {
   __waiwaiPool?: Pool;
   __waiwaiReadPool?: Pool;
   __waiwaiFormPool?: Pool;
+  /** เวลาที่รีเซ็ตล่าสุด (กัน reset storm — เคสจริง 2026-10-14) */
+  __waiwaiPoolResetAt?: number;
+  __waiwaiReadPoolResetAt?: number;
+  __waiwaiFormPoolResetAt?: number;
 };
 
 /** ค่าที่อ่านจาก env — แยกเป็น type เพื่อทดสอบ `resolveRoleUrl()` แบบ pure ได้ */
@@ -35,6 +39,8 @@ export type DatabaseEnv = {
   readonly DATABASE_URL?: string;
   readonly PUBLIC_DATABASE_URL?: string;
   readonly FORM_DATABASE_URL?: string;
+  /** เพดาน connection ต่อ pool (ค่าเริ่มต้น 3) */
+  readonly PG_POOL_MAX?: string;
 };
 
 export type ResolvedRoleUrl = {
@@ -82,13 +88,31 @@ export function isFormRoleConfigured(): boolean {
   return resolveRoleUrl("form", process.env)?.isolated === true;
 }
 
+/**
+ * เพดาน connection ต่อ pool ของโปรเซสนี้ (env `PG_POOL_MAX` · ค่าเริ่มต้น 3 · 1..20)
+ *
+ * ⚠️ เคสจริง 2026-10-14: ผู้ใช้กดเพิ่ม/เผยแพร่ภาพป้ายประกาศ แล้วเจอ
+ * `sorry, too many clients already (53300)` จาก Postgres
+ *   · ต้นเหตุ: ต่อ 1 โปรเซสมีได้ถึง **3 pool** (หลังบ้าน/อ่าน/ฟอร์ม) × `max` เดิม 5 = 15 connection
+ *     และ dev รันคำขอขนานกันหลายใบ ⇒ pool โตถึงเพดานเร็ว · พอมีหลายโปรเซส (dev ค้าง + build + สคริปต์)
+ *     ก็ชน `max_connections = 100` ของกล่อง Postgres ⇒ คำขอใหม่ถูกปฏิเสธทันที
+ *   · แก้: ลดเพดานต่อ pool + คืน connection เร็วขึ้น + กันการรีเซ็ตถี่ (ดู `resetRolePool`)
+ */
+export function poolMaxOf(env: DatabaseEnv = process.env): number {
+  const raw = Number.parseInt(clean(env.PG_POOL_MAX), 10);
+  if (!Number.isFinite(raw)) return 3;
+  return Math.min(20, Math.max(1, raw));
+}
+
 function createPool(url: string): Pool {
   return new Pool({
     connectionString: url,
     /* เดโม/เซิร์ฟเวอร์เล็ก: pool ไม่ต้องใหญ่ · ปิด idle เร็วเพื่อไม่ค้าง connection */
-    max: 5,
-    idleTimeoutMillis: 30_000,
+    max: poolMaxOf(),
+    idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
+    /* ปิด connection ที่ว่างทันทีเมื่อไม่มีงานค้าง (คืน slot ให้ Postgres) */
+    allowExitOnIdle: false,
   });
 }
 
@@ -114,14 +138,45 @@ export function isRoleAuthFailure(error: unknown): boolean {
  *    แล้วอัปเดต `.env.local` — Next รีโหลด env ให้ แต่ pool ถูกเก็บไว้บน `globalThis` ต่อโปรเซส
  *    ⇒ ตัวเก่ายังใช้รหัสผ่านเดิมต่อไป ⇒ ทุกหน้าอ่านผ่านประตูอ่านพังด้วย `28P01` (หน้าเว็บสาธารณะเงียบเป็นข้อมูลตัวอย่าง)
  */
-export function resetRolePool(role: DatabaseRole): void {
+const POOL_RESET_MIN_INTERVAL_MS = 2_000;
+
+export function resetRolePool(role: DatabaseRole): boolean {
   const scope = globalThis as PoolGlobal;
   const key = role === "read" ? "__waiwaiReadPool" : role === "form" ? "__waiwaiFormPool" : "__waiwaiPool";
+  const stampKey = role === "read" ? "__waiwaiReadPoolResetAt" : role === "form" ? "__waiwaiFormPoolResetAt" : "__waiwaiPoolResetAt";
   const pool = scope[key];
-  if (pool === undefined) return;
+  if (pool === undefined) return false;
+
+  /*
+    ⚠️ กัน "reset storm": ถ้าเพิ่งรีเซ็ตไปไม่ถึง 2 วินาที ให้ใช้ pool เดิมต่อ
+    (รีเซ็ตถี่ = สร้าง Pool ใหม่ทับเรื่อย ๆ ⇒ connection ค้างสะสมจนชนเพดาน Postgres — เคสจริง 2026-10-14)
+  */
+  const now = Date.now();
+  const last = scope[stampKey] ?? 0;
+  if (now - last < POOL_RESET_MIN_INTERVAL_MS) return false;
+  scope[stampKey] = now;
+
   scope[key] = undefined;
   /* ปิดแบบไม่รอคำตอบ — คำขอที่ค้างอยู่จบเอง · error ตอนปิดต้องไม่ทำให้คำขอหลักล้ม */
   void pool.end().catch(() => {});
+  return true;
+}
+
+/**
+ * error นี้แปลว่า "Postgres ไม่รับ connection ใหม่แล้ว" (ชน `max_connections`)
+ * ⇒ คำแนะนำ: ปิดโปรเซส dev ที่ค้าง / ลด `PG_POOL_MAX` / เพิ่ม `max_connections` ของกล่อง
+ */
+export function isConnectionExhausted(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return (error as { readonly code?: unknown }).code === "53300";
+}
+
+export function connectionExhaustedHint(): string {
+  return [
+    "ฐานข้อมูลปฏิเสธ connection ใหม่ (Postgres: too many clients already)",
+    "สาเหตุที่พบบ่อย: มีโปรเซส dev/สคริปต์ค้างหลายตัว และแต่ละตัวถือ pool ได้ถึง 3 ใบ",
+    "แก้: ปิดโปรเซสที่ค้าง · ตั้ง PG_POOL_MAX=1..3 ใน .env.local · หรือเพิ่ม max_connections ของ Postgres",
+  ].join(" · ");
 }
 
 /**

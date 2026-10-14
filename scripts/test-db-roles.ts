@@ -3,7 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { databaseRoleStatus, isRoleAuthFailure, resolveRoleUrl, roleCredentialHint } from "@/db/pool";
+import {
+  connectionExhaustedHint,
+  databaseRoleStatus,
+  isConnectionExhausted,
+  isRoleAuthFailure,
+  poolMaxOf,
+  resolveRoleUrl,
+  roleCredentialHint,
+} from "@/db/pool";
 import { runWithRoleRetry } from "@/lib/db/read";
 import { FORBIDDEN_FOR_PUBLIC_READ, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, roleUrl } from "./db-roles.ts";
 
@@ -227,4 +235,34 @@ test("db-roles: credential เปลี่ยนกลางคัน — ทิ
   assert.ok(gate.includes("resetRolePool(role)"), "ต้องทิ้ง pool ของบทบาทนั้นได้");
   assert.equal((gate.match(/queryWithRole<T>\("read"/g) ?? []).length, 1, "readQuery ต้องผ่าน queryWithRole");
   assert.equal((gate.match(/queryWithRole<T>\("form"/g) ?? []).length, 1, "formQuery ต้องผ่าน queryWithRole");
+});
+
+/* ── รอบที่ 274: เพดาน pool + กัน reset storm (เคสจริง "too many clients already" 2026-10-14) ── */
+
+test("pool: เพดาน connection ต่อ pool ถูกจำกัดและปรับได้ด้วย PG_POOL_MAX", () => {
+  assert.equal(poolMaxOf({}), 3, "ค่าเริ่มต้นต้องต่ำ (โฮสต์เล็ก/เดโม)");
+  assert.equal(poolMaxOf({ PG_POOL_MAX: "1" }), 1);
+  assert.equal(poolMaxOf({ PG_POOL_MAX: " 7 " }), 7);
+  assert.equal(poolMaxOf({ PG_POOL_MAX: "0" }), 1, "ค่าต่ำเกินถูกดันขึ้นเป็น 1");
+  assert.equal(poolMaxOf({ PG_POOL_MAX: "999" }), 20, "ค่าสูงเกินถูกตัดที่ 20");
+  assert.equal(poolMaxOf({ PG_POOL_MAX: "abc" }), 3, "ค่าที่อ่านไม่ได้ = ค่าเริ่มต้น");
+});
+
+test("pool: รู้จัก error 53300 และมีข้อความบอกทางแก้", () => {
+  assert.equal(isConnectionExhausted({ code: "53300" }), true);
+  assert.equal(isConnectionExhausted({ code: "28P01" }), false);
+  assert.equal(isConnectionExhausted(null), false);
+  const hint = connectionExhaustedHint();
+  assert.ok(hint.includes("PG_POOL_MAX"), "ต้องบอก env ที่ปรับได้");
+  assert.ok(hint.includes("max_connections"), "ต้องบอกทางแก้ฝั่ง Postgres");
+});
+
+test("pool: resetRolePool ห้ามรีเซ็ตถี่ (กันสร้าง Pool ซ้ำจน connection ล้น)", () => {
+  const source = readFileSync("db/pool.ts", "utf8");
+  assert.ok(source.includes("POOL_RESET_MIN_INTERVAL_MS"), "ต้องมีตัวกัน reset storm");
+  assert.ok(/now - last < POOL_RESET_MIN_INTERVAL_MS/.test(source));
+  /* ตัวอ่านเสริมต้องไม่ทำให้หน้า 500 เมื่อ pool ล้น */
+  const chrome = readFileSync("lib/chrome/preset-repository.ts", "utf8");
+  assert.ok(chrome.includes("isConnectionExhausted(error)"), "การอ่านป้ายย้อนกลับต้องทนต่อ 53300");
+  assert.ok(chrome.includes("console.warn"), "ต้องบันทึกสาเหตุไว้ใน log ของเซิร์ฟเวอร์");
 });

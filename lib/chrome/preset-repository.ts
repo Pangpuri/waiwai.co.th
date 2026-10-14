@@ -1,4 +1,4 @@
-import { getPool } from "@/db/pool";
+import { connectionExhaustedHint, getPool, isConnectionExhausted } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
 import { loadDocumentRow, saveJsonDraft } from "@/lib/blocks/repository";
 import {
@@ -326,10 +326,24 @@ type UndoRow = {
 export async function readChromeDraftUndo(kind: ChromePresetKind): Promise<ChromeDraftUndoInfo | null> {
   if (!isDatabaseConfigured()) return null;
 
-  const { rows } = await getPool().query<UndoRow>(
-    `select payload, replaced_at, replaced_by, preset_name from chrome_draft_undo where page = $1`,
-    [chromePresetPageKey(kind)],
-  );
+  const { rows } = await getPool()
+    .query<UndoRow>(
+      `select payload, replaced_at, replaced_by, preset_name from chrome_draft_undo where page = $1`,
+      [chromePresetPageKey(kind)],
+    )
+    /*
+      ⚠️ เคสจริง 2026-10-14: ถ้าฐานข้อมูลปฏิเสธ connection ใหม่ (`53300 too many clients already`)
+      การอ่าน "ป้ายปุ่มย้อนกลับ" ซึ่งเป็นข้อมูล **เสริม** ไม่ควรทำให้ทั้งหน้าจอ 500
+      ⇒ คืน null แล้วให้หน้าจอซ่อนปุ่ม (พฤติกรรมเดียวกับ "ยังไม่มีชุดที่แทนที่")
+      ส่วน "สาเหตุ/ทางแก้" ถูกบันทึกไว้ที่ `lib/db/pool.ts` (`connectionExhaustedHint()`)
+    */
+    .catch((error: unknown) => {
+      if (isConnectionExhausted(error)) {
+        console.warn(`[db] ${connectionExhaustedHint()}`);
+        return { rows: [] as UndoRow[] };
+      }
+      throw error;
+    });
 
   const row = rows[0];
   if (row === undefined) return null;
