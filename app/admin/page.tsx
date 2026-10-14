@@ -149,7 +149,7 @@ export default async function AdminHomePage() {
             {strings.builderTitle}
           </Link>
           <Link
-            href="/admin/builder/mourning"
+            href="/admin/builder/chrome?part=notice"
             className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
           >
             {strings.mourningTitle}

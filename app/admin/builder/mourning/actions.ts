@@ -16,13 +16,16 @@ import {
 } from "@/lib/mourning/config";
 
 /**
- * Server Actions ของหน้าจอ "ป๊อปอัพไว้อาลัย"
+ * Server Actions ของ **ป้ายประกาศเข้าเว็บ** (`page = "mourning"`)
  *
  * ลำดับเดียวกันทุก action: ตรวจสิทธิ์ → parse (ไม่เชื่อเบราว์เซอร์) → validate → บันทึก/เผยแพร่
  * เก็บในตาราง `page_document` แถว `page = "mourning"` ⇒ ได้ประวัติ + การเผยแพร่ชุดเดิม
+ *
+ * ⚠️ รอบที่ 275 (มติเจ้าของ): **จอ `/admin/builder/mourning` ถูกถอดออก** เพราะซ้ำกับแท็บ
+ *    "ป้ายประกาศ" ใน **ส่วนกลางของเว็บ** (`/admin/builder/chrome?part=notice`) ที่ใช้ actions ชุดนี้อยู่แล้ว
+ *    ⇒ พาธปลายทางหลังบันทึก/ยกเลิก ชี้ไปที่จอที่เหลืออยู่เพียงที่เดียว
  */
-
-const MOURNING_PATH = "/admin/builder/mourning";
+const MOURNING_PATH = "/admin/builder/chrome?part=notice";
 
 type Prepared =
   | { readonly ok: true; readonly value: unknown }

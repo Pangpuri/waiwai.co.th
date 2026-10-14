@@ -48,7 +48,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       label: messages.admin.navGroupContent,
       items: [
         { href: "/admin/builder/chrome", label: messages.admin.navChrome },
-        { href: "/admin/builder/mourning", label: messages.admin.navMourning },
         { href: "/admin/hero", label: messages.admin.navHero },
         { href: "/admin/builder/home", label: messages.admin.navHome },
         { href: "/admin/builder/about", label: messages.admin.navAbout },
@@ -93,7 +92,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   /* สิทธิ์ของแต่ละลิงก์ในเมนูด้านข้าง (ให้ตรงกับเมนูด้านบน — ซ่อนเฉพาะที่ไม่ควรกด ไม่ใช่มาตรการความปลอดภัย) */
   const sidebarPermission: Readonly<Record<string, AdminPermission>> = {
     "/admin/builder/chrome": "presets",
-    "/admin/builder/mourning": "presets",
     "/admin/media": "media",
     "/admin/inbox": "inbox",
     "/admin/preview-links": "preview",

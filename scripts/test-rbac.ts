@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -159,7 +159,6 @@ test("rbac: ลิงก์ข้ามสิทธิ์ต้องถูก�
     { prefix: "/admin/inbox", permission: "inbox" },
     { prefix: "/admin/media", permission: "media" },
     { prefix: "/admin/builder/chrome", permission: "presets" },
-    { prefix: "/admin/builder/mourning", permission: "presets" },
     { prefix: "/admin/builder/footer", permission: "presets" },
     { prefix: "/admin/builder/navbar", permission: "presets" },
   ];
@@ -447,4 +446,30 @@ test("rbac: ประตูต้อง 'บังคับ' ส่งสิท�
     "พารามิเตอร์สิทธิ์ต้องเป็นแบบบังคับ (ห้ามใส่ ? — จะทำให้ลืมส่งสิทธิ์ได้เงียบ ๆ)",
   );
   assert.ok(!dal.includes("permission?:"), "ห้ามทำสิทธิ์เป็น optional");
+});
+
+/* ── รอบที่ 275 (มติเจ้าของ): จอ "ป้ายประกาศ" มีจุดเดียว = แท็บในส่วนกลางของเว็บ ─────────────── */
+
+test("admin: จอ /admin/builder/mourning ถูกถอดออก — เหลือแท็บป้ายประกาศในส่วนกลางจุดเดียว", () => {
+  const fs = readFileSync;
+  assert.equal(
+    existsSync("app/admin/builder/mourning/page.tsx"),
+    false,
+    "ต้องไม่มีจอซ้ำ (เจ้าของสั่งถอด)",
+  );
+  /* actions ยังต้องอยู่ — mourning-editor ของแท็บ "ป้ายประกาศ" ใช้ร่วมกัน */
+  assert.ok(existsSync("app/admin/builder/mourning/actions.ts"), "ต้องเก็บ actions ไว้ให้แท็บใช้");
+
+  const layout = fs("app/admin/layout.tsx", "utf8");
+  assert.ok(!layout.includes("/admin/builder/mourning"), "เมนูต้องไม่ลิงก์จอที่ถอดแล้ว");
+  assert.ok(layout.includes("/admin/builder/chrome"), "ต้องเหลือทางเข้าที่ส่วนกลาง");
+
+  const adminHome = fs("app/admin/page.tsx", "utf8");
+  assert.ok(!adminHome.includes("/admin/builder/mourning"), "การ์ดบน /admin ต้องไม่ลิงก์จอที่ถอดแล้ว");
+  assert.ok(adminHome.includes("/admin/builder/chrome?part=notice"), "การ์ดต้องชี้ไปแท็บป้ายประกาศของส่วนกลาง");
+
+  const actions = fs("app/admin/builder/mourning/actions.ts", "utf8");
+  assert.ok(actions.includes('const MOURNING_PATH = "/admin/builder/chrome?part=notice"'), "ปลายทางหลังบันทึกต้องชี้จอที่เหลือ");
+  const editor = fs("features/admin/ui/mourning-editor.tsx", "utf8");
+  assert.ok(editor.includes("@/app/admin/builder/mourning/actions"), "แท็บป้ายประกาศต้องใช้ actions ชุดเดิม");
 });
