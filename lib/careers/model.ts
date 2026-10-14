@@ -134,6 +134,19 @@ export function validateJobInput(input: JobInput): readonly JobIssue[] {
   return issues;
 }
 
+/**
+ * สถานะที่จะบันทึกจริง — **ฟอร์มไม่ส่ง/ส่งว่าง = คงสถานะเดิม** (รอบที่ 266)
+ *
+ * ทำไมต้องมี: ช่อง "สถานะ" เป็น `<select>` ⇒ ค่าที่เลือกไม่ได้อยู่ใน attribute `value`
+ * ถ้าผู้เรียก (ฟอร์มที่ปิด JS / สคริปต์ / เครื่องมืออื่น) ไม่ส่งคีย์นี้มา แล้วเรา "ตีเป็น draft"
+ * ประกาศที่เผยแพร่อยู่จะ **หลุดจากหน้าเว็บเงียบ ๆ** โดยไม่มีใครรู้ (เคสจริงจากสคริปต์พิสูจน์ CRUD)
+ * ⇒ หลักเดียวกับบทเรียนรอบ 263: "ไม่มีคีย์ = ไม่เปลี่ยนข้อมูล" · ค่าที่ส่งมาแต่ไม่รู้จัก = validator ปฏิเสธ
+ */
+export function resolveJobStatus(submitted: string, current: string): string {
+  if (submitted.trim() === "") return isJobStatus(current) ? current : "draft";
+  return submitted;
+}
+
 export function isJobGenderValue(value: string): value is JobGender {
   return (JOB_GENDERS as readonly string[]).includes(value);
 }

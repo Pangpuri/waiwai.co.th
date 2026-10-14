@@ -10,6 +10,7 @@ import {
   isJobGenderValue,
   isJobStatus,
   newJobId,
+  resolveJobStatus,
   validateJobInput,
   type JobInput,
 } from "@/lib/careers/model";
@@ -88,14 +89,20 @@ export async function saveJobAction(_previous: JobFormState, formData: FormData)
   const input = readJobInput(formData);
   if (input === null) return { status: "error", reason: "invalid", createdId: "" };
 
-  const saved = await updateJobPosting({ ...input, id }, user.email);
+  /*
+    ⚠️ รอบที่ 266: ฟอร์มไม่ส่ง `status` มา (เช่นฟอร์มที่ปิด JS/เครื่องมือยิงฟอร์ม) = **คงสถานะเดิม**
+    ไม่งั้นประกาศที่เผยแพร่อยู่จะกลายเป็นฉบับร่างและหลุดจากหน้าเว็บเงียบ ๆ (เคสจริงจากสคริปต์พิสูจน์ CRUD)
+  */
+  const status = resolveJobStatus(field(formData, "status"), existing.status);
+
+  const saved = await updateJobPosting({ ...input, id, status }, user.email);
   if (!saved) return { status: "error", reason: "database", createdId: "" };
 
   await recordAudit({
     actorEmail: user.email,
     action: "job-save",
     target: auditTarget(id),
-    detail: `${input.status} · ${String(input.openings)} อัตรา`,
+    detail: `${status} · ${String(input.openings)} อัตรา`,
   });
   revalidateAdminPath(LIST_PATH);
   revalidateAdminPath(`${LIST_PATH}/${id}`);

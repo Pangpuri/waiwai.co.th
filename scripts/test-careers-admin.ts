@@ -20,6 +20,7 @@ import {
   isJobStatus,
   newJobId,
   nextJobSortOrder,
+  resolveJobStatus,
   sortJobPostings,
   validateJobInput,
   type JobInput,
@@ -172,6 +173,23 @@ test("ประกาศงาน: ถอยภาษา EN → ไทย เม
   assert.equal(jobTitle(bilingual, "en"), "Sales");
   assert.equal(jobDepartments([bilingual], "en")[0], "Sales dept");
   assert.equal(jobExperience(bilingual, "en"), "1 year");
+});
+
+test("ประกาศงาน: ฟอร์มไม่ส่ง `status` = คงสถานะเดิม (ห้ามถอนประกาศที่เผยแพร่อยู่โดยไม่ตั้งใจ)", () => {
+  /* เคสจริง (รอบที่ 266): ฟอร์มที่ยิงไม่ครบเคยทำให้ประกาศที่เผยแพร่อยู่กลายเป็นฉบับร่าง
+     แล้ว **หลุดจากหน้าเว็บเงียบ ๆ** — บทเรียนเดียวกับรอบ 263 ("ไม่มีคีย์ = ไม่เปลี่ยนข้อมูล") */
+  assert.equal(resolveJobStatus("", "published"), "published", "ไม่ส่ง/ส่งว่าง = คงสถานะเดิม");
+  assert.equal(resolveJobStatus("   ", "draft"), "draft", "ช่องว่างล้วน = คงสถานะเดิมเช่นกัน");
+  assert.equal(resolveJobStatus("published", "draft"), "published", "ส่งมา = ใช้ค่าที่ส่ง");
+  assert.equal(resolveJobStatus("draft", "published"), "draft", "ถอยกลับเป็นร่างได้เมื่อสั่งชัดเจน");
+  assert.equal(resolveJobStatus("", "ไม่รู้จัก"), "draft", "สถานะเดิมเสียหาย = ถอยไปฉบับร่าง (ปลอดภัยที่สุด)");
+  assert.equal(resolveJobStatus("archived", "published"), "archived", "ค่าที่ไม่รู้จักปล่อยผ่านให้ validator ปฏิเสธ");
+
+  const actions = codeOf("app/admin/careers/actions.ts");
+  assert.ok(
+    actions.includes('resolveJobStatus(field(formData, "status"), existing.status)'),
+    "saveJobAction ต้องใช้ตัวช่วยนี้ (ไม่ตีค่าว่างเป็น draft เอง)",
+  );
 });
 
 /* ── 3) ประตูความปลอดภัยในโค้ด ───────────────────────────────────────────── */
