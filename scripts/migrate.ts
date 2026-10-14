@@ -1,17 +1,8 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
 
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
+import { loadMigrationFiles } from "./migration-files.ts";
 import { selectTargetUrl, targetBanner } from "./target-env.ts";
-import {
-  checksumOf,
-  describePlan,
-  findDuplicateIds,
-  parseMigrationFileName,
-  planMigrations,
-  sortMigrations,
-  type MigrationFile,
-} from "@/lib/db/migrations";
+import { checksumOf, describePlan, planMigrations } from "@/lib/db/migrations";
 
 /**
  * ตัวรัน migration (รอบที่ 60) — `npm run db:migrate` / `npm run db:status`
@@ -25,33 +16,9 @@ import {
  * - ⚠️ อ่าน `DATABASE_URL` จาก env เท่านั้น (ห้ามใส่ค่าเริ่มต้น) เหมือนสคริปต์อื่นของโปรเจกต์
  */
 
-const MIGRATIONS_DIR = join(process.cwd(), "db", "migrations");
+/* โฟลเดอร์/การอ่านไฟล์ อยู่ที่ `MIGRATIONS_DIR` + `loadMigrationFiles()` ใน `migration-files.ts` */
 
-function loadMigrations(): readonly MigrationFile[] {
-  const files = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql"));
-  const parsed: MigrationFile[] = [];
-  const unknown: string[] = [];
-
-  for (const fileName of files) {
-    const info = parseMigrationFileName(fileName);
-    if (info === null) {
-      unknown.push(fileName);
-      continue;
-    }
-    parsed.push({ id: info.id, name: info.name, sql: readFileSync(join(MIGRATIONS_DIR, fileName), "utf8") });
-  }
-
-  if (unknown.length > 0) {
-    throw new Error(`ชื่อไฟล์ไม่ตรงรูปแบบ (ต้องเป็น 0001-ชื่อ.sql): ${unknown.join(", ")}`);
-  }
-
-  const duplicates = findDuplicateIds(parsed);
-  if (duplicates.length > 0) {
-    throw new Error(`เลข migration ซ้ำ: ${duplicates.join(", ")}`);
-  }
-
-  return sortMigrations(parsed);
-}
+/* การอ่านไฟล์/ตรวจชื่อ/เลขซ้ำ อยู่ที่ `loadMigrationFiles()` ตัวกลาง (รอบที่ 283) */
 
 async function ensureTable(): Promise<void> {
   await getPool().query(`
@@ -96,7 +63,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const migrations = loadMigrations();
+  const migrations = loadMigrationFiles();
   await ensureTable();
   const state = await readState();
   const plan = planMigrations(migrations, state);

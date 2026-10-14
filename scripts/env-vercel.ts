@@ -126,6 +126,15 @@ async function main(): Promise<void> {
       process.stdout.write("✓ คัดลอกบรรทัด DATABASE_URL ลงคลิปบอร์ดแล้ว (วางใน Vercel ได้เลย)\n");
     }
   }
+
+  /*
+    รอบที่ 283 (ปิดหนี้ D-282-2): วาง env แล้วยังไม่จบ — ต้องยืนยันว่าปลายทาง "พร้อมจริง"
+    · check:target = ฐานข้อมูลปลายทาง (migration ครบ/role พร้อม) — ต้องตั้ง TARGET_DATABASE_URL
+    · check:deploy = หน้าเว็บที่ deploy แล้ว (HTTP เท่านั้น)
+  */
+  process.stdout.write(
+    "\nถัดไป: npm run check:target  (ฐานข้อมูลปลายทาง) → Redeploy → npm run check:deploy -- --url=<โดเมน>\n",
+  );
 }
 
 await main();

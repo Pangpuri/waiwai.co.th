@@ -138,6 +138,15 @@ async function main(): Promise<void> {
     }
   }
 
+  /*
+    รอบที่ 283 (ปิดหนี้ D-282-2): บอกทางไปด่านที่ตรวจ **ฐานข้อมูลปลายทาง** (migration ครบ/role พร้อม)
+    ⚠️ นี่เป็นแค่ "ข้อความชี้ทาง" — ไฟล์นี้ยัง **ไม่แตะฐานข้อมูลเลย** (สัญญาเดิมตั้งแต่รอบ 117)
+  */
+  if (failures.length === 0 && !options.json) {
+    const hint = "ℹ️ ตรวจฐานข้อมูลปลายทาง (migration ครบ/role พร้อม) ต่อด้วย: npm run check:target";
+    process.stdout.write(`\n${hint}\n`);
+  }
+
   if (failures.length > 0) process.exit(1);
 }
 

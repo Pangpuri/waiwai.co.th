@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import pg from "pg";
 
-import { checksumOf, parseMigrationFileName, sortMigrations, type MigrationFile } from "@/lib/db/migrations";
+import { checksumOf } from "@/lib/db/migrations";
+import { loadMigrationFiles } from "./migration-files.ts";
 
 /**
  * ตรวจว่า "เซิร์ฟเวอร์ใหม่สร้างได้จาก migration เปล่า ๆ" (รอบที่ 60)
@@ -21,20 +20,11 @@ import { checksumOf, parseMigrationFileName, sortMigrations, type MigrationFile 
  */
 
 const CHECK_DB = "waiwai_migrate_check";
-const MIGRATIONS_DIR = join(process.cwd(), "db", "migrations");
+/* โฟลเดอร์/การอ่านไฟล์อยู่ที่ `migration-files.ts` (รอบที่ 283) */
 
 type TableShape = { readonly table: string; readonly columns: number };
 
-function loadMigrations(): readonly MigrationFile[] {
-  const files = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith(".sql"));
-  const parsed: MigrationFile[] = [];
-  for (const fileName of files) {
-    const info = parseMigrationFileName(fileName);
-    if (info === null) throw new Error(`ชื่อไฟล์ไม่ตรงรูปแบบ: ${fileName}`);
-    parsed.push({ id: info.id, name: info.name, sql: readFileSync(join(MIGRATIONS_DIR, fileName), "utf8") });
-  }
-  return sortMigrations(parsed);
-}
+/* การอ่านไฟล์/ตรวจชื่อ/เลขซ้ำ อยู่ที่ `loadMigrationFiles()` ตัวกลาง (รอบที่ 283) */
 
 /** เปลี่ยนชื่อฐานข้อมูลใน DATABASE_URL (ใช้สร้าง/เชื่อมฐานข้อมูลชั่วคราว) */
 function withDatabase(url: string, databaseName: string): string {
@@ -110,7 +100,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const migrations = loadMigrations();
+  const migrations = loadMigrationFiles();
   const admin = new pg.Pool({ connectionString: withDatabase(url, "postgres"), max: 1 });
   const target = new pg.Pool({ connectionString: withDatabase(url, CHECK_DB), max: 1 });
 

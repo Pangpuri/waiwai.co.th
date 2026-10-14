@@ -26,8 +26,9 @@ import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
  *   npm run db:roles -- --ro-password=... --form-password=... --reveal
  */
 
-const READ_ROLE = "waiwai_public_ro";
-const FORM_ROLE = "waiwai_public_form";
+/* ⚠️ export เพราะ `check:target` ตรวจว่า role เหล่านี้มีจริงบนปลายทาง (รอบที่ 283) — ที่เดียว ห้ามพิมพ์ซ้ำ */
+export const READ_ROLE = "waiwai_public_ro";
+export const FORM_ROLE = "waiwai_public_form";
 
 /**
  * ตารางที่ **หน้าเว็บสาธารณะอ่าน** — ต้องตรงกับ `readQuery()` ที่ใช้จริง (รอบนี้)
