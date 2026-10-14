@@ -24,11 +24,18 @@ import { parseBlockDocument } from "@/lib/blocks/parse";
 import { loadDocumentRow, saveDraft } from "@/lib/blocks/repository";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import { buildContactDocument } from "@/lib/contact/document";
+import { prepareTargetRun } from "./target-env.ts";
 
 /** ผู้เขียนที่บันทึกใน `page_document.updated_by` — ใช้แยก "งานคน" ออกจาก "งานตัวนำเข้า" */
 const ACTOR = "import:contact/dictionary";
 
-const args = process.argv.slice(2);
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+const args = target.argv;
 const dryRun = args.includes("--dry-run");
 const force = args.includes("--force");
 

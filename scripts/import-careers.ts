@@ -23,8 +23,15 @@ import { JOB_SORT_STEP, isJobGenderValue } from "@/lib/careers/model";
 import { listJobPostingsForAdmin, upsertJobPosting, type JobWriteInput } from "@/lib/careers/repository";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
+import { prepareTargetRun } from "./target-env.ts";
 
-const args = process.argv.slice(2);
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+const args = target.argv;
 const dryRun = args.includes("--dry-run");
 const force = args.includes("--force");
 const ACTOR = "careers-import";

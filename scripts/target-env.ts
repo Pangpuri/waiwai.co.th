@@ -95,3 +95,47 @@ export function targetRequested(
 /** คำเตือนเมื่อธงถูก npm กลืน (ผู้ใช้พิมพ์ตก `--`) — ยังทำงานให้ตามเจตนา แต่ต้องบอกให้แก้ */
 export const NPM_SWALLOWED_TARGET_WARNING =
   "⚠️ npm กลืนธง --target (ต้องมี `--` คั่น) — รอบนี้ใช้ปลายทางให้ตามเจตนาแล้ว · ครั้งหน้าพิมพ์ `npm run … -- --target`";
+
+/** ช่องทางพิมพ์ผลของ CLI (ฉีดเข้ามาได้ ⇒ ทดสอบได้โดยไม่ต้องดัก console) */
+export type TargetRunWriters = {
+  readonly log: (line: string) => void;
+  readonly error: (line: string) => void;
+};
+
+/**
+ * "เตรียมรันกับปลายทาง" สำหรับสคริปต์ที่ **เขียนข้อมูล** — เรียกครั้งเดียวตอนต้น `main()`
+ *
+ * ทำ 4 อย่างให้ครบในที่เดียว (รอบที่ 285 · ปิดหนี้ D-284-1)
+ * 1. ตรวจเจตนาผู้ใช้ (`-- --target` หรือ `--target` ที่ npm กลืน → `targetRequested()`)
+ * 2. ไม่สั่ง = พิมพ์บอกว่าใช้ **ฐานข้อมูลในเครื่อง** (กันเข้าใจผิด — บทเรียนรอบ 284)
+ * 3. สั่ง = เลือกปลายทางผ่านด่านทั้งหมด (`selectTargetUrl()`) แล้ว **ตั้ง `env.DATABASE_URL`**
+ * 4. คืน `argv` ที่ **ตัด `--target` ออกแล้ว** ⇒ parser ของสคริปต์เดิมไม่ต้องรู้จักธงนี้เลย
+ *
+ * ⚠️ ผู้เรียกต้องใช้ `argv` ที่คืนมา (ไม่ใช่ `process.argv.slice(2)` ดิบ) ไม่งั้นสคริปต์ที่ตรวจ
+ *    "ตัวเลือกไม่รู้จัก" จะพังเมื่อผู้ใช้พิมพ์ `--target`
+ * ⚠️ ฟังก์ชันนี้ **แก้ `env` ที่ส่งเข้ามา** (เจตนา — `process.env` คือสิ่งที่ `getPool()` อ่าน)
+ */
+export function prepareTargetRun(
+  argv: readonly string[],
+  env: Record<string, string | undefined>,
+  writers: TargetRunWriters,
+): { readonly ok: true; readonly argv: readonly string[] } | { readonly ok: false } {
+  const wantsTarget = targetRequested(argv, env);
+
+  if (!wantsTarget.requested) {
+    writers.log(localBanner(env["DATABASE_URL"]));
+    return { ok: true, argv };
+  }
+
+  const selection = selectTargetUrl(env);
+  if (!selection.ok) {
+    writers.error(`✗ ${selection.message}`);
+    return { ok: false };
+  }
+
+  env["DATABASE_URL"] = selection.url;
+  writers.log(targetBanner(selection));
+  if (wantsTarget.viaNpmConfig) writers.log(NPM_SWALLOWED_TARGET_WARNING);
+
+  return { ok: true, argv: argv.filter((arg) => arg !== "--target") };
+}

@@ -11,6 +11,7 @@ import { closePool, isDatabaseConfigured } from "@/db/pool";
 import { HERO_SLIDES } from "@/features/home/slides";
 import { focusFromObjectPosition, type HeroPageSlide } from "@/lib/hero/model";
 import { saveHeroPageSlide } from "@/lib/hero/repository";
+import { prepareTargetRun } from "./target-env.ts";
 
 /** คำอธิบายภาพของสไลด์ชุดเดิม (คัดจากพจนานุกรม ณ รอบที่ 184) — เฉพาะการย้ายครั้งแรก */
 const LEGACY_ALT: Readonly<Record<string, { readonly th: string; readonly en: string }>> = {
@@ -19,7 +20,13 @@ const LEGACY_ALT: Readonly<Record<string, { readonly th: string; readonly en: st
   promotion: { th: "ภาพเปิดตัวผลิตภัณฑ์วายวาย 3 รส", en: "Launch banner for the three new flavours" },
 };
 
-const dryRun = process.argv.includes("--dry-run");
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+const dryRun = target.argv.includes("--dry-run");
 
 if (!isDatabaseConfigured()) {
   console.error("✗ ต้องมี DATABASE_URL ก่อนจึงจะนำเข้าได้");

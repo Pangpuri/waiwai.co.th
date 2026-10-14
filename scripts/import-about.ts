@@ -10,6 +10,7 @@ import { loadDocumentRow, saveDraft } from "@/lib/blocks/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import { ensureImportedMedia, type ImportMediaCache, type ImportMediaStats } from "@/lib/import/media";
+import { prepareTargetRun } from "./target-env.ts";
 
 /**
  * นำเข้า **หน้า "บริษัท" (/about) จากหน้าต้นทาง** → เอกสารบล็อก (ฉบับร่าง) — รอบที่ 255 · หนี้ D-253-1
@@ -106,7 +107,13 @@ function reportSource(source: AboutSource, urls: readonly string[]): void {
 }
 
 async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+  const options = parseArgs(target.argv);
 
   /* ── 1) อ่านหน้าต้นทาง ────────────────────────────────────────────────────── */
   const html =

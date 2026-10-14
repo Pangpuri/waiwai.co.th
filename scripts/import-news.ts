@@ -6,6 +6,7 @@ import { newsIdOfSourceId, isFutureNewsDate, validateNewsInput, type NewsInput }
 import { applyNewsDateOverride } from "@/lib/news/date-overrides";
 import { prunePlan } from "@/lib/import/prune";
 import { listNewsIds, setNewsTrashed, upsertNews } from "@/lib/news/repository";
+import { prepareTargetRun } from "./target-env.ts";
 
 /**
  * นำเข้าข่าวสาร & กิจกรรม จากเว็บเดิม (waiwai.co.th · `/th/news/`) — หน้า /news · รอบที่ 105
@@ -161,7 +162,13 @@ async function readLocal(dir: string, filename: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+  const options = parseArgs(target.argv);
 
   if (!options.dryRun && !isDatabaseConfigured()) {
     log("✗ ต้องมี DATABASE_URL (หรือใช้ --dry-run เพื่อดูผลโดยไม่เขียน)");

@@ -23,8 +23,16 @@ import { HOME_SEED } from "@/lib/content/home-seed";
 import { countPageRows, savePageContent } from "@/lib/content/repository";
 import { errorsOf, validateContent } from "@/lib/content/validate";
 import { closePool } from "@/db/pool";
+import { prepareTargetRun } from "./target-env.ts";
 
 const ENV_NAME = "DATABASE_URL";
+
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
 
 async function main(): Promise<void> {
   const connectionString = process.env[ENV_NAME];

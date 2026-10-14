@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { codeOf } from "./source-scan.ts";
-import { localBanner, selectTargetUrl, targetBanner, targetRequested } from "./target-env.ts";
+import { localBanner, prepareTargetRun, selectTargetUrl, targetBanner, targetRequested } from "./target-env.ts";
 
 /**
  * เทสต์ "ธง `--target`" ของสคริปต์ที่ต้องยิงฐานข้อมูลปลายทาง (รอบที่ 282)
@@ -124,4 +124,84 @@ test("--target: ไม่สั่งธงต้องบอกชัดว่�
   /* เครื่องมือที่ยิงปลายทางเสมอ ต้องรับ `--target` ที่ผู้ใช้เผลอพิมพ์ได้ (ห้าม throw) */
   const check = codeOf("scripts/check-target.ts");
   assert.ok(check.includes('arg === "--target"'), "check:target ต้องรับธง --target ได้");
+});
+
+/* ── prepareTargetRun (รอบที่ 285 · หนี้ D-284-1) ─────────────────────────── */
+
+test("prepareTargetRun: ไม่สั่งธง = ใช้ในเครื่อง · ไม่แก้ env · argv เดิม", () => {
+  const env: Record<string, string | undefined> = { DATABASE_URL: LOCAL, TARGET_DATABASE_URL: NEON_DIRECT };
+  const lines: string[] = [];
+  const result = prepareTargetRun(["--dry-run"], env, { log: (line) => lines.push(line), error: (line) => lines.push(`E:${line}`) });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual([...result.argv], ["--dry-run"], "argv ต้องไม่ถูกแตะ");
+  assert.equal(env["DATABASE_URL"], LOCAL, "ห้ามแก้ DATABASE_URL เมื่อไม่ได้สั่งปลายทาง");
+  assert.ok(lines.some((line) => line.includes("ในเครื่อง")), "ต้องบอกว่าใช้ฐานข้อมูลในเครื่อง");
+});
+
+test("prepareTargetRun: สั่งธง = ตั้ง DATABASE_URL เป็นปลายทาง + ตัดธงออกจาก argv", () => {
+  const env: Record<string, string | undefined> = { DATABASE_URL: LOCAL, TARGET_DATABASE_URL: NEON_POOLER };
+  const lines: string[] = [];
+  const result = prepareTargetRun(["--dry-run", "--target"], env, { log: (line) => lines.push(line), error: (line) => lines.push(`E:${line}`) });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual([...result.argv], ["--dry-run"], "ต้องตัด --target ออก (ไม่งั้น parser ของสคริปต์พัง)");
+  assert.equal(env["DATABASE_URL"]?.includes("-pooler"), false, "ต้องตั้งเป็น endpoint ตรง");
+  assert.ok(lines.some((line) => line.includes("ปลายทาง")), "ต้องบอกปลายทาง");
+
+  /* รูปแบบที่ npm กลืน: ต้องทำงานให้เหมือนกัน + เตือน */
+  const env2: Record<string, string | undefined> = {
+    DATABASE_URL: LOCAL,
+    TARGET_DATABASE_URL: NEON_DIRECT,
+    npm_config_target: "true",
+  };
+  const lines2: string[] = [];
+  const result2 = prepareTargetRun([], env2, { log: (line) => lines2.push(line), error: (line) => lines2.push(`E:${line}`) });
+  assert.equal(result2.ok, true);
+  assert.equal(env2["DATABASE_URL"], NEON_DIRECT, "ต้องตั้งปลายทางให้ด้วย");
+  assert.ok(lines2.some((line) => line.includes("npm กลืน")), "ต้องเตือนเรื่อง `--`");
+});
+
+test("prepareTargetRun: ตั้งค่าไม่ได้ = ล้มเหลวพร้อมข้อความ (ไม่ทำงานต่อแบบเดาปลายทาง)", () => {
+  const env: Record<string, string | undefined> = { DATABASE_URL: LOCAL, TARGET_DATABASE_URL: "" };
+  const lines: string[] = [];
+  const result = prepareTargetRun(["--target"], env, { log: (line) => lines.push(line), error: (line) => lines.push(`E:${line}`) });
+
+  assert.equal(result.ok, false);
+  assert.equal(env["DATABASE_URL"], LOCAL, "ห้ามแก้ env เมื่อเลือกปลายทางไม่ได้");
+  assert.ok(lines.some((line) => line.startsWith("E:")), "ต้องรายงานที่ช่อง error");
+});
+
+test("สคริปต์นำเข้า/seed ทุกตัวรองรับ --target (ไม่มีตัวไหนลืม)", () => {
+  const scripts = [
+    "seed-home",
+    "import-products",
+    "import-product-details",
+    "import-products-logos",
+    "import-product-category-defaults",
+    "import-recipes",
+    "import-careers",
+    "import-news",
+    "import-contact",
+    "import-about",
+    "import-hero-slides",
+    "import-about-media",
+  ];
+
+  for (const name of scripts) {
+    const source = codeOf(`scripts/${name}.ts`);
+    assert.ok(
+      source.includes("prepareTargetRun(process.argv.slice(2), process.env,"),
+      `scripts/${name}.ts: ต้องเรียก prepareTargetRun() ก่อนแตะ env/ฐานข้อมูล`,
+    );
+    assert.ok(source.includes("if (!target.ok) process.exit(1)"), `scripts/${name}.ts: ต้องหยุดเมื่อเลือกปลายทางไม่ได้`);
+    /* กันถอยหลัง: ห้ามใช้ process.argv ดิบหลังจากนั้น (จะเห็น --target กลับเข้ามา) */
+    assert.equal(
+      /parseArgs\(process\.argv\.slice\(2\)\)/.test(source),
+      false,
+      `scripts/${name}.ts: ต้องส่ง target.argv ให้ parser ไม่ใช่ process.argv`,
+    );
+  }
 });

@@ -21,8 +21,15 @@ import { ABOUT_MEDIA, type AboutMediaAsset } from "@/lib/blocks/about-media";
 import { ensureImportedMedia, type ImportMediaCache, type ImportMediaStats } from "@/lib/import/media";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { findMediaIdsBySha256 } from "@/lib/media/repository";
+import { prepareTargetRun } from "./target-env.ts";
 
-const args = process.argv.slice(2);
+/*
+  `--target` = ยิงไป **ฐานข้อมูลปลายทาง** แทนในเครื่อง (รอบที่ 285 · หนี้ D-284-1)
+  ต้องเรียก **ก่อน** ใช้ env/ฐานข้อมูลใด ๆ · คืน argv ที่ตัด `--target` ออกแล้ว
+*/
+const target = prepareTargetRun(process.argv.slice(2), process.env, { log: console.log, error: console.error });
+if (!target.ok) process.exit(1);
+const args = target.argv;
 const dryRun = args.includes("--dry-run");
 const reportOnly = args.includes("--report");
 
