@@ -15,7 +15,14 @@ import { getPool, isDatabaseConfigured } from "@/db/pool";
  *   · **ข่าวไม่แสดง** — ต้นเหตุคือตาราง `news` ยังไม่มี `sort_order` (แก้ที่ migration 0025)
  */
 
-const TABLE_BY_KIND = { product: "product", recipe: "recipe", news: "news", category: "product_category" } as const;
+const TABLE_BY_KIND = {
+  product: "product",
+  recipe: "recipe",
+  news: "news",
+  category: "product_category",
+  /* ประกาศรับสมัครงาน (รอบที่ 265 · มติ D26) — มีถังขยะ (`deleted_at`) จึงไม่ต้องยกเว้น */
+  job: "job_posting",
+} as const;
 
 export type ReorderKind = keyof typeof TABLE_BY_KIND;
 
@@ -51,6 +58,7 @@ const TITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   news: "coalesce(nullif(title_th, ''), id)",
   /* หมวดสินค้า: ชื่อไทยว่างได้ (ถอยพจนานุกรม) ⇒ โชว์ id เพื่อให้ยังจัดลำดับได้ */
   category: "coalesce(nullif(name_th, ''), id)",
+  job: "coalesce(nullif(title_th, ''), id)",
 };
 
 const SUBTITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
@@ -58,6 +66,7 @@ const SUBTITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   recipe: "coalesce(video_id, '')",
   news: "coalesce(to_char(published_at at time zone 'Asia/Bangkok', 'DD/MM/YYYY'), '')",
   category: "case when is_hidden then 'hidden' else '' end",
+  job: "coalesce(department_th, '')",
 };
 
 /** หมวดสินค้าที่มีอยู่จริง (ใช้ทำตัวเลือกในหน้าจัดลำดับ · เรียงตามชื่อ) */

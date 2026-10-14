@@ -24,6 +24,7 @@ export const adminTrash = {
   trashKindProduct: "สินค้า",
   trashKindRecipe: "เมนูอาหาร",
   trashKindNews: "ข่าว/กิจกรรม",
+  trashKindJob: "ประกาศรับสมัครงาน",
   /* ชนิดที่ 7 (รอบที่ 237) — สไลด์หน้าแรก (เดิมตกหล่นเพราะสไลด์มีถังขยะทีหลังรอบที่ 176) */
   trashKindSlide: "สไลด์หน้าแรก",
   trashDaysLeft: "อีก {days} วัน",
@@ -54,10 +55,11 @@ export const adminTrash = {
   /** ดัชนีถังขยะเนื้อหา (รอบที่ 175 · ปรับถ้อยคำรอบที่ 176 เมื่อแถวเนื้อหาอยู่ในตารางด้านล่างแล้ว) */
   trashContentTitle: "ถังขยะเนื้อหา",
   trashContentHint: "ตัวนับด้านบนคือของที่ยังกู้คืนได้ตอนนี้ — กู้คืน/ลบถาวรได้จากตารางด้านล่าง หรือเข้าไปดูบริบทเต็มในแท็บ “ถังขยะ” ของจอนั้น",
-  trashContentStats: "สินค้า {product} · เมนูอาหาร {recipe} · ข่าว {news}",
+  trashContentStats: "สินค้า {product} · เมนูอาหาร {recipe} · ข่าว {news} · ประกาศรับสมัครงาน {job}",
   trashContentProduct: "สินค้าและหมวด",
   trashContentRecipe: "เมนูอาหาร",
   trashContentNews: "ข่าวและกิจกรรม",
+  trashContentJob: "ประกาศรับสมัครงาน",
   /* ดัชนีถังขยะสไลด์ (รอบที่ 237) — สไลด์มีเจ้าของอยู่หน้า /admin/hero */
   trashHeroTitle: "ถังขยะสไลด์หน้าแรก",
   trashHeroStats: "สไลด์ในถัง {slide} ใบ",

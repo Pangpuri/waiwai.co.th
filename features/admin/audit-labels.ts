@@ -64,6 +64,11 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "product-category-preset-apply": "ใช้พรีเซ็ตหมวดสินค้า",
     "product-category-preset-delete": "ลบพรีเซ็ตหมวดสินค้า",
     "product-category-preset-import": "นำเข้าพรีเซ็ตหมวดสินค้า",
+    /* ประกาศรับสมัครงาน (มติ D26 · รอบที่ 265) */
+    "job-save": "บันทึกประกาศรับสมัครงาน",
+    "job-trash": "ย้ายประกาศเข้าถังขยะ",
+    "job-restore": "กู้คืนประกาศรับสมัครงาน",
+    "job-delete": "ลบประกาศถาวร",
     "news-save": strings.auditNewsSave,
     "news-trash": strings.auditNewsTrash,
     "news-restore": strings.auditNewsRestore,

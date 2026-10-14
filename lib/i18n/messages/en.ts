@@ -37,6 +37,7 @@ import { previewLinkPage } from "./areas/en/previewLink.ts";
 import { pendingPages } from "./areas/en/pendingPages.ts";
 
 import type { Messages } from "./th";
+import { adminCareers as enAdminCareers } from "./areas/en/adminCareers.ts";
 
 /**
  * English dictionary.
@@ -78,6 +79,8 @@ export const en: Messages = {
   pendingPages,
   blocks,
   /* Admin sub-area that is its own screen — lives at the root (not inside the `admin` bag) */
+  /* ประกาศรับสมัครงานของหน้า /careers (มติ D26 · รอบที่ 265) */
+  adminCareers: enAdminCareers,
   adminCategories: enAdminCategories,
   admin: {
     ...admin,

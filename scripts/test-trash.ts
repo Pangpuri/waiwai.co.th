@@ -273,13 +273,14 @@ test("trash: ตัวอย่างภาพของในถัง — ต�
 /* ── 3) ถังขยะ "เนื้อหา" (รอบที่ 170) — สินค้า/เมนูอาหาร/ข่าว ─────────────────── */
 
 test("trash-content: ชนิด/ยอด/สรุปของถังขยะเนื้อหา", () => {
-  assert.deepEqual([...CONTENT_TRASH_KINDS], ["product", "recipe", "news"]);
+  /* รอบที่ 265: เพิ่ม "ประกาศรับสมัครงาน" (มติ D26) — ชนิดที่ 4 ของถังเนื้อหา */
+  assert.deepEqual([...CONTENT_TRASH_KINDS], ["product", "recipe", "news", "job"]);
 
-  const counts = { product: 2, recipe: 1, news: 4 };
-  assert.equal(contentTrashTotal(counts), 7);
-  assert.equal(summarizeContentTrash(counts), "product=2 recipe=1 news=4");
+  const counts = { product: 2, recipe: 1, news: 4, job: 3 };
+  assert.equal(contentTrashTotal(counts), 10);
+  assert.equal(summarizeContentTrash(counts), "product=2 recipe=1 news=4 job=3");
   assert.equal(contentTrashTotal(emptyContentTrashCounts()), 0);
-  assert.equal(summarizeContentTrash(emptyContentTrashCounts()), "product=0 recipe=0 news=0");
+  assert.equal(summarizeContentTrash(emptyContentTrashCounts()), "product=0 recipe=0 news=0 job=0");
 
   /* ต้องเป็นคนละชุดกับถังขยะรวม (/admin/trash) — ของ 3 ชนิดนี้มีแท็บของตัวเอง */
   for (const kind of CONTENT_TRASH_KINDS) {
@@ -344,12 +345,16 @@ const CONTENT_SCREEN_FILES: Readonly<Record<string, string>> = {
   product: "app/admin/products/page.tsx",
   recipe: "app/admin/recipes/page.tsx",
   news: "app/admin/news/page.tsx",
+  /* รอบที่ 265 — ประกาศรับสมัครงาน (มติ D26) */
+  job: "app/admin/careers/page.tsx",
 };
 
 const CONTENT_REPOSITORY_FILES: Readonly<Record<string, string>> = {
   product: "lib/products/repository.ts",
   recipe: "lib/recipes/repository.ts",
   news: "lib/news/repository.ts",
+  /* รอบที่ 265 — ประกาศรับสมัครงาน (มติ D26) */
+  job: "lib/careers/repository.ts",
 };
 
 test("trash-content: ทะเบียนหน้าจอของถังขยะเนื้อหา — ครบทุกชนิด และชี้ไปแท็บที่มีจริง", () => {
@@ -480,7 +485,7 @@ test("trash-content: ตัวเติม {placeholder} ต้องครบ�
 test("trash-view: ชนิดรวมครอบทั้งสามชุด ไม่ซ้ำ และตรวจค่าจากฟอร์มได้", () => {
   assert.deepEqual(
     [...TRASH_VIEW_KINDS],
-    ["media", "preset", "chromePreset", "product", "recipe", "news", "slide"],
+    ["media", "preset", "chromePreset", "product", "recipe", "news", "job", "slide"],
   );
   assert.equal(new Set(TRASH_VIEW_KINDS).size, TRASH_VIEW_KINDS.length, "ชนิดรวมต้องไม่ซ้ำ");
 

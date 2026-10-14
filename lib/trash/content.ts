@@ -29,10 +29,12 @@ import {
  */
 
 /** ชื่อตารางของแต่ละชนิด — คีย์คือ `ContentTrashKind` ที่ตรวจแล้วเท่านั้น */
-const CONTENT_TABLES: Readonly<Record<ContentTrashKind, "product" | "recipe" | "news">> = {
+const CONTENT_TABLES: Readonly<Record<ContentTrashKind, string>> = {
   product: "product",
   recipe: "recipe",
   news: "news",
+  /* ประกาศรับสมัครงาน (รอบที่ 265 · มติ D26) */
+  job: "job_posting",
 };
 
 export type ContentTrashPurgeReport = {
@@ -131,6 +133,7 @@ const CONTENT_LABEL_SQL: Readonly<Record<ContentTrashKind, string>> = {
   product: "coalesce(nullif(name_th, ''), nullif(name_en, ''), id)",
   recipe: "coalesce(nullif(title_th, ''), nullif(title_en, ''), id)",
   news: "coalesce(nullif(title_th, ''), nullif(title_en, ''), id)",
+  job: "coalesce(nullif(title_th, ''), nullif(title_en, ''), id)",
 };
 
 /** แถวของในถังของชนิดเนื้อหา — รูปเดียวกับ `TrashEntry` ของภาพ/พรีเซ็ต (ให้ตารางเดียวเรนเดอร์ได้) */

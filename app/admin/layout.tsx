@@ -61,6 +61,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         { href: "/admin/recipes", label: messages.admin.navRecipes },
         { href: "/admin/news", label: messages.admin.navNews },
         { href: "/admin/builder/careers", label: messages.admin.navCareers },
+        /* รอบที่ 265 (มติเจ้าของ D26): "ประกาศรับสมัครงาน" ต่อจากตัวสร้างหน้า careers */
+        { href: "/admin/careers", label: messages.adminCareers.navLabel },
         { href: "/admin/builder/contact", label: messages.admin.navContact },
         /* รอบที่ 260 (จัดระเบียบเมนู): จอนี้แก้เนื้อหาหน้าแรกแบบฟิลด์ (เลย์เอาต์เดิม) ⇒ อยู่กลุ่ม "เนื้อหาเว็บไซต์" ไม่ใช่ "จัดการข้อมูล" */
         { href: "/admin/content/home", label: messages.admin.navStructured },

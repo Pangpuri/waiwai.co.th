@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 
 import { filterCards, type Board } from "../board";
-import type { DepartmentId } from "../jobs";
 
 /**
  * กระดานรับสมัครงาน — กรองตามฝ่ายได้ (แทนตารางทึบ ๆ ของเว็บเดิม)
@@ -20,7 +19,7 @@ type JobBoardProps = {
 };
 
 export function JobBoard({ board }: JobBoardProps) {
-  const [active, setActive] = useState<DepartmentId | "all">("all");
+  const [active, setActive] = useState<string>("all");
 
   const visible = useMemo(() => filterCards(board.cards, active), [board.cards, active]);
   const { labels } = board;
@@ -80,17 +79,30 @@ export function JobBoard({ board }: JobBoardProps) {
               </h3>
 
               <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt className="text-fg-muted">{labels.fieldGender}</dt>
-                <dd className="text-fg">{card.genderLabel}</dd>
+                {/* ประกาศใหม่ "ไม่บังคับ" กรอกเพศ/อายุ (มติ D26 ข้อ 4) ⇒ ไม่กรอก = ไม่แสดงบรรทัดว่าง */}
+                {card.genderLabel.trim() === "" ? null : (
+                  <>
+                    <dt className="text-fg-muted">{labels.fieldGender}</dt>
+                    <dd className="text-fg">{card.genderLabel}</dd>
+                  </>
+                )}
 
-                <dt className="text-fg-muted">{labels.fieldAge}</dt>
-                <dd className="text-fg">{card.ageLabel}</dd>
+                {card.ageLabel.trim() === "" ? null : (
+                  <>
+                    <dt className="text-fg-muted">{labels.fieldAge}</dt>
+                    <dd className="text-fg">{card.ageLabel}</dd>
+                  </>
+                )}
 
                 <dt className="text-fg-muted">{labels.fieldExperience}</dt>
                 <dd className="text-fg">{card.experienceLabel}</dd>
 
-                <dt className="text-fg-muted">{labels.fieldQualifications}</dt>
-                <dd className="text-fg">{card.qualificationsLabel}</dd>
+                {card.qualificationsLabel.trim() === "" ? null : (
+                  <>
+                    <dt className="text-fg-muted">{labels.fieldQualifications}</dt>
+                    <dd className="text-fg">{card.qualificationsLabel}</dd>
+                  </>
+                )}
               </dl>
             </li>
           ))}

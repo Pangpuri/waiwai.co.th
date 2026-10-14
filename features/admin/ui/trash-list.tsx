@@ -41,6 +41,8 @@ export type TrashStrings = {
   readonly trashKindNews: string;
   /** ชนิดที่ 7 (รอบที่ 237) — สไลด์หน้าแรก */
   readonly trashKindSlide: string;
+  /** ชนิดที่ 8 (รอบที่ 265) — ประกาศรับสมัครงาน */
+  readonly trashKindJob: string;
   readonly trashDaysLeft: string;
   readonly trashDueNow: string;
   readonly trashRestore: string;
@@ -91,6 +93,9 @@ function kindLabelOf(strings: TrashStrings, kind: TrashViewKind): string {
     /* รอบที่ 237: สไลด์หน้าแรก (ชนิดที่ 7) — type บังคับให้มาเพิ่มที่นี่ */
     case "slide":
       return strings.trashKindSlide;
+    /* รอบที่ 265: ประกาศรับสมัครงาน (ชนิดที่ 8 · มติ D26) — type บังคับให้มาเพิ่มที่นี่อีกครั้ง */
+    case "job":
+      return strings.trashKindJob;
   }
 }
 

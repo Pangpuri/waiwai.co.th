@@ -71,6 +71,20 @@ import {
   setCategoryHidden,
   updateProductCategoryAdmin,
 } from "@/lib/products/categories-repository";
+/* ประกาศรับสมัครงาน (มติ D26 · รอบที่ 265) */
+import {
+  createJobPosting,
+  deleteJobForever,
+  listJobPostingIds,
+  listJobPostings,
+  listJobPostingsForAdmin,
+  loadJobPostingForAdmin,
+  setJobPostingTrashed,
+  updateJobPosting,
+  upsertJobPosting,
+  type JobWriteInput,
+} from "@/lib/careers/repository";
+import { nextJobSortOrder } from "@/lib/careers/model";
 import { newsIdOfSourceId, type NewsInput } from "@/lib/news/model";
 import { parseNewsBody } from "@/lib/news/body";
 import { newsBlocksToEditor, parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
@@ -387,6 +401,9 @@ async function main(): Promise<void> {
 
   /* 38) หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/พรีเซ็ต (มติ D25 · รอบที่ 264) */
   await checkProductCategories();
+
+  /* 39) ประกาศรับสมัครงาน: ร่าง/เผยแพร่/ถังขยะ + นำเข้าไม่ทับงานคน (มติ D26 · รอบที่ 265) */
+  await checkJobPostings();
 
   await closePool();
 
@@ -2322,6 +2339,11 @@ const REORDER_CHECK_UNTOUCHED_ID = "p999993";
 const CATEGORY_CHECK_ID = "check-db-category";
 const CATEGORY_CHECK_ACTOR = "check-db-category@example.invalid";
 const CATEGORY_PRESET_CHECK_NAME = "check-db-category-preset";
+/* ⚠️ ค่าคงที่ของวงจร 39 (ประกาศรับสมัครงาน) — ต้องอยู่ก่อน `await main()` เช่นกัน (บทเรียน TDZ) */
+const JOB_CHECK_ID = "check-db-job";
+const JOB_CHECK_ID_2 = "check-db-job-2";
+const JOB_CHECK_ACTOR = "check-db-job@example.invalid";
+const JOB_CHECK_IMPORTER = "check-db-job-import";
 
 await main();
 
@@ -4368,3 +4390,116 @@ async function checkProductCategories(): Promise<void> {
 }
 
 
+/**
+ * 39) **ประกาศรับสมัครงาน** (มติเจ้าของ D26 · รอบที่ 265): สร้าง → ขึ้นเว็บตามสถานะ → แก้ → จัดลำดับ →
+ *     ถังขยะ/กู้คืน → ลบถาวร (ประตู SQL) → ตัวนำเข้าไม่ทับงานคน
+ *
+ * ทำไมต้องมีรอบนี้: ตรรกะ "ร่าง/ถังขยะ" และ "นำเข้าไม่ทับงานคน" อยู่ที่ **SQL**
+ * (`lib/careers/repository.ts`) — ถ้าลืมกรองที่คำสั่งอ่านใด ประกาศร่างจะหลุดขึ้นหน้า /careers
+ * และถ้าโหมดนำเข้าลืมคง `updated_at/by` การนำเข้าครั้งที่ 2 จะทับงานที่ฝ่ายบุคคลแก้ไว้
+ * ⚠️ ใช้ **ประตูอ่านสาธารณะจริง** (`listJobPostings()` → role อ่านอย่างเดียว) ในการพิสูจน์ว่าเห็น/ไม่เห็น
+ */
+async function checkJobPostings(): Promise<void> {
+  const base: JobWriteInput = {
+    id: JOB_CHECK_ID,
+    titleTh: "ประกาศทดสอบ",
+    titleEn: "Check posting",
+    departmentTh: "ฝ่ายทดสอบ",
+    departmentEn: "Check dept",
+    openings: 2,
+    gender: "any",
+    ageTh: "",
+    ageEn: "",
+    qualificationsTh: "ป.ตรี",
+    qualificationsEn: "",
+    experienceTh: "",
+    experienceEn: "",
+    sortOrder: 900,
+    status: "draft",
+  };
+
+  try {
+    /* 1) สร้างเป็น "ฉบับร่าง" ⇒ หน้าเว็บต้องไม่เห็น */
+    assert.equal(await createJobPosting(base, JOB_CHECK_ACTOR), true, "สร้างประกาศต้องสำเร็จ");
+    assert.equal(await createJobPosting(base, JOB_CHECK_ACTOR), false, "สร้างรหัสซ้ำต้องไม่ทับของเดิม");
+    assert.equal(
+      (await listJobPostings()).some((row) => row.id === JOB_CHECK_ID),
+      false,
+      "ฉบับร่างต้องไม่ขึ้นเว็บ (อ่านผ่านประตูสาธารณะ)",
+    );
+
+    /* 2) เผยแพร่ ⇒ ขึ้นเว็บ + อ่านกลับได้ครบ */
+    assert.equal(await updateJobPosting({ ...base, status: "published" }, JOB_CHECK_ACTOR), true, "บันทึกสถานะต้องสำเร็จ");
+    assert.equal(
+      (await listJobPostings()).some((row) => row.id === JOB_CHECK_ID),
+      true,
+      "เผยแพร่แล้วต้องขึ้นเว็บ",
+    );
+    const loaded = await loadJobPostingForAdmin(JOB_CHECK_ID);
+    assert.equal(loaded?.status, "published");
+    assert.equal(loaded?.openings, 2);
+    assert.equal(loaded?.gender, "any");
+    assert.ok((loaded?.updatedAt ?? "").length > 0, "ต้องมีเวลาแก้ไขล่าสุด (แปลง Date → ISO ที่ชั้นข้อมูล)");
+
+    /* 3) จัดลำดับด้วยเครื่องมือกลาง (เฉพาะแถวทดสอบ ⇒ ของจริงไม่ถูกแตะ) */
+    await createJobPosting({ ...base, id: JOB_CHECK_ID_2, sortOrder: 950, titleTh: "ประกาศทดสอบ 2" }, JOB_CHECK_ACTOR);
+    const first = nextJobSortOrder([{ id: JOB_CHECK_ID, sortOrder: 900 }]);
+    assert.equal(first, 910, "ลำดับถัดไปต้องต่อท้ายของเดิม");
+    assert.equal(await reorderRows("job", [JOB_CHECK_ID_2, JOB_CHECK_ID], JOB_CHECK_ACTOR), 2, "จัดลำดับต้องเขียน 2 แถว");
+    assert.equal((await loadJobPostingForAdmin(JOB_CHECK_ID_2))?.sortOrder, 1, "แถวแรกของรายการต้องได้ลำดับ 1");
+    assert.ok((await listJobPostingIds()).includes(JOB_CHECK_ID), "ตัวอ่านรหัสต้องเห็นประกาศทดสอบ");
+
+    /* 4) ถังขยะ: ประตูสองทาง + บันทึกคนลบ */
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, false, JOB_CHECK_ACTOR), false, "กู้คืนของที่ใช้งานอยู่ = ต้องไม่สำเร็จ");
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, true, JOB_CHECK_ACTOR), true, "ย้ายเข้าถังต้องสำเร็จ");
+    assert.equal(
+      (await listJobPostings()).some((row) => row.id === JOB_CHECK_ID),
+      false,
+      "ของในถังต้องหายจากหน้าเว็บ",
+    );
+    const trashed = await loadJobPostingForAdmin(JOB_CHECK_ID);
+    assert.equal(trashed?.deletedBy, JOB_CHECK_ACTOR, "ต้องบันทึกคนลบ");
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, true, JOB_CHECK_ACTOR), false, "ย้ายซ้ำต้องไม่ทับเวลา/ชื่อคนลบเดิม");
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, false, JOB_CHECK_ACTOR), true, "กู้คืนต้องสำเร็จ");
+    assert.equal((await loadJobPostingForAdmin(JOB_CHECK_ID))?.deletedBy, null, "กู้คืนแล้วต้องล้างคนลบ");
+    assert.equal(
+      (await listJobPostings()).some((row) => row.id === JOB_CHECK_ID),
+      true,
+      "กู้คืนแล้วต้องกลับขึ้นเว็บ",
+    );
+
+    /* 5) ลบถาวร: ของที่ใช้งานอยู่ลบไม่ได้ (ประตูอยู่ที่ SQL) */
+    assert.equal(await deleteJobForever(JOB_CHECK_ID), false, "ลบถาวรของที่ยังใช้งานอยู่ = ต้องไม่สำเร็จ");
+
+    /* 6) ตัวนำเข้า: คงงานที่คนแก้ไว้ (เทียบ updated_by) — และ `replace` ทับจริง */
+    await updateJobPosting({ ...base, titleTh: "แก้โดยคน", status: "published" }, JOB_CHECK_ACTOR);
+    const protectedResult = await upsertJobPosting({ ...base, titleTh: "จากตัวนำเข้า" }, JOB_CHECK_IMPORTER, "protect-edited");
+    assert.equal(protectedResult.protectedEdit, true, "ต้องรู้ว่าได้กันงานคนไว้");
+    assert.equal((await loadJobPostingForAdmin(JOB_CHECK_ID))?.titleTh, "แก้โดยคน", "โหมดนำเข้าต้องไม่ทับงานคน");
+    const forced = await upsertJobPosting({ ...base, titleTh: "จากตัวนำเข้า" }, JOB_CHECK_IMPORTER, "replace");
+    assert.equal(forced.protectedEdit, false, "โหมด replace ต้องไม่รายงานว่ากันไว้");
+    assert.equal((await loadJobPostingForAdmin(JOB_CHECK_ID))?.titleTh, "จากตัวนำเข้า", "โหมด replace ต้องทับจริง");
+
+    /* 7) ลบถาวรของในถัง = สำเร็จ */
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, true, JOB_CHECK_ACTOR), true, "ย้ายเข้าถังก่อนลบถาวร");
+    assert.equal(await deleteJobForever(JOB_CHECK_ID), true, "ลบถาวรของในถังต้องสำเร็จ");
+    assert.equal(await deleteJobForever(JOB_CHECK_ID), false, "ลบซ้ำต้องไม่สำเร็จ");
+    assert.equal(
+      (await listJobPostingsForAdmin()).some((row) => row.id === JOB_CHECK_ID),
+      false,
+      "ลบถาวรแล้วต้องหายจากรายการหลังบ้าน",
+    );
+
+    done(
+      "ประกาศรับสมัครงาน: ร่าง/เผยแพร่/ถังขยะ/ลบถาวร + นำเข้าไม่ทับงานคน",
+      "ประตูอ่านสาธารณะ · ประตูสองทางที่ SQL · คง updated_at/by ของงานคน · reorderRows(job)",
+    );
+  } finally {
+    await getPool().query("delete from job_posting where id = any($1::text[])", [[JOB_CHECK_ID, JOB_CHECK_ID_2]]);
+    assert.equal(
+      await countWhere("job_posting where id = any($1::text[])", [[JOB_CHECK_ID, JOB_CHECK_ID_2]]),
+      0,
+      "ต้องไม่เหลือประกาศทดสอบ",
+    );
+  }
+}

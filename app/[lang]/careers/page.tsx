@@ -5,9 +5,12 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
-import { buildBoard } from "@/features/careers/board";
+import { buildBoard, buildPostingBoard } from "@/features/careers/board";
 import { CAREERS_CONTACT } from "@/features/careers/contact";
-import { countPositions, departmentsInUse, totalOpenings } from "@/features/careers/jobs";
+import { JOBS, countPositions, departmentsInUse, totalOpenings } from "@/features/careers/jobs";
+import { isDatabaseConfigured } from "@/db/pool";
+import { jobStats, jobTitle } from "@/lib/careers/model";
+import { listJobPostings } from "@/lib/careers/repository";
 import { ApplicationForm } from "@/features/careers/ui/application-form";
 import { JobBoard } from "@/features/careers/ui/job-board";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
@@ -73,13 +76,31 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
   }
 
   const m = messages.careersPage;
-  const board = buildBoard(messages);
 
-  /* ตัวเลขในส่วนหัวคำนวณจากข้อมูลจริง (มีเทสต์กันพลาด) */
+  /*
+    ── "ตำแหน่งที่เปิดรับ" มาจากไหน (รอบที่ 265 · มติ D26) ──────────────────────────
+    1. **ประกาศในฐานข้อมูล** (`job_posting`) = แหล่งความจริงใหม่ — ฝ่ายบุคคลเพิ่ม/แก้/ลบเองได้จาก
+       `/admin/careers` (มีทั้งฉบับร่าง/เผยแพร่/ถังขยะ)
+    2. **ยังไม่ได้ตั้งฐานข้อมูล** (เดโม/เครื่อง dev ที่ไม่มี `DATABASE_URL`) ⇒ ถอยไปใช้ข้อมูลตั้งต้นในโค้ด
+       (`JOBS` + พจนานุกรม) **หน้าตาเหมือนเดิมเป๊ะ** ⇒ หน้าเว็บไม่พังเพราะไม่มีฐานข้อมูล
+    ตัวแปลงทั้งสองทางคืนชนิด `Board` เดียวกัน ⇒ หน้าจอ `JobBoard` (client) ใช้ตัวเดิม
+
+    ⚠️ **ตั้งใจให้ต่างกัน** (บทเรียนจากคำถาม "ลบหลายประกาศแล้ว"): ถ้าฐานข้อมูล **พร้อมใช้** แล้ว
+       แต่ไม่มีประกาศที่เผยแพร่ ⇒ ต้องแสดง **กระดานว่าง** ตามความจริง (ผู้ดูแลลบเอง = ต้องหายจริง)
+       **ห้าม** ถอยไปโชว์รายการตั้งต้นในโค้ด ไม่งั้นประกาศที่ลบไปแล้วจะ "ฟื้น" ขึ้นมาเอง
+  */
+  const postings = await listJobPostings();
+  const databaseReady = isDatabaseConfigured();
+  const board = databaseReady ? buildPostingBoard(postings, messages, lang) : buildBoard(messages);
+
+  /* ตัวเลขในส่วนหัวคำนวณจากข้อมูลจริง (ชุดเดียวกับที่แสดงบนกระดาน) */
+  const counts = databaseReady
+    ? jobStats(postings)
+    : { positions: countPositions(), openings: totalOpenings(), departments: departmentsInUse().length };
   const stats: readonly { readonly value: number; readonly label: string }[] = [
-    { value: countPositions(), label: m.stats.positions },
-    { value: totalOpenings(), label: m.stats.openings },
-    { value: departmentsInUse().length, label: m.stats.departments },
+    { value: counts.positions, label: m.stats.positions },
+    { value: counts.openings, label: m.stats.openings },
+    { value: counts.departments, label: m.stats.departments },
   ];
 
   return (
@@ -146,7 +167,15 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
           {/* ฟอร์มสมัครงานออนไลน์ (X1.9 ส่วนที่ 2): ใบสมัคร + เรซูเม่ เข้าฐานข้อมูลของบริษัทจริง */}
           <h3 className="font-display text-fg mt-10 text-xl font-bold">{m.applyFormTitle}</h3>
           <p className="text-fg-muted mt-2 max-w-2xl text-sm leading-relaxed">{m.applyFormIntro}</p>
-          <ApplicationForm messages={messages} />
+          {/* ช่องเลือกตำแหน่งใช้ **ชุดเดียวกับกระดานที่แสดง** ⇒ ลบ/เพิ่มประกาศแล้วเปลี่ยนตาม */}
+          <ApplicationForm
+            messages={messages}
+            positions={
+              databaseReady
+                ? postings.map((posting) => ({ id: posting.id, title: jobTitle(posting, lang) }))
+                : JOBS.map((job) => ({ id: job.id, title: m.jobs[job.id].title }))
+            }
+          />
 
           <dl className="mt-8 grid gap-5 sm:grid-cols-2">
             <div className="rounded-2xl border border-line bg-surface p-5">

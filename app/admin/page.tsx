@@ -76,6 +76,7 @@ export default async function AdminHomePage() {
     product: strings.trashContentProduct,
     recipe: strings.trashContentRecipe,
     news: strings.trashContentNews,
+    job: strings.trashContentJob,
   };
 
   /* ป้ายชื่อของแต่ละชนิดสไลด์ในถัง (รอบที่ 237) */
@@ -285,6 +286,7 @@ export default async function AdminHomePage() {
               product: contentTrash.product,
               recipe: contentTrash.recipe,
               news: contentTrash.news,
+              job: contentTrash.job,
             })}
           </p>
           <div className="flex flex-wrap items-center gap-2">

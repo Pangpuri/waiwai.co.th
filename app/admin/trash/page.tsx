@@ -67,6 +67,7 @@ export default async function AdminTrashPage() {
     product: strings.trashContentProduct,
     recipe: strings.trashContentRecipe,
     news: strings.trashContentNews,
+    job: strings.trashContentJob,
   };
 
   /* ป้ายชื่อของแต่ละชนิดสไลด์ (รอบที่ 237) */
@@ -97,6 +98,8 @@ export default async function AdminTrashPage() {
     trashKindPreset: strings.trashKindPreset,
     trashKindChromePreset: strings.trashKindChromePreset,
     trashKindProduct: strings.trashKindProduct,
+    /* ชนิดที่ 8 (รอบที่ 265) — ประกาศรับสมัครงาน */
+    trashKindJob: strings.trashKindJob,
     trashKindRecipe: strings.trashKindRecipe,
     trashKindNews: strings.trashKindNews,
     trashKindSlide: strings.trashKindSlide,
@@ -154,6 +157,7 @@ export default async function AdminTrashPage() {
                   product: contentTrash.product,
                   recipe: contentTrash.recipe,
                   news: contentTrash.news,
+                  job: contentTrash.job,
                 })}
               </p>
             </div>

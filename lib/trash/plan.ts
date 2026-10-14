@@ -101,13 +101,13 @@ export function trashRetentionDays(): number {
  * ⚠️ ใช้ระยะเก็บเดียวกัน (`TRASH_RETENTION_DAYS`) และไม่ขึ้นหน้า /privacy (ไม่ใช่ข้อมูลส่วนบุคคล)
  */
 
-export const CONTENT_TRASH_KINDS = ["product", "recipe", "news"] as const;
+export const CONTENT_TRASH_KINDS = ["product", "recipe", "news", "job"] as const;
 
 export type ContentTrashKind = (typeof CONTENT_TRASH_KINDS)[number];
 
 /** จำนวนเนื้อหาในถังแยกชนิด (นับเป็น 0 ทุกชนิด) — เขียนตรง ๆ ให้ type ฟ้องเมื่อเพิ่มชนิดใหม่ */
 export function emptyContentTrashCounts(): Record<ContentTrashKind, number> {
-  return { product: 0, recipe: 0, news: 0 };
+  return { product: 0, recipe: 0, news: 0, job: 0 };
 }
 
 export function contentTrashTotal(counts: Readonly<Record<ContentTrashKind, number>>): number {
@@ -133,6 +133,7 @@ export const CONTENT_TRASH_SCREENS: Readonly<Record<ContentTrashKind, string>> =
   product: "/admin/products?tab=trash",
   recipe: "/admin/recipes?tab=trash",
   news: "/admin/news?tab=trash",
+  job: "/admin/careers?tab=trash",
 };
 
 /* ── ถังขยะ "สไลด์หน้าแรก" (รอบที่ 237) — ปิดหนี้ที่ตกหล่นจากรอบ 176 ─────────────

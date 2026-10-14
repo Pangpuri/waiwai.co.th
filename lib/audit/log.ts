@@ -37,6 +37,11 @@ export type AuditAction =
   | "product-category-preset-apply"
   | "product-category-preset-delete"
   | "product-category-preset-import"
+  /* ประกาศรับสมัครงาน (มติ D26 · รอบที่ 265) */
+  | "job-save"
+  | "job-trash"
+  | "job-restore"
+  | "job-delete"
   | "news-save"
   | "news-trash"
   | "news-restore"

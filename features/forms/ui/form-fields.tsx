@@ -154,11 +154,19 @@ export function ContactFormFields({ strings }: { readonly strings: ContactFieldS
 
 /* ── ฟอร์มสมัครงาน ───────────────────────────────────────────────────────── */
 
+export type CareerFieldPosition = { readonly id: string; readonly title: string };
+
 export type CareerFieldStrings = {
   readonly positionLabel: string;
   readonly positionPlaceholder: string;
   /** ชื่อตำแหน่งตาม id ของงาน (ดึงจากพจนานุกรมของหน้าสมัครงาน) */
   readonly jobTitle: (id: JobId) => string;
+  /**
+   * รายการตำแหน่งที่จะให้เลือก (รอบที่ 265) — **ไม่ส่ง = ใช้ `JOBS` ในโค้ดเหมือนเดิม**
+   * หน้า /careers ส่งรายการจากฐานข้อมูล (ประกาศที่เผยแพร่จริง) ⇒ สมัครได้เฉพาะตำแหน่งที่ประกาศอยู่
+   * ⚠️ ทางของบล็อก `form` (พรีวิว/เทมเพลต) ไม่ส่ง ⇒ พฤติกรรมเดิมเป๊ะ
+   */
+  readonly positions?: readonly CareerFieldPosition[];
   readonly nameLabel: string;
   readonly phoneLabel: string;
   readonly emailLabel: string;
@@ -168,6 +176,9 @@ export type CareerFieldStrings = {
 };
 
 export function CareerFormFields({ strings }: { readonly strings: CareerFieldStrings }) {
+  const positions: readonly CareerFieldPosition[] =
+    strings.positions ?? JOBS.map((job) => ({ id: job.id, title: strings.jobTitle(job.id) }));
+
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -179,9 +190,9 @@ export function CareerFormFields({ strings }: { readonly strings: CareerFieldStr
           <option value="" disabled>
             {strings.positionPlaceholder}
           </option>
-          {JOBS.map((job) => (
-            <option key={job.id} value={job.id}>
-              {strings.jobTitle(job.id)}
+          {positions.map((position) => (
+            <option key={position.id} value={position.id}>
+              {position.title}
             </option>
           ))}
         </select>

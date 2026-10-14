@@ -35,6 +35,7 @@ import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { thAdminNotice } from "./areas/th/adminNotice.ts";
 import { previewLinkPage } from "./areas/th/previewLink.ts";
 import { pendingPages } from "./areas/th/pendingPages.ts";
+import { adminCareers as thAdminCareers } from "./areas/th/adminCareers.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -77,6 +78,8 @@ export const th = {
   pendingPages,
   blocks,
   /* พื้นที่ย่อยของหลังบ้านที่เป็น "หน้าจอของตัวเอง" — อยู่ระดับราก (ไม่ใช่ก้อน `admin`) */
+  /* ประกาศรับสมัครงานของหน้า /careers (มติ D26 · รอบที่ 265) */
+  adminCareers: thAdminCareers,
   adminCategories: thAdminCategories,
   admin: {
     ...admin,

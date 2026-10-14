@@ -519,6 +519,46 @@ create table if not exists news (
 create index if not exists news_published_idx on news (published_at desc nulls last, id desc);
 create index if not exists news_source_idx on news (source_id);
 
+-- ── ประกาศรับสมัครงานของหน้า /careers (มติ D26 · migration 0040) ───────────────
+-- ที่มา: เจ้าของสั่ง 2026-10-14 *"ส่วนแก้ไขเนื้อหาร่วมงานกับไวไว หลังบ้าน นำที่มีอยู่ตอนนี้หน้าบ้านเข้า db
+-- จากนั้นสามารถเพิ่ม ลบ ประกาศได้เพราะเป็นประกาศรับสมัครงาน"*
+-- · เดิม 20 ตำแหน่งอยู่ในโค้ด (`features/careers/jobs.ts`) + พจนานุกรม ⇒ ฝ่ายบุคคลแก้เองไม่ได้
+-- · หลังรอบ 265 **ตารางนี้คือแหล่งความจริงเดียว** ของ "ตำแหน่งที่เปิดรับ"
+--   (เลย์เอาต์หน้า /careers + บล็อก jobBoard ที่ตั้ง source = 'database')
+-- · `gender` เก็บ **คีย์** ('male' | 'female' | 'any' | '') — ข้อความมาจากพจนานุกรม `careersPage.genders`
+--   (มติ D26 ข้อ 4: ประกาศใหม่ไม่บังคับกรอกเพศ/อายุ)
+-- · ฝ่ายเป็น **ข้อความอิสระ** (`department_th`/`department_en`) ⇒ เพิ่มฝ่ายใหม่ได้จากหลังบ้าน
+-- · ถังขยะ 30 วัน (`deleted_at`/`deleted_by`) + ตัวลบอัตโนมัติรวมอยู่ที่ `lib/trash/content.ts`
+--   (ชนิด `job` ใน `CONTENT_TRASH_KINDS` — มีเทสต์กันลืม)
+create table if not exists job_posting (
+  id                 text        primary key,
+  title_th           text        not null,
+  title_en           text        not null default '',
+  department_th      text        not null default '',
+  department_en      text        not null default '',
+  /* จำนวนอัตราที่เปิดรับ — 0 = ไม่ระบุจำนวน */
+  openings           integer     not null default 0,
+  /* คีย์เพศจากพจนานุกรม: male | female | any | '' (ไม่ระบุ) */
+  gender             text        not null default '',
+  age_th             text        not null default '',
+  age_en             text        not null default '',
+  qualifications_th  text        not null default '',
+  qualifications_en  text        not null default '',
+  experience_th      text        not null default '',
+  experience_en      text        not null default '',
+  sort_order         integer     not null default 0,
+  status             text        not null default 'draft' check (status in ('draft', 'published')),
+  deleted_at         timestamptz,
+  deleted_by         text,
+  created_at         timestamptz not null default now(),
+  created_by         text        not null default '',
+  updated_at         timestamptz not null default now(),
+  updated_by         text        not null default ''
+);
+
+create index if not exists job_posting_public_idx on job_posting (sort_order, id) where deleted_at is null;
+create index if not exists job_posting_admin_idx on job_posting (deleted_at, status, sort_order, id);
+
 -- ── ยังไม่สร้างในเฟสนี้ (ตั้งใจ) ───────────────────────────────────────────────
 --  * ถังเก็บไฟล์แยก (S3/R2) → ใช้เมื่อหน้าเว็บจริงไม่ได้อยู่ในเครื่องเดียวกับฐานข้อมูล
 

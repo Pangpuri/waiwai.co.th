@@ -27,6 +27,7 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   /* Content kinds (รอบที่ 176 — combined table started with 6 kinds) */
   trashKindProduct: "Product",
   trashKindRecipe: "Recipe",
+  trashKindJob: "Job posting",
   trashKindNews: "News/event",
   /* 7th kind (รอบที่ 237) — home page slides (missed because slide trash came after round 176) */
   trashKindSlide: "Home page slide",
@@ -56,9 +57,10 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashTableHint: "All trash types in one table (images · presets · slides · products · recipes · news) — restore or delete permanently right here.",
   trashContentTitle: "Content trash",
   trashContentHint: "The counts above show what is still restorable — restore or delete permanently in the table below, or open the item's own screen “Trash” tab for full context.",
-  trashContentStats: "{product} products · {recipe} recipes · {news} news",
+  trashContentStats: "{product} products · {recipe} recipes · {news} news · {job} job postings",
   trashContentProduct: "Products & categories",
   trashContentRecipe: "Recipes",
+  trashContentJob: "Job postings",
   trashContentNews: "News & events",
   /* Slide trash index (รอบที่ 237) — slides are owned by /admin/hero */
   trashHeroTitle: "Home page slide trash",
