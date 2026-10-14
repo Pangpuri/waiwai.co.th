@@ -13,7 +13,6 @@ import {
   MAP_IMAGE,
 } from "@/features/contact/content";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
-import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
@@ -31,9 +30,9 @@ export const revalidate = 300;
  * หน้า /contact (ติดต่อเรา)
  *
  * - ช่องทางติดต่อ + ที่ตั้งโรงงาน (ข้อมูลจริงจากแผนที่/ประกาศของบริษัท)
- * - ฟอร์มติดต่อตาม `contact/formcontact.txt` — **เป็นตัวอย่าง ยังใช้งานไม่ได้**
- *   เพราะยังไม่มีฝั่งรับข้อมูล (ข้อกำหนด: ห้ามโฆษณาปุ่มที่ไม่มีปลายทาง → ปุ่มส่งถูก `disabled`
- *   และมีข้อความอธิบายกำกับ + ช่องทางจริงให้ใช้แทน)
+ * - ฟอร์มติดต่อ **ใช้งานจริง** (X1.9 รอบที่ 66): ส่งเข้าฐานข้อมูล + ยินยอม PDPA + กับดักบอต
+ *   ⚠️ รอบที่ 267: **เอาป้าย "ตัวอย่าง/ยังไม่เปิดใช้งาน" ออกแล้ว** (ล้าสมัย — มติเจ้าของ)
+ *   และเพิ่มนโยบาย "กดเผยแพร่ = ขึ้นเว็บทันที" (มติ D27 ข้อ 3) ให้ตรงกับหน้าแรก/บริษัท
  * - แผนที่ที่ตั้งโรงงาน (ภาพที่บริษัททำเอง — ย่อขนาดด้วย sharp ก่อนใช้)
  */
 
@@ -73,7 +72,11 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
   */
   const liveDocument = await loadLiveBlockDocument("contact");
   if (liveDocument !== null) {
-    return <BlockDocumentView document={liveDocument} language={lang} />;
+    /*
+      ⚠️ ต้องส่ง `heading` เสมอ (a11y · 1 h1 ต่อหน้า) — เอกสารบล็อกไม่มี h1 ในตัวเอง
+      เคสจริงรอบที่ 267: เผยแพร่แล้วหน้า /contact **ไม่มี h1 เลย** เพราะไม่ได้ส่งค่านี้
+    */
+    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.contactPage.title} />;
   }
 
   const m = messages.contactPage;
@@ -150,12 +153,6 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
             {m.formTitle}
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-muted">{m.formIntro}</p>
-
-          {/*
-            ฟอร์มยังใช้งานไม่ได้ (ไม่มีฝั่งรับข้อมูล) → แจ้งชัดและปิดปุ่มส่ง
-            ปุ่มที่ disabled + ไม่มี default button ที่กดได้ = ฟอร์มไม่ถูกส่งแม้กด Enter
-          */}
-          <SampleNotice text={m.notice} />
 
           {/* 
             ฟอร์มจริง (X1.9): ส่งเข้าฐานข้อมูลของบริษัท · ตรวจซ้ำฝั่งเซิร์ฟเวอร์ · มีกับดักบอต

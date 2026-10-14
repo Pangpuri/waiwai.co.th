@@ -48,7 +48,7 @@ function sourceOf(relativePath: string): string {
 test("publish-live: หน้าแรก + บริษัท + คณะผู้บริหาร + ใบรับรอง กดเผยแพร่แล้วขึ้นเว็บ", () => {
   assert.deepEqual(
     [...PUBLISH_GOES_LIVE_PAGES],
-    ["home", "about", "executives", "certifications"],
+    ["home", "about", "executives", "certifications", "contact"],
     "มติเจ้าของ: หน้าแรก (รอบ 240) · /about (รอบ 253) · คณะผู้บริหาร (รอบ 259) · ใบรับรองมาตรฐาน (รอบ 262 — เหลือแต่ภาพจากฐานข้อมูล)",
   );
 

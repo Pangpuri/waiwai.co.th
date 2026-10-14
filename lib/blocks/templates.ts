@@ -1,5 +1,6 @@
 import { buildCertificationsTemplate } from "@/lib/blocks/certifications-template";
-import { buildContactTemplate } from "@/lib/blocks/contact-template";
+/* รอบที่ 267: หน้า /contact ใช้ "เอกสารตั้งต้น" ตัวเดียวกับที่ตัวนำเข้าเขียนลงฐานข้อมูล */
+import { buildContactDocument } from "@/lib/contact/document";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
 import { buildNewsTemplate } from "@/lib/blocks/news-template";
@@ -70,7 +71,7 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: Templa
     กด "เริ่มจากเทมเพลต" แล้ว **ทับเนื้อหาที่นำเข้าจริงทั้งหน้า**
   */
   about: null,
-  contact: buildContactTemplate,
+  contact: buildContactDocument,
   products: buildProductsTemplate,
   recipes: buildRecipesTemplate,
   news: buildNewsTemplate,

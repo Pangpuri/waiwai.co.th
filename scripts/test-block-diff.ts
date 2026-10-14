@@ -315,12 +315,22 @@ test("blocks a11y: ตัวเรนเดอร์ต้องออก <h1> �
   /* รอบที่ 258: เดิม h1 อยู่ในสาขา `sidebar` เท่านั้น ⇒ หน้า `full`/`landing` ไม่มี h1 เลย */
   assert.equal([...renderer.matchAll(/\{pageHeading\}/g)].length, 3, "h1 ต้องถูกใช้ครบทุกเลย์เอาต์ (sidebar + landing + full)");
 
-  /* หน้าที่เคยขาด h1: หน้าแรก + /about (ทั้งคู่เรนเดอร์จากบล็อกได้) */
-  for (const file of ["app/[lang]/page.tsx", "app/[lang]/about/page.tsx"]) {
+  /*
+    หน้าที่เคยขาด h1: /about · /executives · /contact (เรนเดอร์จากบล็อกได้)
+    ⚠️ รอบที่ 267: **หน้าแรกไม่นับ** — โหมดบล็อกเรนเดอร์ `Hero` ตัวจริงที่มี `<h1>` อยู่แล้ว
+       การส่ง `heading` ซ้ำทำให้ได้ **2 h1 ต่อหน้า** (ผิดกติกา) ⇒ มีเทสต์แยกที่ scripts/test-contact.ts คุมไว้
+  */
+  for (const file of ["app/[lang]/contact/page.tsx", "app/[lang]/about/page.tsx", "app/[lang]/about/executives/page.tsx"]) {
     const page = readFileSync(file, "utf8");
     if (!page.includes("<BlockDocumentView")) continue;
-    assert.ok(/<BlockDocumentView[\s\S]{0,200}heading=/.test(page), `${file} ต้องส่ง heading ให้ตัวเรนเดอร์`);
+    assert.ok(/<BlockDocumentView[\s\S]{0,300}heading=/.test(page), `${file} ต้องส่ง heading ให้ตัวเรนเดอร์`);
   }
+
+  /* หน้าแรก: h1 มาจาก Hero ⇒ ต้องไม่ส่ง heading */
+  const home = readFileSync("app/[lang]/page.tsx", "utf8");
+  const start = home.indexOf("<BlockDocumentView");
+  const call = home.slice(start, home.indexOf("/>", start));
+  assert.ok(!call.includes("heading="), "หน้าแรกต้องไม่ส่ง heading (Hero มี h1 อยู่แล้ว — ไม่งั้นได้ 2 h1)");
 });
 
 /* ── รอบที่ 168: ไล่ <h1> หน้าที่เหลือ (ต่อจากรอบที่ 149) ─────────────────────── */

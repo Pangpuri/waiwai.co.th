@@ -8,7 +8,7 @@
   /*
     The /contact page — round 17.
     The form comes from `contact/formcontact.txt`; the map is the company's own illustrated map.
-    ⚠️ The form has no receiving side yet → shown as a sample with the send button disabled (see PRODUCT_ROADMAP.md § 9).
+    The form is live (it submits to our database — round 66) · the "sample" notice was removed in round 267.
   */
 export const contactPage = {
     meta: {
@@ -34,10 +34,6 @@ export const contactPage = {
       "Illustrated map showing the locations of both Wai Wai factories in Sam Phran district, Nakhon Pathom, with Phetkasem Road and the surrounding landmarks",
     formTitle: "Contact form",
     formIntro: "Fill in the details below and we will send your message to the right department.",
-    notice:
-      "A sample for the marketing team to review — this form is not live yet and is pending approval.",
-    formStatus:
-      "The send button does not work in this sample version — please reach us by phone or post using the details above.",
     requiredNote: "* indicates a required question",
     topicLabel: "What is this about?",
     topicPlaceholder: "— Choose a topic —",

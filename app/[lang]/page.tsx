@@ -126,11 +126,14 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
           heroCard={heroCard}
           texts={heroTexts}
         />
-        {/* บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query) */}
+        {/*
+          บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query)
+          ⚠️ รอบที่ 267: **ไม่ส่ง `heading`** — เพราะ `Hero` ด้านบนเรนเดอร์ `<h1>` ตัวจริงอยู่แล้ว
+          (เคยได้ 2 h1 ต่อหน้า = ผิดกติกา a11y "1 h1 ต่อหน้า" — ตรวจพบตอนพิสูจน์หน้า /contact)
+        */}
         <BlockDocumentView
           document={liveDocument}
           language={lang}
-          heading={messages.meta.homeTitle}
           productData={await loadProductShowcaseData(liveDocument)}
         recipeData={await loadRecipeShowcaseData(liveDocument)}
         newsData={await loadNewsShowcaseData(liveDocument)}
