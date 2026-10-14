@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 
 import { generatePassword } from "@/lib/auth/credentials";
+import { selectTargetUrl, targetBanner } from "./target-env.ts";
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
 
 /**
@@ -168,6 +169,21 @@ async function grantSequenceUsage(role: string, tables: readonly string[], dryRu
 }
 
 async function main(): Promise<void> {
+  /*
+    `--target` = สร้าง/รีเฟรช role บน **ฐานข้อมูลปลายทาง** (คลาวด์) — รอบที่ 282
+    ⚠️ role อยู่ในฐานข้อมูลนั้น ๆ ⇒ การตั้ง least privilege บนโฮสต์จริงต้องรันธงนี้
+       แล้วเอาค่า PUBLIC_DATABASE_URL/FORM_DATABASE_URL ที่พิมพ์ได้ไปวางใน env ของโฮสต์
+  */
+  if (process.argv.includes("--target")) {
+    const selection = selectTargetUrl(process.env);
+    if (!selection.ok) {
+      process.stderr.write(`✗ ${selection.message}\n`);
+      process.exit(1);
+    }
+    process.env["DATABASE_URL"] = selection.url;
+    process.stdout.write(`${targetBanner(selection)}\n`);
+  }
+
   if (!isDatabaseConfigured()) {
     process.stderr.write("✗ ไม่พบ DATABASE_URL — ใส่ใน .env.local ก่อน (ต้องเป็นบัญชีเจ้าของที่สร้าง role ได้)\n");
     process.exit(1);

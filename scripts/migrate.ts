@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
+import { selectTargetUrl, targetBanner } from "./target-env.ts";
 import {
   checksumOf,
   describePlan,
@@ -72,6 +73,22 @@ async function readState(): Promise<{ appliedIds: string[]; appliedChecksums: Re
 
 async function main(): Promise<void> {
   const statusOnly = process.argv.includes("--status");
+
+  /*
+    `--target` = ยิงไป **ฐานข้อมูลปลายทาง** (คลาวด์) แทน Postgres ในเครื่อง (รอบที่ 282)
+    ⚠️ ต้องเลือกโดยเจตนา (ไม่ใช่ค่าเริ่มต้น) และผ่านด่านของ `selectTargetUrl()`
+       (ห้ามชี้เครื่องตัวเอง · ห้ามซ้ำกับ DATABASE_URL ของ dev · ตัด `-pooler` ให้เอง)
+  */
+  if (process.argv.includes("--target")) {
+    const selection = selectTargetUrl(process.env);
+    if (!selection.ok) {
+      console.error(`✗ ${selection.message}`);
+      process.exitCode = 1;
+      return;
+    }
+    process.env["DATABASE_URL"] = selection.url;
+    console.log(targetBanner(selection));
+  }
 
   if (!isDatabaseConfigured()) {
     console.error("✗ ต้องตั้ง DATABASE_URL ก่อน (สคริปต์นี้ไม่เดาค่าให้)");
