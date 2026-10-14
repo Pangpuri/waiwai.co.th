@@ -205,3 +205,33 @@ test("สคริปต์นำเข้า/seed ทุกตัวรอง�
     );
   }
 });
+
+test("prepareTargetRun: ล้าง PUBLIC_/FORM_DATABASE_URL ชั่วคราว (อ่าน/เขียนต้องอยู่ฐานข้อมูลเดียวกัน)", () => {
+  /*
+    บั๊กจริงรอบที่ 285: `about:import --target` อ่านฉบับร่างจาก **ในเครื่อง** (ผ่าน readQuery →
+    PUBLIC_DATABASE_URL) แล้วปฏิเสธไม่เขียน ทั้งที่ปลายทางยังไม่มีงานนั้น
+  */
+  const env: Record<string, string | undefined> = {
+    DATABASE_URL: LOCAL,
+    PUBLIC_DATABASE_URL: "postgres://waiwai_public_ro@localhost:55432/waiwai",
+    FORM_DATABASE_URL: "postgres://waiwai_public_form@localhost:55432/waiwai",
+    TARGET_DATABASE_URL: NEON_DIRECT,
+  };
+  const lines: string[] = [];
+  const result = prepareTargetRun(["--target"], env, { log: (line) => lines.push(line), error: (line) => lines.push(`E:${line}`) });
+
+  assert.equal(result.ok, true);
+  assert.equal(env["DATABASE_URL"], NEON_DIRECT, "เขียน = ปลายทาง");
+  assert.equal(env["PUBLIC_DATABASE_URL"], undefined, "อ่านต้องไม่ชี้ในเครื่อง");
+  assert.equal(env["FORM_DATABASE_URL"], undefined);
+  assert.ok(lines.some((line) => line.includes("อ่าน/เขียน")), "ต้องบอกผู้ใช้ว่าล้างอะไรไป");
+
+  /* ไม่สั่งธง = ห้ามแตะค่า role เด็ดขาด */
+  const localEnv: Record<string, string | undefined> = {
+    DATABASE_URL: LOCAL,
+    PUBLIC_DATABASE_URL: "postgres://ro@localhost:55432/waiwai",
+    TARGET_DATABASE_URL: NEON_DIRECT,
+  };
+  prepareTargetRun([], localEnv, { log: () => {}, error: () => {} });
+  assert.equal(localEnv["PUBLIC_DATABASE_URL"], "postgres://ro@localhost:55432/waiwai", "ไม่ได้สั่งปลายทาง = ไม่แตะ");
+});

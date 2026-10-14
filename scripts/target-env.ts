@@ -134,8 +134,27 @@ export function prepareTargetRun(
   }
 
   env["DATABASE_URL"] = selection.url;
+
+  /*
+    ⚠️ **สำคัญ (บั๊กจริงรอบที่ 285):** ประตูอ่านของแอป (`readQuery()`) ใช้ `PUBLIC_DATABASE_URL`
+    ถ้าตั้งไว้ (ซึ่งใน `.env.local` ชี้ **ฐานข้อมูลในเครื่อง**) ⇒ สคริปต์จะ "อ่านที่หนึ่ง เขียนอีกที่หนึ่ง"
+    เคสจริง: `npm run about:import -- --target` อ่านฉบับร่าง **ของในเครื่อง** เจอว่า "คนแก้ไว้"
+    แล้ว **ปฏิเสธไม่เขียน** ทั้งที่ปลายทางยังไม่มีงานนั้นเลย
+    ⇒ ล้างค่าชั่วคราวในโปรเซสนี้ (ไม่แก้ไฟล์ .env.local) ⇒ ประตูอ่านถอยไปใช้ `DATABASE_URL` = ปลายทาง
+  */
+  const clearedRoleUrls: string[] = [];
+  for (const key of ["PUBLIC_DATABASE_URL", "FORM_DATABASE_URL"]) {
+    if ((env[key] ?? "").trim() !== "") clearedRoleUrls.push(key);
+    delete env[key];
+  }
+
   writers.log(targetBanner(selection));
   if (wantsTarget.viaNpmConfig) writers.log(NPM_SWALLOWED_TARGET_WARNING);
+  if (clearedRoleUrls.length > 0) {
+    writers.log(
+      `ℹ️  ล้าง ${clearedRoleUrls.join(" · ")} เฉพาะโปรเซสนี้ — อ่าน/เขียนใช้ปลายทางเดียวกัน (ไฟล์ .env.local ไม่ถูกแก้)`,
+    );
+  }
 
   return { ok: true, argv: argv.filter((arg) => arg !== "--target") };
 }
