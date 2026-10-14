@@ -97,6 +97,13 @@ test("isr: ทุกหน้า/เลย์เอาต์สาธารณ�
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
     "app/[lang]/news/page/[page]/page.tsx",
+    /* รอบที่ 271: มุมมองกรอง (ปี พ.ศ. · ล่าสุด/เก่าสุด) — หน้าจอรวมอ่าน DB ให้ (delegate) */
+    "app/[lang]/news/oldest/page.tsx",
+    "app/[lang]/news/oldest/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/page.tsx",
+    "app/[lang]/news/year/[year]/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page/[page]/page.tsx",
     "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
@@ -114,8 +121,12 @@ test("isr: ทุกหน้า/เลย์เอาต์สาธารณ�
       `${file} ต้องมี export const revalidate = ${PAGE_REVALIDATE_SECONDS}; (ค่าคงที่ literal เท่านั้น)`,
     );
 
-    /* หน้าที่อ้าง loader ของ DB ต้องอยู่ในรายการนี้ (กันลืมหน้าใหม่) */
+    /*
+      หน้าที่อ้าง loader ของ DB ต้องอยู่ในรายการนี้ (กันลืมหน้าใหม่)
+      รอบที่ 271: เส้นทางมุมมองข่าวส่งงานอ่าน DB ให้หน้าจอรวม (`NewsListViewPage`) ⇒ นับเป็นการอ่าน DB เช่นกัน
+    */
     if (DATABASE_MARKERS.some((marker) => source.includes(marker))) continue;
+    if (source.includes("NewsListViewPage")) continue;
     missing.push(file);
   }
 
@@ -135,6 +146,13 @@ test("isr: ไฟล์ที่อ่าน DB ในเส้นทางส�
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
     "app/[lang]/news/page/[page]/page.tsx",
+    /* รอบที่ 271: มุมมองกรอง (ปี พ.ศ. · ล่าสุด/เก่าสุด) — หน้าจอรวมอ่าน DB ให้ (delegate) */
+    "app/[lang]/news/oldest/page.tsx",
+    "app/[lang]/news/oldest/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/page.tsx",
+    "app/[lang]/news/year/[year]/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page/[page]/page.tsx",
     "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",
@@ -147,7 +165,10 @@ test("isr: ไฟล์ที่อ่าน DB ในเส้นทางส�
   for (const file of watched) {
     const source = sourceOf(file);
     assert.ok(
-      DATABASE_MARKERS.some((marker) => source.includes(marker)) || source.includes("loadLiveBlockDocument"),
+      DATABASE_MARKERS.some((marker) => source.includes(marker)) ||
+        source.includes("loadLiveBlockDocument") ||
+        /* รอบที่ 271: เส้นทางมุมมองข่าวบาง ๆ ส่งงานอ่าน DB ให้หน้าจอรวม (`NewsListViewPage`) */
+        source.includes("NewsListViewPage"),
       `${file} อยู่ในรายการเฝ้าดูแต่ไม่พบการอ่าน DB — ถ้าไม่ใช้ DB แล้วให้ถอดออกจากรายการ`,
     );
   }
@@ -165,6 +186,13 @@ test("isr: ค่า revalidate ในหน้าเว็บต้องเป
     "app/[lang]/contact/page.tsx",
     "app/[lang]/news/page.tsx",
     "app/[lang]/news/page/[page]/page.tsx",
+    /* รอบที่ 271: มุมมองกรอง (ปี พ.ศ. · ล่าสุด/เก่าสุด) — หน้าจอรวมอ่าน DB ให้ (delegate) */
+    "app/[lang]/news/oldest/page.tsx",
+    "app/[lang]/news/oldest/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/page.tsx",
+    "app/[lang]/news/year/[year]/page/[page]/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page.tsx",
+    "app/[lang]/news/year/[year]/oldest/page/[page]/page.tsx",
     "app/[lang]/news/[id]/page.tsx",
     "app/[lang]/privacy/page.tsx",
     "app/[lang]/maintenance/page.tsx",

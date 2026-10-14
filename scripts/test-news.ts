@@ -329,11 +329,21 @@ test("news: ข้อมูลที่ถูกต้องผ่าน · ท�
 /* ── 5) กติกาหน้าเว็บ (สแกนซอร์ส) ─────────────────────────────────────────── */
 
 test("news: หน้ารายการ/หน้าแบ่งหน้า เป็น static + ISR และไม่เพิ่ม JS ในส่วนรายการ", () => {
+  /*
+    รอบที่ 271: ตรรกะของรายการย้ายไป "หน้าจอรวม" (ใช้ร่วมทุกมุมมอง: ล่าสุด/เก่าสุด/กรองปี)
+    ⇒ เส้นทางบาง ๆ ต้องไม่ถือตรรกะเอง และหน้าจอรวมต้องอ่านข่าวจริง + ไม่ใช้ searchParams
+  */
   const listPage = sourceOf("app/[lang]/news/page.tsx");
   assert.ok(listPage.includes("export const revalidate = 300;"), "ต้องประกาศ revalidate (ISR)");
-  assert.ok(listPage.includes("listNews("), "ต้องอ่านข่าวจริงจากฐานข้อมูล");
-  assert.ok(listPage.includes("countNews("), "ต้องรู้จำนวนทั้งหมดเพื่อแบ่งหน้า");
+  assert.ok(listPage.includes("NewsListViewPage"), "ต้องใช้หน้าจอรวมของรายการข่าว");
   assert.ok(!listPage.includes("searchParams"), "ห้ามใช้ searchParams (ทำให้หน้าเป็น dynamic)");
+
+  const shared = sourceOf("features/news/ui/news-list-page.tsx");
+  assert.ok(shared.includes("listNews("), "หน้าจอรวมต้องอ่านข่าวจริงจากฐานข้อมูล");
+  assert.ok(shared.includes("countNews("), "ต้องรู้จำนวนทั้งหมดเพื่อแบ่งหน้า");
+  assert.ok(shared.includes("NewsFilter"), "ต้องมีแถวกรอง (ปี พ.ศ. · ล่าสุด/เก่าสุด)");
+  assert.ok(!shared.includes("searchParams"), "ห้ามใช้ searchParams ในหน้าจอรวมเช่นกัน");
+  assert.ok(shared.includes("heading={m.title}"), "โหมดบล็อกต้องส่ง heading (a11y · 1 h1 ต่อหน้า)");
 
   const pageN = sourceOf("app/[lang]/news/page/[page]/page.tsx");
   assert.ok(pageN.includes("export const revalidate = 300;"));

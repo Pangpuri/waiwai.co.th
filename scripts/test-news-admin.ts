@@ -250,27 +250,28 @@ test("news admin: คำบรรยายใต้ภาพต้องแส�
   );
 });
 
-/* ── รอบที่ 155: หน้าข่าวสาธารณะต้องเรียงตามลำดับที่จัดจากหลังบ้าน ────────────── */
+/* ── รอบที่ 271 (มติเจ้าของ D29 ข้อ 3): หน้าข่าวสาธารณะเรียงตาม "วันที่" เสมอ ─────────────────
+   เดิม (รอบที่ 155) ให้ `sort_order` ที่จัดจากหลังบ้านมาก่อนวันที่ — แต่ข่าวทั้ง 151 แถวถูกตั้ง
+   `sort_order` ตั้งแต่ตอนนำเข้า ⇒ หน้าเว็บขึ้นข่าว 24 ก.พ. 2564 ก่อนข่าวล่าสุด (เคสจริงจากเจ้าของ)
+   ⇒ ตัด `sort_order` ออกจากลำดับสาธารณะ · คงไว้ใช้เฉพาะในตารางหลังบ้าน
+────────────────────────────────────────────────────────────────────────────── */
 
-test("news: หน้าข่าวสาธารณะเรียงตาม sort_order (จัดจากหลังบ้านแล้วหน้าบ้านต้องขยับ)", () => {
+test("news: หน้าข่าวสาธารณะเรียงตามวันที่เสมอ — `sort_order` ไม่มีผลกับหน้าเว็บ (มติ D29)", () => {
   const repo = readFileSync("lib/news/repository.ts", "utf8");
-  assert.ok(
-    repo.includes("PUBLIC_NEWS_ORDER"),
-    "ต้องมีค่าลำดับกลางสำหรับหน้าข่าวสาธารณะ (ที่เดียว ไม่กระจัดกระจาย)",
-  );
-  assert.ok(
-    repo.includes("case when n.sort_order = 0 then 1 else 0 end"),
-    "sort_order = 0 (ยังไม่จัด) ต้องอยู่ท้าย ไม่ใช่ขึ้นหน้า",
-  );
-  assert.ok(
-    repo.includes("n.sort_order, n.published_at desc nulls last"),
-    "จัดแล้วเรียงตาม sort_order แล้วค่อยถอยไปใช้วันที่",
-  );
-  /* ของเดิม 151 ข่าว sort_order = 0 ทั้งหมด ⇒ ลำดับต้องเหมือนเดิมเป๊ะ (ตามวันที่) */
-  assert.ok(
-    repo.includes("when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc"),
-    "ค่าเริ่มต้นต้องไม่เปลี่ยนลำดับข่าวเดิม",
-  );
+  assert.ok(repo.includes("PUBLIC_NEWS_ORDER"), "ต้องมีค่าลำดับกลางสำหรับหน้าข่าวสาธารณะ (ที่เดียว)");
+
+  const orderStart = repo.indexOf("const PUBLIC_NEWS_ORDER");
+  const order = repo.slice(orderStart, repo.indexOf(";", orderStart) + 1);
+  assert.ok(order.includes("n.published_at desc nulls last"), "ค่าเริ่มต้นต้องเป็นวันที่มาก่อน");
+  assert.ok(order.includes("n.id desc"), "เมื่อวันที่ซ้ำกันต้องใช้อคติที่นิ่ง (id)");
+  assert.ok(!order.includes("sort_order"), "ห้ามมี sort_order ในลำดับสาธารณะ (กับดักที่ทำให้ข่าวเก่าขึ้นก่อน)");
+
+  /* เรียงกลับทางได้ (เก่าสุดก่อน) ด้วยตัวแปรทิศทางเดียว — ไม่พิมพ์คำสั่งซ้ำ */
+  assert.ok(repo.includes('const direction = options.sort === "oldest" ? "asc" : "desc";'));
+  /* กรองปีต้องผูกพารามิเตอร์ ไม่ต่อสตริงจากผู้ใช้ */
+  assert.ok(repo.includes("extract(year from n.published_at) = $"));
+  /* หลังบ้านยังจัดลำดับได้ (sort_order ยังอยู่ในคิวรีของหลังบ้านเท่านั้น) */
+  assert.ok(repo.includes("const ADMIN_NEWS_ORDER"));
 });
 
 /* ── รอบที่ 174: ลบข่าวถาวรจากถังขยะ (ประตูอยู่ที่ SQL) ───────────────────────── */

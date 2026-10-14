@@ -21,6 +21,10 @@ import type { NewsInput } from "@/lib/news/model";
 /** จำนวนข่าวต่อหน้า (เท่ากับเว็บเดิม: 15) */
 export const NEWS_PER_PAGE = 15;
 
+import { BUDDHIST_YEAR_OFFSET, type NewsSort } from "@/lib/news/list-view";
+
+export type { NewsSort };
+
 /** จำนวนข่าวต่อหน้าในหลังบ้าน */
 export const ADMIN_NEWS_PER_PAGE = 20;
 
@@ -83,12 +87,13 @@ function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
   };
 }
 
-/** จำนวนข่าวที่ **ขึ้นเว็บ** แล้ว (ใช้คำนวณจำนวนหน้า) */
-export async function countNews(): Promise<number> {
+/** จำนวนข่าวที่ **ขึ้นเว็บ** แล้ว (ใช้คำนวณจำนวนหน้า) — ส่งปี (ค.ศ.) เพื่อนับเฉพาะปีนั้น */
+export async function countNews(year: number | null = null): Promise<number> {
   if (!isDatabaseConfigured()) return 0;
   try {
     const result = await readQuery<{ count: string }>(
-      `select count(*)::text as count from news n where ${PUBLIC_NEWS_CONDITION}`,
+      `select count(*)::text as count from news n where ${PUBLIC_NEWS_CONDITION}${newsYearCondition(year)}`,
+      year === null ? [] : [year],
     );
     const value = Number.parseInt(result.rows[0]?.count ?? "0", 10);
     return Number.isFinite(value) ? value : 0;
@@ -97,19 +102,33 @@ export async function countNews(): Promise<number> {
   }
 }
 
-/** ข่าวชุดหนึ่ง (เรียงใหม่สุดก่อน) — `offset` เริ่มที่ 0 */
-export async function listNews(limit = NEWS_PER_PAGE, offset = 0): Promise<readonly NewsRecord[]> {
+/**
+ * ตัวเลือกของรายการข่าว (รอบที่ 271 · มติ D29) — ไม่ส่ง = พฤติกรรมเดิม (ล่าสุดก่อน ทุกปี)
+ * `year` เป็น **ปี ค.ศ.** (ผู้เรียกแปลงจาก พ.ศ. ด้วย `christianYearOfLabel()`)
+ */
+export type NewsListOptions = {
+  readonly sort?: NewsSort;
+  readonly year?: number | null;
+};
+
+/** ข่าวชุดหนึ่ง — ค่าเริ่มต้นเรียงใหม่สุดก่อน · `offset` เริ่มที่ 0 */
+export async function listNews(
+  limit = NEWS_PER_PAGE,
+  offset = 0,
+  options: NewsListOptions = {},
+): Promise<readonly NewsRecord[]> {
   if (!isDatabaseConfigured()) return [];
+  const year = options.year ?? null;
+  const direction = options.sort === "oldest" ? "asc" : "desc";
   try {
     const result = await readQuery<Record<string, unknown>>(
       `select ${NEWS_COLUMNS}
          from news n
          left join media m on m.id = n.cover_media_id
-        where ${PUBLIC_NEWS_CONDITION}
-        /* รอบที่ 155: ตามลำดับที่จัดจากหลังบ้านก่อน (sort_order = 0 ทุกแถว = ใช้พฤติกรรมเดิม) */
-        order by case when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc
+        where ${PUBLIC_NEWS_CONDITION}${newsYearCondition(year, 3)}
+        order by n.published_at ${direction} nulls last, n.id ${direction}
         limit $1 offset $2`,
-      [Math.max(0, limit), Math.max(0, offset)],
+      year === null ? [Math.max(0, limit), Math.max(0, offset)] : [Math.max(0, limit), Math.max(0, offset), year],
     );
 
     const items: NewsRecord[] = [];
@@ -118,6 +137,36 @@ export async function listNews(limit = NEWS_PER_PAGE, offset = 0): Promise<reado
       if (record !== null) items.push(record);
     }
     return items;
+  } catch {
+    return [];
+  }
+}
+
+
+/**
+ * เงื่อนไขกรองปี (ค.ศ.) — ใช้ `$1` ของคำสั่งนับ และ `$3` ของคำสั่งรายการ (หลัง limit/offset)
+ * ⚠️ ค่าที่ส่งเข้ามาต้องเป็นจำนวนเต็มจาก `christianYearOfLabel()` เท่านั้น (ไม่รับสตริงดิบจากผู้ใช้)
+ */
+function newsYearCondition(year: number | null, parameterIndex = 1): string {
+  if (year === null || !Number.isInteger(year)) return "";
+  return ` and extract(year from n.published_at) = $${String(parameterIndex)}`;
+}
+
+/** ปี (พ.ศ.) ที่มีข่าวจริง + จำนวน — ใช้สร้างแถวกรอง (มาก→น้อย) */
+export async function listNewsYears(): Promise<readonly { readonly year: number; readonly count: number }[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await readQuery<{ year: number; count: string }>(
+      `select (extract(year from n.published_at)::int + ${String(BUDDHIST_YEAR_OFFSET)}) as year,
+              count(*)::text as count
+         from news n
+        where ${PUBLIC_NEWS_CONDITION} and n.published_at is not null
+        group by 1
+        order by 1 desc`,
+    );
+    return result.rows
+      .map((row) => ({ year: Number(row.year), count: Number.parseInt(row.count, 10) }))
+      .filter((row) => Number.isFinite(row.year) && Number.isFinite(row.count));
   } catch {
     return [];
   }
@@ -324,7 +373,13 @@ const ADMIN_NEWS_ORDER = "order by n.published_at desc nulls last, n.id desc";
  * `sort_order` = 0 ทุกแถว (ของเดิม 151 ข่าว) ⇒ เรียงตามวันที่เหมือนเดิมเป๊ะ
  * พอจัดลำดับจากหลังบ้าน (1..N) ⇒ ตามลำดับนั้น แล้วค่อยถอยไปใช้วันที่/id
  */
-const PUBLIC_NEWS_ORDER = "order by case when n.sort_order = 0 then 1 else 0 end, n.sort_order, n.published_at desc nulls last, n.id desc";
+/*
+  ⚠️ รอบที่ 271 (มติเจ้าของ D29 ข้อ 3): **หน้าเว็บเรียงตามวันที่เสมอ — `sort_order` ไม่มีผล**
+  เคสจริง: ข่าวทั้ง 151 แถวถูกตั้ง `sort_order` (2..152) ตั้งแต่ตอนนำเข้า ⇒ คิวรีเดิมยก
+  "ลำดับที่จัดไว้" มาก่อนวันที่ ⇒ หน้าเว็บขึ้นข่าว **24 ก.พ. 2564** ก่อนข่าวล่าสุด
+  (`sort_order` ยังใช้ได้ในตารางหลังบ้าน แต่ไม่แตะลำดับบนหน้าเว็บอีก)
+*/
+const PUBLIC_NEWS_ORDER = "order by n.published_at desc nulls last, n.id desc";
 
 function statusOf(value: unknown): AdminNewsStatus {
   return value === "draft" ? "draft" : "published";

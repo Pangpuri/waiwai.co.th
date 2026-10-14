@@ -49,6 +49,13 @@ export const newsPage = {
     notice:
       "This page is a sample (mockup) pending approval — the test cards below are placeholder data.",
     /* The real news section from the database (round 105) — imported from the brand's previous site */
+    /* News list filter row (round 271 · owner decision D29) */
+    dbFilterLabel: "Period",
+    dbFilterAllYears: "All years",
+    dbFilterYear: "{year}",
+    dbSortLabel: "Sort by",
+    dbSortNewest: "Newest first",
+    dbSortOldest: "Oldest first",
     dbListTitle: "Wai Wai news and activities",
     dbListCount: "{count} news items",
     dbReadMore: "Read more",
