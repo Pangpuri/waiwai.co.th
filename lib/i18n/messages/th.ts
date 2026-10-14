@@ -29,6 +29,7 @@ import { adminChromePreset } from "./areas/th/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/th/adminBlockTypes.ts";
 import { adminSchedule } from "./areas/th/adminSchedule.ts";
 import { adminLive } from "./areas/th/adminLive.ts";
+import { thAdminCategories } from "./areas/th/adminCategories.ts";
 import { adminRbac } from "./areas/th/adminRbac.ts";
 import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { thAdminNotice } from "./areas/th/adminNotice.ts";
@@ -75,6 +76,8 @@ export const th = {
   previewLinkPage,
   pendingPages,
   blocks,
+  /* พื้นที่ย่อยของหลังบ้านที่เป็น "หน้าจอของตัวเอง" — อยู่ระดับราก (ไม่ใช่ก้อน `admin`) */
+  adminCategories: thAdminCategories,
   admin: {
     ...admin,
     ...adminMedia,

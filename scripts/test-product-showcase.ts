@@ -36,6 +36,8 @@ const category = (id: string, label: string, extra: Partial<ProductCategoryCardR
   logoWidth: null,
   logoHeight: null,
   productCount: 9,
+  sortOrder: 100,
+  isHidden: false,
   ...extra,
 });
 

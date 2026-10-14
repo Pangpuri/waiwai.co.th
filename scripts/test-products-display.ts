@@ -137,10 +137,12 @@ test("products display: โลโก้หมวด — คลังภาพม
   assert.equal(categoryLogoOf("   ", "/products/x.png"), "/products/x.png");
 });
 
-test("products display: หน้า /products + [slug] ต้องใช้ตัวช่วยกลางสำหรับชื่อ/โลโก้หมวด", () => {
-  for (const file of ["app/[lang]/products/page.tsx", "app/[lang]/products/[slug]/page.tsx"]) {
-    const source = readFileSync(file, "utf8");
-    assert.ok(source.includes("categoryNameOf("), `${file} ต้องใช้ categoryNameOf()`);
-  }
-  assert.ok(readFileSync("app/[lang]/products/page.tsx", "utf8").includes("categoryLogoOf("), "หน้าสินค้าต้องใช้ categoryLogoOf()");
+test("products display: หน้า /products รวมหมวดด้วยตัวช่วยกลาง · [slug] ใช้ categoryNameOf", () => {
+  const listPage = readFileSync("app/[lang]/products/page.tsx", "utf8");
+  /* รอบที่ 264: หน้าแรก/หน้าสินค้าต้องใช้ตัวรวมกลาง (หมวดในโค้ด + หมวดใหม่ + ซ่อนไว้ไม่แสดง) */
+  assert.ok(listPage.includes("mergeSiteCategories("), "หน้าสินค้าต้องใช้ mergeSiteCategories()");
+  assert.ok(listPage.includes("siteCategoryName("), "หน้าสินค้าต้องเลือกชื่อตามภาษาด้วย siteCategoryName()");
+
+  const detailPage = readFileSync("app/[lang]/products/[slug]/page.tsx", "utf8");
+  assert.ok(detailPage.includes("categoryNameOf("), "หน้ารายละเอียดต้องใช้ categoryNameOf() (DB → พจนานุกรม)");
 });

@@ -55,6 +55,22 @@ import {
   upsertProduct,
   upsertProductCategory,
 } from "@/lib/products/repository";
+/* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/พรีเซ็ต (มติ D25 · รอบที่ 264) */
+import { categoryPresetPayload } from "@/lib/products/categories";
+import {
+  applyCategoryPreset,
+  createProductCategoryAdmin,
+  deleteCategoryPreset,
+  listAdminCategories,
+  listCategoryDefaults,
+  listCategoryIds,
+  listCategoryPresets,
+  loadAdminCategory,
+  restoreCategoryFromDefault,
+  saveCategoryPreset,
+  setCategoryHidden,
+  updateProductCategoryAdmin,
+} from "@/lib/products/categories-repository";
 import { newsIdOfSourceId, type NewsInput } from "@/lib/news/model";
 import { parseNewsBody } from "@/lib/news/body";
 import { newsBlocksToEditor, parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
@@ -368,6 +384,9 @@ async function main(): Promise<void> {
 
   /* 37) ถังขยะสไลด์ในตารางรวม `/admin/trash` (รอบที่ 237) */
   await checkHeroTrashTable();
+
+  /* 38) หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/พรีเซ็ต (มติ D25 · รอบที่ 264) */
+  await checkProductCategories();
 
   await closePool();
 
@@ -2299,6 +2318,10 @@ const REORDER_CHECK_ACTOR = "check-db-reorder@example.invalid";
 const REORDER_CHECK_IDS = ["p999990", "p999991", "p999992", "p999993"] as const;
 /** แถวสุดท้ายที่ "จงใจไม่ส่ง" ให้ reorderRows ⇒ ต้องไม่ถูกแตะ */
 const REORDER_CHECK_UNTOUCHED_ID = "p999993";
+/* ⚠️ ค่าคงที่ของวงจร 38 (หมวดสินค้า) ก็ต้องอยู่ก่อน `await main()` เหมือนกัน (บทเรียน TDZ รอบ 78) */
+const CATEGORY_CHECK_ID = "check-db-category";
+const CATEGORY_CHECK_ACTOR = "check-db-category@example.invalid";
+const CATEGORY_PRESET_CHECK_NAME = "check-db-category-preset";
 
 await main();
 
@@ -4176,4 +4199,172 @@ async function checkHeroTrashTable(): Promise<void> {
     );
   }
 }
+
+/**
+ * 38) **หมวดสินค้า** (มติเจ้าของ D25 · รอบที่ 264): เพิ่ม → ขึ้นเว็บ → ซ่อน/แสดง → แก้ → จัดลำดับ →
+ *     คืนค่าเริ่มต้นถาวร → พรีเซ็ต — และ **คืนสภาพข้อมูลจริงทุกอย่าง**
+ *
+ * ทำไมต้องมีรอบนี้: ตรรกะ "หมวดใหม่ขึ้นเว็บได้ / ซ่อนแล้วหาย / คืนค่าเริ่มต้น" อยู่ที่ **SQL + ชั้นข้อมูล**
+ * (`lib/products/repository.ts` · `lib/products/categories-repository.ts`) — ถ้าลืมกรอง `is_hidden`
+ * ที่คำสั่งอ่านใด หมวดที่ซ่อนจะหลุดขึ้นเว็บเงียบ ๆ (หรือหมวดใหม่ไม่โผล่ทั้งที่มีข้อมูล)
+ * ⚠️ **ห้ามลบหมวดจากแอป** (มติ D25 ข้อ 3) ⇒ การทดสอบลบแถวทดสอบด้วย SQL ตรง ๆ แล้วพิสูจน์ว่ากลับมาเท่าเดิม
+ * ⚠️ ต้องมีข้อมูลจริง (หมวด/สินค้า) — CI ที่ไม่มีข้อมูลต้อง **ข้ามอย่างเปิดเผย** (บทเรียนรอบที่ 261)
+ * ⚠️ ค่าคงที่ของวงจรนี้ประกาศไว้ **ก่อน `await main()`** (กัน TDZ — บทเรียนรอบที่ 78)
+ */
+
+async function checkProductCategories(): Promise<void> {
+  const before = await listAdminCategories();
+  if (before.length === 0) {
+    skip("หมวดสินค้า", "ฐานข้อมูลนี้ยังไม่มีหมวด (ต้องรัน `products:import` ก่อน)");
+    return;
+  }
+
+  const baseline = before.length;
+  const publicBefore = (await listProductCategoryCards()).map((card) => card.id);
+  const sample = before[0];
+  assert.ok(sample !== undefined);
+  const sampleLogoMediaId = sample.logoPath === null ? null : sample.logoPath.replace(/^\/media\//, "");
+  let presetId = "";
+
+  try {
+    /* 1) เพิ่มหมวดใหม่ — id ซ้ำต้องไม่ทับของเดิม (unique key ที่ฐานข้อมูล) */
+    const input = {
+      id: CATEGORY_CHECK_ID,
+      nameTh: "หมวดทดสอบ",
+      nameEn: "Check category",
+      descriptionTh: "คำอธิบายทดสอบ",
+      descriptionEn: "",
+      sortOrder: 900,
+      imageMediaId: sampleLogoMediaId,
+      logoMediaId: sampleLogoMediaId,
+    };
+    assert.equal(await createProductCategoryAdmin(input, CATEGORY_CHECK_ACTOR), true, "เพิ่มหมวดใหม่ต้องสำเร็จ");
+    assert.equal(await createProductCategoryAdmin(input, CATEGORY_CHECK_ACTOR), false, "เพิ่ม id ซ้ำต้องไม่ทับของเดิม");
+    assert.equal((await listAdminCategories()).length, baseline + 1, "จำนวนหมวดต้องเพิ่มขึ้น 1");
+    assert.ok((await listCategoryIds()).includes(CATEGORY_CHECK_ID), "ตัวอ่าน id ต้องเห็นหมวดใหม่");
+
+    /* 2) หมวดใหม่ (มีภาพ) ต้องขึ้นหน้าเว็บ และ **หมวดเดิมต้องไม่หาย** */
+    const publicAfterCreate = (await listProductCategoryCards()).map((card) => card.id);
+    assert.ok(publicAfterCreate.includes(CATEGORY_CHECK_ID), "หมวดใหม่ที่มีภาพต้องขึ้นหน้าเว็บ");
+    assert.deepEqual(
+      [...publicAfterCreate].filter((id) => id !== CATEGORY_CHECK_ID),
+      [...publicBefore],
+      "หมวดเดิมต้องอยู่ครบและลำดับเดิม",
+    );
+
+    /* 3) ซ่อนจากเว็บ ⇒ หลุดจากหน้าเว็บ + ตัวอ่านสาธารณะบอกว่าซ่อน (มติ D25 ข้อ 3) */
+    assert.equal(await setCategoryHidden(CATEGORY_CHECK_ID, true, CATEGORY_CHECK_ACTOR), true, "ซ่อนต้องสำเร็จ");
+    assert.equal(
+      (await listProductCategoryCards()).some((card) => card.id === CATEGORY_CHECK_ID),
+      false,
+      "หมวดที่ซ่อนต้องไม่ขึ้นหน้าเว็บ",
+    );
+    assert.equal((await loadProductCategory(CATEGORY_CHECK_ID))?.isHidden, true, "ตัวอ่านสาธารณะต้องบอกว่าถูกซ่อน");
+
+    /* 4) แสดงกลับ + แก้ชื่อ/คำอธิบาย/ลำดับ */
+    assert.equal(await setCategoryHidden(CATEGORY_CHECK_ID, false, CATEGORY_CHECK_ACTOR), true, "แสดงกลับต้องสำเร็จ");
+    assert.equal(
+      (await listProductCategoryCards()).some((card) => card.id === CATEGORY_CHECK_ID),
+      true,
+      "แสดงกลับแล้วต้องขึ้นเว็บเหมือนเดิม",
+    );
+    assert.equal(
+      await updateProductCategoryAdmin(
+        {
+          id: CATEGORY_CHECK_ID,
+          nameTh: "หมวดทดสอบ (แก้)",
+          nameEn: "Check category",
+          descriptionTh: "แก้แล้ว",
+          descriptionEn: "",
+          sortOrder: 901,
+          isHidden: false,
+        },
+        CATEGORY_CHECK_ACTOR,
+      ),
+      true,
+      "บันทึกค่าหมวดต้องสำเร็จ",
+    );
+    const edited = await loadAdminCategory(CATEGORY_CHECK_ID);
+    assert.equal(edited?.nameTh, "หมวดทดสอบ (แก้)", "อ่านกลับต้องได้ชื่อที่แก้");
+    assert.equal(edited?.sortOrder, 901, "อ่านกลับต้องได้ลำดับที่แก้");
+
+    /* 5) จัดลำดับด้วยเครื่องมือกลาง — ส่งเฉพาะหมวดทดสอบ ⇒ หมวดจริงไม่ถูกแตะ */
+    assert.equal(await reorderRows("category", [CATEGORY_CHECK_ID], CATEGORY_CHECK_ACTOR), 1, "จัดลำดับต้องเขียน 1 แถว");
+    assert.equal((await loadAdminCategory(CATEGORY_CHECK_ID))?.sortOrder, 1, "ลำดับใหม่ต้องเป็น 1");
+
+    /* 6) ค่าเริ่มต้นถาวร: คืนค่าแล้วได้ค่าตรงกับชุดที่เก็บไว้จริง ๆ แล้ว **เขียนค่าจริงกลับ** */
+    const defaults = await listCategoryDefaults();
+    const target = defaults.find((row) => row.id === sample.id);
+    if (target === undefined) {
+      skip("ค่าเริ่มต้นถาวรของหมวด", "ยังไม่ได้รัน `products:category-defaults`");
+    } else {
+      const original = {
+        nameTh: sample.nameTh,
+        nameEn: sample.nameEn,
+        descriptionTh: sample.descriptionTh,
+        descriptionEn: sample.descriptionEn,
+        sortOrder: sample.sortOrder,
+        isHidden: sample.isHidden,
+      };
+      try {
+        assert.equal(await restoreCategoryFromDefault(sample.id, CATEGORY_CHECK_ACTOR), true, "คืนค่าเริ่มต้นต้องสำเร็จ");
+        const restored = await loadAdminCategory(sample.id);
+        assert.equal(restored?.nameTh, target.nameTh, "ชื่อต้องกลับไปเท่าค่าเริ่มต้น");
+        assert.equal(restored?.sortOrder, target.sortOrder, "ลำดับต้องกลับไปเท่าค่าเริ่มต้น");
+        assert.equal(restored?.isHidden, false, "คืนค่าเริ่มต้น = กลับมาแสดงบนเว็บ");
+      } finally {
+        assert.equal(
+          await updateProductCategoryAdmin({ id: sample.id, ...original }, CATEGORY_CHECK_ACTOR),
+          true,
+          "ต้องคืนค่าจริงของหมวดนั้นได้",
+        );
+      }
+    }
+
+    /* 7) พรีเซ็ต: ชื่อซ้ำ = เขียนทับชุดเดิม → ใช้ชุด → ลบชุด */
+    const payload = categoryPresetPayload([
+      {
+        id: CATEGORY_CHECK_ID,
+        nameTh: "จากชุด",
+        nameEn: "From preset",
+        descriptionTh: "ชุด",
+        descriptionEn: "",
+        imageMediaId: sampleLogoMediaId,
+        logoMediaId: sampleLogoMediaId,
+        sortOrder: 902,
+        isHidden: false,
+      },
+    ]);
+    presetId = await saveCategoryPreset(CATEGORY_PRESET_CHECK_NAME, payload, CATEGORY_CHECK_ACTOR);
+    const savedAgain = await saveCategoryPreset(CATEGORY_PRESET_CHECK_NAME, payload, CATEGORY_CHECK_ACTOR);
+    assert.equal(savedAgain, presetId, "ชื่อชุดซ้ำต้องเขียนทับชุดเดิม (id เดิม)");
+    assert.ok(
+      (await listCategoryPresets()).some((preset) => preset.id === presetId),
+      "ชุดที่บันทึกต้องอ่านกลับได้",
+    );
+
+    const applied = await applyCategoryPreset(payload, CATEGORY_CHECK_ACTOR);
+    assert.equal(applied.applied, 1, "ใช้ชุดต้องเขียน 1 หมวด");
+    assert.deepEqual([...applied.skipped], [], "ไม่มีหมวดที่ถูกข้าม (หมวดทดสอบมีอยู่จริง)");
+    assert.equal((await loadAdminCategory(CATEGORY_CHECK_ID))?.nameTh, "จากชุด", "ใช้ชุดแล้วค่าต้องเปลี่ยนตามชุด");
+
+    done(
+      "หมวดสินค้า: เพิ่ม → ขึ้นเว็บ → ซ่อน/แสดง → แก้ → จัดลำดับ → คืนค่าเริ่มต้น → พรีเซ็ต",
+      "หมวดใหม่ขึ้นเว็บได้ · ซ่อนแล้วหาย · คืนค่าเริ่มต้นตรงชุดถาวร · หมวดจริงไม่ถูกแตะ",
+    );
+  } finally {
+    /* ไม่มีฟังก์ชันลบหมวดในแอป (มติ D25) ⇒ การทดสอบเก็บกวาดด้วย SQL ตรง ๆ */
+    await getPool().query("delete from product_category where id = $1", [CATEGORY_CHECK_ID]);
+    if (presetId !== "") await deleteCategoryPreset(presetId);
+
+    assert.equal(await countWhere("product_category where id = $1", [CATEGORY_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
+    assert.equal(
+      await countWhere("product_category_preset where name = $1", [CATEGORY_PRESET_CHECK_NAME]),
+      0,
+      "ต้องไม่เหลือชุดทดสอบ",
+    );
+    assert.equal((await listAdminCategories()).length, baseline, "จำนวนหมวดต้องกลับมาเท่าเดิม");
+  }
+}
+
 

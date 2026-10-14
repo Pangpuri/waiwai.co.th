@@ -1,6 +1,8 @@
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
 import { catalogHref } from "@/features/products/catalog";
+/* รวมหมวดในโค้ด + หมวดจากฐานข้อมูล (มติ D25 · รอบที่ 264) */
+import { mergeSiteCategories, siteCategoryDescription, siteCategoryName } from "@/lib/products/categories";
 import { formatRecipeDate } from "@/lib/recipes/model";
 import { formatNewsDate, newsPathOfId } from "@/lib/news/model";
 import { localePath, type Locale } from "@/lib/i18n/config";
@@ -28,7 +30,8 @@ export type HomeImage = {
 };
 
 export type HomeCategoryCard = {
-  readonly id: (typeof CATALOG_ITEMS)[number]["id"];
+  /** slug ของหมวด (= `id` ในฐานข้อมูล) — หมวดที่สร้างใหม่จากหลังบ้านไม่มีคีย์พจนานุกรม */
+  readonly id: string;
   readonly slug: string;
   readonly href: string;
   readonly name: string;
@@ -36,6 +39,8 @@ export type HomeCategoryCard = {
   /** จำนวนสินค้าในหมวด — 0 = ไม่มีข้อมูล (ซ่อนตัวเลขได้) */
   readonly productCount: number;
   readonly image: HomeImage;
+  /** ข้อความ alt ของภาพหมวด — มาจากพจนานุกรม (หมวดในโค้ด) หรือชื่อหมวด (หมวดใหม่) */
+  readonly imageAlt: string;
   /** true = ภาพมาจากคลัง (ฐานข้อมูล) · false = ภาพในโค้ด `public/products/*` */
   readonly imageFromDatabase: boolean;
 };
@@ -73,57 +78,55 @@ function pick(th: string, en: string, language: Locale): string {
 }
 
 /**
- * การ์ดหมวดสินค้า **6 ใบตาม `CATALOG_ITEMS` เสมอ** (ลำดับ/ชื่อ/slug จากโค้ด)
+ * การ์ดหมวดสินค้าของหน้าแรก
+ *
+ * รอบที่ 264 (มติ D25): **หมวดในโค้ด 6 ใบ + หมวดที่สร้างใหม่จากหลังบ้าน + ลำดับที่ผู้ดูแลจัด**
  * ฐานข้อมูลเติม "คำอธิบาย · ภาพจริง · จำนวนสินค้า" ให้ — ไม่มี DB ก็ยังเป็นการ์ดที่ลิงก์ถูกทุกใบ
+ * ⚠️ หมวดที่ถูก **"ซ่อนจากเว็บ"** ไม่ถูกส่งมาแล้ว (`listProductCategoryCards()` กรองที่ SQL และ merge กรองซ้ำ)
  */
 export function homeCategoryCards(
   rows: readonly ProductCategoryCardRecord[],
   language: Locale,
   messages: Messages,
 ): readonly HomeCategoryCard[] {
-  const bySlug = new Map(rows.map((row) => [row.id, row]));
+  const builtIn = CATALOG_ITEMS.map((item) => ({
+    slug: item.slug,
+    name: messages.productsPage.items[item.id].name,
+    imageAlt: messages.productsPage.items[item.id].imageAlt,
+    imageSrc: item.image.src,
+    imageWidth: item.image.width,
+    imageHeight: item.image.height,
+  }));
 
-  return CATALOG_ITEMS.map((item) => {
-    /* ⚠️ `product_category.id` = **slug** (ไม่ใช่คีย์พจนานุกรม) ⇒ จับคู่ด้วย slug เท่านั้น */
-    const row = bySlug.get(item.slug);
-    const fallbackImage: HomeImage = {
-      src: item.image.src,
-      width: item.image.width,
-      height: item.image.height,
-    };
-    const databaseImage =
-      row !== undefined && row.imagePath !== null && row.imageWidth !== null && row.imageHeight !== null
-        ? { src: row.imagePath, width: row.imageWidth, height: row.imageHeight }
-        : null;
-
-    return {
-      id: item.id,
-      slug: item.slug,
-      href: catalogHref(language, item.slug),
-      name: messages.productsPage.items[item.id].name,
-      description: row === undefined ? "" : pick(row.descriptionTh, row.descriptionEn, language),
-      productCount: row?.productCount ?? 0,
-      image: databaseImage ?? fallbackImage,
-      imageFromDatabase: databaseImage !== null,
-    };
-  });
+  return mergeSiteCategories(builtIn, rows, language).map((category) => ({
+    id: category.slug,
+    slug: category.slug,
+    href: catalogHref(language, category.slug),
+    name: siteCategoryName(category, language),
+    description: siteCategoryDescription(category, language),
+    productCount: category.productCount,
+    image: { src: category.imageSrc, width: category.imageWidth, height: category.imageHeight },
+    imageAlt: category.imageAlt,
+    imageFromDatabase: category.imageSrc.startsWith("/media/"),
+  }));
 }
 
 /**
- * สินค้าเด่น 6 ตัว (1 ตัวต่อหมวด) — เรียงตาม `CATALOG_ITEMS` · **ไม่มีข้อมูล = คืน []** (ผู้เรียกซ่อนส่วนนี้)
+ * สินค้าเด่น — 1 ตัวต่อหมวด **ตามลำดับการ์ดหมวดที่แสดงจริง** · **ไม่มีข้อมูล = คืน []** (ผู้เรียกซ่อนส่วนนี้)
  * ⚠️ ไม่มีข้อมูลจำลอง: ห้ามแต่งชื่อสินค้าขึ้นเอง (บทเรียน: การ์ด "ข้อมูลทดสอบ" บนหน้าเว็บจริง)
+ * ⚠️ รอบที่ 264: รับ "การ์ดหมวดที่แสดงจริง" เข้ามา ⇒ หมวดที่ถูกซ่อนไม่โผล่ · หมวดใหม่ก็มีสินค้าเด่นได้
  */
 export function homeProductHighlights(
   rows: readonly ProductHighlightRecord[],
   language: Locale,
-  messages: Messages,
+  categories: readonly HomeCategoryCard[],
 ): readonly HomeProductHighlight[] {
   const byCategory = new Map(rows.map((row) => [row.categoryId, row]));
 
   const items: HomeProductHighlight[] = [];
-  for (const catalogItem of CATALOG_ITEMS) {
-    /* เช่นเดียวกับด้านบน: `category_id` ในฐานข้อมูล = slug */
-    const row = byCategory.get(catalogItem.slug);
+  for (const category of categories) {
+    /* ⚠️ `category_id` ในฐานข้อมูล = slug (ไม่ใช่คีย์พจนานุกรม) */
+    const row = byCategory.get(category.slug);
     if (row === undefined || row.imagePath === null || row.imageWidth === null || row.imageHeight === null) continue;
 
     const name = pick(row.nameTh, row.nameEn, language);
@@ -132,9 +135,9 @@ export function homeProductHighlights(
     items.push({
       id: row.id,
       /* ยังไม่มีหน้ารายละเอียดสินค้ารายชิ้น ⇒ พาไปหน้าหมวดของสินค้านั้น (ไม่ใช่ลิงก์ตาย) */
-      href: catalogHref(language, catalogItem.slug),
+      href: catalogHref(language, category.slug),
       name,
-      categoryName: messages.productsPage.items[catalogItem.id].name,
+      categoryName: category.name,
       image: { src: row.imagePath, width: row.imageWidth, height: row.imageHeight },
     });
   }

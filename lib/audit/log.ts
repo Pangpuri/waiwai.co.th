@@ -28,6 +28,15 @@ export type AuditAction =
   /* สินค้า (รอบที่ 132) */
   | "product-save"
   | "product-category-save"
+  /* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/จัดลำดับ/พรีเซ็ต (มติ D25 · รอบที่ 264) */
+  | "product-category-create"
+  | "product-category-hide"
+  | "product-category-restore"
+  | "product-category-reorder"
+  | "product-category-preset-save"
+  | "product-category-preset-apply"
+  | "product-category-preset-delete"
+  | "product-category-preset-import"
   | "news-save"
   | "news-trash"
   | "news-restore"

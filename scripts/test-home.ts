@@ -48,6 +48,8 @@ const categoryRow: ProductCategoryCardRecord = {
   logoWidth: null,
   logoHeight: null,
   productCount: 22,
+  sortOrder: 10,
+  isHidden: false,
 };
 
 const highlightRow: ProductHighlightRecord = {
@@ -136,8 +138,9 @@ test("home: การ์ดหมวดเป็นอังกฤษได้ (
 
 /* ── 2) สินค้าเด่น ────────────────────────────────────────────────────────── */
 
-test("home: สินค้าเด่น 1 ตัวต่อหมวด เรียงตามแค็ตตาล็อก และกดไปหน้าหมวดจริง", () => {
-  const items = homeProductHighlights([highlightRow], "th", th);
+test("home: สินค้าเด่น 1 ตัวต่อหมวด เรียงตามการ์ดที่แสดง และกดไปหน้าหมวดจริง", () => {
+  const categories = homeCategoryCards([categoryRow], "th", th);
+  const items = homeProductHighlights([highlightRow], "th", categories);
   assert.equal(items.length, 1);
   const first = items[0];
   assert.ok(first !== undefined);
@@ -148,12 +151,13 @@ test("home: สินค้าเด่น 1 ตัวต่อหมวด เ�
 });
 
 test("home: ไม่มีข้อมูลจริง = ไม่มีสินค้าเด่น (ห้ามแต่งชื่อสินค้าขึ้นเอง)", () => {
-  assert.deepEqual([...homeProductHighlights([], "th", th)], []);
+  const categories = homeCategoryCards([categoryRow], "th", th);
+  assert.deepEqual([...homeProductHighlights([], "th", categories)], []);
 
   /* แถวที่ไม่มีภาพ/ชื่อว่าง ต้องถูกข้าม */
   const noImage: ProductHighlightRecord = { ...highlightRow, imagePath: null, imageWidth: null, imageHeight: null };
   const noName: ProductHighlightRecord = { ...highlightRow, nameTh: "  ", nameEn: "" };
-  assert.deepEqual([...homeProductHighlights([noImage, noName], "th", th)], []);
+  assert.deepEqual([...homeProductHighlights([noImage, noName], "th", categories)], []);
 });
 
 /* ── 3) เมนูอาหาร + ข่าว: ของจริง + ลิงก์ถูก ──────────────────────────────── */
@@ -231,7 +235,7 @@ test("home: ห้ามมี slug เก่าที่ไม่มีอย�
 
 test("home: ชื่อสินค้า/หมวดทุกใบมี alt (a11y) และการ์ดสินค้าใช้ <Image> ที่มีขนาดจริง", () => {
   const showcase = sourceOf("features/home/ui/products-showcase.tsx");
-  assert.ok(showcase.includes("alt={messages.productsPage.items[category.id].imageAlt}"), "รูปหมวดต้องมี alt");
+  assert.ok(showcase.includes("alt={category.imageAlt}"), "รูปหมวดต้องมี alt");
   assert.ok(showcase.includes("alt={product.name}"), "รูปสินค้าต้องมี alt จากชื่อจริง");
   assert.ok(showcase.includes("width={product.image.width}") && showcase.includes("height={product.image.height}"));
   assert.ok(!showcase.includes("PackShot"), "ไม่ใช้ภาพสินค้าแบบวาดแล้ว (ของจริงมาจากฐานข้อมูล)");

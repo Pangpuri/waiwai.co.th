@@ -354,6 +354,9 @@ create index if not exists chrome_preset_trash_idx on chrome_preset (deleted_at)
 -- · `product_category` เก็บเนื้อหาของหมวด (คำอธิบาย · ภาพหัวหมวด) + **ชื่อ + โลโก้การ์ดที่แก้จากหลังบ้านได้**
 --   (migration 0037 · รอบที่ 254 · มติ D24) · ชื่อในพจนานุกรม `features/products/catalog.ts` = **ค่า fallback**
 --   เมื่อคอลัมน์ในฐานข้อมูลว่าง ⇒ หน้าเว็บหน้าตาเหมือนเดิมจนกว่าจะมีคนแก้จากหลังบ้าน
+-- · **หลังบ้านหมวดสินค้า (migration 0039 · รอบที่ 264 · มติ D25):**
+--   `sort_order` = ลำดับการแสดง (แก้จากจอ/ลากจัดลำดับ) · `is_hidden` = "ซ่อนจากเว็บ" (ไม่มี "ลบหมวด")
+--   ⇒ คำสั่งอ่านฝั่งเว็บต้องกรอง `is_hidden = false` เสมอ
 -- · `product.id` = `p<source_id>` ⇒ นำเข้าซ้ำได้แบบ idempotent (`npm run products:import`)
 -- · รูปเก็บในตาราง `media` (มติ D11) · ที่นี่เก็บแค่ id ของภาพ (มติ D9) · `media.sha256` = ลายนิ้วมือไฟล์ (dedupe ตอนนำเข้า)
 -- · `product_category.image_media_id` / `logo_media_id` / `product.image_media_id` = on delete set null (ลบภาพในถังขยะแล้วไม่หาย)
@@ -372,9 +375,46 @@ create table if not exists product_category (
   image_media_id text        references media (id) on delete set null,
   /* โลโก้ที่แสดงบนการ์ด `/products` (migration 0037) — null = ใช้ไฟล์ใน public/products */
   logo_media_id  text        references media (id) on delete set null,
+  /* ลำดับการแสดง (migration 0039) — หมวดในโค้ดเริ่มที่ 10, 20, … · หมวดใหม่ต่อท้าย */
+  sort_order     integer     not null default 100,
+  /* ซ่อนจากเว็บโดยไม่ลบ (migration 0039 · มติ D25 ข้อ 3) */
+  is_hidden      boolean     not null default false,
   updated_at     timestamptz not null default now(),
   updated_by     text
 );
+
+create index if not exists product_category_order_idx on product_category (sort_order, id);
+
+-- ค่าเริ่มต้นถาวรของหมวด (migration 0039 · มติ D25 ข้อ 4)
+-- ⚠️ **แอปอ่านอย่างเดียว** — เติมด้วย `npm run products:category-defaults` (fill-only:
+--    `on conflict do nothing`) · "คืนค่าเริ่มต้น" = คัดลอกจากตารางนี้ลง `product_category`
+create table if not exists product_category_default (
+  id             text        primary key,
+  name_th        text        not null default '',
+  name_en        text        not null default '',
+  description_th text        not null default '',
+  description_en text        not null default '',
+  image_media_id text        references media (id) on delete set null,
+  logo_media_id  text        references media (id) on delete set null,
+  sort_order     integer     not null default 100,
+  captured_at    timestamptz not null default now(),
+  captured_by    text        not null default ''
+);
+
+-- พรีเซ็ตของหมวด (migration 0039 · มติ D25 ข้อ 5) — `payload` = `{ version, categories[] }`
+-- เก็บไม่จำกัดจำนวนชุด · ไม่หมดอายุ · **ไม่ขึ้นหน้า /privacy** (ไม่ใช่ข้อมูลส่วนบุคคล)
+create table if not exists product_category_preset (
+  id         text        primary key,
+  name       text        not null,
+  payload    jsonb       not null,
+  created_at timestamptz not null default now(),
+  created_by text        not null default '',
+  updated_at timestamptz not null default now(),
+  updated_by text        not null default ''
+);
+
+create unique index if not exists product_category_preset_name_idx
+  on product_category_preset (lower(name));
 
 create table if not exists product (
   id             text        primary key,

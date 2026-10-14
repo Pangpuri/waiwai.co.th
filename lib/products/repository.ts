@@ -1,6 +1,8 @@
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
 import type { ImageWriteMode } from "@/lib/products/media-mode";
 import { readQuery } from "@/lib/db/read";
+/* ลำดับตั้งต้นของหมวด = ลำดับในโค้ด (migration 0039 · รอบที่ 264) */
+import { defaultSortOrderOf } from "@/lib/products/categories";
 import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
 
 /**
@@ -62,11 +64,19 @@ export type ProductCategoryRecord = {
   readonly descriptionEn: string;
   /** ภาพหัวหมวด (หน้ารายละเอียดหมวด) */
   readonly imagePath: string | null;
+  /** ขนาดจริงของภาพหัวหมวด (จาก `media`) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด (รอบที่ 264) */
+  readonly imageWidth: number | null;
+  readonly imageHeight: number | null;
   /** โลโก้ที่แสดงบนการ์ด `/products` (migration 0037) — null = ใช้ไฟล์ใน public */
   readonly logoPath: string | null;
   /** ขนาดจริงของโลโก้ (จาก `media`) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด */
   readonly logoWidth: number | null;
   readonly logoHeight: number | null;
+  /**
+   * หมวดนี้ถูก "ซ่อนจากเว็บ" ไหม (migration 0039 · มติ D25 ข้อ 3)
+   * ⇒ หน้ารายละเอียดต้องตอบ 404 และการ์ดต้องไม่ขึ้นเว็บ
+   */
+  readonly isHidden: boolean;
 };
 
 /*
@@ -138,9 +148,11 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
   try {
     const result = await readQuery<Record<string, unknown>>(
       `select c.id, c.name_th, c.name_en, c.description_th, c.description_en,
-              c.image_media_id, c.logo_media_id,
+              c.image_media_id, c.logo_media_id, c.is_hidden,
+              im.width  as image_width,  im.height  as image_height,
               lm.width as logo_width, lm.height as logo_height
          from product_category c
+         left join media im on im.id = c.image_media_id
          left join media lm on lm.id = c.logo_media_id
         where c.id = $1
         limit 1`,
@@ -159,9 +171,12 @@ export async function loadProductCategory(categoryId: string): Promise<ProductCa
       descriptionTh: text(row.description_th),
       descriptionEn: text(row.description_en),
       imagePath: mediaPath(row.image_media_id),
+      imageWidth: dim(row.image_width),
+      imageHeight: dim(row.image_height),
       logoPath: mediaPath(row.logo_media_id),
       logoWidth: dim(row.logo_width),
       logoHeight: dim(row.logo_height),
+      isHidden: row.is_hidden === true,
     };
   } catch {
     return null;
@@ -250,6 +265,10 @@ export type ProductCategoryCardRecord = {
   readonly logoWidth: number | null;
   readonly logoHeight: number | null;
   readonly productCount: number;
+  /** ลำดับการแสดงที่ผู้ดูแลจัดไว้ (migration 0039 · รอบที่ 264) */
+  readonly sortOrder: number;
+  /** ซ่อนจากเว็บ (มติ D25 ข้อ 3) — คิวรีสาธารณะกรองออกให้แล้ว */
+  readonly isHidden: boolean;
 };
 
 export async function listProductCategoryCards(): Promise<readonly ProductCategoryCardRecord[]> {
@@ -268,6 +287,8 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
       logoWidth: number | null;
       logoHeight: number | null;
       productCount: string;
+      sortOrder: number;
+      isHidden: boolean;
     }>(
       `select c.id,
               c.name_th        as "nameTh",
@@ -280,6 +301,8 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
               lm.id            as "logoId",
               lm.width         as "logoWidth",
               lm.height        as "logoHeight",
+              c.sort_order     as "sortOrder",
+              c.is_hidden      as "isHidden",
               count(p.id)::text as "productCount"
          from product_category c
          left join media m on m.id = c.image_media_id
@@ -287,7 +310,9 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
          left join media lm on lm.id = c.logo_media_id
          /* ⚠️ รอบที่ 139: ใส่เงื่อนไขถังขยะใน join (ไม่ใช่ where) เพื่อให้หมวดที่ไม่มีสินค้าเหลือยังได้การ์ดอยู่ */
          left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION}
-        group by c.id, m.id, m.width, m.height, lm.id, lm.width, lm.height`,
+        where c.is_hidden = false
+        group by c.id, c.sort_order, c.is_hidden, m.id, m.width, m.height, lm.id, lm.width, lm.height
+        order by c.sort_order, c.id`,
     );
 
     const cards: ProductCategoryCardRecord[] = [];
@@ -306,6 +331,8 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
         logoWidth: row.logoWidth,
         logoHeight: row.logoHeight,
         productCount: Number.isFinite(count) ? count : 0,
+        sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 100,
+        isHidden: row.isHidden === true,
       });
     }
     return cards;
@@ -424,8 +451,8 @@ export async function upsertProductCategory(
   const logoMode = options.logoMode ?? "keep";
 
   await getPool().query(
-    `insert into product_category (id, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
+    `insert into product_category (id, source_id, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, updated_at, updated_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $10, now(), $9)
      on conflict (id) do update set
        /* ค่าว่างต้องไม่ลบ source_id เดิม (แบบฟอร์มหลังบ้านส่งค่านี้ผ่านช่องซ่อน) */
        source_id      = coalesce(nullif(excluded.source_id, ''), product_category.source_id),
@@ -447,6 +474,11 @@ export async function upsertProductCategory(
       imageMediaId,
       logoMediaId,
       actor,
+      /*
+        ลำดับตั้งต้น = ลำดับในโค้ด (10, 20, …) — เขียนเฉพาะตอน **สร้างแถวใหม่**
+        ⚠️ สาขา `on conflict` ไม่แตะ `sort_order` ⇒ รันนำเข้าซ้ำ **ไม่ทับลำดับที่ผู้ดูแลจัดไว้** (รอบที่ 264)
+      */
+      defaultSortOrderOf(input.id),
     ],
   );
 }
@@ -461,10 +493,10 @@ export async function upsertProductCategory(
  */
 export async function importCategoryLogo(id: string, logoMediaId: string, actor: string): Promise<boolean> {
   await getPool().query(
-    `insert into product_category (id, name_th, name_en, updated_at, updated_by)
-       values ($1, '', '', now(), $2)
+    `insert into product_category (id, name_th, name_en, sort_order, updated_at, updated_by)
+       values ($1, '', '', $3, now(), $2)
      on conflict (id) do nothing`,
-    [id, actor],
+    [id, actor, defaultSortOrderOf(id)],
   );
   const result = await getPool().query(
     `update product_category

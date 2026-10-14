@@ -154,7 +154,7 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   ]);
 
   const categories = homeCategoryCards(categoryRows, lang, messages);
-  const highlights = homeProductHighlights(highlightRows, lang, messages);
+  const highlights = homeProductHighlights(highlightRows, lang, categories);
   const recipes = homeRecipeItems(recipeRows, lang, HOME_RECIPE_LIMIT);
   const news = homeNewsItems(newsRows, lang, HOME_NEWS_LIMIT);
 

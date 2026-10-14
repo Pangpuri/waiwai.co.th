@@ -4,14 +4,14 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
-import { CATALOG_ITEMS, catalogHref } from "@/features/products/catalog";
+import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { ProductCategoryCard } from "@/features/products/ui/category-card";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
-import { categoryLogoOf, categoryNameOf } from "@/lib/products/display";
+import { mergeSiteCategories, siteCategoryName } from "@/lib/products/categories";
 import { listProductCategoryCards } from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
@@ -67,12 +67,20 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
   const m = messages.productsPage;
 
   /*
-    ── ชื่อ + โลโก้หมวดมาจากไหน (รอบที่ 254 · มติ D24) ─────────────────────────────
-    หลังบ้านแก้ชื่อหมวด/โลโก้การ์ดได้ ⇒ เอาค่าจากฐานข้อมูลมาก่อน แล้ว **ถอยไปใช้ค่าในโค้ด/พจนานุกรม**
-    เมื่อยังไม่แก้ (หรือไม่มีฐานข้อมูล — `listProductCategoryCards()` คืน [] ⇒ หน้าตาเหมือนเดิมเป๊ะ)
+    ── หมวดที่แสดงบนหน้านี้มาจากไหน (รอบที่ 264 · มติ D25) ──────────────────────────
+    **หมวดในโค้ด 6 ใบ + หมวดที่สร้างใหม่จากหลังบ้าน + ลำดับที่ผู้ดูแลจัด** (ซ่อนไว้ = ไม่แสดง)
+    ค่าจากฐานข้อมูลทับค่าในโค้ด (ชื่อ/คำอธิบาย/ภาพ/โลโก้) — ไม่มี DB ⇒ หน้าตาเหมือนเดิมเป๊ะ
   */
   const categoryCards = await listProductCategoryCards();
-  const cardBySlug = new Map(categoryCards.map((card) => [card.id, card]));
+  const builtInCategories = CATALOG_ITEMS.map((item) => ({
+    slug: item.slug,
+    name: m.items[item.id].name,
+    imageAlt: m.items[item.id].imageAlt,
+    imageSrc: item.image.src,
+    imageWidth: item.image.width,
+    imageHeight: item.image.height,
+  }));
+  const categories = mergeSiteCategories(builtInCategories, categoryCards, lang);
 
   return (
     <>
@@ -107,23 +115,18 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
       <section className="container-site py-16 lg:py-24">
         {/* `category-card-grid` = คลาสเดียวกับพรีวิวหลังบ้านใช้บังคับ 1 คอลัมน์ (ดู app/globals.css) */}
         <ul className="category-card-grid grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {CATALOG_ITEMS.map((item) => {
-            const copy = m.items[item.id];
-            const card = cardBySlug.get(item.slug) ?? null;
-
-            return (
-              <li key={item.id}>
-                <ProductCategoryCard
-                  name={categoryNameOf(card?.nameTh ?? "", card?.nameEn ?? "", copy.name, lang)}
-                  imageSrc={categoryLogoOf(card?.logoPath ?? null, item.image.src)}
-                  imageWidth={card?.logoWidth ?? item.image.width}
-                  imageHeight={card?.logoHeight ?? item.image.height}
-                  imageAlt={copy.imageAlt}
-                  href={catalogHref(lang, item.slug)}
-                />
-              </li>
-            );
-          })}
+          {categories.map((category) => (
+            <li key={category.slug}>
+              <ProductCategoryCard
+                name={siteCategoryName(category, lang)}
+                imageSrc={category.logoSrc}
+                imageWidth={category.logoWidth}
+                imageHeight={category.logoHeight}
+                imageAlt={category.imageAlt}
+                href={localePath(lang, `/products/${category.slug}`)}
+              />
+            </li>
+          ))}
         </ul>
       </section>
     </>

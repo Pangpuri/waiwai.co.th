@@ -29,6 +29,7 @@ import { adminChromePreset } from "./areas/en/adminChromePreset.ts";
 import { adminBlockTypes } from "./areas/en/adminBlockTypes.ts";
 import { adminSchedule } from "./areas/en/adminSchedule.ts";
 import { adminLive } from "./areas/en/adminLive.ts";
+import { enAdminCategories } from "./areas/en/adminCategories.ts";
 import { adminRbac } from "./areas/en/adminRbac.ts";
 import { adminPreviewLink } from "./areas/en/adminPreviewLink.ts";
 import { enAdminNotice } from "./areas/en/adminNotice.ts";
@@ -76,6 +77,8 @@ export const en: Messages = {
   previewLinkPage,
   pendingPages,
   blocks,
+  /* Admin sub-area that is its own screen — lives at the root (not inside the `admin` bag) */
+  adminCategories: enAdminCategories,
   admin: {
     ...admin,
     ...adminMedia,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
-import { catalogSlugs, findCatalogItem } from "@/features/products/catalog";
+import { catalogSlugs, findCatalogItem, type CatalogItem } from "@/features/products/catalog";
 import { ProductListSection, productListStringsOf } from "@/features/products/ui/product-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
@@ -13,7 +13,8 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { loadPageSeo } from "@/lib/pages/repository";
-import { categoryLogoOf, categoryNameOf } from "@/lib/products/display";
+import { FALLBACK_CATEGORY_IMAGE_HEIGHT, FALLBACK_CATEGORY_IMAGE_WIDTH } from "@/lib/products/categories";
+import { categoryNameOf } from "@/lib/products/display";
 import { listProductsByCategory, loadProductCategory, type ProductCategoryRecord } from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
@@ -28,6 +29,10 @@ import { withPageSeo } from "@/lib/seo/page-seo";
  * ⚠️ **เปิดให้จัดทำดัชนีแล้ว (รอบที่ 170 · มติเจ้าของ 2026-10-07):** หน้านี้มีข้อมูลสินค้าจริงจากฐานข้อมูล
  *    (รอบที่ 103–104) และชื่อ/คำอธิบายหมวดไม่ใช่ข้อความ "ยังไม่เปิดใช้งาน" อีกแล้ว ⇒ ถอด `noindex` ออก
  *    · หลังบ้านยังสั่ง `noindex` กลับได้รายหน้าผ่านช่อง SEO (W2) — `withPageSeo` จะตั้ง `robots` ให้เอง
+ *
+ * 🆕 **รอบที่ 264 (มติ D25):** หน้านี้รับ **หมวดที่สร้างใหม่จากหลังบ้าน** ด้วย (ไม่อยู่ในทะเบียนโค้ด)
+ *    · หมวดที่ถูก **"ซ่อนจากเว็บ"** (`is_hidden`) = **404** (ไม่ใช่ 200 ที่เนื้อหาว่าง)
+ *    · ชื่อ/คำอธิบาย/ภาพ มาจากฐานข้อมูล · ถอยไปใช้พจนานุกรม (เฉพาะหมวดในโค้ด)
  */
 
 /*
@@ -37,19 +42,20 @@ import { withPageSeo } from "@/lib/seo/page-seo";
   (`lib/cache/refresh.ts`) ⇒ รายการที่ prerender ไว้ถูกทำให้เก่าทั้งหมด
   ⇒ คำขอถัดไปเข้าเส้นทาง "fallback" ซึ่งถูกปิดไว้ → เซิร์ฟเวอร์โยน `NoFallbackError`
   ⇒ **หน้าหมวดทั้ง 6 ตอบ 404 จนกว่าจะ build ใหม่** (คือ กดบันทึกอะไรก็ได้ แล้วหน้าเว็บพังทันที)
-  ⇒ ปล่อยเป็นค่าเริ่มต้น (true) แล้วพึ่ง `findCatalogItem()` + `notFound()` ด้านล่างกัน slug มั่ว
-     (ปลอดภัยเท่ากัน เพราะ slug ต้องอยู่ในทะเบียนโค้ด `features/products/catalog.ts` อยู่แล้ว)
+  ⇒ ปล่อยเป็นค่าเริ่มต้น (true) แล้วพึ่ง `findCatalogItem()` / แถวในฐานข้อมูล + `notFound()` ด้านล่างกัน slug มั่ว
+     (และเป็นทางที่ทำให้ **หมวดที่สร้างใหม่** เปิดได้ทันทีโดยไม่ต้อง build ใหม่ — รอบที่ 264)
   ❗ มีเทสต์กันถอยหลังใน `scripts/test-isr.ts`
 */
 
 /*
-  ต่ออายุเพจนี้เองทุก 5 นาที — หน้านี้อ่านฐานข้อมูล (เอกสารบล็อกของหมวด)
+  ต่ออายุเพจนี้เองทุก 5 นาที — หน้านี้อ่านฐานข้อมูล (เอกสารบล็อก/สินค้า/หมวด)
   ⚠️ ต้องเป็น **ค่าคงที่ literal** เท่านั้น · Next อ่านค่านี้จากซอร์สตอน build
      เทสต์ scripts/test-isr.ts บังคับให้ค่านี้ตรงกับ PAGE_REVALIDATE_SECONDS ใน lib/cache/window.ts
 */
 export const revalidate = 300;
 
 export function generateStaticParams() {
+  /* prerender หมวดในโค้ดก่อน · หมวดที่สร้างใหม่ถูกสร้างตอนขอครั้งแรก (dynamicParams = true) */
   return catalogSlugs().map((slug) => ({ slug }));
 }
 
@@ -67,6 +73,53 @@ function introTextOf(messages: Messages, category: ProductCategoryRecord | null,
   return messages.productsPage.detailStub.body;
 }
 
+/** ชื่อจากพจนานุกรมของหมวดในโค้ด — หมวดที่สร้างใหม่ไม่มีคีย์ ⇒ คืน slug (แต่ค่าจาก DB ทับอยู่แล้ว) */
+function dictionaryNameOf(item: CatalogItem | undefined, slug: string, m: Messages["productsPage"]): string {
+  return item === undefined ? slug : m.items[item.id].name;
+}
+
+/** ชื่อหมวดที่แสดงจริง: DB (ตามภาษา) → ถอยพจนานุกรม (หมวดในโค้ด) → ถอย slug */
+function displayNameOf(
+  item: CatalogItem | undefined,
+  category: ProductCategoryRecord | null,
+  slug: string,
+  language: "th" | "en",
+  m: Messages["productsPage"],
+): string {
+  return categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", dictionaryNameOf(item, slug, m), language);
+}
+
+/** ภาพที่แสดงในหน้ารายละเอียด: โลโก้จากคลัง → ภาพหัวหมวดจากคลัง → ไฟล์ใน `public/` (เฉพาะหมวดในโค้ด) */
+function heroImageOf(
+  item: CatalogItem | undefined,
+  category: ProductCategoryRecord | null,
+): { readonly src: string; readonly width: number; readonly height: number } | null {
+  if (category !== null) {
+    if (category.logoPath !== null) {
+      return {
+        src: category.logoPath,
+        width: category.logoWidth ?? FALLBACK_CATEGORY_IMAGE_WIDTH,
+        height: category.logoHeight ?? FALLBACK_CATEGORY_IMAGE_HEIGHT,
+      };
+    }
+    if (category.imagePath !== null) {
+      return {
+        src: category.imagePath,
+        width: category.imageWidth ?? FALLBACK_CATEGORY_IMAGE_WIDTH,
+        height: category.imageHeight ?? FALLBACK_CATEGORY_IMAGE_HEIGHT,
+      };
+    }
+  }
+  if (item === undefined) return null;
+  return { src: item.image.src, width: item.image.width, height: item.image.height };
+}
+
+/** หมวดนี้เปิดให้ดูได้ไหม (อยู่ในโค้ด หรือมีแถวในฐานข้อมูลที่ยังไม่ถูกซ่อน) — ไม่เปิด ⇒ 404 */
+function isVisibleCategory(item: CatalogItem | undefined, category: ProductCategoryRecord | null): boolean {
+  if (category !== null && category.isHidden) return false;
+  return item !== undefined || category !== null;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps<"/[lang]/products/[slug]">): Promise<Metadata> {
@@ -74,18 +127,18 @@ export async function generateMetadata({
   if (!isLocale(lang)) return {};
 
   const item = findCatalogItem(slug);
-  if (!item) return {};
+  const category = await loadProductCategory(slug);
+  if (!isVisibleCategory(item, category)) return {};
 
   const messages = await getMessagesFor(lang);
   const m = messages.productsPage;
 
-  /* ชื่อหมวด: ค่าจากหลังบ้านมาก่อน → ถอยพจนานุกรม (รอบที่ 254 · มติ D24) */
-  const category = await loadProductCategory(item.slug);
-  const displayName = categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", m.items[item.id].name, lang);
+  /* ชื่อหมวด: ค่าจากหลังบ้านมาก่อน → ถอยพจนานุกรม (หมวดในโค้ด) */
+  const displayName = displayNameOf(item, category, slug, lang, m);
 
   return withPageSeo(
     lang,
-    `/products/${item.slug}`,
+    `/products/${slug}`,
     {
       /*
         ชื่อหน้า = ชื่อหมวด + ชื่อหน้าหมวด — ไม่ใช้ข้อความ "ยังไม่เปิดใช้งาน" อีกแล้ว
@@ -94,9 +147,9 @@ export async function generateMetadata({
       title: { absolute: `${displayName} — ${m.title}` },
       description: introTextOf(messages, category, lang),
       /* รอบที่ 170: ไม่บังคับ noindex แล้ว — ถ้าหลังบ้านตั้ง noindex `applySeoToMetadata` จะใส่กลับให้ */
-      alternates: buildAlternates(lang, `/products/${item.slug}`),
+      alternates: buildAlternates(lang, `/products/${slug}`),
     },
-    () => loadPageSeo(productDetailPageId(item.slug)),
+    () => loadPageSeo(productDetailPageId(slug)),
   );
 }
 
@@ -108,7 +161,9 @@ export default async function ProductCategoryPage({
   if (!isLocale(lang)) notFound();
 
   const item = findCatalogItem(slug);
-  if (!item) notFound();
+  const category = await loadProductCategory(slug);
+  /* หมวดที่ไม่รู้จัก หรือถูก "ซ่อนจากเว็บ" ⇒ 404 (ไม่ใช่ 200 ที่เนื้อหาว่าง) — มติ D25 ข้อ 3 */
+  if (!isVisibleCategory(item, category)) notFound();
 
   /*
     ── เนื้อหาของหน้านี้มาจาก 2 ทาง ──────────────────────────────────────────────
@@ -119,25 +174,20 @@ export default async function ProductCategoryPage({
   */
   const messages = await getMessages(lang);
   const m = messages.productsPage;
-  const copy = m.items[item.id];
 
-  const [liveDocument, products, category] = await Promise.all([
-    loadLiveBlockDocument(productDetailPageId(item.slug)),
-    listProductsByCategory(item.slug),
-    loadProductCategory(item.slug),
+  const [liveDocument, products] = await Promise.all([
+    loadLiveBlockDocument(productDetailPageId(slug)),
+    listProductsByCategory(slug),
   ]);
 
   const listStrings = productListStringsOf(m);
   const hasProducts = products.length > 0;
   const intro = introTextOf(messages, category, lang);
 
-  /* ชื่อ + โลโก้หมวด: ค่าจากหลังบ้าน (migration 0037) → ถอยค่าในโค้ด/พจนานุกรม */
-  const displayName = categoryNameOf(category?.nameTh ?? "", category?.nameEn ?? "", copy.name, lang);
-  const logo = {
-    src: categoryLogoOf(category?.logoPath ?? null, item.image.src),
-    width: category?.logoWidth ?? item.image.width,
-    height: category?.logoHeight ?? item.image.height,
-  };
+  /* ชื่อ + ภาพหมวด: ค่าจากหลังบ้าน (migration 0037/0039) → ถอยค่าในโค้ด/พจนานุกรม */
+  const displayName = displayNameOf(item, category, slug, lang, m);
+  const imageAlt = item === undefined ? displayName : m.items[item.id].imageAlt;
+  const heroImage = heroImageOf(item, category);
 
   if (liveDocument !== null) {
     return (
@@ -174,14 +224,17 @@ export default async function ProductCategoryPage({
 
       <section className="container-site py-16 lg:py-24">
         <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-          <Image
-            src={logo.src}
-            alt={copy.imageAlt}
-            width={logo.width}
-            height={logo.height}
-            sizes="300px"
-            className="h-auto w-60 max-w-full"
-          />
+          {/* ไม่มีภาพเลย (หมวดที่สร้างใหม่และยังไม่ได้ใส่ภาพ) ⇒ ข้ามภาพ ไม่เรนเดอร์ `src=""` */}
+          {heroImage === null ? null : (
+            <Image
+              src={heroImage.src}
+              alt={imageAlt}
+              width={heroImage.width}
+              height={heroImage.height}
+              sizes="300px"
+              className="h-auto w-60 max-w-full"
+            />
+          )}
 
           {hasProducts ? null : (
             <h2 className="mt-8 font-display text-xl font-extrabold text-fg sm:text-2xl">{m.detailStub.title}</h2>

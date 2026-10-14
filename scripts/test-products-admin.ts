@@ -383,10 +383,11 @@ test("products admin: ฟอร์มหมวดมีช่องชื่อ 
   assert.ok(categoryForm.includes("category-card-grid"), "ต้องใช้กริดเดียวกับหน้าเว็บ (มีกฎบังคับ 1 คอลัมน์ในพรีวิว)");
 });
 
-test("products admin: หน้า /products ใช้ชื่อ/โลโก้จากฐานข้อมูลก่อน แล้วถอยค่าในโค้ด", () => {
+test("products admin: หน้า /products รวมหมวดในโค้ด + หมวดจากฐานข้อมูล (มติ D25 · รอบที่ 264)", () => {
   const page = readFileSync("app/[lang]/products/page.tsx", "utf8");
-  assert.ok(page.includes("listProductCategoryCards"), "ต้องอ่านชื่อ/โลโก้จากฐานข้อมูล");
-  assert.ok(page.includes("categoryNameOf(") && page.includes("categoryLogoOf("), "ต้องใช้ตัวช่วยเลือกค่ากลาง (ไม่ประกอบเอง)");
+  assert.ok(page.includes("listProductCategoryCards"), "ต้องอ่านชื่อ/โลโก้/ลำดับจากฐานข้อมูล");
+  assert.ok(page.includes("mergeSiteCategories("), "ต้องใช้ตัวรวมกลาง (หมวดในโค้ด + หมวดใหม่ · ซ่อนไว้ไม่แสดง)");
+  assert.ok(page.includes("siteCategoryName("), "ต้องเลือกชื่อตามภาษาด้วยตัวช่วยกลาง (ไม่ประกอบเอง)");
   assert.ok(page.includes("ProductCategoryCard"), "ใช้การ์ดตัวเดียวกับพรีวิวหลังบ้าน");
   assert.ok(!page.includes("cardCta"), "ไม่มีข้อความ CTA 'ดูรายละเอียด' แล้ว (รอบที่ 254)");
 });

@@ -15,9 +15,15 @@ import { getPool, isDatabaseConfigured } from "@/db/pool";
  *   · **ข่าวไม่แสดง** — ต้นเหตุคือตาราง `news` ยังไม่มี `sort_order` (แก้ที่ migration 0025)
  */
 
-const TABLE_BY_KIND = { product: "product", recipe: "recipe", news: "news" } as const;
+const TABLE_BY_KIND = { product: "product", recipe: "recipe", news: "news", category: "product_category" } as const;
 
 export type ReorderKind = keyof typeof TABLE_BY_KIND;
+
+/**
+ * ตารางที่ **ไม่มี** คอลัมน์ `deleted_at` (จึงไม่ต้องกรองถังขยะ)
+ * ⚠️ `product_category` ไม่มีถังขยะ — มติ D25 ใช้ "ซ่อนจากเว็บ" (`is_hidden`) แทนการลบ
+ */
+const KINDS_WITHOUT_TRASH: readonly ReorderKind[] = ["category"];
 
 export function isReorderKind(value: string): value is ReorderKind {
   return Object.prototype.hasOwnProperty.call(TABLE_BY_KIND, value);
@@ -43,12 +49,15 @@ const TITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   product: "coalesce(nullif(name_th, ''), id)",
   recipe: "coalesce(nullif(title_th, ''), id)",
   news: "coalesce(nullif(title_th, ''), id)",
+  /* หมวดสินค้า: ชื่อไทยว่างได้ (ถอยพจนานุกรม) ⇒ โชว์ id เพื่อให้ยังจัดลำดับได้ */
+  category: "coalesce(nullif(name_th, ''), id)",
 };
 
 const SUBTITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   product: "category_id",
   recipe: "coalesce(video_id, '')",
   news: "coalesce(to_char(published_at at time zone 'Asia/Bangkok', 'DD/MM/YYYY'), '')",
+  category: "case when is_hidden then 'hidden' else '' end",
 };
 
 /** หมวดสินค้าที่มีอยู่จริง (ใช้ทำตัวเลือกในหน้าจัดลำดับ · เรียงตามชื่อ) */
@@ -78,20 +87,22 @@ export async function listReorderItems(
   if (!isDatabaseConfigured()) return [];
   const table = TABLE_BY_KIND[kind];
   const params: string[] = [];
-  const where: string[] = ["deleted_at is null"];
+  const where: string[] = [];
+  if (!KINDS_WITHOUT_TRASH.includes(kind)) where.push("deleted_at is null");
   if (kind === "product") {
     const categoryId = options?.categoryId ?? "";
     if (categoryId === "") return [];
     params.push(categoryId);
     where.push(`category_id = $${String(params.length)}`);
   }
+  const whereClause = where.length === 0 ? "" : `where ${where.join(" and ")}`;
   try {
     const result = await getPool().query<{ id: string; title: string; subtitle: string }>(
       `select id,
               ${TITLE_COLUMN_BY_KIND[kind]} as title,
               coalesce(${SUBTITLE_COLUMN_BY_KIND[kind]}, '') as subtitle
          from ${table}
-        where ${where.join(" and ")}
+        ${whereClause}
         order by sort_order, id`,
       params,
     );

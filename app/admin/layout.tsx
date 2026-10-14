@@ -55,6 +55,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         /* รอบที่ 262 (มติเจ้าของ): "ใบรับรองมาตรฐาน" ต่อจาก "บริษัท" ตามลำดับเมนูหน้าบ้าน */
         { href: "/admin/builder/certifications", label: messages.admin.navCertifications },
         { href: "/admin/builder/executives", label: messages.admin.navExecutives },
+        /* รอบที่ 264 (มติเจ้าของ D25): "หมวดสินค้า" ต่อจาก "คณะผู้บริหาร" เหนือ "สินค้า" ตามที่สั่งไว้ */
+        { href: "/admin/product-categories", label: messages.adminCategories.navLabel },
         { href: "/admin/products", label: messages.admin.navProducts },
         { href: "/admin/recipes", label: messages.admin.navRecipes },
         { href: "/admin/news", label: messages.admin.navNews },

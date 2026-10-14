@@ -22,14 +22,18 @@ import { SectionHeading } from "./section-heading";
  * รูปทุกใบมี alt จากข้อมูลจริง (ชื่อหมวด/ชื่อสินค้า) — ไม่ใช่ alt="" เพราะรูปสื่อความหมาย
  */
 
-const CATEGORY_ICON: Record<HomeCategoryCard["id"], string> = {
-  instantNoodles: "M4 9h16l-1.2 9.2A2 2 0 0 1 16.8 20H7.2a2 2 0 0 1-2-1.8L4 9Zm4 0V6a4 4 0 0 1 8 0v3",
-  driedVermicelli: "M3 7h18M3 12h18M3 17h18M7 4v16M17 4v16",
+/* ไอคอนของหมวดในโค้ด (คีย์ = **slug** ซึ่งเป็น `id` ที่การ์ดส่งมา) — หมวดที่สร้างใหม่ใช้ไอคอนกลาง (รอบที่ 264) */
+const CATEGORY_ICON: Record<string, string> = {
+  "instant-noodles": "M4 9h16l-1.2 9.2A2 2 0 0 1 16.8 20H7.2a2 2 0 0 1-2-1.8L4 9Zm4 0V6a4 4 0 0 1 8 0v3",
+  "dried-vermicelli": "M3 7h18M3 12h18M3 17h18M7 4v16M17 4v16",
   serda: "M12 3l2.2 5.4L20 9.4l-4 3.9.9 5.7L12 16.4 7.1 19l.9-5.7-4-3.9 5.8-1Z",
-  quickZabb: "M13 2 4.5 13.5H11L9.8 22l8.7-11.7H12L13 2Z",
+  "quick-zabb": "M13 2 4.5 13.5H11L9.8 22l8.7-11.7H12L13 2Z",
   noodie: "M5 5h14v3a7 7 0 0 1-7 7 7 7 0 0 1-7-7V5Zm3 14h8",
-  rodDed: "M10 3h4v3l1.8 2.2A4 4 0 0 1 16.6 12v6a3 3 0 0 1-3 3h-3.2a3 3 0 0 1-3-3v-6a4 4 0 0 1 .8-2.4L10 6V3Z",
+  "rod-ded": "M10 3h4v3l1.8 2.2A4 4 0 0 1 16.6 12v6a3 3 0 0 1-3 3h-3.2a3 3 0 0 1-3-3v-6a4 4 0 0 1 .8-2.4L10 6V3Z",
 };
+
+/** ไอคอนของหมวดที่ไม่มีในโค้ด (กล่องสินค้า — ใช้รูปทรงกลาง ๆ ไม่สื่อความหมายผิด) */
+const DEFAULT_CATEGORY_ICON = "M4 7h16v10H4zM4 11h16";
 
 type ProductsShowcaseProps = {
   readonly locale: Locale;
@@ -74,7 +78,7 @@ export function ProductsShowcase({ locale, messages, categories, highlights, cou
               <span className="relative flex h-40 items-center justify-center bg-bg-subtle p-4">
                 <Image
                   src={category.image.src}
-                  alt={messages.productsPage.items[category.id].imageAlt}
+                  alt={category.imageAlt}
                   width={category.image.width}
                   height={category.image.height}
                   sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 320px"
@@ -97,7 +101,7 @@ export function ProductsShowcase({ locale, messages, categories, highlights, cou
                       strokeLinejoin="round"
                       className="h-5 w-5"
                     >
-                      <path d={CATEGORY_ICON[category.id]} />
+                      <path d={CATEGORY_ICON[category.id] ?? DEFAULT_CATEGORY_ICON} />
                     </svg>
                   </span>
                   <span className="font-display text-lg font-bold text-fg">{category.name}</span>
