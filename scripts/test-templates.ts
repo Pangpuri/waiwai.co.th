@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -34,6 +34,27 @@ function sourceOf(relativePath: string): string {
 }
 
 /* ── 1) ทะเบียนเทมเพลต ─────────────────────────────────────────────────────── */
+
+test("admin: ต้องไม่มีแถบแท็บหน้าที่สร้างจากตาราง `page` (แท็บตาย — กดแล้ว 404 · มติเจ้าของรอบ 268)", () => {
+  /*
+    เคสจริง: แถบแท็บในจอตัวสร้างสร้างจาก **ทุกแถวของตาราง `page`** ⇒ หน้าที่ไม่มีจอตัวสร้างแล้ว
+    (เช่น `careers` ที่ถอดในรอบ 266) ยังโชว์เป็นแท็บ และกดแล้วได้ 404
+    ⇒ ถอดทั้งคอมโพเนนต์ · เมนูด้านข้าง (จัดระเบียบรอบ 260) เป็นแหล่งนำทางเดียว
+  */
+  const tabFile = path.join(ROOT, "features/admin/ui/page-tabs.tsx");
+  assert.equal(existsSync(tabFile), false, "ไฟล์ page-tabs.tsx ต้องถูกลบแล้ว");
+
+  const builder = sourceOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(!builder.includes("PageTabs"), "จอตัวสร้างต้องไม่เรนเดอร์แถบแท็บอีก");
+  assert.ok(builder.includes("listPages("), "ยังต้องตรวจ id ที่รู้จักกับตาราง `page` (404 หน้าที่ไม่รู้จัก)");
+
+  /* เมนูด้านข้างต้องมีทางไปจอที่ใช้จริงครบ + ไม่มีทางไปหน้าที่ถูกถอด */
+  const layout = sourceOf("app/admin/layout.tsx");
+  for (const href of ["/admin/builder/home", "/admin/builder/contact", "/admin/careers", "/admin/product-categories"]) {
+    assert.ok(layout.includes(`href: "${href}"`), `เมนูต้องมี ${href}`);
+  }
+  assert.ok(!layout.includes("/admin/builder/careers"), "เมนูต้องไม่มีหน้าที่ถูกถอด (careers)");
+});
 
 test("templates: หน้าที่ถูกถอดออกจากทะเบียน (careers) ต้องไม่มีจอตัวสร้าง — กันทาง 'กดเผยแพร่ทับ' กลับมา", () => {
   assert.equal(isBlockBuilderPage("careers"), false, "careers ต้องไม่อยู่ในทะเบียนจอตัวสร้างแล้ว");

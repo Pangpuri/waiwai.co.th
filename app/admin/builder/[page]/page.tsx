@@ -5,7 +5,6 @@ import { BlockBuilder } from "@/features/admin/ui/block-builder";
 import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui/image-library";
 import { PageSeoSettings } from "@/features/admin/ui/page-seo-settings";
 import { PageSettings } from "@/features/admin/ui/page-settings";
-import { PageTabs } from "@/features/admin/ui/page-tabs";
 import { TemplateCoverageNote } from "@/features/admin/ui/template-coverage-note";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
@@ -169,7 +168,12 @@ export default async function AdminBuilderPage({
 
   return (
     <main className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-6">
-      <PageTabs pages={pages} activeId={page} label={strings.pagesTabsLabel} strings={{ pageHiddenFromMenu: strings.pageHiddenFromMenu }} />
+      {/*
+        ⚠️ รอบที่ 268: **ถอดแถบแท็บ "หน้า" ออก** (มติเจ้าของ) — เหตุผลจากหลักฐานจริง:
+        · แท็บสร้างจาก *ทุกแถวของตาราง `page`* ⇒ หน้าที่ไม่มีจอตัวสร้างแล้ว (เช่น `careers` รอบที่ 266) กลายเป็น **แท็บตาย กดแล้ว 404**
+        · ซ้ำกับเมนูด้านข้างที่จัดระเบียบแล้ว (รอบที่ 260) ซึ่งเป็นแหล่งนำทางจริง
+        เมนูด้านซ้ายยังนำทางครบทุกจอ · จอตัวสร้างยังตรวจ id ที่รู้จัก (ตาราง `page`) เหมือนเดิม
+      */}
 
       {/* หน้าเป็นวัตถุ (W1): ตั้งค่าหน้า/เมนู + SEO รายหน้า (SEO แสดงเฉพาะบทบาทที่มีสิทธิ์ seo) */}
       <div className="grid gap-4 md:grid-cols-2">
