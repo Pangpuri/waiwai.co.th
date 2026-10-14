@@ -1,4 +1,3 @@
-import { NEWS_ENTRIES, RECIPE_ORDER } from "@/features/home/content";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { HERO_CARD_HREF, HERO_CARD_IMAGE } from "@/features/home/hero-card";
 import { HERO_CTA_HREF } from "@/lib/content/home-hero";
@@ -117,14 +116,11 @@ const products: SectionContent = {
 
 /* ── เมนูอาหาร (หน้าแรก) ─────────────────────────────────────────────── */
 
-const recipeCards: readonly ItemContent[] = RECIPE_ORDER.map((id, index) =>
-  item(index + 1, {
-    name: text(th.recipes.items[id].name, en.recipes.items[id].name),
-    description: text(th.recipes.items[id].description, en.recipes.items[id].description),
-    minutes: notLocalized(th.recipes.items[id].minutes),
-    level: notLocalized(th.recipes.items[id].level),
-  }),
-);
+/*
+  รอบที่ 277 (ปิดหนี้ D-273-1): **ไม่ seed การ์ดเมนู/ข่าวที่แต่งขึ้นอีก** — หน้าแรกอ่านของจริง
+  จากฐานข้อมูล (`listRecipes` / `listNews`) และตัวเรนเดอร์การ์ดทดสอบถูกถอดออกตั้งแต่รอบ 273
+*/
+const recipeCards: readonly ItemContent[] = [];
 
 const recipes: SectionContent = {
   fields: {
@@ -137,14 +133,7 @@ const recipes: SectionContent = {
 
 /* ── ข่าว/กิจกรรม (หน้าแรก) ──────────────────────────────────────────── */
 
-const newsCards: readonly ItemContent[] = NEWS_ENTRIES.map((entry, index) =>
-  item(index + 1, {
-    title: text(th.news.items[entry.id].title, en.news.items[entry.id].title),
-    excerpt: text(th.news.items[entry.id].excerpt, en.news.items[entry.id].excerpt),
-    tag: text(th.news.items[entry.id].tag, en.news.items[entry.id].tag),
-    date: notLocalized(entry.date),
-  }),
-);
+const newsCards: readonly ItemContent[] = [];
 
 const news: SectionContent = {
   fields: {

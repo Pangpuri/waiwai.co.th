@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { HOME_SEED } from "@/lib/content/home-seed";
+import { withContentFixture } from "./content-fixture.ts";
+import type { PageContent } from "@/lib/content/types";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { assemblePageContent, planOrphanKeys, rowKeyOf, type ContentRow } from "@/lib/content/rows";
 import { CONTENT_FIELD_COLUMNS, SEED_ACTOR, buildUpsertStatements } from "@/lib/content/sql";
@@ -24,10 +26,14 @@ function row(partial: Partial<ContentRow> & Pick<ContentRow, "section" | "field"
 }
 
 /** คีย์ทั้งหมดที่ "ชั้น SQL" จะเขียนจริง — รูปแบบเดียวกับที่ DB ประกอบ */
-function keysFromSql(): readonly string[] {
+/**
+ * คีย์ "แบบที่ชั้น SQL เขียน" จาก seed + รายการทดสอบที่ฉีดเอง
+ * (รอบที่ 277: seed จริงไม่มีรายการเมนู/ข่าวแล้ว ⇒ ต้องฉีดก่อน ไม่งั้นไม่มีคีย์ของรายการให้ทดสอบ)
+ */
+function keysFromSql(seed: PageContent = withContentFixture(HOME_SEED)): readonly string[] {
   const size = CONTENT_FIELD_COLUMNS.length;
   const keys: string[] = [];
-  for (const statement of buildUpsertStatements(HOME_PAGE_SPEC, HOME_SEED, SEED_ACTOR)) {
+  for (const statement of buildUpsertStatements(HOME_PAGE_SPEC, seed, SEED_ACTOR)) {
     for (let offset = 0; offset < statement.values.length; offset += size) {
       const rowValues = statement.values.slice(offset, offset + size);
       keys.push(rowKeyOf(String(rowValues[1]), String(rowValues[2]), String(rowValues[4])));
@@ -51,13 +57,16 @@ test("rows: planOrphanKeys ต้องไม่ลบอะไรเลยเ�
     แต่ DB ใช้ `section||field` → ทุกแถวระดับ section ถูกมองเป็นแถวกำพร้า แล้วถูกลบทิ้ง (140 → 104 แถว)
     เทสต์นี้ผูก "คีย์ที่ชั้น SQL เขียน" กับ "คีย์ที่ตัวลบเข้าใจ" ให้เป็นชุดเดียวกัน
   */
-  const orphans = planOrphanKeys(HOME_PAGE_SPEC, HOME_SEED, keysFromSql());
+  /* รอบที่ 277: ใช้ seed ชุดเดียวกับที่ใช้สร้างคีย์ (มีรายการทดสอบฉีดอยู่) */
+  const orphans = planOrphanKeys(HOME_PAGE_SPEC, withContentFixture(HOME_SEED), keysFromSql());
   assert.deepEqual(orphans, [], `ต้องไม่มีแถวกำพร้า แต่พบ ${orphans.length} แถว`);
 });
 
 test("rows: ลบรายการออกจากเนื้อหา → คีย์ของรายการนั้นถูกระบุเป็นแถวกำพร้า", () => {
-  const keys = keysFromSql();
-  const recipes = HOME_SEED.sections.recipes;
+  /* รอบที่ 277: seed ไม่มีรายการทดสอบแล้ว ⇒ ฉีดรายการของเทสต์เอง แล้วใช้ชุดคีย์ชุดเดียวกัน */
+  const seeded = withContentFixture(HOME_SEED);
+  const keys = keysFromSql(seeded);
+  const recipes = seeded.sections.recipes;
   assert.ok(recipes, "ต้องมี section recipes");
   const recipesGroup = HOME_PAGE_SPEC.sections.find((section) => section.key === "recipes")?.items.find((group) => group.key === "recipes");
   assert.ok(recipesGroup, "ต้องมี spec ของกลุ่ม recipes");
@@ -66,9 +75,9 @@ test("rows: ลบรายการออกจากเนื้อหา → 
   assert.ok(list.length > 0, "ต้องมีรายการตั้งต้นอย่างน้อย 1 รายการ");
 
   const reduced = {
-    page: HOME_SEED.page,
+    page: seeded.page,
     sections: {
-      ...HOME_SEED.sections,
+      ...seeded.sections,
       recipes: { ...recipes, items: { ...recipes.items, recipes: list.slice(0, -1) } },
     },
   };

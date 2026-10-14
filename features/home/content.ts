@@ -1,5 +1,3 @@
-import type { Messages } from "@/lib/i18n/messages/th";
-
 /**
  * ข้อมูลเชิงโครงสร้างของหน้าแรก — เป็น pure module (ไม่แตะ DOM/DB/Next.js)
  *
@@ -18,30 +16,4 @@ import type { Messages } from "@/lib/i18n/messages/th";
 
 /* ── ชนิดข้อมูลที่ผูกกับพจนานุกรม ─────────────────────────── */
 
-export type RecipeId = keyof Messages["recipes"]["items"];
-export type NewsId = keyof Messages["news"]["items"];
-/* ── เมนูอาหาร (ทางถอยเมื่อไม่มีฐานข้อมูล) ────────────────── */
 
-export const RECIPE_ORDER: readonly RecipeId[] = [
-  "dryTomYum",
-  "boatNoodleBowl",
-  "crispyNoodleSalad",
-];
-
-/* ── ข่าวสาร (ทางถอยเมื่อไม่มีฐานข้อมูล) ──────────────────── */
-
-export type NewsEntry = {
-  readonly id: NewsId;
-  /** วันที่ในรูปแบบ ISO — จัดรูปแบบตามภาษาด้วย lib/format.ts */
-  readonly date: string;
-};
-
-/**
- * ⚠️ วันที่เป็นข้อมูลตัวอย่างสำหรับจัดวาง — ใช้เฉพาะตอน **ไม่มีฐานข้อมูล** (ฐานข้อมูลว่าง/ยังไม่ตั้งค่า)
- *    ถ้ามีข่าวจริง หน้าแรกจะแสดงข่าวจริงแทนทั้งชุด (ไม่ผสมกัน)
- */
-export const NEWS_ENTRIES: readonly NewsEntry[] = [
-  { id: "community", date: "2026-08-19" },
-  { id: "exhibition", date: "2026-07-02" },
-  { id: "certification", date: "2026-05-27" },
-];

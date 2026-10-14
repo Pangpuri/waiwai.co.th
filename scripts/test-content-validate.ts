@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { HOME_SEED } from "@/lib/content/home-seed";
+import { withContentFixture } from "./content-fixture.ts";
 import { errorsOf, missingEnglishReport, validateContent, warningsOf } from "@/lib/content/validate";
 import type { ContentIssue, IssueCode } from "@/lib/content/validate";
 import type { LocalizedValue, PageContent } from "@/lib/content/types";
@@ -33,7 +34,11 @@ type MutableContent = {
 };
 
 function clone(): MutableContent {
-  return structuredClone(HOME_SEED) as unknown as MutableContent;
+  /*
+    รอบที่ 277 (ปิดหนี้ D-273-1): seed จริงไม่มีการ์ดเมนู/ข่าวที่แต่งขึ้นแล้ว (หน้าแรกอ่านของจริงจาก DB)
+    ⇒ เทสต์ของ "เครื่องจักร" ฉีดรายการทดสอบของตัวเองผ่าน `withContentFixture`
+  */
+  return structuredClone(withContentFixture(HOME_SEED)) as unknown as MutableContent;
 }
 
 function validate(content: MutableContent): readonly ContentIssue[] {

@@ -51,81 +51,18 @@ export const products = {
     countLabel: "{count} items",
     categoriesTitle: "Categories",
     featuredTitle: "Featured products",
-    categories: {
-      packet: {
-        name: "Packet noodles",
-        description: "Test data",
-      },
-      cup: {
-        name: "Cup noodles",
-        description: "Test data",
-      },
-      semi: {
-        name: "Ready-to-cook",
-        description: "Test data",
-      },
-      sauce: {
-        name: "Seasoning & sauces",
-        description: "Test data",
-      },
-    },
-    items: {
-      tomYumGoong: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-      mooSub: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-      nuaSub: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-      kai: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-      boatNoodle: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-      padThai: { name: "Wai Wai XXX Flavour", tagline: "Test data" },
-    },
 };
 
 export const recipes = {
     eyebrow: "Recipes",
     title: "What to cook with Wai Wai",
     body: "It is not only for boiling. Try these simple ideas that turn a packet into something a little more special.",
-    items: {
-      dryTomYum: {
-        name: "Test recipe 1",
-        description: "Test data",
-        minutes: "XX",
-        level: "XX",
-      },
-      boatNoodleBowl: {
-        name: "Test recipe 2",
-        description: "Test data",
-        minutes: "XX",
-        level: "XX",
-      },
-      crispyNoodleSalad: {
-        name: "Test recipe 3",
-        description: "Test data",
-        minutes: "XX",
-        level: "XX",
-      },
-    },
 };
 
 export const news = {
     eyebrow: "News & activities",
     title: "What is happening right now",
     body: "Company activities, product news, and our work with the community.",
-    items: {
-      community: {
-        title: "Test news headline 1",
-        excerpt: "Test data",
-        tag: "XX",
-      },
-      exhibition: {
-        title: "Test news headline 2",
-        excerpt: "Test data",
-        tag: "XX",
-      },
-      certification: {
-        title: "Test news headline 3",
-        excerpt: "Test data",
-        tag: "XX",
-      },
-    },
 };
 
 export const whereToBuy = {

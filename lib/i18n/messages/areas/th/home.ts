@@ -51,81 +51,18 @@ export const products = {
     countLabel: "{count} รายการ",
     categoriesTitle: "หมวดสินค้า",
     featuredTitle: "สินค้าแนะนำ",
-    categories: {
-      packet: {
-        name: "บะหมี่ซอง",
-        description: "ข้อมูลทดสอบ",
-      },
-      cup: {
-        name: "บะหมี่ถ้วย",
-        description: "ข้อมูลทดสอบ",
-      },
-      semi: {
-        name: "อาหารกึ่งสำเร็จรูป",
-        description: "ข้อมูลทดสอบ",
-      },
-      sauce: {
-        name: "เครื่องปรุง & ซอส",
-        description: "ข้อมูลทดสอบ",
-      },
-    },
-    items: {
-      tomYumGoong: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-      mooSub: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-      nuaSub: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-      kai: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-      boatNoodle: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-      padThai: { name: "ไวไว รส XXX", tagline: "ข้อมูลทดสอบ" },
-    },
 };
 
 export const recipes = {
     eyebrow: "เมนูอาหาร",
     title: "ทำอะไรกินดีจากไวไว",
     body: "ไม่ใช่แค่ต้มกินเฉย ๆ ลองเมนูง่าย ๆ ที่เปลี่ยนบะหมี่ซองให้เป็นมื้อที่พิเศษขึ้น",
-    items: {
-      dryTomYum: {
-        name: "เมนูทดสอบ 1",
-        description: "ข้อมูลทดสอบ",
-        minutes: "XX",
-        level: "XX",
-      },
-      boatNoodleBowl: {
-        name: "เมนูทดสอบ 2",
-        description: "ข้อมูลทดสอบ",
-        minutes: "XX",
-        level: "XX",
-      },
-      crispyNoodleSalad: {
-        name: "เมนูทดสอบ 3",
-        description: "ข้อมูลทดสอบ",
-        minutes: "XX",
-        level: "XX",
-      },
-    },
 };
 
 export const news = {
     eyebrow: "ข่าวสาร & กิจกรรม",
     title: "ความเคลื่อนไหวล่าสุด",
     body: "ติดตามกิจกรรมขององค์กร ข่าวผลิตภัณฑ์ และงานกับชุมชน",
-    items: {
-      community: {
-        title: "หัวข้อข่าวทดสอบ 1",
-        excerpt: "ข้อมูลทดสอบ",
-        tag: "XX",
-      },
-      exhibition: {
-        title: "หัวข้อข่าวทดสอบ 2",
-        excerpt: "ข้อมูลทดสอบ",
-        tag: "XX",
-      },
-      certification: {
-        title: "หัวข้อข่าวทดสอบ 3",
-        excerpt: "ข้อมูลทดสอบ",
-        tag: "XX",
-      },
-    },
 };
 
 export const whereToBuy = {

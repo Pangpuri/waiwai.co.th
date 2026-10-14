@@ -12,11 +12,17 @@ import {
   toDraft,
 } from "@/lib/content/draft";
 import { HOME_SEED } from "@/lib/content/home-seed";
+import { withContentFixture } from "./content-fixture.ts";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import { parsePageContent } from "@/lib/content/parse";
 import { errorsOf, validateContent } from "@/lib/content/validate";
 
 /** เทสต์ของ "ฉบับร่าง" ที่หน้าจอแก้ไขใช้ (pure — ไม่ต้องมี React/DB) */
+
+/* รอบที่ 277: seed ไม่มีรายการทดสอบแล้ว ⇒ เทสต์ใช้ seed + รายการที่ฉีดเอง (เหมือนข้อมูลจริงใน DB) */
+const SEED = withContentFixture(HOME_SEED);
+
+/* รอบที่ 277: seed ไม่มีรายการทดสอบแล้ว ⇒ ใช้ seed + รายการที่ฉีดเอง (เหมือนข้อมูลจริงใน DB) */
 
 function specSection(key: string) {
   const section = HOME_PAGE_SPEC.sections.find((candidate) => candidate.key === key);
@@ -31,10 +37,10 @@ function specGroup(sectionKey: string, groupKey: string) {
 }
 
 test("draft: แปลงเนื้อหาเป็นฉบับร่างได้ครบ (และกลับเป็นเนื้อหาเดิมได้)", () => {
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
   const content = toContent(draft);
 
-  assert.deepEqual(content, HOME_SEED, "ไป-กลับต้องได้ค่าเดิม");
+  assert.deepEqual(content, SEED, "ไป-กลับต้องได้ค่าเดิม");
   assert.equal(errorsOf(validateContent(HOME_PAGE_SPEC, content)).length, 0);
 });
 
@@ -49,7 +55,7 @@ test("draft: เติมโครงให้ครบตาม spec แม้�
 });
 
 test("draft: แก้ข้อความระดับ section และระดับรายการ", () => {
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
 
   const afterSection = setSectionText(draft, "hero", "title", "th", "หัวข้อใหม่");
   assert.equal(afterSection.sections.hero?.fields.title?.th, "หัวข้อใหม่");
@@ -65,7 +71,7 @@ test("draft: แก้ข้อความระดับ section และร�
 
 test("draft: เพิ่มรายการ → ลำดับต่อท้าย และมีช่องข้อความครบทุกฟิลด์ (ยกเว้นภาพ)", () => {
   const group = specGroup("recipes", "recipes");
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
 
   const before = draft.sections.recipes?.items.recipes?.length ?? 0;
   const after = addItem(draft, "recipes", group);
@@ -82,7 +88,7 @@ test("draft: เพิ่มเกินจำนวนที่กำหนด�
   const group = specGroup("hero", "card");
   assert.equal(group.maxItems, 1, "การ์ดประกาศมีได้ 1 ใบ");
 
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
   assert.equal(canAddItem(draft, "hero", group), false, "มีครบแล้ว = เพิ่มไม่ได้");
 
   const same = addItem(draft, "hero", group);
@@ -90,7 +96,7 @@ test("draft: เพิ่มเกินจำนวนที่กำหนด�
 });
 
 test("draft: ลบรายการแล้วจัดลำดับใหม่ 1..n (คีย์ใน DB ห้ามมีช่องว่าง)", () => {
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
   const before = draft.sections.products?.items.categories?.length ?? 0;
   assert.ok(before >= 2, "ต้องมีสไลด์อย่างน้อย 2 ใบในชุดตั้งต้น");
 
@@ -110,7 +116,7 @@ test("draft: ลบรายการแล้วจัดลำดับให�
 });
 
 test("draft: ตั้งค่าภาพ (พาธ + alt + ลายน้ำ) และล้างภาพได้", () => {
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
 
   const withImage = setItemMedia(draft, "recipes", "recipes", 0, "image", {
     path: "/products/pad-thai.jpg",
@@ -128,7 +134,7 @@ test("draft: ตั้งค่าภาพ (พาธ + alt + ลายน้�
 });
 
 test("draft: ฉบับร่างที่แก้แล้วยังส่งเข้า parse → validate ได้ตามเส้นทางจริงของหน้าจอ", () => {
-  const draft = toDraft(HOME_PAGE_SPEC, HOME_SEED);
+  const draft = toDraft(HOME_PAGE_SPEC, SEED);
   const edited = setSectionText(draft, "hero", "title", "th", "หัวข้อที่แก้จากหน้าจอ");
 
   /* จำลองสิ่งที่ฟอร์มทำ: แปลงเป็น JSON แล้วส่งกลับเข้าตัวตรวจ */
