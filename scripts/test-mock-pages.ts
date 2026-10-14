@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const PROJECT_ROOT = path.resolve(import.meta.dirname, "..");
+
+/** อ่านซอร์สของไฟล์ในโปรเจกต์ (ใช้ตรวจว่า "ไม่มีป้ายตัวอย่าง" แล้ว) */
+function io_read(relativePath: string): string {
+  return readFileSync(path.join(PROJECT_ROOT, relativePath), "utf8");
+}
+
 
 import {
   MOCK_CARDS_PER_ROW,
@@ -31,7 +41,6 @@ test("พจนานุกรม recipesPage / newsPage: ข้อความ�
         ["eyebrow", m.eyebrow],
         ["title", m.title],
         ["intro", m.intro],
-        ["notice", m.notice],
         ["cardTitle", m.cardTitle],
         ["cardMeta", m.cardMeta],
         ["figureCaption", m.figureCaption],
@@ -43,22 +52,44 @@ test("พจนานุกรม recipesPage / newsPage: ข้อความ�
   }
 });
 
-test("notice: ต้องบอกชัดว่าเป็นหน้าตัวอย่าง รอการอนุมัติ (ผู้ใช้สั่งให้แจ้งบนหน้า)", () => {
-  assert.ok(th.recipesPage.notice.includes("ตัวอย่าง"), "th recipesPage.notice ต้องมีคำว่า ตัวอย่าง");
-  assert.ok(th.recipesPage.notice.includes("รอการอนุมัติ"), "th recipesPage.notice ต้องบอกว่ารอการอนุมัติ");
-  assert.ok(th.newsPage.notice.includes("ตัวอย่าง"), "th newsPage.notice ต้องมีคำว่า ตัวอย่าง");
-  assert.ok(th.newsPage.notice.includes("รอการอนุมัติ"), "th newsPage.notice ต้องบอกว่ารอการอนุมัติ");
+test("mock pages: ต้องไม่มีป้าย \"ตัวอย่าง/รอการอนุมัติ\" แล้ว — เนื้อหาจริงขึ้นเว็บหมด (มติเจ้าของรอบ 272)", () => {
+  /*
+    เดิม (รอบที่ 15) หน้ากลุ่มนี้เป็น mockup ⇒ ผู้ใช้สั่งให้ติดป้าย "ตัวอย่าง รอการอนุมัติ"
+    ตอนนี้มีเนื้อหาจริงครบแล้ว (เมนู 18 · ข่าว 151 · สินค้า 54 · หมวด 6) ⇒ เจ้าของสั่งถอดป้ายออก
+    (เคสเดียวกับหน้า /contact รอบที่ 267)
+  */
+  for (const [locale, page] of [
+    ["th", th.recipesPage],
+    ["en", en.recipesPage],
+    ["th", th.newsPage],
+    ["en", en.newsPage],
+  ] as const) {
+    assert.ok(!("notice" in page), `${locale}: ต้องไม่มีคีย์ notice อีก`);
+  }
 
-  assert.ok(en.recipesPage.notice.toLowerCase().includes("sample"), "en recipesPage.notice ต้องมี sample");
-  assert.ok(
-    en.recipesPage.notice.toLowerCase().includes("pending approval"),
-    "en recipesPage.notice ต้องบอกว่า pending approval",
-  );
-  assert.ok(en.newsPage.notice.toLowerCase().includes("sample"), "en newsPage.notice ต้องมี sample");
-  assert.ok(
-    en.newsPage.notice.toLowerCase().includes("pending approval"),
-    "en newsPage.notice ต้องบอกว่า pending approval",
-  );
+  const dictionary = JSON.stringify(th) + JSON.stringify(en);
+  for (const stale of ["ยังเป็นตัวอย่างรอการอนุมัติ", "หน้าตัวอย่าง (mockup)", "sample for the marketing team"]) {
+    assert.ok(!dictionary.includes(stale), `พจนานุกรมต้องไม่มีข้อความล้าสมัย: ${stale}`);
+  }
+
+  /* หน้าที่เคยติดป้าย: ต้องไม่เรนเดอร์ SampleNotice อีก (หน้า /privacy ยังใช้ป้าย "ร่าง" ได้) */
+  for (const file of [
+    "app/[lang]/products/page.tsx",
+    "app/[lang]/recipes/page.tsx",
+    "features/news/ui/news-list-page.tsx",
+  ]) {
+    const source = io_read(file);
+    assert.ok(!source.includes("SampleNotice"), `${file}: ต้องไม่เรนเดอร์ป้ายตัวอย่างอีก`);
+  }
+
+  /* การ์ดทดสอบยังอยู่ (ใช้เมื่อฐานข้อมูลว่าง) — แต่ไม่มีป้ายบอกว่า "หน้านี้เป็นตัวอย่าง" */
+  const mockPages = ["app/[lang]/products/page.tsx", "app/[lang]/recipes/page.tsx"];
+  for (const file of mockPages) {
+    assert.ok(
+      !io_read(file).includes("searchParams"),
+      `${file}: ต้องไม่ใช้ searchParams (หน้า static)`,
+    );
+  }
 });
 
 test("การ์ดตัวอย่าง: ชื่อการ์ดเป็น 'ป้าย + ลำดับ' ที่แยกใบได้ ไม่ใช่ข้อมูลที่แต่งขึ้น", () => {

@@ -7,7 +7,6 @@ import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
-import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
@@ -108,7 +107,6 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
             {m.intro}
           </p>
 
-          <SampleNotice text={m.notice} />
         </div>
       </section>
 

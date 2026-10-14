@@ -9,19 +9,17 @@
     The /products page (product category catalogue).
     Kept separate from the `products` namespace above, which the home page uses for
     its featured-products section — different context.
-    ⚠️ The whole page is a sample pending approval (see PRODUCT_ROADMAP.md § 9).
+    ⚠️ Round 272: the "sample / pending approval" notice was removed — this page has real data (54 products · 6 categories).
   */
 export const productsPage = {
     meta: {
       title: "Products — Wai Wai product categories",
       description:
-        "Wai Wai product categories, including instant noodles, dried rice vermicelli and the brands in the group — sample images pending approval.",
+        "Wai Wai product categories, including instant noodles, dried rice vermicelli and the brands in the group.",
     },
     eyebrow: "Products",
     title: "Our product categories",
     intro: "Pick a category to see what is inside it.",
-    notice:
-      "A sample for the marketing team to review — the images and category names on this page are pending approval, and the product detail pages have not been built yet.",
     items: {
       instantNoodles: {
         name: "Instant noodles",
@@ -52,9 +50,8 @@ export const productsPage = {
       },
     },
     detailStub: {
-      eyebrow: "Sample · pending approval",
-      title: "This detail page is not live yet",
-      body: "This page only demonstrates that the link from the products page works. The product detail content has not been written yet — it is waiting for information and approval from the marketing team.",
+      title: "No products in this category yet",
+      body: "This category does not have any products yet — once products are added, the list appears here automatically.",
       back: "Back to products",
     },
     /* Products in this category — imported from the old site (S4, round 103) */

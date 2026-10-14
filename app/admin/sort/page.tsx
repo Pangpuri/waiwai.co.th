@@ -37,7 +37,6 @@ export default async function AdminSortPage({
   const tabs: readonly { readonly kind: ReorderKind; readonly label: string }[] = [
     { kind: "product", label: m.sortTabProduct },
     { kind: "recipe", label: m.sortTabRecipe },
-    { kind: "news", label: m.sortTabNews },
   ];
 
   return (

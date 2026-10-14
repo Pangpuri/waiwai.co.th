@@ -5,7 +5,6 @@ export const thAdminSort = {
   sortHint: "ลากแถวไปวางตำแหน่งที่ต้องการ (หรือใช้ปุ่ม ↑ ↓) แล้วกดบันทึกลำดับ · ลำดับที่บันทึกมีผลกับหน้าเว็บทันที",
   sortTabProduct: "สินค้า",
   sortTabRecipe: "เมนูอาหาร",
-  sortTabNews: "ข่าวสาร",
   sortCategoryLabel: "หมวดสินค้า",
   sortCategoryHint: "สินค้าจัดลำดับภายในหมวด — เลือกหมวดก่อนแล้วลากเรียง",
   sortEmpty: "ยังไม่มีรายการในหมวดนี้",

@@ -6,7 +6,7 @@
  */
 
   /*
-    The /recipes and /news pages (round 15) — sample pages only.
+    The /recipes and /news pages — real content since rounds 104/105 (the "sample" notice was removed in round 272).
     They contain just the layout and six test cards (3×2); there is no real content.
     ⚠️ Pending approval from the marketing team (see PRODUCT_ROADMAP.md § 9).
   */
@@ -14,14 +14,11 @@ export const recipesPage = {
     meta: {
       title: "Recipes — Wai Wai recipe videos",
       description:
-        "Wai Wai recipe videos (the brand's own, imported from its previous site) — this page layout is still a sample pending approval.",
+        "Wai Wai recipe videos (the brand's own, imported from its previous site).",
     },
     eyebrow: "Recipes",
     title: "Recipes from Wai Wai",
-    intro:
-      "A sample of how the recipe cards will be laid out, for the marketing team to review before the real content is written.",
-    notice:
-      "This page is a sample (mockup) pending approval — the test cards below are placeholder data.",
+    intro: "Wai Wai recipe videos and cooking ideas, imported from the brand's previous site.",
     /* The "recipe videos" section from the database (round 104) — imported from the brand's previous site */
     dbListTitle: "Recipe videos from Wai Wai",
     dbListCount: "{count} recipes",
@@ -40,14 +37,11 @@ export const newsPage = {
     meta: {
       title: "News & Activities",
       description:
-        "Wai Wai news and activities (the brand's own, imported from its previous site) — this page layout is still a sample pending approval.",
+        "Wai Wai news and activities (the brand's own, imported from its previous site).",
     },
     eyebrow: "News & Activities",
     title: "News & Activities",
-    intro:
-      "A sample of how the news cards will be laid out, for the marketing team to review before the real content is written.",
-    notice:
-      "This page is a sample (mockup) pending approval — the test cards below are placeholder data.",
+    intro: "Wai Wai news and activities, imported from the brand's previous site.",
     /* The real news section from the database (round 105) — imported from the brand's previous site */
     /* News list filter row (round 271 · owner decision D29) */
     dbFilterLabel: "Period",

@@ -300,3 +300,20 @@ test("news admin: ลบถาวรได้เฉพาะของในถ�
   const labels = readFileSync("features/admin/audit-labels.ts", "utf8");
   assert.ok(labels.includes('"news-delete"'), "ต้องมีป้ายเหตุการณ์ news-delete");
 });
+
+/* ── รอบที่ 272 (มติเจ้าของ): ถอด "จัดลำดับข่าว" — ไม่มีผลกับหน้าเว็บแล้ว (D-271-2) ───────────
+   หลังรอบ 271 หน้าเว็บเรียงตามวันที่เสมอ ⇒ การลากจัดลำดับข่าวไม่ทำให้หน้าเว็บขยับ
+   เจ้าของสั่งถอดออก ไม่ให้เหลือทางที่ผู้ดูแลเข้าใจผิดว่ามีผล
+────────────────────────────────────────────────────────────────────────────── */
+
+test("news admin: ต้องไม่มีทาง 'จัดลำดับข่าว' อีก (ไม่มีผลกับหน้าเว็บ — มติเจ้าของรอบ 272)", () => {
+  const reorder = readFileSync("lib/admin/reorder.ts", "utf8");
+  assert.ok(!reorder.includes('news: "news"'), "ห้ามมี kind news ในทะเบียนจัดลำดับ");
+  assert.ok(!/^  news: "/m.test(reorder), "ห้ามเหลือคอลัมน์ของข่าวในทะเบียนจัดลำดับ");
+
+  const sortPage = readFileSync("app/admin/sort/page.tsx", "utf8");
+  assert.ok(!sortPage.includes('kind: "news"'), "จอจัดลำดับต้องไม่มีแท็บข่าว");
+
+  /* ยังมี kind อื่นให้จัดลำดับตามปกติ (ไม่เผลอปิดทั้งจอ) */
+  assert.ok(sortPage.includes('kind: "product"'), "จอจัดลำดับยังต้องมีสินค้า/เมนู/หมวดให้จัด");
+});

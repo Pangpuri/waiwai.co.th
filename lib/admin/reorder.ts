@@ -18,7 +18,6 @@ import { getPool, isDatabaseConfigured } from "@/db/pool";
 const TABLE_BY_KIND = {
   product: "product",
   recipe: "recipe",
-  news: "news",
   category: "product_category",
   /* ประกาศรับสมัครงาน (รอบที่ 265 · มติ D26) — มีถังขยะ (`deleted_at`) จึงไม่ต้องยกเว้น */
   job: "job_posting",
@@ -51,11 +50,13 @@ export function parseOrderCsv(raw: string): readonly string[] {
 
 export type ReorderItem = { readonly id: string; readonly title: string; readonly subtitle: string };
 
-/** คอลัมน์หัวข้อ/บรรทัดรองต่อชนิด (news ใช้ title_th/published_at — ตรวจกับสคีมาจริงแล้ว) */
+/**
+ * คอลัมน์หัวข้อ/บรรทัดรองต่อชนิด — ตรวจกับสคีมาจริงแล้ว
+ * ⚠️ รอบที่ 272: **ไม่มี `news`** แล้ว — เจ้าของสั่งถอด "จัดลำดับข่าว" (หน้าเว็บเรียงตามวันที่เสมอ)
+ */
 const TITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   product: "coalesce(nullif(name_th, ''), id)",
   recipe: "coalesce(nullif(title_th, ''), id)",
-  news: "coalesce(nullif(title_th, ''), id)",
   /* หมวดสินค้า: ชื่อไทยว่างได้ (ถอยพจนานุกรม) ⇒ โชว์ id เพื่อให้ยังจัดลำดับได้ */
   category: "coalesce(nullif(name_th, ''), id)",
   job: "coalesce(nullif(title_th, ''), id)",
@@ -64,7 +65,6 @@ const TITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
 const SUBTITLE_COLUMN_BY_KIND: Readonly<Record<ReorderKind, string>> = {
   product: "category_id",
   recipe: "coalesce(video_id, '')",
-  news: "coalesce(to_char(published_at at time zone 'Asia/Bangkok', 'DD/MM/YYYY'), '')",
   category: "case when is_hidden then 'hidden' else '' end",
   job: "coalesce(department_th, '')",
 };

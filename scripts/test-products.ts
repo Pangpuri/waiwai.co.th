@@ -84,8 +84,6 @@ test("productsPage: ข้อความ 'ตัวอย่างรออน�
       ["eyebrow", m.eyebrow],
       ["title", m.title],
       ["intro", m.intro],
-      ["notice", m.notice],
-      ["detailStub.eyebrow", m.detailStub.eyebrow],
       ["detailStub.title", m.detailStub.title],
       ["detailStub.body", m.detailStub.body],
       ["detailStub.back", m.detailStub.back],

@@ -6,7 +6,6 @@ import { NewsFilter, newsFilterStringsOf } from "@/features/news/ui/news-filter"
 import { NewsList, NewsListHeader, NewsPagination, newsListStringsOf } from "@/features/news/ui/news-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { MockCardGrid } from "@/features/shell/ui/mock-card-grid";
-import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { buildAlternates, localePath, type Locale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -147,7 +146,6 @@ export async function NewsListViewPage({ lang, view }: { readonly lang: Locale; 
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">{m.intro}</p>
 
-          <SampleNotice text={m.notice} />
         </div>
       </section>
 

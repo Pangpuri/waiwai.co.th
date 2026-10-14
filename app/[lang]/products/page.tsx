@@ -7,7 +7,6 @@ import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { ProductCategoryCard } from "@/features/products/ui/category-card";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
-import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
@@ -108,7 +107,6 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
           </p>
 
           {/* ข้อความบอกสถานะ "ตัวอย่างรออนุมัติ" — ใช้คอมโพเนนต์กลางให้เหมือนหน้า recipes/news */}
-          <SampleNotice text={m.notice} />
         </div>
       </section>
 

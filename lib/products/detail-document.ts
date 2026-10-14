@@ -29,7 +29,11 @@ import { FALLBACK_CATEGORY_IMAGE_HEIGHT, FALLBACK_CATEGORY_IMAGE_WIDTH } from "@
  *     ⇒ เจ้าของเพิ่ม/ลบ/ย้ายบล็อกได้อิสระโดยที่สินค้าจริงไม่มีทางหาย
  */
 
-/** ค่าจริงจากฐานข้อมูลของหมวด (ผู้เรียกที่อ่าน DB ได้เป็นคนส่งมา) — ไม่มี = ใช้ค่าในโค้ด/พจนานุกรม */
+/**
+ * ค่าจริงจากฐานข้อมูลของหมวด (ผู้เรียกที่อ่าน DB ได้เป็นคนส่งมา) — ไม่มี = ใช้ค่าในโค้ด/พจนานุกรม
+ * ℹ️ `hasProducts` ยังอยู่ในชนิดข้อมูล (ผู้เรียกใช้ตัดสินใจ/แสดงผลได้) แต่ **เอกสารตั้งต้นไม่ใช้แล้ว**
+ *    ตั้งแต่รอบที่ 272 — eyebrow ใช้ป้ายเดียวกับหน้าหมวด (ไม่มีสาขา "ตัวอย่าง/รออนุมัติ" อีก)
+ */
 export type ProductDetailCategoryValues = {
   readonly slug: string;
   readonly nameTh: string;
@@ -80,7 +84,6 @@ export function buildProductDetailDocument(
   const thCopy = item === undefined ? null : thPage.items[item.id];
   const enCopy = item === undefined ? null : enPage.items[item.id];
 
-  const hasProducts = values?.hasProducts ?? false;
   const thImageAlt = thCopy?.imageAlt ?? thPage.detailStub.title;
   const enImageAlt = enCopy?.imageAlt ?? enPage.detailStub.title;
   const media = values === null ? null : mediaImageOf(values);
@@ -99,10 +102,8 @@ export function buildProductDetailDocument(
         th: values === null ? thPage.detailStub.body : textOf(values.descriptionTh, thPage.detailStub.body),
         en: values === null ? enPage.detailStub.body : textOf(values.descriptionEn, enPage.detailStub.body),
       },
-      note: {
-        th: hasProducts ? thPage.eyebrow : thPage.detailStub.eyebrow,
-        en: hasProducts ? enPage.eyebrow : enPage.detailStub.eyebrow,
-      },
+      /* รอบที่ 272: ป้ายเดียวกับหน้าหมวด (เดิมมีสาขา "ตัวอย่าง · รอการอนุมัติ" ที่ล้าสมัย) */
+      note: { th: thPage.eyebrow, en: enPage.eyebrow },
       /* ภาพจริงจากคลังก่อน · ไม่มี ⇒ ไฟล์ที่นำเข้าจากเว็บเดิม (หมวดในโค้ดเท่านั้น) */
       image:
         media === null

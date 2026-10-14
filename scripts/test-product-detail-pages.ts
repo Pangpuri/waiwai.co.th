@@ -233,7 +233,7 @@ test("product-detail: เอกสารตั้งต้นใช้ 'ค่�
   assert.equal(hero.image?.path, "/media/logoTEST", "ภาพต้องมาจากคลัง (/media/<id>) — มติ D9");
   assert.equal(hero.image?.hasWatermark, false, "ภาพจากคลังไม่ใช่ภาพติดลายน้ำ");
   assert.equal(hero.ctaHref, "/products", "ปุ่มย้อนกลับต้องเป็นพาธกลาง");
-  assert.equal(hero.note.th, th.productsPage.eyebrow, "หมวดที่มีสินค้า ⇒ eyebrow เดียวกับหน้าเว็บจริง");
+  assert.equal(hero.note.th, th.productsPage.eyebrow, "eyebrow ต้องเป็นป้ายเดียวกับหน้าเว็บ (รอบ 272: ไม่มีสาขาตัวอย่าง)");
 
   /* ค่าใน DB ว่าง = ถอยไปใช้พจนานุกรม/ไฟล์ใน public (หน้าเว็บไม่พัง) */
   const fallback = buildProductDetailDocument("serda", { ...DETAIL_VALUES, nameTh: "  ", descriptionTh: "", imagePath: null });
@@ -244,13 +244,14 @@ test("product-detail: เอกสารตั้งต้นใช้ 'ค่�
   assert.equal(fHero.subtitle.th, th.productsPage.detailStub.body);
   assert.equal(fHero.image?.path, findCatalogItem("serda")?.image.src);
 
-  /* ไม่มีสินค้าในหมวด = eyebrow ของหน้า stub (ตรงกับหน้าเว็บ) */
+  /* รอบที่ 272: ไม่มีสาขา "ตัวอย่าง/รออนุมัติ" อีก — ทุกกรณีใช้ป้ายเดียวกับหน้าหมวด */
   const noProducts = buildProductDetailDocument("serda", { ...DETAIL_VALUES, hasProducts: false });
   const nHero = noProducts?.blocks[0];
   assert.ok(nHero !== undefined && nHero.type === "hero");
   if (nHero !== undefined && nHero.type === "hero") {
-    assert.equal(nHero.note.th, th.productsPage.detailStub.eyebrow);
+    assert.equal(nHero.note.th, th.productsPage.eyebrow);
   }
+
 
   /* slug ที่ไม่รู้จัก (ไม่มีในโค้ด ไม่มีค่า DB) = null — ห้ามเขียนทับหน้าอื่น */
   assert.equal(buildProductDetailDocument("not-a-category", null), null);

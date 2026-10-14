@@ -217,7 +217,8 @@ export default async function ProductCategoryPage({
 
           <p className="mt-8 inline-flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-accent uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {hasProducts ? m.eyebrow : m.detailStub.eyebrow}
+            {/* รอบที่ 272: ไม่มีสาขา "ตัวอย่าง/รอการอนุมัติ" อีก — ใช้ป้ายเดียวกับหน้าหมวด */}
+            {m.eyebrow}
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
