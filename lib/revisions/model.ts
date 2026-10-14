@@ -1,6 +1,7 @@
 import type { AdminProductDetail } from "@/lib/products/repository";
 import type { ProductInput } from "@/lib/products/model";
 import type { AdminNewsDetail } from "@/lib/news/repository";
+import type { AdminJobPosting } from "@/lib/careers/repository";
 import type { AdminRecipeListItem } from "@/lib/recipes/repository";
 import type { NewsBlock } from "@/lib/news/body";
 
@@ -16,7 +17,7 @@ import type { NewsBlock } from "@/lib/news/body";
  * - `revisionDiff` เทียบแบบค่าราบ (สตริง/ตัวเลข/null) · อาร์เรย์ (ส่วนผสม/บล็อกข่าว) ถูกรวมเป็นข้อความบรรทัดเดียว
  */
 
-export const REVISION_KINDS = ["product", "recipe", "news"] as const;
+export const REVISION_KINDS = ["product", "recipe", "news", "job"] as const;
 export type RevisionKind = (typeof REVISION_KINDS)[number];
 
 export type RevisionSnapshot = Readonly<Record<string, unknown>>;
@@ -247,6 +248,71 @@ export function recipeRestoreOf(snapshot: RevisionSnapshot): RecipeRestore {
       videoId: snapshotText(snapshot["videoId"]),
       publishedOn: typeof snapshot["publishedOn"] === "string" ? snapshot["publishedOn"] : null,
       sortOrder: typeof snapshot["sortOrder"] === "number" ? snapshot["sortOrder"] : 0,
+      status: snapshot["status"] === "draft" ? "draft" : "published",
+    },
+  };
+}
+
+/* ── ประกาศรับสมัครงาน (รอบที่ 278 · ปิดหนี้ D-265-3) ─────────────────────────── */
+
+/** สแนปช็อตของประกาศรับสมัครงาน — สำเนาทุกช่องที่แก้ได้ (ไม่รวม id/ผู้แก้/เวลา) */
+export function jobSnapshotOf(detail: AdminJobPosting): RevisionSnapshot {
+  return {
+    titleTh: detail.titleTh,
+    titleEn: detail.titleEn,
+    departmentTh: detail.departmentTh,
+    departmentEn: detail.departmentEn,
+    openings: detail.openings,
+    gender: detail.gender,
+    ageTh: detail.ageTh,
+    ageEn: detail.ageEn,
+    qualificationsTh: detail.qualificationsTh,
+    qualificationsEn: detail.qualificationsEn,
+    experienceTh: detail.experienceTh,
+    experienceEn: detail.experienceEn,
+    sortOrder: detail.sortOrder,
+    status: detail.status,
+  };
+}
+
+export type JobRestore = {
+  readonly values: {
+    readonly titleTh: string;
+    readonly titleEn: string;
+    readonly departmentTh: string;
+    readonly departmentEn: string;
+    readonly openings: number;
+    readonly gender: string;
+    readonly ageTh: string;
+    readonly ageEn: string;
+    readonly qualificationsTh: string;
+    readonly qualificationsEn: string;
+    readonly experienceTh: string;
+    readonly experienceEn: string;
+    readonly sortOrder: number;
+    readonly status: "draft" | "published";
+  };
+};
+
+/** แปลงสแนปช็อตกลับเป็นอินพุตของตัวเขียนเดิม (ใช้ตอนกู้คืน) — ค่าที่อ่านไม่ได้ = ค่ากลางที่ปลอดภัย */
+export function jobRestoreOf(snapshot: RevisionSnapshot): JobRestore {
+  const openings = Number(snapshot["openings"]);
+  const sortOrder = Number(snapshot["sortOrder"]);
+  return {
+    values: {
+      titleTh: snapshotText(snapshot["titleTh"]),
+      titleEn: snapshotText(snapshot["titleEn"]),
+      departmentTh: snapshotText(snapshot["departmentTh"]),
+      departmentEn: snapshotText(snapshot["departmentEn"]),
+      openings: Number.isFinite(openings) ? openings : 0,
+      gender: snapshotText(snapshot["gender"]),
+      ageTh: snapshotText(snapshot["ageTh"]),
+      ageEn: snapshotText(snapshot["ageEn"]),
+      qualificationsTh: snapshotText(snapshot["qualificationsTh"]),
+      qualificationsEn: snapshotText(snapshot["qualificationsEn"]),
+      experienceTh: snapshotText(snapshot["experienceTh"]),
+      experienceEn: snapshotText(snapshot["experienceEn"]),
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
       status: snapshot["status"] === "draft" ? "draft" : "published",
     },
   };

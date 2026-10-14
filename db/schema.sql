@@ -569,7 +569,7 @@ create index if not exists news_admin_idx on news (deleted_at, status, published
    — เก็บทุกครั้งที่บันทึก · ระยะเก็บ 1 ปี (lib/retention/plan.ts) · กู้คืนก็เป็นรุ่นหนึ่ง */
 create table if not exists entity_revision (
   id         bigint      generated always as identity primary key,
-  kind       text        not null check (kind in ('product', 'recipe', 'news')),
+  kind       text        not null check (kind in ('product', 'recipe', 'news', 'job')),
   entity_id  text        not null,
   revision   integer     not null,
   snapshot   jsonb       not null,

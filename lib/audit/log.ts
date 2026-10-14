@@ -42,6 +42,7 @@ export type AuditAction =
   | "job-trash"
   | "job-restore"
   | "job-delete"
+  | "job-revision-restore"
   | "news-save"
   | "news-trash"
   | "news-restore"

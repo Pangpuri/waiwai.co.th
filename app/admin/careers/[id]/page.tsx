@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadJobPostingForAdmin } from "@/lib/careers/repository";
+import { loadEntityRevision, listEntityRevisions } from "@/lib/revisions/repository";
+import { jobSnapshotOf, revisionDiff } from "@/lib/revisions/model";
+import { RevisionHistoryPanel } from "@/features/admin/ui/revision-history";
+import { restoreJobRevisionAction } from "@/app/admin/careers/actions";
 import { buildBoard } from "@/features/careers/board";
 import { JobForm } from "@/features/admin/ui/job-form";
 
@@ -14,7 +18,13 @@ import { JobForm } from "@/features/admin/ui/job-form";
  * - กด "เผยแพร่" = ขึ้นเว็บทันที (`refreshPublicSite("page")` ใน action) · "ฉบับร่าง" = ยังไม่ขึ้นเว็บ
  * - พรีวิวใช้ `JobBoard` ตัวเดียวกับหน้า /careers ⇒ "สิ่งที่เห็น = สิ่งที่ขึ้นเว็บ"
  */
-export default async function AdminCareerEditPage({ params }: { readonly params: Promise<{ readonly id: string }> }) {
+export default async function AdminCareerEditPage({
+  params,
+  searchParams,
+}: {
+  readonly params: Promise<{ readonly id: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
@@ -22,6 +32,18 @@ export default async function AdminCareerEditPage({ params }: { readonly params:
   const { id } = await params;
   const posting = await loadJobPostingForAdmin(decodeURIComponent(id));
   if (posting === null) notFound();
+
+  /* ── ประวัติรุ่น (รอบที่ 278 · ปิดหนี้ D-265-3) — แม่แบบเดียวกับสินค้า/เมนู/ข่าว ── */
+  const revisionParam = (await searchParams).revision;
+  const selectedRevisionId = typeof revisionParam === "string" ? revisionParam : "";
+  const currentSnapshot = jobSnapshotOf(posting);
+  const revisions = await listEntityRevisions({ kind: "job", entityId: posting.id, current: currentSnapshot });
+  const selectedSnapshot =
+    selectedRevisionId === ""
+      ? null
+      : await loadEntityRevision({ kind: "job", entityId: posting.id, revisionId: selectedRevisionId });
+  const selectedRevision = selectedSnapshot === null ? null : (revisions.find((item) => item.id === selectedRevisionId) ?? null);
+  const revisionChanges = selectedSnapshot === null ? [] : revisionDiff(selectedSnapshot, currentSnapshot);
 
   const board = buildBoard(messages);
 
@@ -68,6 +90,24 @@ export default async function AdminCareerEditPage({ params }: { readonly params:
           }}
         />
       </div>
+
+      <RevisionHistoryPanel
+        strings={messages.admin}
+        revisions={revisions.map((item) => ({
+          id: item.id,
+          revision: item.revision,
+          note: item.note,
+          createdBy: item.createdBy,
+          createdLocal: item.createdLocal,
+          changeCount: item.changeCount,
+          isCurrent: item.isCurrent,
+        }))}
+        selected={selectedRevision}
+        changes={revisionChanges}
+        restoreAction={restoreJobRevisionAction}
+        entityId={posting.id}
+        basePath={`/admin/careers/${posting.id}`}
+      />
     </main>
   );
 }

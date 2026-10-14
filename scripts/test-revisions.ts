@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -10,6 +11,8 @@ import {
   recipeRestoreOf,
   revisionDiff,
   revisionValueText,
+  jobRestoreOf,
+  jobSnapshotOf,
 } from "@/lib/revisions/model";
 import type { AdminProductDetail } from "@/lib/products/repository";
 
@@ -104,5 +107,61 @@ test("revisions: กู้คืนข่าว/เมนูอ่านค่�
 });
 
 test("revisions: ชนิดที่รองรับต้องครบ 3 ชนิด (สินค้า/เมนู/ข่าว)", () => {
-  assert.deepEqual([...REVISION_KINDS], ["product", "recipe", "news"]);
+  assert.deepEqual([...REVISION_KINDS], ["product", "recipe", "news", "job"], "รอบที่ 278: เพิ่มประกาศรับสมัครงาน");
+});
+
+/* ── รอบที่ 278 (ปิดหนี้ D-265-3): ประวัติรุ่นของประกาศรับสมัครงาน ─────────────── */
+
+test("revision: สแนปช็อตประกาศรับสมัครงานครบทุกช่องที่แก้ได้ (ไม่มี id/ผู้แก้/เวลา)", () => {
+  const snapshot = jobSnapshotOf({
+    id: "j1700000000000",
+    titleTh: "พนักงานผลิต",
+    titleEn: "Production staff",
+    departmentTh: "ฝ่ายผลิต",
+    departmentEn: "Production",
+    openings: 3,
+    gender: "any",
+    ageTh: "20-35 ปี",
+    ageEn: "20-35 years",
+    qualificationsTh: "วุฒิ ม.6",
+    qualificationsEn: "High school",
+    experienceTh: "ไม่จำเป็น",
+    experienceEn: "Not required",
+    sortOrder: 30,
+    status: "published",
+    deletedAt: null,
+    createdAt: "2026-10-14T00:00:00.000Z",
+    createdBy: "a@b.c",
+    updatedAt: "2026-10-14T00:00:00.000Z",
+    updatedBy: "a@b.c",
+  } as unknown as Parameters<typeof jobSnapshotOf>[0]);
+
+  for (const key of ["titleTh", "openings", "gender", "status", "sortOrder", "qualificationsTh"]) {
+    assert.ok(key in snapshot, `สแนปช็อตต้องมี ${key}`);
+  }
+  for (const key of ["id", "createdAt", "createdBy", "updatedAt", "updatedBy", "deletedAt"]) {
+    assert.ok(!(key in snapshot), `สแนปช็อตต้องไม่มี ${key} (เทียบความต่างให้สะอาด)`);
+  }
+
+  /* กู้คืน: ค่าที่อ่านไม่ได้ต้องไม่โยน error และตกไปที่ค่ากลางที่ปลอดภัย */
+  const restore = jobRestoreOf({ ...snapshot, openings: "ไม่ใช่ตัวเลข", sortOrder: null, status: "อะไรก็ไม่รู้" });
+  assert.equal(restore.values.openings, 0);
+  assert.equal(restore.values.sortOrder, 0);
+  assert.equal(restore.values.status, "published", "ค่าไม่รู้จัก ⇒ ปลอดภัยที่สุดคือคงเป็นเผยแพร่");
+  assert.equal(restore.values.titleTh, "พนักงานผลิต");
+});
+
+test("revision: จอประกาศรับสมัครงานผูกเก็บรุ่น + กู้คืน + ป้าย audit ครบ", () => {
+  const actions = readFileSync("app/admin/careers/actions.ts", "utf8");
+  assert.ok(actions.includes('kind: "job"'), "ต้องเก็บ/อ่านรุ่นชนิด job");
+  assert.ok(actions.includes("recordJobRevision(id, user.email)"), "บันทึกแล้วต้องเก็บรุ่น");
+  assert.ok(actions.includes('recordJobRevision(id, user.email, "ก่อนกู้คืน")'), "กู้คืนต้องเก็บรุ่นปัจจุบันก่อนเสมอ");
+  assert.ok(actions.includes("restoreJobRevisionAction"), "ต้องมี action กู้คืน");
+
+  const page = readFileSync("app/admin/careers/[id]/page.tsx", "utf8");
+  assert.ok(page.includes("RevisionHistoryPanel"), "จอแก้ต้องมีแผงประวัติรุ่น");
+  assert.ok(page.includes('kind: "job"'), "แผงต้องอ่านรุ่นชนิด job");
+
+  const labels = readFileSync("features/admin/audit-labels.ts", "utf8");
+  assert.ok(labels.includes("job-revision-restore"), "ต้องมีป้ายของเหตุการณ์กู้คืนรุ่น");
 });
