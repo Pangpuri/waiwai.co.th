@@ -3,11 +3,8 @@ import { buildCertificationsTemplate } from "@/lib/blocks/certifications-templat
 import { buildContactDocument } from "@/lib/contact/document";
 import { buildExecutivesTemplate } from "@/lib/blocks/executives-template";
 import { buildHomeTemplate } from "@/lib/blocks/home-template";
-import { buildNewsTemplate } from "@/lib/blocks/news-template";
-import { buildProductsTemplate } from "@/lib/blocks/products-template";
 import { buildProductDetailTemplate } from "@/lib/blocks/product-detail-template";
 import { PRODUCT_DETAIL_PAGE_IDS } from "@/lib/blocks/product-detail";
-import { buildRecipesTemplate } from "@/lib/blocks/recipes-template";
 import type { BlockDocument } from "@/lib/blocks/types";
 
 /**
@@ -32,12 +29,17 @@ const MENU_TEMPLATE_PAGE_IDS = [
      เหตุผล: เนื้อหาหน้าอยู่ที่ **ประกาศรับสมัครงานในฐานข้อมูล** + จอ `/admin/careers` (รอบที่ 265)
      ⇒ ตัวสร้างหน้า careers ไม่มีอะไรให้แก้ และเป็นทาง "กดเผยแพร่ทับหน้า" ที่ไม่ต้องการ */
   "contact",
-  "products",
-  "recipes",
-  "news",
   "certifications",
   "executives",
 ] as const;
+/*
+  ⚠️ รอบที่ 269 (มติเจ้าของ: "เราเผยแพร่จุดเดียวจุดที่ไซด์บาร์พาไปส่วนนั้นๆ จะได้ไม่สับสน"):
+  ถอดจอตัวสร้างของ **`products` · `recipes` · `news`** ออก — ซ้ำซ้อนกับจอหลักที่ไซด์บาร์พาไป
+  (`/admin/products` · `/admin/recipes` · `/admin/news`) และหลักฐานยืนยันว่าไม่เคยถูกใช้:
+  · ฐานข้อมูลไม่มีเอกสารบล็อกของสามหน้านี้เลย (มีแต่ home · about · contact · certifications · executives)
+  · ไม่อยู่ใน `PUBLISH_GOES_LIVE_PAGES` ⇒ กดเผยแพร่แล้วหน้าเว็บก็ไม่เปลี่ยน (กับดัก)
+  เนื้อหาสามหน้านี้ยังแก้ได้ตามปกติที่จอของมันเอง · เลย์เอาต์หน้าเว็บ (โค้ด) ไม่ถูกแตะ
+*/
 
 /**
  * ทะเบียนรวมของ "หน้าที่มีเทมเพลตบล็อก" — หน้าเมนู 9 หน้า + หน้ารายละเอียดหมวดสินค้า 6 หน้า
@@ -72,9 +74,6 @@ const TEMPLATE_BUILDERS: Readonly<Record<BlockTemplatePageId, ((options?: Templa
   */
   about: null,
   contact: buildContactDocument,
-  products: buildProductsTemplate,
-  recipes: buildRecipesTemplate,
-  news: buildNewsTemplate,
   certifications: buildCertificationsTemplate,
   executives: buildExecutivesTemplate,
   /* หน้ารายละเอียดหมวด — เทมเพลตต่อหมวด (ใช้ชื่อ/ภาพจริง + คำอธิบาย "ยังไม่เปิดใช้งาน" ในพจนานุกรม) */
@@ -139,10 +138,6 @@ const COVERAGE: Readonly<Record<BlockTemplatePageId, readonly BlockCoveragePartI
   about: [],
   /* รอบที่ 87: ฟอร์มติดต่อ + แผนที่ (ภาพ) เป็นบล็อกแล้ว ⇒ ครอบคลุมครบ */
   contact: [],
-  /* หน้านี้แสดงเป็นกริดการ์ดสินค้าอยู่แล้ว (`cards`) — ไม่มีแกลเลอรี/lightbox แยก */
-  products: ["gallery"],
-  recipes: ["sampleData"],
-  news: ["sampleData"],
   /* รอบที่ 87: ใช้บล็อก `gallery` (มี lightbox ในตัว) แทนการ์ด ⇒ ครอบคลุม gallery + lightbox */
   certifications: [],
   /*

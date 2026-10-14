@@ -82,8 +82,8 @@ test("product-detail: ทุก id มีพาธใน PAGE_PATHS และพ
     assert.equal(hasBlockTemplate(pageId), true, `${pageId}: ต้องมีเทมเพลต`);
   }
 
-  /* ทะเบียนเทมเพลตรวม = หน้าเมนู 8 + หน้า detail ทั้งหมด (รอบที่ 266: ตัด careers ออก) */
-  assert.equal(BLOCK_TEMPLATE_PAGE_IDS.length, 8 + CATALOG_ITEMS.length);
+  /* ทะเบียนเทมเพลตรวม = หน้าเมนู 5 + หน้า detail ทั้งหมด (รอบ 269: ตัด products/recipes/news ออกด้วย) */
+  assert.equal(BLOCK_TEMPLATE_PAGE_IDS.length, 5 + CATALOG_ITEMS.length);
 });
 
 /* ── 2) เทมเพลตต่อหมวด ────────────────────────────────────────────────────── */
@@ -131,8 +131,12 @@ test("product-detail: buildBlockTemplate ของหน้า detail คืน�
   assert.equal(template?.page, "product-serda");
   assert.ok(template.blocks.some((block) => block.type === "hero"));
 
-  /* หน้าเมนูยังคืนเอกสารของตัวเอง (ไม่ถูกหน้า detail ทับ) */
-  assert.equal(buildBlockTemplate("products")?.page, "products");
+  /* หน้าเมนูที่ยังมีเทมเพลตต้องคืนเอกสารของตัวเอง (ไม่ถูกหน้า detail ทับ) */
+  assert.equal(buildBlockTemplate("certifications")?.page, "certifications");
+  /* รอบ 269: products/recipes/news ใช้จอข้อมูลของตัวเอง ⇒ ไม่มีเทมเพลตซ้อน */
+  assert.equal(buildBlockTemplate("products"), null);
+  assert.equal(buildBlockTemplate("recipes"), null);
+  assert.equal(buildBlockTemplate("news"), null);
 });
 
 /* ── 3) หน้าเว็บสาธารณะ ────────────────────────────────────────────────────── */

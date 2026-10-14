@@ -70,16 +70,13 @@ test("templates: หน้าที่ถูกถอดออกจากทะ
   );
 });
 
-test("templates: ทะเบียนครบ 8 หน้าเมนู + 6 หน้ารายละเอียดหมวด และทุกตัวสร้างเอกสารที่ใช้ได้จริง", () => {
+test("templates: ทะเบียนครบ 5 หน้าเมนู + 6 หน้ารายละเอียดหมวด และทุกตัวสร้างเอกสารที่ใช้ได้จริง (รอบ 269: ถอด products/recipes/news)", () => {
   assert.deepEqual(
     [...BLOCK_TEMPLATE_PAGE_IDS],
     [
       "home",
       "about",
       "contact",
-      "products",
-      "recipes",
-      "news",
       "certifications",
       "executives",
       /* หน้ารายละเอียดหมวดสินค้า (S3 ส่วนที่ 2 · รอบที่ 102) — เรียงตามลำดับหมวดใน CATALOG_ITEMS */
@@ -165,8 +162,10 @@ test("templates: ทุกหน้าต้องประกาศ 'ส่ว�
     buildExecutivesTemplate().blocks.every((block) => block.type !== "rosterText"),
     "ห้ามใส่รายชื่อผู้บริหารที่ยังไม่ยืนยันเป็นข้อความ",
   );
-  assert.ok(blockCoverageGaps("recipes").includes("sampleData"), "หน้าเมนูเป็นข้อมูลตัวอย่าง");
-  assert.ok(blockCoverageGaps("news").includes("sampleData"), "หน้าข่าวเป็นข้อมูลตัวอย่าง");
+  /* รอบที่ 269: `products` · `recipes` · `news` ไม่มีเทมเพลตแล้ว ⇒ ไม่ต้องประกาศช่องว่างของมัน */
+  for (const gone of ["products", "recipes", "news"]) {
+    assert.ok(!(BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes(gone), `${gone}: ต้องไม่อยู่ในทะเบียนแล้ว`);
+  }
   assert.deepEqual(
     [...blockCoverageGaps("home")],
     [],
@@ -203,6 +202,11 @@ test("templates: หน้าที่ปิดช่อง coverage ต้อ�
   };
 
   assert.ok(typesOf("contact").includes("form"), "contact: ต้องมีบล็อกฟอร์มติดต่อจริง");
+  /* รอบที่ 269: สามหน้านี้ใช้จอข้อมูลของตัวเอง ⇒ ต้องไม่มีเทมเพลต/จอตัวสร้างซ้อน */
+  for (const gone of ["products", "recipes", "news"]) {
+    assert.equal(hasBlockTemplate(gone), false, `${gone}: ต้องไม่มีเทมเพลตแล้ว (จุดเผยแพร่เดียว = จอที่ไซด์บาร์พาไป)`);
+    assert.equal(buildBlockTemplate(gone), null, `${gone}: สร้างเทมเพลตต้องไม่ได้`);
+  }
   assert.ok(typesOf("contact").includes("map"), "contact: ต้องมีบล็อกแผนที่ (ภาพ)");
   assert.ok(typesOf("certifications").includes("gallery"), "certifications: ต้องมีบล็อกแกลเลอรี (มี lightbox)");
 
@@ -260,7 +264,8 @@ test("templates: บล็อกในเทมเพลตมี id ไม่�
 test("templates: รายการหน้าที่พรีวิวได้มาจากทะเบียนเทมเพลต (ไม่ใช่การพิมพ์ซ้ำ)", () => {
   assert.deepEqual([...PREVIEWABLE_PAGE_IDS], [...BLOCK_TEMPLATE_PAGE_IDS]);
   assert.equal(isPreviewablePage("about"), true);
-  assert.equal(isPreviewablePage("products"), true, "มีเทมเพลตแล้ว = พรีวิวได้");
+  assert.equal(isPreviewablePage("products"), false, "ไม่เหลือเทมเพลต ⇒ ไม่เปิดพรีวิว (จุดเผยแพร่คือ /admin/products)");
+  assert.equal(isPreviewablePage("certifications"), true, "หน้าที่มีเทมเพลต = พรีวิวได้");
   assert.equal(isPreviewablePage("privacy"), false, "หน้าที่ไม่มีเทมเพลต (อยู่ในโค้ดล้วน) ต้องไม่เปิดพรีวิว");
 
   const paths = sourceOf("lib/pages/paths.ts");
@@ -298,7 +303,7 @@ test("templates: ตัวเลือกลิงก์พรีวิวคร
 
 test("templates: ทุกหน้าที่มีเทมเพลตต้องเรนเดอร์เอกสารที่เผยแพร่ได้ และมีทางถอยเป็นเลย์เอาต์เดิม", () => {
   /*
-    หน้าเมนู 9 หน้า → ไฟล์ route ของตัวเอง
+    หน้าเมนู 5 หน้า (รอบ 269) → ไฟล์ route ของตัวเอง
     หน้ารายละเอียดหมวด 6 หน้า → ใช้ไฟล์ร่วมกัน (`app/[lang]/products/[slug]/page.tsx`)
       โดย id ของหน้าแตกต่างกัน (`product-<slug>`) ⇒ ตรวจแบบ "ไฟล์เดียวกัน + มี id ในโค้ด"
   */
@@ -306,9 +311,6 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
     home: "app/[lang]/page.tsx",
     about: "app/[lang]/about/page.tsx",
     contact: "app/[lang]/contact/page.tsx",
-    products: "app/[lang]/products/page.tsx",
-    recipes: "app/[lang]/recipes/page.tsx",
-    news: "app/[lang]/news/page.tsx",
     certifications: "app/[lang]/about/certifications/page.tsx",
     executives: "app/[lang]/about/executives/page.tsx",
   };

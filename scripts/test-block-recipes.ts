@@ -15,7 +15,7 @@ import {
 } from "@/lib/blocks/edit";
 import { localizedBlockHref } from "@/lib/blocks/href";
 import { parseBlockDocument } from "@/lib/blocks/parse";
-import { TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
+import { BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, buildBlockTemplate, hasBlockTemplate } from "@/lib/blocks/templates";
 import {
   BLOCK_CATALOG,
   BLOCK_TYPES,
@@ -287,20 +287,12 @@ test("href: ตัวเรนเดอร์ใช้ตัวช่วยก�
 
 /* ── เทมเพลต ───────────────────────────────────────────────────────────────── */
 
-test("recipes: เทมเพลตมีบล็อกเมนูอาหารว่าง (ไม่แต่งเมนูปลอม) และผ่าน parser + validator", () => {
-  const template = buildBlockTemplate("recipes");
-  assert.ok(template !== null);
-  if (template === null) return;
-
-  const block = template.blocks.find((entry) => entry.type === "recipeCards");
-  assert.ok(block !== undefined && block.type === "recipeCards", "ต้องมีบล็อก recipeCards");
-  assert.equal(block.items.length, 0, "ห้ามแต่งเมนูปลอมขึ้นเอง");
-  assert.ok(block.heading.th.trim() !== "", "ต้องมีหัวข้อส่วน (จากพจนานุกรม)");
-
-  const parsed = parseBlockDocument("recipes", JSON.parse(JSON.stringify(template)));
-  assert.equal(parsed.ok, true);
-  assert.ok(parsed.ok);
-  assert.deepEqual(documentErrorsOf(validateDocument(parsed.document)), []);
+test("recipes: จอตัวสร้างหน้า /recipes ถูกถอดออกแล้ว (รอบ 269) — เทมเพลตจึงต้องไม่มีอีก", () => {
+  /* มติเจ้าของ: "เราเผยแพร่จุดเดียวจุดที่ไซด์บาร์พาไปส่วนนั้นๆ จะได้ไม่สับสน"
+     ⇒ /recipes แก้ที่จอ `/admin/recipes` เท่านั้น · ไม่มีเทมเพลตบล็อก/จอตัวสร้างซ้อน */
+  assert.equal(buildBlockTemplate("recipes"), null);
+  assert.equal(hasBlockTemplate("recipes"), false);
+  assert.ok(!(BLOCK_TEMPLATE_PAGE_IDS as readonly string[]).includes("recipes"), "ทะเบียนเทมเพลตต้องไม่มี recipes");
 });
 
 test("templates: ทุก href ในเทมเพลตเป็นพาธกลาง (ห้ามผูกภาษา) — บทเรียนรอบที่ 101", () => {
@@ -319,18 +311,17 @@ test("templates: ทุก href ในเทมเพลตเป็นพาธ
   }
 });
 
-test("templates: การ์ดสินค้าชี้พาธกลาง /products/<slug> (ไม่ใช่ /th/…)", () => {
-  const template = buildBlockTemplate("products");
+test("templates: ลิงก์การ์ดสินค้าในเทมเพลตหน้าแรกชี้พาธกลาง /products/<slug> (ไม่ใช่ /th/…)", () => {
+  /* รอบที่ 269: เทมเพลตของหน้า /products ถูกถอด (ใช้จอ /admin/products) — เหลือตรวจที่เทมเพลตหน้าแรก */
+  const template = buildBlockTemplate("home");
   assert.ok(template !== null);
-  const cards = template?.blocks.find((entry) => entry.type === "cards");
-  assert.ok(cards !== undefined && cards.type === "cards");
-
-  const hrefs = cards.items.map((item) => item.href);
-  assert.ok(hrefs.length > 0);
-  for (const href of hrefs) {
-    assert.match(href, /^\/products\/[a-z0-9-]+$/, `href ต้องเป็นพาธกลาง: ${href}`);
+  const showcase = template.blocks.find((entry) => entry.type === "productShowcase");
+  assert.ok(showcase !== undefined, "เทมเพลตหน้าแรกต้องมีบล็อกหมวดสินค้า");
+  for (const value of collectStrings(template)) {
+    assert.ok(!/^\/(th|en)(\/|$)/.test(value), `หน้าแรก: ห้ามเก็บ href ที่ผูกภาษาไว้ (${value})`);
   }
 });
+
 
 test("recipes: สารบัญ (sidebar) มองเห็นหัวข้อของบล็อกเมนูอาหาร", () => {
   const block = mutable(createBlock("recipeCards", "b1"));

@@ -127,12 +127,15 @@ test("การ์ดหมวดสินค้า (/products): ไม่มี
   );
   assert.ok(!pageSource.includes("cardCta"), "หน้าหมวดสินค้ายังอ้าง cardCta");
 
-  // เทมเพลตบล็อกการ์ดต้องไม่ฝังข้อความ CTA ลงใน body อีก
-  const templateSource = readFileSync(
-    path.join(PROJECT_ROOT, "lib", "blocks", "products-template.ts"),
+  /*
+    รอบที่ 269: เทมเพลตของหน้า /products ถูกถอด (จุดเผยแพร่เดียว = จอ /admin/products)
+    ⇒ ตรวจแทนว่า "การ์ดหมวด" ตัวกลาง (ที่หน้าเว็บและพรีวิวหลังบ้านใช้ร่วมกัน) ไม่มี CTA หลงเหลือ
+  */
+  const cardSource = readFileSync(
+    path.join(PROJECT_ROOT, "features", "products", "ui", "category-card.tsx"),
     "utf8",
   );
-  assert.ok(!templateSource.includes("cardCta"), "เทมเพลตยังอ้าง cardCta");
+  assert.ok(!cardSource.includes("cardCta"), "การ์ดหมวดยังอ้าง cardCta");
 });
 
 test("productsPage: ชื่อหมวดต้องไม่มีอักขระหลุดหัวท้าย (กัน ':' หลุดเข้าไปในชื่อ)", () => {
