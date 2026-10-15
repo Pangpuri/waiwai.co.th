@@ -138,6 +138,8 @@ export function CategoryEditorForm(props: CategoryEditorFormProps) {
         </label>
       </div>
       {props.builtIn ? <p className="text-fg-muted mt-1 text-[11px]">{m.nameThFallbackHint}</p> : null}
+      {/* ชื่อนี้คือ "ชื่อหน้าของหน้าเว็บ" ด้วย — แหล่งเดียว (รอบที่ 286 · ปิดหนี้ D-281-1) */}
+      <p className="text-fg-muted mt-1 text-[11px]">{m.nameSyncHint}</p>
 
       <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
         <CategoryImagePicker

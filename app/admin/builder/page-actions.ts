@@ -21,12 +21,24 @@ export async function updatePageAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim();
   if (id === "") return;
 
-  const nameTh = normalizePageName(String(formData.get("nameTh") ?? ""));
-  const rawNameEn = String(formData.get("nameEn") ?? "").trim();
-  const nameEn = rawNameEn === "" ? "" : normalizePageName(rawNameEn);
-  if (nameTh === null || nameEn === null) return;
-
-  if (validatePageName(nameTh, nameEn).length > 0) return;
+  /*
+    ⚠️ รอบที่ 286 (D-281-1): หน้า `product-<หมวด>` **ไม่ส่งชื่อมา** เพราะชื่อมาจากจอหมวดสินค้า
+    ⇒ ไม่มีคีย์ในฟอร์ม = ไม่แตะชื่อ (`undefined`) · มีคีย์ = ตรวจ/บันทึกตามเดิม
+    (`updatePage` บังคับ `in_menu = false` ให้หน้า detail เองอีกชั้น — D-281-2)
+  */
+  const rawNameTh = formData.get("nameTh");
+  const rawNameEn = formData.get("nameEn");
+  let nameTh: string | undefined;
+  let nameEn: string | undefined;
+  if (rawNameTh !== null || rawNameEn !== null) {
+    const normalizedTh = normalizePageName(String(rawNameTh ?? ""));
+    const rawEn = String(rawNameEn ?? "").trim();
+    const normalizedEn = rawEn === "" ? "" : normalizePageName(rawEn);
+    if (normalizedTh === null || normalizedEn === null) return;
+    if (validatePageName(normalizedTh, normalizedEn).length > 0) return;
+    nameTh = normalizedTh;
+    nameEn = normalizedEn;
+  }
 
   const orderRaw = Number.parseInt(String(formData.get("menuOrder") ?? "0"), 10);
   const menuOrder = Number.isFinite(orderRaw) ? Math.max(0, Math.min(orderRaw, 9999)) : 0;

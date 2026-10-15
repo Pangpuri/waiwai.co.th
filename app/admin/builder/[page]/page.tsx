@@ -11,7 +11,7 @@ import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
 import { blockCoverageGaps, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage, type BlockCoveragePartId } from "@/lib/blocks/templates";
-import { isProductDetailPageLike } from "@/lib/blocks/product-detail";
+import { isProductDetailPageLike, productDetailCategoryIdOfPageId } from "@/lib/blocks/product-detail";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
@@ -170,6 +170,25 @@ export default async function AdminBuilderPage({
     livePath = detailPaths.get(page) ?? livePath;
   }
 
+  /*
+    ── หน้า detail ของหมวด: ชื่อ/เมนู **ถูกล็อก** (รอบที่ 286 · ปิดหนี้ D-281-1/D-281-2) ──────────
+    ชื่อมาจาก `product_category.name_th` (จอหมวดสินค้า) และเมนูหลักปิดถาวร (มติ D30)
+    ⇒ จอนี้แสดงชื่อแบบอ่านอย่างเดียว + ลิงก์ไปจอต้นทาง (ไม่มีช่องกรอกที่แก้แล้วไม่มีผล)
+    · แถว `page` ในจอหมวดสินค้ามี id = `category-<รหัสหมวด>` ⇒ ลิงก์ตรงไปการ์ดใบนั้น
+  */
+  const detailCategoryId = productDetailCategoryIdOfPageId(page);
+  const pageLock =
+    detailCategoryId === null
+      ? undefined
+      : {
+          strings: {
+            pageNameLockedTitle: strings.pageNameLockedTitle,
+            pageNameLockedLink: strings.pageNameLockedLink,
+            pageMenuLockedNote: strings.pageMenuLockedNote,
+          },
+          href: `/admin/product-categories#category-${detailCategoryId}`,
+        };
+
   /* คำเตือน "ส่วนที่เทมเพลตไม่ครอบคลุม" — ใช้ทั้งตอนยังไม่มีฉบับร่าง และตอนจะเปิดสวิตช์เว็บจริง */
   const coverage = {
     title: strings.templateCoverageTitle,
@@ -189,7 +208,7 @@ export default async function AdminBuilderPage({
 
       {/* หน้าเป็นวัตถุ (W1): ตั้งค่าหน้า/เมนู + SEO รายหน้า (SEO แสดงเฉพาะบทบาทที่มีสิทธิ์ seo) */}
       <div className="grid gap-4 md:grid-cols-2">
-        <PageSettings page={currentPage} strings={strings} />
+        <PageSettings page={currentPage} strings={strings} lock={pageLock} />
         {can(user.role, "seo") ? <PageSeoSettings page={currentPage} strings={strings} /> : null}
       </div>
 

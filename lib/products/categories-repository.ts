@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getPool, isDatabaseConfigured, withTransaction } from "@/db/pool";
-import { productDetailPageId } from "@/lib/blocks/product-detail";
+import { PRODUCT_DETAIL_PAGE_ID_PREFIX, productDetailPageId } from "@/lib/blocks/product-detail";
 import {
   categoryPresetApplyPlan,
   defaultSortOrderOf,
@@ -194,8 +194,9 @@ export async function listCategorySlugs(): Promise<readonly string[]> {
 
 /*
   ⚠️ การค้น "ที่อยู่เก่า → หมวด" (ใช้ทำ 301) อยู่ที่ `lib/products/repository.ts`
-     (`findCategoryIdByOldSlug`) — เพราะเป็น **การอ่านของหน้าเว็บสาธารณะ** ต้องผ่านประตูอ่านอย่างเดียว
+     (`findCategoryHistoryBySlug`) — เพราะเป็น **การอ่านของหน้าเว็บสาธารณะ** ต้องผ่านประตูอ่านอย่างเดียว
      ไม่ใช่ `getPool()` ของหลังบ้าน (มติ D23 · least privilege)
+     · รอบที่ 286: คำตอบแยกเป็น "หมวดที่ยังอยู่" (เด้งไปที่อยู่ปัจจุบัน) กับ "หมวดถูกลบแล้ว" (เด้งไป /products)
 */
 
 /* ── ค่าเริ่มต้นถาวร (immutable) ─────────────────────────────────────────────── */
@@ -278,53 +279,82 @@ export async function insertCategoryDefaults(
  * คืนค่าหมวดจากค่าเริ่มต้น (รายหมวด)
  * - แถวหมวดยังไม่มี (ฐานข้อมูลใหม่ที่ยังไม่รันตัวนำเข้า) ⇒ **สร้างจากค่าเริ่มต้นให้**
  * - คืน `true` = เขียนจริง
+ * 🆕 รอบที่ 286: ซิงก์ **ชื่อหน้า** ตามชื่อหมวดที่คืนมา (`page.name_th` ห้ามว่าง ⇒ ไม่ทับด้วยค่าว่าง)
  */
 export async function restoreCategoryFromDefault(id: string, actor: string): Promise<boolean> {
-  const result = await getPool().query(
-    `insert into product_category
-       (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
-            d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $2
-       from product_category_default d
-      where d.id = $1
-     on conflict (id) do update set
-       name_th        = excluded.name_th,
-       name_en        = excluded.name_en,
-       description_th = excluded.description_th,
-       description_en = excluded.description_en,
-       image_media_id = excluded.image_media_id,
-       logo_media_id  = excluded.logo_media_id,
-       sort_order     = excluded.sort_order,
-       is_hidden      = false,
-       updated_at     = now(),
-       updated_by     = excluded.updated_by`,
-    [id, actor],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const pageId = productDetailPageId(id);
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `insert into product_category
+         (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+       select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
+              d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $2
+         from product_category_default d
+        where d.id = $1
+       on conflict (id) do update set
+         name_th        = excluded.name_th,
+         name_en        = excluded.name_en,
+         description_th = excluded.description_th,
+         description_en = excluded.description_en,
+         image_media_id = excluded.image_media_id,
+         logo_media_id  = excluded.logo_media_id,
+         sort_order     = excluded.sort_order,
+         is_hidden      = false,
+         updated_at     = now(),
+         updated_by     = excluded.updated_by`,
+      [id, actor],
+    );
+    await client.query(
+      `update page p
+          set name_th    = coalesce(nullif(trim(c.name_th), ''), p.name_th),
+              name_en    = case when trim(c.name_en) = '' then p.name_en else c.name_en end,
+              updated_at = now(),
+              updated_by = $2
+         from product_category c
+        where p.id = $1 and c.id = $3`,
+      [pageId, actor, id],
+    );
+    return (result.rowCount ?? 0) > 0;
+  });
 }
 
-/** คืนค่าเริ่มต้น **ทั้งชุด** (ทุกหมวดที่มีค่าเริ่มต้น) — คืนจำนวนแถวที่เขียน */
+/**
+ * คืนค่าเริ่มต้น **ทั้งชุด** (ทุกหมวดที่มีค่าเริ่มต้น) — คืนจำนวนแถวที่เขียน
+ * 🆕 รอบที่ 286: ซิงก์ **ชื่อหน้า** ของทุกหมวดในชุดเดียวกับที่คืนค่า (ไม่ทับด้วยค่าว่าง)
+ */
 export async function restoreAllCategoriesFromDefault(actor: string): Promise<number> {
-  const result = await getPool().query(
-    `insert into product_category
-       (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
-     select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
-            d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $1
-       from product_category_default d
-     on conflict (id) do update set
-       name_th        = excluded.name_th,
-       name_en        = excluded.name_en,
-       description_th = excluded.description_th,
-       description_en = excluded.description_en,
-       image_media_id = excluded.image_media_id,
-       logo_media_id  = excluded.logo_media_id,
-       sort_order     = excluded.sort_order,
-       is_hidden      = false,
-       updated_at     = now(),
-       updated_by     = excluded.updated_by`,
-    [actor],
-  );
-  return result.rowCount ?? 0;
+  return withTransaction(async (client) => {
+    const result = await client.query(
+      `insert into product_category
+         (id, slug, name_th, name_en, description_th, description_en, image_media_id, logo_media_id, sort_order, is_hidden, updated_at, updated_by)
+       select d.id, d.id, d.name_th, d.name_en, d.description_th, d.description_en,
+              d.image_media_id, d.logo_media_id, d.sort_order, false, now(), $1
+         from product_category_default d
+       on conflict (id) do update set
+         name_th        = excluded.name_th,
+         name_en        = excluded.name_en,
+         description_th = excluded.description_th,
+         description_en = excluded.description_en,
+         image_media_id = excluded.image_media_id,
+         logo_media_id  = excluded.logo_media_id,
+         sort_order     = excluded.sort_order,
+         is_hidden      = false,
+         updated_at     = now(),
+         updated_by     = excluded.updated_by`,
+      [actor],
+    );
+    await client.query(
+      `update page p
+          set name_th    = coalesce(nullif(trim(c.name_th), ''), p.name_th),
+              name_en    = case when trim(c.name_en) = '' then p.name_en else c.name_en end,
+              updated_at = now(),
+              updated_by = $1
+         from product_category c
+        where p.id = $2 || c.id`,
+      [actor, PRODUCT_DETAIL_PAGE_ID_PREFIX],
+    );
+    return result.rowCount ?? 0;
+  });
 }
 
 /* ── เขียนค่าหมวด (หลังบ้าน) ─────────────────────────────────────────────────── */
@@ -415,6 +445,13 @@ export async function createProductCategoryAdmin(
  * 2. `update … set slug = ใหม่`
  * 3. ลบประวัติที่ชี้ที่อยู่ **ใหม่** ของหมวดเดียวกัน (ถ้าเคยใช้) — ที่อยู่นั้นกลับมาเป็นของหมวดนี้ตรง ๆ
  * ⚠️ ที่อยู่ใหม่ชนกับหมวดอื่น = unique index โยน error ⇒ **ทั้ง transaction ย้อนกลับ** (ไม่มีที่อยู่ครึ่ง ๆ กลาง ๆ)
+ *
+ * ## 🆕 รอบที่ 286 (ปิดหนี้ D-281-1) — ชื่อหมวด = **แหล่งความจริงเดียวของชื่อหน้า**
+ * จอตัวสร้างของหน้า `product-<หมวด>` ไม่ให้แก้ชื่ออีก (แสดงอย่างเดียว + ลิงก์มาที่จอนี้)
+ * ⇒ ทุกครั้งที่บันทึกหมวด ชื่อหน้าต้องถูกซิงก์ใน **transaction เดียวกัน**
+ * ⚠️ ชื่อไทยว่าง = **ไม่ทับของเดิม** (`page.name_th` ห้ามว่าง — `toPage()` ทิ้งแถวนั้น ⇒ จอตัวสร้าง 404)
+ * ⚠️ ชื่ออังกฤษว่าง = ไม่ทับของเดิมเช่นกัน (ค่า EN ของหน้าอาจถูกตั้งไว้ก่อนรอบนี้)
+ * ⚠️ ที่อยู่ที่ **ปลดระวาง** (หมวดถูกลบ) แล้วถูกยึดคืน ⇒ ต้องล้าง `retired_at` ด้วย ไม่งั้นหน้าใหม่จะเด้งไป `/products`
  */
 export async function updateProductCategoryAdmin(input: CategoryWriteInput, actor: string): Promise<boolean> {
   const touchImage = input.imageMediaId !== undefined;
@@ -425,11 +462,13 @@ export async function updateProductCategoryAdmin(input: CategoryWriteInput, acto
   /*
     ที่อยู่เก่า → ประวัติ (ก่อนแก้) · `on conflict` = ที่อยู่นี้เคยชี้ที่อื่น ⇒ ย้ายมาเป็นของหมวดนี้
     เงื่อนไข `slug is distinct from $2` กันบันทึกค่าที่อยู่เดิมซ้ำเข้าไปในประวัติ
+    ⚠️ รอบที่ 286: ยึดที่อยู่คืน ⇒ ล้างสถานะ "ปลดระวาง" (หมวดกลับมามีชีวิต)
   */
-  const insertHistorySql = `insert into product_category_slug_history (slug, category_id, created_at, created_by)
-     select slug, id, now(), $3 from product_category where id = $1 and slug is distinct from $2
+  const insertHistorySql = `insert into product_category_slug_history (slug, category_id, created_at, created_by, retired_at, retired_by)
+     select slug, id, now(), $3, null, '' from product_category where id = $1 and slug is distinct from $2
      on conflict (slug) do update
-       set category_id = excluded.category_id, created_at = now(), created_by = excluded.created_by`;
+       set category_id = excluded.category_id, created_at = now(), created_by = excluded.created_by,
+           retired_at = null, retired_by = ''`;
 
   const updateSql = `update product_category
         set name_th        = $2,
@@ -461,18 +500,27 @@ export async function updateProductCategoryAdmin(input: CategoryWriteInput, acto
     nextSlug ?? null,
   ];
 
-  /* ที่อยู่ใหม่ = ของหมวดนี้แล้ว ⇒ ประวัติที่ชี้ที่อยู่นี้ไม่จำเป็นอีก (กัน 301 วนกลับตัวเอง) */
-  const deleteHistorySql = `delete from product_category_slug_history where category_id = $1 and slug = $2`;
+  /*
+    ที่อยู่ใหม่ = ของหมวดนี้แล้ว ⇒ ประวัติที่ชี้ที่อยู่นี้ไม่จำเป็นอีก (กัน 301 วนกลับตัวเอง)
+    ⚠️ รวมแถวที่ **ปลดระวาง** (`category_id is null`) ของที่อยู่เดียวกัน — ที่อยู่ที่ถูกยึดคืนต้องกลับมามีชีวิต
+  */
+  const deleteHistorySql = `delete from product_category_slug_history
+     where slug = $2 and (category_id = $1 or category_id is null)`;
 
-  if (!renameSlug) {
-    const result = await getPool().query(updateSql, updateParams);
-    return (result.rowCount ?? 0) > 0;
-  }
+  /* ซิงก์ชื่อหน้า ← ชื่อหมวด (รอบที่ 286 · D-281-1) */
+  const syncPageNameSql = `update page
+        set name_th = coalesce(nullif(trim($2), ''), name_th),
+            name_en = case when trim($3) = '' then name_en else $3 end,
+            updated_at = now(),
+            updated_by = $4
+      where id = $1`;
+  const pageId = productDetailPageId(input.id);
 
   return withTransaction(async (client) => {
-    await client.query(insertHistorySql, [input.id, nextSlug, actor]);
+    if (renameSlug) await client.query(insertHistorySql, [input.id, nextSlug, actor]);
     const result = await client.query(updateSql, updateParams);
-    await client.query(deleteHistorySql, [input.id, nextSlug]);
+    if (renameSlug) await client.query(deleteHistorySql, [input.id, nextSlug]);
+    await client.query(syncPageNameSql, [pageId, input.nameTh, input.nameEn, actor]);
     return (result.rowCount ?? 0) > 0;
   });
 }
@@ -483,12 +531,40 @@ export async function updateProductCategoryAdmin(input: CategoryWriteInput, acto
  * ⚠️ **ประตูอยู่ที่ SQL เองทั้งสองข้อ** (fail-closed — แม้ action ถูกเรียกตรง ๆ):
  *   1. `not exists (select … from product …)` ⇒ มีสินค้า 1 ชิ้นก็ลบไม่ได้
  *   2. `id <> all($2::text[])` ⇒ หมวดในโค้ด 6 ใบ (`builtInSlugs` จากผู้เรียก) ลบไม่ได้
- * ลบ **ประวัติ slug** (FK `on delete cascade`) และ **เอกสารตัวสร้างหน้า** (`page_document` ของ `product-<id>`)
- * ใน transaction เดียว · คืน `true` = ลบจริง
+ * ลบ **เอกสารตัวสร้างหน้า** (`page_document`/`_revision`/`page` ของ `product-<id>`) ใน transaction เดียว
+ * · คืน `true` = ลบจริง
+ *
+ * ## 🆕 รอบที่ 286 (ปิดหนี้ D-280-3) — ที่อยู่เดิม **ไม่ตายทาง**
+ * มติเจ้าของ 2026-10-15: ที่อยู่เดิมของหมวดที่ถูกลบ ⇒ **308 ไปหน้า `/products`**
+ * ⇒ ก่อนลบต้อง **เก็บที่อยู่ปัจจุบันเข้าประวัติ + ปลดระวางทุกที่อยู่ของหมวดนี้** (`category_id = null` ·
+ * `retired_at`/`retired_by`) เพราะ FK เป็น `on delete set null` แล้ว (migration 0044) แถวประวัติจึงอยู่ต่อ
+ * ⚠️ ลำดับสำคัญ: ถ้าลบหมวดก่อน (FK จะ set null ให้) จะหาประวัติของหมวดนี้ไม่เจออีก ⇒ ลบไม่สำเร็จ = rollback ทั้งก้อน
  */
-export async function deleteEmptyCategoryAdmin(id: string, builtInSlugs: readonly string[]): Promise<boolean> {
+export async function deleteEmptyCategoryAdmin(
+  id: string,
+  builtInSlugs: readonly string[],
+  actor: string,
+): Promise<boolean> {
   if (id.trim() === "") return false;
   return withTransaction(async (client) => {
+    /* ① เก็บ "ที่อยู่ปัจจุบัน" เข้าประวัติก่อน (ที่อยู่เก่าก่อนหน้านี้อยู่ในประวัติแล้ว) */
+    await client.query(
+      `insert into product_category_slug_history (slug, category_id, created_at, created_by, retired_at, retired_by)
+       select slug, id, now(), $2, null, '' from product_category where id = $1
+       on conflict (slug) do update
+         set category_id = excluded.category_id, created_at = now(), created_by = excluded.created_by,
+             retired_at = null, retired_by = ''`,
+      [id, actor],
+    );
+
+    /* ② ปลดระวางทุกที่อยู่ของหมวดนี้ — แถวอยู่ต่อให้หน้าเว็บรู้ว่า "ที่อยู่นี้เคยมี" */
+    await client.query(
+      `update product_category_slug_history
+          set category_id = null, retired_at = now(), retired_by = $2
+        where category_id = $1`,
+      [id, actor],
+    );
+
     const result = await client.query(
       `delete from product_category
         where id = $1

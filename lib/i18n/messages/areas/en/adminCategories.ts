@@ -27,6 +27,8 @@ export const enAdminCategories = {
   fieldSortOrderHint: "Lower number shows first",
   fieldHidden: "Hide from site",
   nameThFallbackHint: "Leave empty to keep the dictionary name (original categories only)",
+  nameSyncHint:
+    "This name is also the web page name for the category - edit it here only (the page builder cannot rename it, round 286)",
   fieldSlug: "Web address (slug)",
   slugHint: "lowercase a–z · 0–9 · hyphen — this address opens the category detail page",
   slugChangeHint: "Changing the address makes the system 301-redirect the old one, so existing links keep working",
@@ -55,9 +57,11 @@ export const enAdminCategories = {
   deleteCategory: "Delete this category",
   deleteCategoryHint: "Only categories with no products, and never an original site category",
   deleteCategoryConfirm: "Confirm permanent delete - this cannot be undone",
+  deleteRedirectNote:
+    "After deleting, the old address (e.g. /products/{slug}) sends visitors to /products automatically - no dead end (round 286)",
   deleteBlockedProducts: "Cannot delete - this category still has products · use “hide from site”",
   deleteBlockedBuiltIn: "Cannot delete - this is an original site category · use “hide from site”",
-  deleted: "Deleted the category “{slug}” — its old address no longer works",
+  deleted: "Deleted the category “{slug}” — its old address now goes to /products",
   reorderTitle: "Display order on the site",
   reorderHint: "Drag a row or use the arrows, then save · the order takes effect on the site immediately",
   reorderEmpty: "No categories to reorder yet",

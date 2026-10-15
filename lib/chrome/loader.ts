@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import { isProductDetailPageLike } from "@/lib/blocks/product-detail";
 import { loadDocumentRow } from "@/lib/blocks/repository";
 import {
   NAVBAR_PAGE_KEY,
@@ -67,13 +68,18 @@ export const loadNavbarConfig = cache(async (locale: Locale): Promise<NavbarConf
       ชื่อเมนูมาจาก "ชื่อหน้า" (ตาราง page) — W1 · ผู้ใช้สั่ง "เมนูก็คงเอาไว้ตามหน้า"
       ⚠️ บทเรียน รอบที่ 61: ต้องใช้ชื่อหน้า **แม้ยังไม่มีแถว navbar ที่เผยแพร่**
          (เดิมคืน null ก่อน ⇒ หน้าเว็บใช้พจนานุกรม แล้วชื่อหน้าที่แก้ไปไม่มีผลเลย)
+      ⚠️ รอบที่ 286 (D-281-2): หน้า detail ของหมวดสินค้า **ไม่ขึ้นเมนูหลักเสมอ** (มติ D30)
+         ⇒ กรองที่ตัวอ่านด้วย ไม่พึ่ง `in_menu` ในฐานข้อมูลอย่างเดียว
     */
     const pages = await listPages(defaultPages(messages));
     const labels: Record<string, { th: string; en: string }> = {};
     const hidden: string[] = [];
     for (const page of pages) {
-      if (page.inMenu) labels[page.id] = { th: page.nameTh, en: page.nameEn.trim() === "" ? page.nameTh : page.nameEn };
-      else hidden.push(page.id);
+      if (page.inMenu && !isProductDetailPageLike(page.id)) {
+        labels[page.id] = { th: page.nameTh, en: page.nameEn.trim() === "" ? page.nameTh : page.nameEn };
+      } else {
+        hidden.push(page.id);
+      }
     }
 
     const row = await loadDocumentRow(NAVBAR_PAGE_KEY, "published");

@@ -385,16 +385,25 @@ create table if not exists product_category (
 
 create unique index if not exists product_category_slug_key on product_category (slug);
 
-/* รอบที่ 279 (D30): ประวัติ slug เดิม → ใช้ทำ 301 เมื่อเปลี่ยนที่อยู่ของหมวด */
+/* รอบที่ 279 (D30): ประวัติ slug เดิม → ใช้ทำ 301 เมื่อเปลี่ยนที่อยู่ของหมวด
+   รอบที่ 286 (D-280-3): หมวดถูกลบ ⇒ ประวัติ **อยู่ต่อ** (FK `on delete set null`) เพื่อให้รู้ว่า
+   "ที่อยู่นี้เคยมี" แล้วหน้าเว็บทำ 308 ไปหน้า `/products` แทนการ 404 เงียบ ๆ
+   ⚠️ `category_id` เป็น null ได้ = หมวดที่ถูกปลดระวาง (มี `retired_at`/`retired_by` กำกับ) */
 create table if not exists product_category_slug_history (
   slug        text        primary key,
-  category_id text        not null references product_category (id) on delete cascade,
+  category_id text        references product_category (id) on delete set null,
   created_at  timestamp with time zone not null default now(),
-  created_by  text        not null default ''
+  created_by  text        not null default '',
+  retired_at  timestamptz,
+  retired_by  text        not null default ''
 );
 
 create index if not exists product_category_slug_history_category_idx
   on product_category_slug_history (category_id, created_at desc);
+
+create index if not exists product_category_slug_history_retired_idx
+  on product_category_slug_history (retired_at)
+  where retired_at is not null;
 
 
 create index if not exists product_category_order_idx on product_category (sort_order, id);

@@ -32,8 +32,14 @@ export const PRODUCT_DETAIL_PAGE_IDS = [
 
 export type ProductDetailPageId = (typeof PRODUCT_DETAIL_PAGE_IDS)[number];
 
-/** คำนำหน้าของ id หน้า detail — ใช้ทั้งสร้างและถอดกลับ */
-const PAGE_ID_PREFIX = "product-";
+/**
+ * คำนำหน้าของ id หน้า detail — ใช้ทั้งสร้างและถอดกลับ
+ * ⚠️ `export` เพราะชั้นข้อมูลต้องใช้ **ค่าเดียวกัน** ในการอัปเดตชื่อหน้า/เมนูของหมวด
+ *    (`page.id = <prefix> || หมวด`) โดยไม่ต้องพิมพ์สตริงซ้ำใน SQL (รอบที่ 286)
+ */
+export const PRODUCT_DETAIL_PAGE_ID_PREFIX = "product-";
+
+const PAGE_ID_PREFIX = PRODUCT_DETAIL_PAGE_ID_PREFIX;
 
 /** id ของหน้าจาก **รหัสภายใน** ของหมวด (เช่น `instant-noodles` → `product-instant-noodles`) */
 export function productDetailPageId(categoryId: string): string {

@@ -160,10 +160,13 @@ test("product-detail: หน้า /products/[slug] อ่านเอกสา�
   /* 🆕 รอบที่ 264 (มติ D25): หมวดที่ถูก "ซ่อนจากเว็บ" ต้อง 404 และหมวดใหม่ต้องเปิดได้ */
   assert.ok(source.includes("isVisibleCategory("), "ต้องมีประตูตัดสินว่าเปิดดูได้ไหม (หมวดใหม่/ถูกซ่อน)");
   assert.ok(source.includes("category.isHidden"), "ต้องอ่านสถานะซ่อนจากฐานข้อมูลแล้วตอบ 404");
-  /* 🆕 รอบที่ 280 (มติ D30): ที่อยู่บนเว็บแก้ได้ ⇒ ที่อยู่เก่าต้อง 301 และ prerender ต้องมาจาก DB */
-  assert.ok(source.includes("findCategoryIdByOldSlug("), "ต้องค้นที่อยู่เก่าจากประวัติ slug");
-  assert.ok(source.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **301** ไปที่อยู่ปัจจุบัน");
+  /* 🆕 รอบที่ 280 (มติ D30): ที่อยู่บนเว็บแก้ได้ ⇒ ที่อยู่เก่าต้อง 308 และ prerender ต้องมาจาก DB */
+  assert.ok(source.includes("findCategoryHistoryBySlug("), "ต้องค้นที่อยู่เก่าจากประวัติ slug");
+  assert.ok(source.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **308** ไปที่อยู่ปัจจุบัน");
   assert.ok(source.includes("listPublicCategorySlugs()"), "generateStaticParams ต้องอ่านที่อยู่จริงจากฐานข้อมูล");
+  /* 🆕 รอบที่ 286 (ปิด D-280-3): ที่อยู่ของหมวดที่ถูกลบ ⇒ เด้งไปหน้าเลือกหมวด (ไม่ 404 เงียบ ๆ) */
+  assert.ok(source.includes("categoryRedirectTarget("), "ต้องใช้ตรรกะกลางตัดสินปลายทาง");
+  assert.ok(source.includes('kind === "index"'), "ต้องมีสาขาสำหรับ \"หมวดถูกลบแล้ว\" → /products");
 });
 
 /* ── 4) migration ─────────────────────────────────────────────────────────── */

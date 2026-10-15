@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { codeOf, rawOf } from "./source-scan.ts";
 import { loadMigrationFiles } from "./migration-files.ts";
 import { planMigrations } from "@/lib/db/migrations";
+import { isProbeTableName } from "./role-probe.ts";
 
 /**
  * เทสต์ด่าน "ปลายทางพร้อมไหม" (`npm run check:target` · รอบที่ 283 · ปิดหนี้ D-282-2)
@@ -117,4 +118,61 @@ test("migration-files — ตัวอ่านไฟล์ใช้ร่วม
       `${file}: ห้ามมีสำเนาการอ่านโฟลเดอร์เอง (จุดเริ่มของ "ด่านไม่ตรงกัน")`,
     );
   }
+});
+
+/* ── รอบที่ 286 (ปิดหนี้ D-283-2): พิสูจน์สิทธิ์ role จริง ───────────────────────── */
+
+test("check:target — ต้องพิสูจน์ 'role อ่านได้จริง' ด้วยการต่อด้วย role นั้น (ไม่ใช่แค่มีชื่อใน pg_roles)", () => {
+  const source = codeOf("scripts/check-target.ts");
+  assert.ok(source.includes("probeReadRole("), "ต้องพิสูจน์ role อ่าน");
+  assert.ok(source.includes("probeFormRole("), "ต้องพิสูจน์ role ฟอร์ม");
+  assert.ok(source.includes("TARGET_PUBLIC_DATABASE_URL"), "รับ URL ของ role อ่านจาก env (ไม่เดาค่าให้)");
+  assert.ok(source.includes("TARGET_FORM_DATABASE_URL"), "รับ URL ของ role ฟอร์มจาก env");
+  assert.ok(source.includes('"--read-url="'), "รับ URL ทาง flag ได้ด้วย");
+  assert.ok(source.includes("ข้ามการพิสูจน์สิทธิ์"), "ไม่มี URL = **ข้ามอย่างเปิดเผย** ไม่ใช่ผ่านเงียบ ๆ");
+  assert.ok(source.includes("PUBLIC_READ_TABLES"), "รายการตารางต้องมาจาก db-roles.ts (แหล่งเดียว)");
+});
+
+test("check:target — role-probe ต้องอ่านเท่านั้น (ตรวจการเขียนด้วย catalog ไม่ใช่ลองเขียนจริง)", () => {
+  const probe = codeOf("scripts/role-probe.ts");
+
+  const writePatterns: readonly [RegExp, string][] = [
+    [/\binsert\s+into\b/i, "insert into"],
+    [/\bupdate\s+[a-z_]+\s+set\b/i, "update … set"],
+    [/\bdelete\s+from\b/i, "delete from"],
+    [/\bcreate\s+(table|index)\b/i, "create table/index"],
+    [/\balter\s+table\b/i, "alter table"],
+    [/\bdrop\s+table\b/i, "drop table"],
+    [/\bgrant\s+/i, "grant"],
+    [/\brevoke\s+/i, "revoke"],
+  ];
+  for (const [pattern, label] of writePatterns) {
+    assert.equal(pattern.test(probe), false, `role-probe ต้องไม่มี "${label}" (ต้องไม่แตะข้อมูลปลายทาง)`);
+  }
+
+  assert.ok(probe.includes("has_table_privilege"), "ตรวจ 'เขียนไม่ได้' จาก catalog");
+  assert.ok(probe.includes("client.end()"), "ต้องปิด connection ทุกครั้ง (ไม่ค้าง pool)");
+  assert.ok(probe.includes("FORBIDDEN_FOR_PUBLIC_READ"), "รายชื่อตารางอ่อนไหวต้องมาจาก db-roles.ts");
+});
+
+test("role-probe — ชื่อตารางต้องผ่านด่านก่อนใส่ในคำสั่ง (กันชื่อแปลกจากภายนอก)", () => {
+  for (const good of ["page_document", "form_submission", "product_category_slug_history", "a1_b2"]) {
+    assert.equal(isProbeTableName(good), true, `${good} ต้องผ่าน`);
+  }
+  for (const bad of [
+    "Page", // ตัวพิมพ์ใหญ่ = ไม่ใช่ชื่อที่ Postgres สร้าง
+    "page-document",
+    "page document",
+    'page"; drop table x; --',
+    "public.page",
+    "_leading",
+    "",
+  ]) {
+    assert.equal(isProbeTableName(bad), false, `${JSON.stringify(bad)} ต้องไม่ผ่าน`);
+  }
+});
+
+test("db-roles --target — บอกทางเก็บ URL ของ role ให้ check:target พิสูจน์สิทธิ์ต่อ", () => {
+  const source = codeOf("scripts/db-roles.ts");
+  assert.ok(source.includes("TARGET_PUBLIC_DATABASE_URL"), "ต้องบอกชื่อ env ที่ check:target ใช้");
 });

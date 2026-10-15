@@ -190,7 +190,8 @@ export default async function AdminProductCategoriesPage({
           const hasDefault = defaultById.has(row.id);
 
           return (
-            <section key={row.id} className="border-line rounded-2xl border p-4">
+            /* ⚠️ `id` ของการ์ด = จุดหมายของลิงก์จากจอตัวสร้างหน้าเว็บ (`#category-<รหัสหมวด>`) — รอบที่ 286 */
+            <section key={row.id} id={`category-${row.id}`} className="border-line scroll-mt-24 rounded-2xl border p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="border-line bg-surface text-fg-muted rounded-full border px-2.5 py-0.5 text-[11px] font-semibold">
                   {builtIn ? m2.builtInBadge : m2.newBadge}
@@ -270,6 +271,8 @@ export default async function AdminProductCategoriesPage({
                       {m2.deleteCategory}
                     </button>
                     <span className="text-fg-muted text-[11px]">{m2.deleteCategoryConfirm}</span>
+                    {/* รอบที่ 286: ที่อยู่เดิมไม่ตายทาง — บอกผู้ใช้ล่วงหน้าว่าจะเกิดอะไรขึ้นกับลิงก์เก่า */}
+                    <span className="text-fg-muted text-[11px]">{m2.deleteRedirectNote}</span>
                   </form>
                 ) : (
                   <p className="text-fg-muted text-xs">{builtIn ? m2.deleteBlockedBuiltIn : m2.deleteBlockedProducts}</p>

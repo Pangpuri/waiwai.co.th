@@ -246,6 +246,18 @@ async function main(): Promise<void> {
     process.stdout.write(`FORM_DATABASE_URL=${maskUrl(formUrl)}\n`);
     process.stdout.write("(ซ่อนรหัสผ่าน — ใส่ --reveal เพื่อแสดงเต็ม)\n");
   }
+
+  /*
+    ⚠️ รอบที่ 286 (ปิดหนี้ D-283-2): `check:target` พิสูจน์ได้แค่ "role มีอยู่" ไม่พอ
+    ต้องลอง **ต่อด้วย role นั้นจริง** ⇒ ต้องเก็บ URL ของ role (ของ **ปลายทาง**) ไว้อีกชื่อหนึ่ง
+    (คนละใบกับ URL ที่เอาไปตั้งบนโฮสต์ — เพราะโฮสต์ใช้ค่านี้อ่านฐานข้อมูลปลายทางเอง)
+  */
+  if (wantsTarget.requested) {
+    process.stdout.write(
+      "\nℹ️ ให้ `check:target` พิสูจน์สิทธิ์จริง: เก็บสองบรรทัดข้างบนใน .env.local เป็น\n" +
+        "   TARGET_PUBLIC_DATABASE_URL=… · TARGET_FORM_DATABASE_URL=… (ห้าม commit)\n",
+    );
+  }
 }
 
 /* รันเฉพาะเมื่อถูกเรียกเป็นสคริปต์ — ให้เทสต์ import ค่าคงที่ได้โดยไม่รันฐานข้อมูลจริง */

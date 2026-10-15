@@ -16,11 +16,12 @@ import { loadPageSeo } from "@/lib/pages/repository";
 import {
   FALLBACK_CATEGORY_IMAGE_HEIGHT,
   FALLBACK_CATEGORY_IMAGE_WIDTH,
-  categoryRedirectSlug,
+  categoryRedirectTarget,
+  type CategoryRedirect,
 } from "@/lib/products/categories";
 import { categoryNameOf } from "@/lib/products/display";
 import {
-  findCategoryIdByOldSlug,
+  findCategoryHistoryBySlug,
   listProductsByCategory,
   listPublicCategorySlugs,
   loadProductCategory,
@@ -141,11 +142,11 @@ function isVisibleCategory(item: CatalogItem | undefined, category: ProductCateg
 }
 
 /**
- * ผลลัพธ์ของการแก้ที่อยู่ `/products/<requested>` (รอบที่ 280)
+ * ผลลัพธ์ของการแก้ที่อยู่ `/products/<requested>` (รอบที่ 280 · ขยายรอบที่ 286)
  * - `category` = หมวดที่เจอด้วย **ที่อยู่ปัจจุบันหรือรหัสภายใน**
  * - `moved` = หมวดที่เจอจาก **ประวัติที่อยู่ (301)** — ไม่ใช่ที่อยู่ปัจจุบันแล้ว
  * - `key` = คีย์ที่ใช้หาพจนานุกรม/เอกสารบล็อก = **รหัสภายใน** ของหมวดที่แสดง
- * - `redirectTo` = slug ที่ต้อง **301** ไป (null = แสดงหน้านี้ต่อ/404)
+ * - `redirect` = ปลายทางที่ต้องเด้ง (`308`) · `null` = แสดงหน้านี้ต่อ/404
  */
 async function resolveCategoryRequest(
   requested: string,
@@ -153,24 +154,33 @@ async function resolveCategoryRequest(
   readonly category: ProductCategoryRecord | null;
   readonly moved: ProductCategoryRecord | null;
   readonly key: string;
-  readonly redirectTo: string | null;
+  readonly redirect: CategoryRedirect | null;
 }> {
   const category = await loadProductCategory(requested);
   /* ไม่เจอด้วยที่อยู่ปัจจุบัน/รหัสภายใน และไม่ใช่หมวดในโค้ด ⇒ ลองหาที่อยู่เก่า */
   let moved: ProductCategoryRecord | null = null;
+  let retired = false;
   if (category === null && findCatalogItem(requested) === undefined) {
-    const previousId = await findCategoryIdByOldSlug(requested);
-    if (previousId !== null) moved = await loadProductCategory(previousId);
+    const history = await findCategoryHistoryBySlug(requested);
+    if (history !== null) {
+      if (history.retired) {
+        /* ที่อยู่นี้เคยเป็นของหมวดที่ **ถูกลบไปแล้ว** ⇒ พาไปหน้าเลือกหมวด (ไม่ 404 เงียบ ๆ) */
+        retired = true;
+      } else if (history.categoryId !== null) {
+        moved = await loadProductCategory(history.categoryId);
+      }
+    }
   }
 
-  const redirectTo = categoryRedirectSlug({
+  const redirect = categoryRedirectTarget({
     requested,
     current: category === null ? null : { slug: category.slug, isHidden: category.isHidden },
     moved: moved === null ? null : { slug: moved.slug, isHidden: moved.isHidden },
+    retired,
   });
 
   const key = (category ?? moved)?.id ?? requested;
-  return { category, moved, key, redirectTo };
+  return { category, moved, key, redirect };
 }
 
 export async function generateMetadata({
@@ -218,15 +228,21 @@ export default async function ProductCategoryPage({
   if (!isLocale(lang)) notFound();
 
   /*
-    ── ① แก้ที่อยู่ (รอบที่ 280 · มติ D30) ────────────────────────────────────────
+    ── ① แก้ที่อยู่ (รอบที่ 280 · มติ D30 · ขยายรอบที่ 286) ────────────────────────
     · ที่อยู่ที่ขอ = ที่อยู่ปัจจุบัน/รหัสภายในของหมวด ⇒ แสดงต่อ (แต่ถ้าขอด้วย **รหัสภายใน**
-      ขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ **301** ไปที่อยู่ปัจจุบัน เพื่อไม่ให้มี 2 URL ของหน้าเดียวกัน)
-    · ที่อยู่ที่ขอ = **ที่อยู่เก่า** ที่อยู่ในประวัติ ⇒ **301** ไปที่อยู่ปัจจุบัน
+      ขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ **308** ไปที่อยู่ปัจจุบัน เพื่อไม่ให้มี 2 URL ของหน้าเดียวกัน)
+    · ที่อยู่ที่ขอ = **ที่อยู่เก่า** ที่อยู่ในประวัติ ⇒ **308** ไปที่อยู่ปัจจุบัน
+    · ที่อยู่ที่ขอ = **ที่อยู่ของหมวดที่ถูกลบไปแล้ว** (ประวัติยังอยู่) ⇒ **308** ไปหน้า `/products`
+      (มติเจ้าของ 2026-10-15 · ปิดหนี้ D-280-3 — ไม่ปล่อยให้ลิงก์เก่าตายทาง)
     · ไม่รู้จักเลย ⇒ 404 (ด้านล่าง)
   */
   const resolved = await resolveCategoryRequest(slug);
-  if (resolved.redirectTo !== null) {
-    permanentRedirect(localePath(lang, `/products/${resolved.redirectTo}`));
+  if (resolved.redirect !== null) {
+    permanentRedirect(
+      resolved.redirect.kind === "index"
+        ? localePath(lang, "/products")
+        : localePath(lang, `/products/${resolved.redirect.slug}`),
+    );
   }
 
   const category = resolved.category ?? resolved.moved;

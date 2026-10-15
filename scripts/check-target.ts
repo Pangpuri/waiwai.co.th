@@ -1,11 +1,12 @@
 import { getPool, closePool } from "@/db/pool";
 import { describePlan, planMigrations, type MigrationState } from "@/lib/db/migrations";
-import { FORM_ROLE, READ_ROLE } from "./db-roles.ts";
+import { FORM_ROLE, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, READ_ROLE } from "./db-roles.ts";
 import { loadMigrationFiles } from "./migration-files.ts";
+import { probeFormRole, probeReadRole, type RoleProbeOutcome } from "./role-probe.ts";
 import { selectTargetUrl, targetBanner } from "./target-env.ts";
 
 /**
- * `npm run check:target` (รอบที่ 283 · ปิดหนี้ D-282-2)
+ * `npm run check:target` (รอบที่ 283 · ปิดหนี้ D-282-2 · ขยายรอบที่ 286)
  *
  * ## ปัญหาที่ปิด
  * ก่อนรอบนี้ **ไม่มีด่านไหนรู้ว่าฐานข้อมูลปลายทาง (Neon) ล้าหลัง migration** — ต้องมีคนนึกได้แล้วรัน
@@ -21,28 +22,42 @@ import { selectTargetUrl, targetBanner } from "./target-env.ts";
  * 2. **role แบบ least privilege มีจริงไหม** (`waiwai_public_ro` · `waiwai_public_form`)
  *    · ขาด = **เตือน**โดยค่าเริ่มต้น (เว็บยังทำงานได้แต่ไม่มีการแยกสิทธิ์ — มติ D23)
  *    · ใส่ `--strict` = ถือเป็น **ตก** (ใช้ก่อนเปิดใช้จริง/ใน CI ที่มี credential)
- * 3. **ข้อมูลสรุป**: โฮสต์ปลายทาง · จำนวนตารางใน schema public (ไว้เทียบกับในเครื่อง)
+ * 3. **role อ่าน/ฟอร์มอ่านได้จริงไหม** (รอบที่ 286 · ปิดหนี้ D-283-2 — เก็บแค่ "มี role" ไม่พอ)
+ *    ต้องมี **URL ของ role** ให้ด่านนี้ด้วย (คนละใบกับ URL เจ้าของตาราง):
+ *    · `TARGET_PUBLIC_DATABASE_URL` / `TARGET_FORM_DATABASE_URL` (หรือ `--read-url=` / `--form-url=`)
+ *    · วิธีได้มา: `npm run db:roles -- --target --reveal` → เก็บค่าที่พิมพ์ลง `.env.local` (ห้าม commit)
+ *    · ไม่มี URL = **ข้ามอย่างเปิดเผย** (พิมพ์ว่า "ข้าม: …") ไม่ใช่ผ่านเงียบ ๆ
+ * 4. **ข้อมูลสรุป**: โฮสต์ปลายทาง · จำนวนตารางใน schema public (ไว้เทียบกับในเครื่อง)
  *
  * ⚠️ **ต้องตั้ง `TARGET_DATABASE_URL`** (ปลายทาง) — ตัวเลือก `--url=` สำหรับตรวจเว็บที่ deploy อยู่ที่ `check:deploy`
- * ⚠️ ตัวเลือก: `--json` (ผลเป็น JSON) · `--strict` (role ขาด = ตก)
+ * ⚠️ ตัวเลือก: `--json` (ผลเป็น JSON) · `--strict` (role ขาด/ข้ามการพิสูจน์ role = ตก)
+ * ⚠️ ไฟล์นี้ต้องไม่มีคำสั่งเขียน SQL เลย (มีเทสต์สแกนบังคับ 8 รูปแบบ) — ตัวพิสูจน์สิทธิ์อยู่ใน `role-probe.ts`
+ *    ซึ่งใช้ `has_table_privilege` (catalog) ไม่ใช่การลองเขียนจริง
  */
 
 type Options = {
   readonly json: boolean;
   readonly strict: boolean;
+  /** URL ของ role อ่านบนปลายทาง (ถ้าไม่ส่ง = ข้ามการพิสูจน์) */
+  readonly readUrl: string;
+  readonly formUrl: string;
 };
 
 function parseArgs(argv: readonly string[]): Options {
   let json = false;
   let strict = false;
+  let readUrl = process.env["TARGET_PUBLIC_DATABASE_URL"]?.trim() ?? "";
+  let formUrl = process.env["TARGET_FORM_DATABASE_URL"]?.trim() ?? "";
   for (const arg of argv) {
     if (arg === "--json") json = true;
     /* `check:target` ยิงปลายทางเสมอ ⇒ รับ `--target` ไว้ได้ (กันผู้ใช้พิมพ์ตามคำสั่งอื่นแล้ว 500) */
     else if (arg === "--target") continue;
     else if (arg === "--strict") strict = true;
+    else if (arg.startsWith("--read-url=")) readUrl = arg.slice("--read-url=".length).trim();
+    else if (arg.startsWith("--form-url=")) formUrl = arg.slice("--form-url=".length).trim();
     else if (arg.trim() !== "") throw new Error(`ไม่รู้จักตัวเลือก: ${arg}`);
   }
-  return { json, strict };
+  return { json, strict, readUrl, formUrl };
 }
 
 /** สถานะ migration ของปลายทาง — `hasTable = false` = ยังไม่เคยรันด้วยระบบนี้ */
@@ -125,12 +140,40 @@ async function main(): Promise<void> {
       `ยังไม่มี role: ${missingRoles.join(" · ")} ⇒ รัน \`npm run db:roles --target --reveal\` แล้วตั้ง PUBLIC_DATABASE_URL/FORM_DATABASE_URL บนโฮสต์ (มติ D23)`,
     );
   }
+
+  /*
+    ── ③ พิสูจน์ว่าอ่านได้จริง (รอบที่ 286 · ปิดหนี้ D-283-2) ─────────────────────────
+    "มี role" ≠ "role อ่านได้" ⇒ ต้องลองต่อด้วย role นั้นจริง (URL มาจาก env/flag · ห้ามเดา)
+    ไม่มี URL = **ข้ามอย่างเปิดเผย** (ไม่ใช่ผ่านเงียบ ๆ) — และ `--strict` ถือว่าการข้าม = ตก
+  */
+  const readProbe = options.readUrl === "" ? null : await probeReadRole(options.readUrl, PUBLIC_READ_TABLES);
+  const formProbe = options.formUrl === "" ? null : await probeFormRole(options.formUrl, PUBLIC_FORM_TABLES);
+  const skippedProbes: string[] = [];
+  if (readProbe === null) skippedProbes.push("role อ่าน (TARGET_PUBLIC_DATABASE_URL)");
+  if (formProbe === null) skippedProbes.push("role ฟอร์ม (TARGET_FORM_DATABASE_URL)");
+  if (skippedProbes.length > 0) {
+    warnings.push(
+      `ข้ามการพิสูจน์สิทธิ์: ${skippedProbes.join(" · ")} ⇒ เอามาจาก \`npm run db:roles -- --target --reveal\` แล้วเก็บใน .env.local (ห้าม commit)`,
+    );
+  }
+  for (const [label, outcome] of [
+    ["role อ่าน", readProbe],
+    ["role ฟอร์ม", formProbe],
+  ] as const) {
+    if (outcome === null) continue;
+    if (outcome.ok) continue;
+    for (const line of outcome.failures) failures.push(`${label}: ${line}`);
+  }
+
   if (options.strict && warnings.length > 0) {
     failures.push(...warnings);
     warnings.length = 0;
   }
 
   const appliedCount = state.appliedIds.length;
+
+  const probeJson = (outcome: RoleProbeOutcome | null): unknown =>
+    outcome === null ? null : { ok: outcome.ok, role: outcome.role, readable: outcome.readable, failures: outcome.failures };
 
   if (options.json) {
     process.stdout.write(
@@ -145,6 +188,7 @@ async function main(): Promise<void> {
           modified: plan?.modified.map((item) => item.id) ?? [],
           publicTables: tableCount,
           missingRoles,
+          probes: { read: probeJson(readProbe), form: probeJson(formProbe) },
           failures,
           warnings,
         },
@@ -165,6 +209,17 @@ async function main(): Promise<void> {
         ? "role least privilege: ครบ (waiwai_public_ro · waiwai_public_form)\n"
         : `role least privilege: ขาด ${missingRoles.join(" · ")}\n`,
     );
+    /* ผลการพิสูจน์สิทธิ์จริง (ต่อด้วย role นั้น) — ข้ามจะบอกตรง ๆ ว่าไม่ได้พิสูจน์ */
+    if (readProbe !== null) {
+      process.stdout.write(
+        `  · role อ่าน: ${readProbe.ok ? "✓" : "✗"} ต่อด้วย ${readProbe.role} · อ่านได้ ${String(readProbe.readable)}/${String(PUBLIC_READ_TABLES.length)} ตาราง\n`,
+      );
+    }
+    if (formProbe !== null) {
+      process.stdout.write(
+        `  · role ฟอร์ม: ${formProbe.ok ? "✓" : "✗"} ต่อด้วย ${formProbe.role} · อ่านได้ ${String(formProbe.readable)}/${String(PUBLIC_FORM_TABLES.length)} ตาราง\n`,
+      );
+    }
 
     for (const line of warnings) process.stdout.write(`\n⚠️ ${line}\n`);
     if (failures.length > 0) {

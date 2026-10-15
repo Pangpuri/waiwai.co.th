@@ -247,20 +247,39 @@ export async function listProductDetailPagePaths(): Promise<ReadonlyMap<string, 
 }
 
 /**
- * หา **id ภายใน** ของหมวดจากที่อยู่เก่า (ประวัติ slug) — ใช้ทำ **301** (รอบที่ 280)
+ * หา **ประวัติที่อยู่** ของหมวดจาก slug — ใช้ทำ **301** และ "ที่อยู่ของหมวดที่ถูกลบ" (รอบที่ 280 · ขยายรอบที่ 286)
+ *
+ * คืน
+ * - `{ categoryId, retired: false }` = ที่อยู่เก่าของหมวดที่ยังอยู่ ⇒ ผู้เรียกเด้งไปที่อยู่ปัจจุบัน (308)
+ * - `{ categoryId: null, retired: true }` = ที่อยู่ของหมวดที่ **ถูกลบแล้ว** ⇒ ผู้เรียกเด้งไปหน้า `/products`
+ * - `null` = ไม่เคยมีที่อยู่นี้ (ผู้เรียกต้อง 404 ต่อ — ห้ามเดา)
+ *
  * ⚠️ อ่านผ่านประตูอ่านอย่างเดียว (`readQuery`) · ตารางนี้อยู่ใน `PUBLIC_READ_TABLES` แล้ว
- * คืน `null` = ไม่เคยมีที่อยู่นี้ (ผู้เรียกต้อง 404 ต่อ — ห้ามเดา)
  */
-export async function findCategoryIdByOldSlug(slug: string): Promise<string | null> {
+export type CategorySlugHistoryRecord = {
+  /** รหัสหมวดที่ที่อยู่นี้เคยชี้ถึง — `null` = หมวดถูกลบแล้ว (แถวประวัติยังอยู่) */
+  readonly categoryId: string | null;
+  readonly retired: boolean;
+};
+
+export async function findCategoryHistoryBySlug(slug: string): Promise<CategorySlugHistoryRecord | null> {
   const value = slug.trim();
   if (!isDatabaseConfigured() || value === "") return null;
   try {
-    const result = await readQuery<{ categoryId: string }>(
-      `select category_id as "categoryId" from product_category_slug_history where slug = $1 limit 1`,
+    const result = await readQuery<{ categoryId: string | null; retiredAt: Date | string | null }>(
+      `select category_id as "categoryId", retired_at as "retiredAt"
+         from product_category_slug_history
+        where slug = $1
+        limit 1`,
       [value],
     );
-    const id = text(result.rows[0]?.categoryId).trim();
-    return id === "" ? null : id;
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    const id = text(row.categoryId).trim();
+    /* ⚠️ `pg` คืน `timestamptz` เป็น `Date` (บทเรียนรอบที่ 197) ⇒ ตรวจแบบ "ไม่ใช่ null" เท่านั้น */
+    const retired = row.retiredAt !== null && row.retiredAt !== undefined;
+    if (retired) return { categoryId: null, retired: true };
+    return id === "" ? null : { categoryId: id, retired: false };
   } catch {
     return null;
   }

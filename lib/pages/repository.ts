@@ -2,6 +2,7 @@ import { cache } from "react";
 
 import { getPool } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
+import { isProductDetailPageLike } from "@/lib/blocks/product-detail";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { defaultPages, isPageEditor, sortPages, type PageEditor, type PageRecord, type PageSeo } from "@/lib/pages/model";
 
@@ -97,24 +98,45 @@ export const loadPageSeo = cache(async (id: string): Promise<PageSeo | null> => 
 });
 
 export type PageUpdate = {
-  readonly nameTh: string;
-  readonly nameEn: string;
+  /**
+   * ชื่อไทยของหน้า — `undefined` = **ไม่แตะของเดิม**
+   * (รอบที่ 286: จอตัวสร้างของหน้า `product-<หมวด>` ไม่ส่งชื่อมา เพราะชื่อมาจากจอหมวดสินค้า — D-281-1)
+   */
+  readonly nameTh?: string;
+  /** ชื่ออังกฤษ — `undefined` = ไม่แตะของเดิม */
+  readonly nameEn?: string;
   readonly inMenu: boolean;
   readonly menuOrder: number;
 };
 
-/** บันทึกชื่อ/เมนู/ลำดับของหน้า (ผู้เรียกต้องตรวจสิทธิ์และตรวจค่าแล้ว) */
+/**
+ * บันทึกชื่อ/เมนู/ลำดับของหน้า (ผู้เรียกต้องตรวจสิทธิ์และตรวจค่าแล้ว)
+ *
+ * ## 🆕 รอบที่ 286 (ปิดหนี้ D-281-2) — หน้า detail ของหมวด **ห้ามขึ้นเมนูหลักเสมอ**
+ * เดิม `in_menu` ของหน้า `product-<หมวด>` สลับเป็น true ได้ ⇒ หมวดจะโผล่ในเมนูหลักของเว็บ
+ * ⇒ ที่นี่ **บังคับ false ที่คำสั่ง SQL เอง** (fail-closed: ผู้เรียกส่งค่าอะไรมาก็ไม่หลุด)
+ * เหตุผลเชิงออกแบบ: หน้า detail ถูกเข้าถึงจากหน้า `/products` และ sitemap ไม่ใช่เมนูหลัก (มติ D30)
+ */
 export async function updatePage(id: string, update: PageUpdate, actor: string): Promise<boolean> {
+  const lockedOutOfMenu = isProductDetailPageLike(id);
   const { rowCount } = await getPool().query(
     `update page
-        set name_th = $2,
-            name_en = $3,
-            in_menu = $4,
+        set name_th    = coalesce($2::text, name_th),
+            name_en    = coalesce($3::text, name_en),
+            in_menu    = case when $7::boolean then false else $4::boolean end,
             menu_order = $5,
             updated_at = now(),
             updated_by = $6
       where id = $1`,
-    [id, update.nameTh, update.nameEn, update.inMenu, update.menuOrder, actor],
+    [
+      id,
+      update.nameTh ?? null,
+      update.nameEn ?? null,
+      update.inMenu,
+      update.menuOrder,
+      actor,
+      lockedOutOfMenu,
+    ],
   );
   return (rowCount ?? 0) > 0;
 }
@@ -137,12 +159,17 @@ export async function updatePageSeo(id: string, seo: PageSeo, actor: string): Pr
   return (rowCount ?? 0) > 0;
 }
 
-/** ชื่อหน้าสำหรับใช้แทนป้ายเมนูของ navbar (คีย์ = id ของเมนู) */
+/**
+ * ชื่อหน้าสำหรับใช้แทนป้ายเมนูของ navbar (คีย์ = id ของเมนู)
+ * ⚠️ รอบที่ 286 (D-281-2): หน้า detail ของหมวด **ไม่ขึ้นเมนูเสมอ** — กรองที่ตัวอ่านด้วย
+ *    (ด่านที่สอง: ถ้าฐานข้อมูลมี `in_menu = true` ค้างจากก่อนรอบนี้ เมนูก็ยังไม่พัง)
+ */
 export async function pageMenuLabels(fallback: readonly PageRecord[]): Promise<Readonly<Record<string, { readonly th: string; readonly en: string }>>> {
   const pages = await listPages(fallback);
   const labels: Record<string, { th: string; en: string }> = {};
   for (const page of pages) {
     if (!page.inMenu) continue;
+    if (isProductDetailPageLike(page.id)) continue;
     labels[page.id] = { th: page.nameTh, en: page.nameEn.trim() === "" ? page.nameTh : page.nameEn };
   }
   return labels;

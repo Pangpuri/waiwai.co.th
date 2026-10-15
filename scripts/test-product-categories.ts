@@ -13,7 +13,7 @@ import {
   categoryDeletionAllowed,
   categoryPresetApplyPlan,
   categoryPresetPayload,
-  categoryRedirectSlug,
+  categoryRedirectTarget,
   categoryRestoreFields,
   categorySlugInput,
   categorySlugIssue,
@@ -181,31 +181,63 @@ test("หมวด: ตรวจค่าที่แก้ + slug (คำสง
   );
 });
 
-test("หมวด: ตัดสินการ 301 จากที่อยู่เก่า (logic ล้วนของหน้า /products/[slug])", () => {
+test("หมวด: ตัดสินปลายทางของ /products/[slug] — ที่อยู่เก่า (308) · ที่อยู่ของหมวดที่ถูกลบ (index)", () => {
   const moved = { slug: "noodles", isHidden: false };
+  const none = { current: null, moved: null, retired: false } as const;
 
   /* ที่อยู่ที่ขอ = ที่อยู่ปัจจุบัน ⇒ ไม่เด้ง */
   assert.equal(
-    categoryRedirectSlug({ requested: "noodles", current: { slug: "noodles", isHidden: false }, moved: null }),
+    categoryRedirectTarget({ requested: "noodles", current: { slug: "noodles", isHidden: false }, moved: null, retired: false }),
     null,
   );
-  /* ขอด้วยรหัสภายในขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ 301 ไปที่อยู่ปัจจุบัน */
-  assert.equal(
-    categoryRedirectSlug({ requested: "instant-noodles", current: { slug: "noodles", isHidden: false }, moved: null }),
-    "noodles",
+  /* ขอด้วยรหัสภายในขณะที่เว็บใช้ที่อยู่ใหม่ ⇒ 308 ไปที่อยู่ปัจจุบัน */
+  assert.deepEqual(
+    categoryRedirectTarget({ requested: "instant-noodles", current: { slug: "noodles", isHidden: false }, moved: null, retired: false }),
+    { kind: "slug", slug: "noodles" },
   );
-  /* ที่อยู่เก่าที่อยู่ในประวัติ ⇒ 301 ไปที่อยู่ปัจจุบัน */
-  assert.equal(categoryRedirectSlug({ requested: "instant-noodles", current: null, moved }), "noodles");
+  /* ที่อยู่เก่าที่อยู่ในประวัติ ⇒ 308 ไปที่อยู่ปัจจุบัน */
+  assert.deepEqual(categoryRedirectTarget({ requested: "instant-noodles", current: null, moved, retired: false }), {
+    kind: "slug",
+    slug: "noodles",
+  });
   /* ที่อยู่ไม่รู้จักเลย ⇒ ไม่เด้ง (ปล่อยให้ 404) */
-  assert.equal(categoryRedirectSlug({ requested: "ไม่มีหมวดนี้", current: null, moved: null }), null);
+  assert.equal(categoryRedirectTarget({ requested: "ไม่มีหมวดนี้", ...none }), null);
   /* หมวดถูกซ่อน ⇒ ไม่เด้ง ไม่บอกใบ้ว่ามีอยู่ */
   assert.equal(
-    categoryRedirectSlug({ requested: "เก่า", current: { slug: "ใหม่", isHidden: true }, moved: null }),
+    categoryRedirectTarget({ requested: "เก่า", current: { slug: "ใหม่", isHidden: true }, moved: null, retired: false }),
     null,
   );
-  assert.equal(categoryRedirectSlug({ requested: "เก่า", current: null, moved: { slug: "ใหม่", isHidden: true } }), null);
+  assert.equal(
+    categoryRedirectTarget({ requested: "เก่า", current: null, moved: { slug: "ใหม่", isHidden: true }, retired: false }),
+    null,
+  );
   /* ที่อยู่เก่าชี้กลับที่อยู่ปัจจุบันของตัวเอง ⇒ ไม่ต้องเด้งซ้ำ */
-  assert.equal(categoryRedirectSlug({ requested: "noodles", current: null, moved }), null);
+  assert.equal(categoryRedirectTarget({ requested: "noodles", current: null, moved, retired: false }), null);
+
+  /*
+    ── รอบที่ 286 (ปิดหนี้ D-280-3) ─────────────────────────────────────────────
+    ที่อยู่ของ "หมวดที่ถูกลบ" (ประวัติยังอยู่ · ปลดระวาง) ⇒ เด้งไปหน้าเลือกหมวด ไม่ปล่อยเป็น 404
+  */
+  assert.deepEqual(categoryRedirectTarget({ requested: "หมวดที่ถูกลบ", ...none, retired: true }), {
+    kind: "index",
+    slug: "",
+  });
+  /* ที่อยู่ที่ถูก "ยึดคืน" โดยหมวดใหม่ ⇒ ต้องเปิดหมวดใหม่ ไม่ใช่เด้งไป index (กันกับดักที่ร้ายที่สุด) */
+  assert.deepEqual(
+    categoryRedirectTarget({
+      requested: "หมวดที่ถูกลบ",
+      current: { slug: "หมวดที่ถูกลบ", isHidden: false },
+      moved: null,
+      retired: true,
+    }),
+    null,
+    "มีหมวดใช้ที่อยู่นี้จริง ⇒ แสดงหน้านั้น (ไม่เด้งไป /products)",
+  );
+  assert.deepEqual(
+    categoryRedirectTarget({ requested: "เก่า", current: null, moved, retired: true }),
+    { kind: "slug", slug: "noodles" },
+    "เจอหมวดที่ยังอยู่จากประวัติ ⇒ 308 ไปที่อยู่ปัจจุบัน (retired ไม่มีผล)",
+  );
 });
 
 test("หมวด: ลบได้เฉพาะหมวดว่างที่ไม่ใช่หมวดในโค้ด", () => {
@@ -584,8 +616,15 @@ test("หมวด: ที่อยู่บนเว็บ (slug) แก้ไ�
   assert.ok(repository.includes("insert into product_category_slug_history"), "ต้องบันทึกที่อยู่เก่าลงประวัติ");
   assert.ok(repository.includes("withTransaction"), "เปลี่ยนที่อยู่ + ประวัติ ต้องอยู่ใน transaction เดียว");
   const detailPage = codeOf("app/[lang]/products/[slug]/page.tsx");
-  assert.ok(detailPage.includes("findCategoryIdByOldSlug("), "ต้องค้นที่อยู่เก่าจากประวัติ");
-  assert.ok(detailPage.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **301** ไปที่อยู่ปัจจุบัน");
+  assert.ok(detailPage.includes("findCategoryHistoryBySlug("), "ต้องค้นที่อยู่เก่าจากประวัติ");
+  assert.ok(detailPage.includes("permanentRedirect("), "ที่อยู่เก่าต้อง **308** ไปที่อยู่ปัจจุบัน");
+  /* 🆕 รอบที่ 286 (ปิด D-280-3): ที่อยู่ของหมวดที่ถูกลบ ⇒ เด้งไปหน้า /products ไม่ปล่อย 404 */
+  assert.ok(detailPage.includes("categoryRedirectTarget("), "ต้องตัดสินปลายทางด้วยตรรกะล้วนตัวกลาง");
+  assert.ok(detailPage.includes('kind === "index"'), "ต้องมีสาขา \"ที่อยู่ของหมวดที่ถูกลบ\" → /products");
+  assert.ok(
+    repository.includes("set category_id = null, retired_at = now()"),
+    "ลบหมวดต้อง **ปลดระวาง** ที่อยู่ (ไม่ลบประวัติทิ้ง)",
+  );
 });
 
 test("หมวด: ตัวอ่านของหลังบ้านใช้ getPool (PII/ความลับ) ไม่ใช่ประตูอ่านสาธารณะ", () => {

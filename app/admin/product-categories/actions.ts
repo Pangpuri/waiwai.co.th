@@ -207,6 +207,8 @@ export async function toggleCategoryHiddenAction(formData: FormData): Promise<vo
  *
  * ⚠️ **ประตูจริงอยู่ที่ SQL** (`deleteEmptyCategoryAdmin` — `exists product` + `id <> all(builtIn)`)
  *   ที่นี่ตรวจซ้ำเพื่อให้ข้อความบนจอตรงสาเหตุ (ไม่ใช่ด่านกันการโจมตี)
+ * 🆕 รอบที่ 286 (D-280-3): ลบแล้ว **ที่อยู่เดิมไม่ตายทาง** — ชั้นข้อมูลเก็บที่อยู่ไว้เป็น "ปลดระวาง"
+ *   แล้วหน้าเว็บ `308` ไป `/products` (มติเจ้าของ 2026-10-15)
  * ลบสำเร็จ/ไม่สำเร็จ ⇒ **redirect กลับหน้าจอพร้อมข้อความ** (ฟอร์มธรรมดา ไม่ต้องมี JS)
  */
 export async function deleteCategoryAction(formData: FormData): Promise<void> {
@@ -219,7 +221,7 @@ export async function deleteCategoryAction(formData: FormData): Promise<void> {
   if (builtInCategorySlugs().includes(id)) redirect(`${LIST_PATH}?error=delete-built-in`);
   if (row.productCount > 0) redirect(`${LIST_PATH}?error=delete-has-products`);
 
-  const deleted = await deleteEmptyCategoryAdmin(id, builtInCategorySlugs());
+  const deleted = await deleteEmptyCategoryAdmin(id, builtInCategorySlugs(), user.email);
   if (!deleted) redirect(`${LIST_PATH}?error=delete-blocked`);
 
   await recordAudit({

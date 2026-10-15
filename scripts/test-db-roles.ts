@@ -108,7 +108,7 @@ test("db-roles: role อ่านต้องไม่มีตารางอ�
 test("db-roles: ฟังก์ชันที่หน้าเว็บสาธารณะใช้ ต้องอ่านผ่าน `readQuery` (ไม่ใช่ getPool)", () => {
   const cases: readonly (readonly [string, readonly string[]])[] = [
     ["lib/blocks/repository.ts", ["loadDocumentRow", "isPageLive"]],
-    ["lib/products/repository.ts", ["loadProductCategory", "listProductsByCategory", "countProductsByCategory", "listProductCategoryCards", "listProductHighlights", "listPublicCategorySlugs", "findCategoryIdByOldSlug", "listProductDetailPagePaths"]],
+    ["lib/products/repository.ts", ["loadProductCategory", "listProductsByCategory", "countProductsByCategory", "listProductCategoryCards", "listProductHighlights", "listPublicCategorySlugs", "findCategoryHistoryBySlug", "listProductDetailPagePaths"]],
     ["lib/recipes/repository.ts", ["listRecipes"]],
     ["lib/news/repository.ts", ["countNews", "listNews", "loadNewsBySourceId", "listNewsSourceIds"]],
     ["lib/media/repository.ts", ["loadMediaSizes", "getMediaBinary"]],

@@ -279,31 +279,50 @@ export function isCategorySlugChange(currentSlug: string, nextSlug: string | und
 }
 
 /**
- * ตัดสินว่าคำขอ `/products/<requested>` ต้อง **301** ไปที่อยู่ใหม่ไหม (รอบที่ 280 · มติ D30)
+ * ปลายทางของคำขอ `/products/<requested>` (รอบที่ 280 · มติ D30 · ขยายรอบที่ 286)
+ * - `slug` = เด้งไปที่อยู่ปัจจุบันของหมวดนั้น (`308` permanent)
+ * - `index` = ที่อยู่นี้ "เคยมีแต่หมวดถูกลบแล้ว" ⇒ เด้งไปหน้าเลือกหมวด `/products` (ไม่ตายทาง)
+ *   (มติเจ้าของ 2026-10-15 · ปิดหนี้ D-280-3)
+ */
+export type CategoryRedirect = {
+  readonly kind: "slug" | "index";
+  /** slug ปลายทาง — มีค่าเฉพาะ `kind = "slug"` */
+  readonly slug: string;
+};
+
+/**
+ * ตัดสินว่าคำขอ `/products/<requested>` ต้องเด้งไปไหนไหม
  *
  * @param current หมวดที่เจอด้วยที่อยู่ปัจจุบันหรือรหัสภายใน (`null` = ไม่เจอ)
- * @param moved หมวดที่เจอจากประวัติที่อยู่ (`null` = ที่อยู่นี้ไม่เคยมี)
- * @returns slug ปลายทาง · `null` = ไม่ต้องเด้ง (แสดงหน้านี้ต่อ หรือปล่อยให้ผู้เรียก 404)
+ * @param moved หมวดที่เจอจากประวัติที่อยู่ (`null` = ที่อยู่นี้ไม่เคยมี/ไม่มีหมวดแล้ว)
+ * @param retired ที่อยู่นี้เคยเป็นของหมวดที่ **ถูกลบไปแล้ว** (ประวัติยังอยู่ · `category_id = null`)
+ * @returns ปลายทาง · `null` = ไม่ต้องเด้ง (แสดงหน้านี้ต่อ หรือปล่อยให้ผู้เรียก 404)
  *
  * กติกา
  * - เจอหมวดแต่ที่อยู่ที่ขอ **ไม่ใช่ที่อยู่ปัจจุบัน** (เช่นลิงก์เก่าที่ชี้ `id`) ⇒ เด้งไปที่อยู่ปัจจุบัน
  * - หมวดที่ **ถูกซ่อน** = ไม่เด้ง (ปล่อยให้ 404 — ไม่บอกใบ้ว่ามีอยู่)
  * - เจอได้แค่จากประวัติ ⇒ เด้งไปที่อยู่ปัจจุบันของหมวดนั้น (นี่คือหัวใจของ 301)
+ * - ประวัติที่ **ปลดระวางแล้ว** (หมวดถูกลบ) ⇒ เด้งไปหน้า `/products` (ไม่ปล่อยเป็น 404 เงียบ ๆ)
+ *   ⚠️ เช็ค `current`/`moved` ก่อนเสมอ — ที่อยู่ที่ถูกหมวดใหม่ "ยึดคืน" แล้วต้องเปิดหมวดใหม่ ไม่ใช่เด้งไป index
  */
-export function categoryRedirectSlug(options: {
+export function categoryRedirectTarget(options: {
   readonly requested: string;
   readonly current: { readonly slug: string; readonly isHidden: boolean } | null;
   readonly moved: { readonly slug: string; readonly isHidden: boolean } | null;
-}): string | null {
+  readonly retired: boolean;
+}): CategoryRedirect | null {
   const requested = options.requested.trim();
   if (options.current !== null) {
     if (options.current.isHidden) return null;
     const slug = options.current.slug.trim();
-    return slug === "" || slug === requested ? null : slug;
+    return slug === "" || slug === requested ? null : { kind: "slug", slug };
   }
-  if (options.moved === null || options.moved.isHidden) return null;
-  const slug = options.moved.slug.trim();
-  return slug === "" || slug === requested ? null : slug;
+  if (options.moved !== null) {
+    if (options.moved.isHidden) return null;
+    const slug = options.moved.slug.trim();
+    return slug === "" || slug === requested ? null : { kind: "slug", slug };
+  }
+  return options.retired ? { kind: "index", slug: "" } : null;
 }
 
 /**
