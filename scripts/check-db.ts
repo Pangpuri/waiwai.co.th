@@ -423,6 +423,17 @@ async function main(): Promise<void> {
   /* 42) ชื่อหน้า/เมนูของหน้า detail: ชื่อมาจากหมวด + ห้ามขึ้นเมนูหลัก (รอบที่ 286 · D-281-1/D-281-2) */
   await checkDetailPageNameAndMenu();
 
+  /*
+    ── ด่านสุดท้าย: `check:db` ต้องไม่ทิ้งขยะของตัวเองไว้ในฐานข้อมูล (รอบที่ 286) ──────────────
+    ตั้งแต่ประวัติที่อยู่ "อยู่ต่อแบบปลดระวาง" การลบด้วย `category_id` ไม่พออีกต่อไป ⇒ ต้องมีด่านนี้
+    ไม่งั้นรอบถัดไปจะเจอขยะแล้วเข้าใจผิดว่าเป็นข้อมูลจริง (นับเฉพาะรอยของ `check:db` = `@example.invalid`)
+  */
+  assert.equal(
+    await countWhere("product_category_slug_history where retired_by like $1", ["%@example.invalid"]),
+    0,
+    "check:db ต้องเก็บกวาดประวัติที่อยู่ทดสอบครบ (รวมแถวปลดระวาง)",
+  );
+
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
@@ -446,13 +457,19 @@ async function countWhere(sql: string, params: readonly unknown[]): Promise<numb
  * (เจอจริง: `product-check-db-category` ค้าง แล้วถูก migration 0043 เก็บเข้าไปเป็นหน้าเต็มตัว)
  *
  * กติกาเดียวกับตัวลบในแอป (`deleteEmptyCategoryAdmin`) — ไม่มี FK ให้พึ่ง ⇒ ลบเองทีละตาราง
+ *
+ * ⚠️ รอบที่ 286: ประวัติที่อยู่ของหมวดที่ "ถูกลบ" ตอนนี้อยู่ต่อแบบ **ปลดระวาง** (`category_id = null`)
+ * ⇒ ลบด้วย `category_id` ไม่ถึง ต้องส่ง `extraSlugs` (ที่อยู่ที่วงจรนี้สร้าง) มาเก็บกวาดด้วย
  */
-async function removeTestCategory(id: string): Promise<void> {
+async function removeTestCategory(id: string, extraSlugs: readonly string[] = []): Promise<void> {
   const pageId = productDetailPageId(id);
   await getPool().query("delete from page_document_revision where page = $1", [pageId]);
   await getPool().query("delete from page_document where page = $1", [pageId]);
   await getPool().query("delete from page where id = $1", [pageId]);
   await getPool().query("delete from product_category_slug_history where category_id = $1", [id]);
+  if (extraSlugs.length > 0) {
+    await getPool().query("delete from product_category_slug_history where slug = any($1::text[])", [[...extraSlugs]]);
+  }
   await getPool().query("delete from product_category where id = $1", [id]);
 }
 
@@ -4662,6 +4679,15 @@ async function checkCategorySlugRouting(): Promise<void> {
       "หมวดในโค้ดลบไม่ได้ แม้จะว่าง (ประตู SQL)",
     );
     assert.equal(await loadAdminCategory(builtInId) !== null, true, "หมวดในโค้ดต้องยังอยู่");
+    /*
+      🔴 กันบั๊กจริงของรอบที่ 286: ร่างแรก "ปลดระวางก่อนตรวจประตู" ⇒ ลบไม่สำเร็จแต่ `return false` = commit
+      ⇒ ประวัติของหมวดที่ยังใช้งานอยู่ถูกปลดระวางทิ้ง (เจอที่นี่เป็นครั้งแรก) ⇒ ต้องไม่มีอะไรถูกแตะเลย
+    */
+    assert.equal(
+      await findCategoryHistoryBySlug(builtInId),
+      null,
+      "ลบไม่สำเร็จ (หมวดในโค้ด) ⇒ ประวัติที่อยู่ของหมวดนั้นต้องไม่ถูกแตะแม้แต่แถวเดียว",
+    );
 
     /* หมวดที่มีสินค้า ⇒ ลบไม่ได้ (แม้ไม่ใช่หมวดในโค้ด) */
     await insertMedia({
@@ -4712,6 +4738,12 @@ async function checkCategorySlugRouting(): Promise<void> {
       await deleteEmptyCategoryAdmin(SLUG_CHECK_ID, builtIn, SLUG_CHECK_ACTOR),
       false,
       "หมวดที่มีสินค้าลบไม่ได้ (ประตู SQL)",
+    );
+    /* กันบั๊กเดิมซ้ำอีกทาง: ลบไม่สำเร็จเพราะ "มีสินค้า" ก็ต้องไม่แตะประวัติของหมวดที่ยังอยู่ */
+    assert.deepEqual(
+      await findCategoryHistoryBySlug(SLUG_CHECK_NEW),
+      { categoryId: SLUG_CHECK_ID, retired: false },
+      "ลบไม่สำเร็จ (มีสินค้า) ⇒ ประวัติต้องยังชี้หมวดที่ยังใช้งานอยู่ ไม่ถูกปลดระวาง",
     );
 
     /*
@@ -4880,7 +4912,8 @@ async function checkProductDetailBuilderPage(): Promise<void> {
       "transaction เดียว · ผ่าน parser · ไม่เหลือหน้าลอย/เอกสาร/ประวัติ",
     );
   } finally {
-    await removeTestCategory(BUILDER_CHECK_ID);
+    /* ⚠️ รอบที่ 286: ลบหมวด ⇒ ที่อยู่กลายเป็นแถว "ปลดระวาง" (`category_id = null`) ⇒ ต้องส่ง slug มาเก็บกวาด */
+    await removeTestCategory(BUILDER_CHECK_ID, ["check-db-builder", tempSlug]);
 
     assert.equal(await countWhere("product_category where id = $1", [BUILDER_CHECK_ID]), 0, "ต้องไม่เหลือหมวดทดสอบ");
     assert.equal(await countWhere("page where id = $1", [pageId]), 0, "ต้องไม่เหลือหน้าทดสอบ");

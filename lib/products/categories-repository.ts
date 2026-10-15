@@ -536,9 +536,13 @@ export async function updateProductCategoryAdmin(input: CategoryWriteInput, acto
  *
  * ## 🆕 รอบที่ 286 (ปิดหนี้ D-280-3) — ที่อยู่เดิม **ไม่ตายทาง**
  * มติเจ้าของ 2026-10-15: ที่อยู่เดิมของหมวดที่ถูกลบ ⇒ **308 ไปหน้า `/products`**
- * ⇒ ก่อนลบต้อง **เก็บที่อยู่ปัจจุบันเข้าประวัติ + ปลดระวางทุกที่อยู่ของหมวดนี้** (`category_id = null` ·
- * `retired_at`/`retired_by`) เพราะ FK เป็น `on delete set null` แล้ว (migration 0044) แถวประวัติจึงอยู่ต่อ
- * ⚠️ ลำดับสำคัญ: ถ้าลบหมวดก่อน (FK จะ set null ให้) จะหาประวัติของหมวดนี้ไม่เจออีก ⇒ ลบไม่สำเร็จ = rollback ทั้งก้อน
+ * ⇒ ตอนลบต้อง **เก็บทุกที่อยู่ของหมวดนี้ไว้แบบ "ปลดระวาง"** (`category_id = null` · `retired_at`/`retired_by`)
+ * เพราะ FK เป็น `on delete set null` แล้ว (migration 0044) แถวประวัติจึงอยู่ต่อ
+ *
+ * 🔴 **บทเรียนจากบั๊กจริงในรอบนี้ (อย่าลบออก):** ร่างแรกปลดระวาง *ก่อน* ตรวจประตูลบ
+ *   ⇒ เมื่อลบไม่สำเร็จ (หมวดในโค้ด/มีสินค้า) โค้ด `return false` = **commit** ของที่ปลดระวางไปแล้ว
+ *   ⇒ ประวัติของหมวดที่ยังใช้งานอยู่ถูกปลดระวางทิ้ง (เจอโดย `check:db` วงจรที่ 40)
+ *   ⇒ ลำดับที่ถูกต้องคือ **ตรวจประตูก่อน → ไม่ผ่าน = คืน false โดยยังไม่เขียนอะไรเลย**
  */
 export async function deleteEmptyCategoryAdmin(
   id: string,
@@ -547,32 +551,40 @@ export async function deleteEmptyCategoryAdmin(
 ): Promise<boolean> {
   if (id.trim() === "") return false;
   return withTransaction(async (client) => {
-    /* ① เก็บ "ที่อยู่ปัจจุบัน" เข้าประวัติก่อน (ที่อยู่เก่าก่อนหน้านี้อยู่ในประวัติแล้ว) */
-    await client.query(
-      `insert into product_category_slug_history (slug, category_id, created_at, created_by, retired_at, retired_by)
-       select slug, id, now(), $2, null, '' from product_category where id = $1
-       on conflict (slug) do update
-         set category_id = excluded.category_id, created_at = now(), created_by = excluded.created_by,
-             retired_at = null, retired_by = ''`,
-      [id, actor],
-    );
-
-    /* ② ปลดระวางทุกที่อยู่ของหมวดนี้ — แถวอยู่ต่อให้หน้าเว็บรู้ว่า "ที่อยู่นี้เคยมี" */
-    await client.query(
-      `update product_category_slug_history
-          set category_id = null, retired_at = now(), retired_by = $2
-        where category_id = $1`,
-      [id, actor],
-    );
-
-    const result = await client.query(
-      `delete from product_category
+    /*
+      ── ① ประตูอยู่ที่นี่ **ก่อนการเขียนทุกกรณี** ────────────────────────────────────
+      ตรวจด้วยคำสั่งเดียวแล้วอ่านที่อยู่ปัจจุบันออกมาใช้ต่อ ⇒ ไม่ผ่าน = ออกไปโดยไม่แตะข้อมูล
+    */
+    const gate = await client.query<{ slug: string }>(
+      `select coalesce(nullif(slug, ''), id) as slug
+         from product_category
         where id = $1
           and id <> all($2::text[])
           and not exists (select 1 from product where product.category_id = product_category.id)`,
       [id, [...builtInSlugs]],
     );
-    if ((result.rowCount ?? 0) === 0) return false;
+    const currentSlug = gate.rows[0]?.slug;
+    if (currentSlug === undefined) return false;
+
+    /* ② ที่อยู่เก่าทั้งหมดของหมวดนี้ (อ่านก่อนลบ — หลังลบ FK จะ set null ให้จนแยกไม่ออกว่าเป็นของใคร) */
+    const history = await client.query<{ slug: string }>(
+      `select slug from product_category_slug_history where category_id = $1`,
+      [id],
+    );
+
+    const result = await client.query(`delete from product_category where id = $1`, [id]);
+    /* ผ่านประตูแล้วแต่ลบไม่ได้ = สภาพไม่ตรงกับที่ตรวจ (ไม่ควรเกิด) ⇒ โยนเพื่อ rollback ทั้งก้อน ไม่ทิ้งครึ่ง ๆ */
+    if ((result.rowCount ?? 0) === 0) throw new Error(`ลบหมวด ${id} ไม่สำเร็จทั้งที่ผ่านประตู`);
+
+    /* ③ ปลดระวาง: ที่อยู่ปัจจุบัน + ที่อยู่เก่าทั้งหมด ⇒ แถวอยู่ต่อให้หน้าเว็บเด้งไป /products */
+    const retiredSlugs = [currentSlug, ...history.rows.map((row) => row.slug)];
+    await client.query(
+      `insert into product_category_slug_history (slug, category_id, created_at, created_by, retired_at, retired_by)
+       select unnest($1::text[]), null, now(), $2, now(), $2
+       on conflict (slug) do update
+         set category_id = null, retired_at = now(), retired_by = excluded.retired_by`,
+      [retiredSlugs, actor],
+    );
     /*
       เก็บกวาด "หน้าตัวสร้าง" ของหมวดนี้ให้หมด (รอบที่ 281) — หมวดหายแล้วต้องไม่เหลือหน้าลอย:
       · `page_document` (ฉบับร่าง/เผยแพร่) · `page_document_revision` (ประวัติ) · `page` (แถวของหน้า)

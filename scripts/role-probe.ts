@@ -79,8 +79,15 @@ export async function probeRole(
       }
     }
 
-    /* ตารางอ่อนไหว: ต้อง **อ่านไม่ได้** (42501 = insufficient_privilege) */
-    for (const table of FORBIDDEN_FOR_PUBLIC_READ) {
+    /*
+      ตารางอ่อนไหว: ต้อง **อ่านไม่ได้** (42501 = insufficient_privilege)
+      ⚠️ เฉพาะตารางที่ **ไม่ใช่ของบทบาทนี้** — ตารางฟอร์ม (`form_submission`/`form_attachment`)
+         อยู่ใน `FORBIDDEN_FOR_PUBLIC_READ` เพราะ **role อ่านของหน้าเว็บ** ห้ามแตะ
+         แต่ role ฟอร์มต้องอ่าน/เขียนได้ ⇒ ถ้าไม่ตัดออก ด่านจะ "ตก" ทั้งที่ระบบถูก
+         (เจอจริงตอน smoke test รอบที่ 286)
+    */
+    const forbidden = FORBIDDEN_FOR_PUBLIC_READ.filter((table) => !tables.includes(table));
+    for (const table of forbidden) {
       if (!isProbeTableName(table)) continue;
       try {
         await client.query(`select count(*)::int as n from "${table}"`);

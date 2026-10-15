@@ -129,13 +129,19 @@ test("D-280-3: ประวัติที่อยู่ของหมวด�
     "คำสั่งที่รันจริงต้องไม่เหลือ cascade ของประวัติ slug (ไม่งั้นที่อยู่เดิมหาย = 404)",
   );
   assert.ok(statements.includes("on delete set null"), "คำสั่งที่รันจริงต้องตั้ง FK เป็น set null");
-  /* ตัวลบหมวดต้องปลดระวางก่อนลบ (ลำดับสำคัญ: ถ้าลบก่อนจะหาประวัติไม่เจอ) */
+  /* ⚠️ ลำดับสำคัญ (บทเรียนจากบั๊กจริงในรอบนี้): ประตู/ลบ ต้องมาก่อนการปลดระวาง
+     ถ้าปลดระวางก่อนแล้วลบไม่สำเร็จ การ `return false` = commit ของที่ปลดระวางไปแล้ว (พิษกับหมวดที่ยังอยู่) */
   const repository = codeOf("lib/products/categories-repository.ts").replace(/\r\n/g, "\n");
+  /* ⚠️ ต้องระบุท้ายคำสั่งให้ชัด ไม่งั้นจะไปโดน `delete from product_category_slug_history` ที่อยู่ก่อนหน้า */
+  const deleteIndex = repository.indexOf("delete from product_category where id = $1");
   const retireIndex = repository.indexOf("set category_id = null, retired_at = now()");
-  /* ⚠️ ต้องมี `\n` ต่อท้าย ไม่งั้นจะไปโดน `delete from product_category_slug_history` ที่อยู่ก่อนหน้า */
-  const deleteIndex = repository.indexOf("delete from product_category\n");
+  assert.ok(deleteIndex > 0, "ต้องมีคำสั่งลบหมวด");
   assert.ok(retireIndex > 0, "ต้องมีคำสั่งปลดระวาง");
-  assert.ok(deleteIndex > retireIndex, "ต้องปลดระวาง **ก่อน** ลบหมวด");
+  assert.ok(deleteIndex < retireIndex, "ต้องลบ (หลังผ่านประตู) **ก่อน** ปลดระวาง");
+  assert.ok(
+    repository.includes("if (currentSlug === undefined) return false;"),
+    "ประตูต้องคืน false ก่อนมีการเขียนใด ๆ",
+  );
 });
 
 /* ── พจนานุกรม: พื้นที่ใหม่ต้องมีครบสองภาษา ──────────────────────────────────── */
