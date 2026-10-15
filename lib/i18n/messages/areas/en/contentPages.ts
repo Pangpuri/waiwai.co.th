@@ -7,19 +7,21 @@
 
   /*
     The /recipes and /news pages — real content since rounds 104/105 (the "sample" notice was removed in round 272).
-    They contain just the layout and six test cards (3×2); there is no real content.
-    ⚠️ Pending approval from the marketing team (see PRODUCT_ROADMAP.md § 9).
+    🔴 Round 288 (owner decision 2026-10-15): **every reference to the brand's previous site was removed.**
+    Once the new site goes live and the old one is shut down, this is the only site ⇒ visitors must not be
+    pointed at a site that no longer exists.
+    (Verified: the wording existed only in the dictionary — no copy in the local or cloud database.)
   */
 export const recipesPage = {
     meta: {
       title: "Recipes — Wai Wai recipe videos",
       description:
-        "Wai Wai recipe videos (the brand's own, imported from its previous site).",
+        "Wai Wai recipe videos and cooking ideas.",
     },
     eyebrow: "Recipes",
     title: "Recipes from Wai Wai",
-    intro: "Wai Wai recipe videos and cooking ideas, imported from the brand's previous site.",
-    /* The "recipe videos" section from the database (round 104) — imported from the brand's previous site */
+    intro: "Wai Wai recipe videos and cooking ideas.",
+    /* The "recipe videos" section from the database (round 104) */
     dbListTitle: "Recipe videos from Wai Wai",
     dbListCount: "{count} recipes",
     dbPlay: "Play video",
@@ -33,12 +35,12 @@ export const newsPage = {
     meta: {
       title: "News & Activities",
       description:
-        "Wai Wai news and activities (the brand's own, imported from its previous site).",
+        "Wai Wai news and activities.",
     },
     eyebrow: "News & Activities",
     title: "News & Activities",
-    intro: "Wai Wai news and activities, imported from the brand's previous site.",
-    /* The real news section from the database (round 105) — imported from the brand's previous site */
+    intro: "Wai Wai news and activities.",
+    /* The real news section from the database (round 105) */
     /* News list filter row (round 271 · owner decision D29) */
     dbFilterLabel: "Period",
     dbFilterAllYears: "All years",
