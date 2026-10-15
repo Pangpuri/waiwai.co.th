@@ -70,7 +70,16 @@ export const MAINTENANCE_ALWAYS_ALLOWED_SEGMENTS = ["admin", MAINTENANCE_SEGMENT
  *    · และมีเทสต์กันไม่ให้รายการนี้หลุดจาก `PROXY_BYPASS_PREFIXES` (สองรายการต้องสอดคล้องกันเสมอ
  *    ไม่งั้นหน้าที่ควรปิดจะหลุดผ่าน proxy ไปได้)
  */
-const MAINTENANCE_ALLOWED_TOP_LEVEL_PREFIXES = ["/admin", "/api", "/_next", "/media", "/icons", "/images"] as const;
+const MAINTENANCE_ALLOWED_TOP_LEVEL_PREFIXES = [
+  "/admin",
+  "/api",
+  "/_next",
+  "/media",
+  "/icons",
+  "/images",
+  /* รอบที่ 289: ตัวตรวจสุขภาพระบบต้องตอบได้แม้เว็บปิดปรับปรุง (ปิดด้วยคีย์เสมอ) */
+  "/healthz",
+] as const;
 const MAINTENANCE_ALLOWED_FILES = ["/robots.txt", "/sitemap.xml", "/favicon.ico"] as const;
 
 /** แยก `/{locale}` ออกจาก pathname (`/th/products` → `{ locale: "th", rest: "/products" }`) */
