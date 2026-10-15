@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { type BuilderIssue, type BuilderState } from "@/features/admin/builder-state";
 import { type ScheduleState } from "@/features/admin/schedule-state";
 import { requireAdminUser } from "@/lib/auth/dal";
-import { ABOUT_MEDIA, aboutImagePath } from "@/lib/blocks/about-media";
 import { documentDiff } from "@/lib/blocks/diff";
 import { isProductDetailPageLike } from "@/lib/blocks/product-detail";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
@@ -33,7 +32,7 @@ import { PRUNE_HISTORY_CONFIRM_VALUE } from "@/lib/blocks/revision-plan";
 import type { BlockDocument } from "@/lib/blocks/types";
 import { recordAudit } from "@/lib/audit/log";
 import { refreshPublicSite } from "@/lib/cache/refresh";
-import { findMediaIdsBySha256 } from "@/lib/media/repository";
+import { aboutTemplateImageResolver } from "@/lib/blocks/template-images";
 
 /**
  * Server Actions ของหน้าจอสร้างหน้าเว็บ (บล็อกอิสระ)
@@ -474,17 +473,8 @@ export async function migrateBlocksAction(_previous: BuilderState, formData: For
   }
 }
 
-/* ── ตัวช่วยของเทมเพลตหน้า "บริษัท" (รอบที่ 253) ────────────────────────────────────
-   ⚠️ ไฟล์นี้เป็น `"use server"` ⇒ **ห้าม export ตัวช่วยที่ไม่ใช่ async** (Next บังคับ)
-   ⇒ ประกาศเป็นฟังก์ชันภายในโมดูล (ผู้เรียกคือ action ด้านบน)
+/* ── ตัวช่วยของเทมเพลตที่ใช้ภาพจากคลัง (รอบที่ 253 · ย้ายที่อยู่รอบที่ 287) ───────────
+   ตัวช่วย `aboutTemplateImageResolver()` ย้ายไป `lib/blocks/template-images.ts`
+   ⇒ ใช้ร่วมกับ CLI `npm run pages:publish` (ตรรกะเดียว ไม่ลอกโค้ด)
+   และเพราะไฟล์นี้เป็น `"use server"` ⇒ **ห้าม export ตัวช่วยที่ไม่ใช่ async** (Next บังคับ)
 */
-
-/** หา id ในคลังภาพจากลายนิ้วมือของไฟล์เดิม แล้วคืนตัวช่วย `(key) => "/media/<id>"` */
-async function aboutTemplateImageResolver(): Promise<(key: string) => string> {
-  const ids = await findMediaIdsBySha256(ABOUT_MEDIA.map((asset) => asset.sha256)).catch(() => new Map<string, string>());
-  return (key: string) =>
-    aboutImagePath(key, (sha256) => {
-      const id = ids.get(sha256);
-      return id === undefined ? null : `/media/${id}`;
-    });
-}
