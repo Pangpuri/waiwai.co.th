@@ -16,6 +16,8 @@ export const PROBE_FLOW_IDS = [
   "preview-link",
   "sql-injection",
   "contact-form",
+  "newsletter-form",
+  "careers-form",
 ] as const;
 export type ProbeFlowId = (typeof PROBE_FLOW_IDS)[number];
 
@@ -26,6 +28,8 @@ export const PROBE_FLOWS: readonly { readonly id: ProbeFlowId; readonly title: s
   { id: "preview-link", title: "ลิงก์พรีวิว 24 ชม. (เปิดได้โดยไม่มีบัญชี · ยกเลิก/หมดอายุ = 404)", needsSession: true },
   { id: "sql-injection", title: "SQL injection: payload ต้องถูกมองเป็น \"ค่า\" ไม่ใช่คำสั่ง (อ่านอย่างเดียว)", needsSession: true },
   { id: "contact-form", title: "ฟอร์มติดต่อ → ต้องมีการ์ดข้อความเข้าหลังบ้านจริง (ไม่ใช่แค่ข้อความบนจอ)", needsSession: false },
+  { id: "newsletter-form", title: "ฟอร์มรับข่าวสาร → ต้องมีการ์ดข้อความเข้าหลังบ้านจริง", needsSession: false },
+  { id: "careers-form", title: "ฟอร์มสมัครงาน → ต้องมีการ์ด + ไฟล์แนบ (เรซูเม่) ถูกเก็บจริง", needsSession: false },
 ];
 
 export function isProbeFlowId(value: string): value is ProbeFlowId {

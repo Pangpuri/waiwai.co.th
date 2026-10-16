@@ -67,13 +67,17 @@ async function getStatus(url: string, session: ProbeSession | null): Promise<{ s
   return { status: response.status, body: await response.text() };
 }
 
-/** ส่งฟอร์มแบบ no-JS (multipart) · `override` = แทนที่ค่าช่องที่มีชื่อซ้ำ (เช่น `page`) */
+/**
+ * ส่งฟอร์มแบบ no-JS (multipart) · `override` = แทนที่ค่าช่องที่มีชื่อซ้ำ (เช่น `page`)
+ * `fileFieldName` = ชื่อช่องไฟล์ในฟอร์มนั้น (ฟอร์มสมัครงานใช้ `resume` · ตัวอื่นใช้ `file`)
+ */
 async function postForm(
   url: string,
   form: string,
   session: ProbeSession | null,
   override: Readonly<Record<string, string>> = {},
   file: { readonly bytes: Uint8Array<ArrayBuffer>; readonly name: string; readonly mime: string } | null = null,
+  fileFieldName = "file",
 ): Promise<{ status: number; body: string }> {
   const body = new FormData();
   const replaceNames = new Set(Object.keys(override));
@@ -83,7 +87,7 @@ async function postForm(
     body.append(name, value);
   }
   for (const [name, value] of Object.entries(override)) body.append(name, value);
-  if (file !== null) body.append("file", new Blob([file.bytes], { type: file.mime }), file.name);
+  if (file !== null) body.append(fileFieldName, new Blob([file.bytes], { type: file.mime }), file.name);
 
   const response = await fetch(url, { method: "POST", redirect: "manual", headers: { ...adminHeaders(session), origin: new URL(url).origin }, body });
   return { status: response.status, body: await response.text() };
@@ -577,6 +581,144 @@ async function runContactFormFlow(deps: FlowDeps): Promise<FlowOutcome> {
   }
 }
 
+/* ── flow 7–8: ฟอร์มรับข่าวสาร + ฟอร์มสมัครงาน (รอบที่ 297) ─────────────────── */
+
+/**
+ * ต่อจาก flow `contact-form` (รอบ 296) — เจ้าของทดสอบผ่านทั้ง 3 ฟอร์ม
+ * ⇒ ล็อกทุกฟอร์มสาธารณะด้วยหลักฐาน "มีของเข้าหลังบ้านจริง" ไม่ใช่แค่ข้อความบนจอ
+ */
+
+/** กล่องแจ้งผลที่เรนเดอร์จริง: `status` = สำเร็จ · `alert` = ไม่สำเร็จ · `(ไม่พบ)` = ไม่มีกล่อง */
+function statusRoleOf(html: string): string {
+  if (html.includes('role="status"')) return "status";
+  if (html.includes('role="alert"')) return "alert";
+  return "(ไม่พบ)";
+}
+
+/** ไฟล์ PDF ขนาดเล็กที่ผ่านการตรวจหัวไฟล์ (`%PDF`) — ใช้ทดสอบฟอร์มสมัครงาน */
+function minimalPdf(): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(["%PDF-1.4", "1 0 obj<</Type/Catalog>>endobj", "trailer<</Root 1 0 R>>", "%%EOF", ""].join("\n"));
+}
+
+/** หาฟอร์มของชนิดที่ต้องการจาก "ช่องซ่อน" ที่ระบบใส่เอง (`<input name="form" value="newsletter">`) */
+function formOfKind(html: string, kind: string): string | undefined {
+  return formsOf(html).find((candidate) => candidate.includes('name="form"') && candidate.includes(`value="${kind}"`));
+}
+
+/** ชื่อช่องไฟล์ในฟอร์มนั้น (ฟอร์มสมัครงานใช้ `resume` เป็นต้น) */
+function fileFieldNameOf(form: string): string {
+  const fileTag = /<input[^>]*type="file"[^>]*>/.exec(form)?.[0] ?? "";
+  return /name="([^"]+)"/.exec(fileTag)?.[1] ?? "";
+}
+
+/**
+ * ค่าแรกที่ **ไม่ว่าง** ของ `<select>` ชื่อที่กำหนด
+ *
+ * ⚠️ จำเป็นจริง (เจอตอนรัน flow ครั้งแรก): ฟอร์มสมัครงานมีตัวเลือกตำแหน่งที่ตัวแรกเป็นตัวบอก
+ * ("— เลือกตำแหน่ง —" ซึ่งมีค่าว่าง) แต่ `formFieldsOf()` เลือก "ตัวแรก" ตามที่เบราว์เซอร์ทำ
+ * ⇒ ส่งค่าว่างไป validator ตอบ `required` ทั้งที่ผู้ใช้จริงเลือกตำแหน่งจริงเสมอ
+ */
+function firstOptionValueOf(form: string, fieldName: string): string {
+  const at = form.indexOf(`name="${fieldName}"`);
+  if (at === -1) return "";
+  const selectEnd = form.indexOf("</select>", at);
+  if (selectEnd === -1) return "";
+
+  for (const match of form.slice(at, selectEnd).matchAll(/value="([^"]*)"/g)) {
+    const value = match[1] ?? "";
+    if (value !== "") return value;
+  }
+  return "";
+}
+
+async function runNewsletterFormFlow(deps: FlowDeps): Promise<FlowOutcome> {
+  const steps: FlowStep[] = [];
+  const email = `probe-news-${String(Date.now())}@example.com`;
+
+  try {
+    const page = await getStatus(`${deps.baseUrl}/th`, null);
+    const form = formOfKind(page.body, "newsletter");
+
+    if (form === undefined) {
+      steps.push({ label: "หาฟอร์มรับข่าวสารบนหน้าแรก", ok: false, detail: `ไม่พบ (HTTP ${String(page.status)})` });
+      return { id: "newsletter-form", title: "ฟอร์มรับข่าวสาร", steps, cleanup: "ไม่มีอะไรต้องเก็บ", ok: false };
+    }
+
+    const before = await countRows("form_submission", "email = $1", [email]);
+    const posted = await postForm(`${deps.baseUrl}/th`, form, null, { email, consent: "on" });
+    const role = statusRoleOf(posted.body);
+
+    steps.push({ label: "หน้าเว็บแจ้งว่าส่งสำเร็จ (role=status)", ok: role === "status", detail: role });
+    const after = await countRows("form_submission", "email = $1", [email]);
+    steps.push({ label: "เกิดแถวในฐานข้อมูลจริง", ok: after === before + 1, detail: `แถว ${String(before)} → ${String(after)}` });
+    const stored = await countRows("form_submission", "email = $1 and form = 'newsletter' and status = 'new'", [email]);
+    steps.push({ label: "เป็น form=newsletter · status=new (เข้าถล่องข้อความ)", ok: stored === 1, detail: `${String(stored)} แถว` });
+
+    return { id: "newsletter-form", title: "ฟอร์มรับข่าวสาร", steps, cleanup: "ยังไม่ได้เก็บ (จะเก็บในขั้นถัดไป)", ok: steps.every((step) => step.ok) };
+  } finally {
+    const removed = await deleteRows("form_submission", "email = $1", [email]);
+    cleanupNotes.push(`ลบข้อความรับข่าวสารทดสอบ ${String(removed)} แถว`);
+  }
+}
+
+async function runCareersFormFlow(deps: FlowDeps): Promise<FlowOutcome> {
+  const steps: FlowStep[] = [];
+  const email = `probe-job-${String(Date.now())}@example.com`;
+
+  try {
+    const page = await getStatus(`${deps.baseUrl}/th/careers`, null);
+    const form = formOfKind(page.body, "careers");
+
+    if (form === undefined) {
+      steps.push({ label: "หาฟอร์มสมัครงานบน /th/careers", ok: false, detail: `ไม่พบ (HTTP ${String(page.status)})` });
+      return { id: "careers-form", title: "ฟอร์มสมัครงาน (มีไฟล์แนบ)", steps, cleanup: "ไม่มีอะไรต้องเก็บ", ok: false };
+    }
+
+    const fileField = fileFieldNameOf(form);
+    if (fileField === "") {
+      steps.push({ label: "หาช่องไฟล์แนบในฟอร์มสมัครงาน", ok: false, detail: "ไม่พบช่องไฟล์" });
+      return { id: "careers-form", title: "ฟอร์มสมัครงาน (มีไฟล์แนบ)", steps, cleanup: "ไม่มีอะไรต้องเก็บ", ok: false };
+    }
+
+    const posted = await postForm(
+      `${deps.baseUrl}/th/careers`,
+      form,
+      null,
+      {
+        email,
+        name: "ทดสอบอัตโนมัติ (probe)",
+        /* ตำแหน่ง: ต้องเลือกค่าจริง (ตัวเลือกแรกของฟอร์มเป็นตัวบอกที่มีค่าว่าง) */
+        topic: firstOptionValueOf(form, "topic"),
+        message: "ใบสมัครทดสอบจากเครื่องมือ probe — จะถูกลบอัตโนมัติ",
+        consent: "on",
+      },
+      { bytes: minimalPdf(), name: "probe-resume.pdf", mime: "application/pdf" },
+      fileField,
+    );
+    const role = statusRoleOf(posted.body);
+
+    steps.push({
+      label: `หน้าเว็บแจ้งว่าส่งสำเร็จ (role=status) · ช่องไฟล์ "${fileField}"`,
+      ok: role === "status",
+      detail: role,
+    });
+    const stored = await countRows("form_submission", "email = $1 and form = 'careers' and status = 'new'", [email]);
+    steps.push({ label: "เป็น form=careers · status=new (เข้าถล่องข้อความ)", ok: stored === 1, detail: `${String(stored)} แถว` });
+
+    const files = await countRows(
+      "form_attachment a join form_submission s on s.id = a.submission_id",
+      "s.email = $1 and a.mime = 'application/pdf' and a.size_bytes > 0",
+      [email],
+    );
+    steps.push({ label: "ไฟล์แนบ (เรซูเม่) ถูกเก็บจริงเป็น PDF", ok: files === 1, detail: `${String(files)} ไฟล์` });
+
+    return { id: "careers-form", title: "ฟอร์มสมัครงาน (มีไฟล์แนบ)", steps, cleanup: "ยังไม่ได้เก็บ (จะเก็บในขั้นถัดไป)", ok: steps.every((step) => step.ok) };
+  } finally {
+    const removed = await deleteRows("form_submission", "email = $1", [email]);
+    cleanupNotes.push(`ลบใบสมัครทดสอบ ${String(removed)} แถว (ไฟล์แนบลบตาม FK)`);
+  }
+}
+
 /* ── จุดเข้าใช้ ────────────────────────────────────────────────────────────── */
 
 export type RunProbeFlowsOptions = {
@@ -613,7 +755,9 @@ export async function runProbeFlows(options: RunProbeFlowsOptions): Promise<Flow
     else if (flow.id === "upload-guard") outcomes.push(await runUploadGuardFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "preview-link") outcomes.push(await runPreviewLinkFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "sql-injection") outcomes.push(await runSqlInjectionFlow({ baseUrl: options.baseUrl, session }));
-    else outcomes.push(await runContactFormFlow({ baseUrl: options.baseUrl, session }));
+    else if (flow.id === "contact-form") outcomes.push(await runContactFormFlow({ baseUrl: options.baseUrl, session }));
+    else if (flow.id === "newsletter-form") outcomes.push(await runNewsletterFormFlow({ baseUrl: options.baseUrl, session }));
+    else outcomes.push(await runCareersFormFlow({ baseUrl: options.baseUrl, session }));
 
     const last = outcomes[outcomes.length - 1];
     if (last !== undefined) {

@@ -196,9 +196,9 @@ test("probe: อ่านช่องฟอร์มแบบที่เบร�
 });
 
 test("probe: flow หลายขั้น — มีครบ 4 flow · เลือกได้ · และ **ปฏิเสธเซิร์ฟเวอร์ไกล** โดยค่าเริ่มต้น", () => {
-  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection", "contact-form"]);
-  assert.equal(PROBE_FLOWS.length, 6);
-  assert.equal(selectProbeFlows().length, 6);
+  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection", "contact-form", "newsletter-form", "careers-form"]);
+  assert.equal(PROBE_FLOWS.length, 8);
+  assert.equal(selectProbeFlows().length, 8);
   assert.equal(selectProbeFlows("upload").length, 1);
   assert.equal(selectProbeFlows("ไม่มีทางเจอ").length, 0);
   /* flow ที่ต้องใช้เซสชัน (ยกเว้น rate limit ที่ยิงสาธารณะได้) */
