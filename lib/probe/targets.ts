@@ -179,6 +179,13 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
   { url: "/th/preview/home", expect: [307], group: "admin" },
 
   /*
+    🐞 ชุดกันถอยหลังของรอบที่ 293 — 404 ของหลังบ้านต้องเป็น **หน้าของเรา** (เดิมเป็นดีฟอลต์ของ Next)
+  */
+  { url: "/admin/nope-nope", admin: true, expect: [404], must: ["ไม่พบหน้านี้ในหลังบ้าน"], note: "ห้ามกลับไปเป็นหน้าดีฟอลต์ของ Next", group: "admin" },
+  { url: "/admin/nope-nope/noo", admin: true, expect: [404], must: ["ไม่พบหน้านี้ในหลังบ้าน"], group: "admin" },
+  { url: "/admin/nope-nope", expect: [307], note: "ยังไม่ล็อกอิน ⇒ เด้งไปหน้าล็อกอิน (ไม่ใช่ 404 เปล่า)", group: "admin" },
+
+  /*
     🐞 ชุดกันถอยหลังของรอบที่ 291 — พารามิเตอร์ซ้ำ (array) + NUL เคยทำให้ **500**
     (ห้ามลบออกจากทะเบียนนี้: ด่านนี้คือสิ่งที่กันไม่ให้บั๊กกลับมา)
   */

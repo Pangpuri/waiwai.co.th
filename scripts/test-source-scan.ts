@@ -102,7 +102,16 @@ function adminFiles(): readonly string[] {
 
 test("source-scan: ทุกไฟล์ใน app/admin ต้องมีสิทธิ์ใน 'โค้ดจริง' (สแกนแบบตัดคอมเมนต์)", () => {
   /* ไฟล์ที่เข้าได้ก่อนมีเซสชัน (เรื่องล็อกอิน) — ไม่ต้องมีสิทธิ์ */
-  const allowlist = new Set(["app/admin/actions.ts", "app/admin/login/page.tsx"]);
+  const allowlist = new Set([
+    "app/admin/actions.ts",
+    "app/admin/login/page.tsx",
+    /*
+      `not-found.tsx` ไม่มีทางตรวจสิทธิ์ได้เอง (ถูกเรนเดอร์โดยตัว router ในบริบทที่ยังไม่มีหน้า)
+      ⇒ ประตูอยู่ที่ (ก) หน้าต้นทางที่เรียก `notFound()` ซึ่งผ่าน `requireAdminUser()` ก่อนเสมอ
+      และ (ข) ตัวจับ `app/admin/[...rest]/page.tsx` ที่ตรวจสิทธิ์ก่อนสั่ง `notFound()` (รอบที่ 293)
+    */
+    "app/admin/not-found.tsx",
+  ]);
   const missing: string[] = [];
 
   for (const file of adminFiles()) {

@@ -66,7 +66,16 @@ test("rbac: ทุกไฟล์ใน app/admin ต้องตรวจสิ
     ไฟล์ที่ "ไม่ต้องมีสิทธิ์": เฉพาะเรื่องล็อกอิน (ต้องเข้าได้ก่อนมีเซสชัน)
     ⚠️ route handler ที่อ่านไฟล์ (เช่นภาพในถัง) ต้องตรวจสิทธิ์เอง — ไม่ใช่แค่ "ล็อกอินแล้ว"
   */
-  const allowlist = new Set(["app/admin/actions.ts", "app/admin/login/page.tsx"]);
+  const allowlist = new Set([
+    "app/admin/actions.ts",
+    "app/admin/login/page.tsx",
+    /*
+      `not-found.tsx` ไม่มีทางตรวจสิทธิ์ได้เอง (ถูกเรนเดอร์โดยตัว router ในบริบทที่ยังไม่มีหน้า)
+      ⇒ ประตูอยู่ที่ (ก) หน้าต้นทางที่เรียก `notFound()` ซึ่งผ่าน `requireAdminUser()` ก่อนเสมอ
+      และ (ข) ตัวจับ `app/admin/[...rest]/page.tsx` ที่ตรวจสิทธิ์ก่อนสั่ง `notFound()` (รอบที่ 293)
+    */
+    "app/admin/not-found.tsx",
+  ]);
   const callPattern = /requireAdminUser\(([^)]*)\)/g;
 
   const missing: string[] = [];

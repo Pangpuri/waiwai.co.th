@@ -1,18 +1,20 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { test } from "node:test";
 
 import {
   DEFAULT_PROBE_URL,
+  evaluateProbeResponse,
   formatProbeLine,
   parseProbeArgs,
+  shouldRetryAfter5xx,
   summarizeProbeResults,
   targetsForOptions,
 } from "@/lib/probe/runner";
 import type { ProbeTarget } from "@/lib/probe/targets";
 import { MAINTENANCE_PROBE_TARGETS, PROBE_TARGETS, probeProblems, selectProbeTargets } from "@/lib/probe/targets";
-import { REPO_ROOT, stripComments } from "@/scripts/source-scan";
+import { PROBE_FLOW_IDS, PROBE_FLOWS, isLocalProbeUrl, selectProbeFlows } from "@/lib/probe/flow-plan";
+import { formFieldsOf, formWithField, formWithFileInput, formsOf, hasServerActionFields } from "@/lib/probe/forms";
+import { codeOf } from "./source-scan.ts";
 
 /**
  * เทสต์ของเครื่องมือยิงเส้นทาง (`npm run probe:routes` · รอบที่ 292)
@@ -132,10 +134,12 @@ test("probe: เลือกเส้นตามตัวเลือก + ส�
 });
 
 test("probe: สัญญาความปลอดภัยของสคริปต์ — เพิกถอนเซสชัน · ไม่พิมพ์คุกกี้ · ไม่เขียนข้อมูลเนื้อหา", () => {
-  const source = stripComments(readFileSync(path.join(REPO_ROOT, "scripts/probe-routes.ts"), "utf8"));
-  const runner = stripComments(readFileSync(path.join(REPO_ROOT, "lib/probe/runner.ts"), "utf8"));
+  const source = codeOf("scripts/probe-routes.ts");
+  const runner = codeOf("lib/probe/runner.ts");
+  const session = codeOf("scripts/probe-session.ts");
 
-  assert.ok(source.includes("revokeAdminSessions("), "ต้องเพิกถอนเซสชันที่มินต์ไว้เมื่อจบ");
+  assert.ok(source.includes("releaseProbeSession("), "ต้องเพิกถอนเซสชันที่มินต์ไว้เมื่อจบ");
+  assert.ok(session.includes("revokeAdminSessions("), "ตัวเพิกถอนต้องเรียกเส้นทางจริงของโปรเจกต์");
   assert.ok(source.includes("options.useSession"), "ต้องเคารพธงปิดการใช้เซสชัน");
   assert.ok(runner.includes('"--no-session"'), "ต้องมีทางปิดการใช้เซสชัน (อ่านจาก argv)");
   assert.ok(source.includes("waiwai-probe-routes"), "ต้องติด user-agent ของตัวเอง (แยกแยะในตาราง admin_session)");
@@ -151,4 +155,117 @@ test("probe: สัญญาความปลอดภัยของสคร�
   for (const pattern of forbidden) {
     assert.ok(!pattern.test(source), `สคริปต์ต้องไม่เขียนข้อมูลเอง (พบ ${String(pattern)})`);
   }
+});
+
+/* ── รอบที่ 293: อ่านฟอร์มให้ครบ (บทเรียน select ตกหล่น) · flow หลายขั้น · ยิงซ้ำเมื่อ 5xx ── */
+
+test("probe: อ่านช่องฟอร์มแบบที่เบราว์เซอร์ส่งจริง — select/textarea/$ACTION_REF ต้องไม่ตกหล่น", () => {
+  const html = `
+    <form action="" method="POST">
+      <input type="hidden" name="$ACTION_REF_1"/>
+      <input type="hidden" name="$ACTION_1:0" value="{&quot;id&quot;:&quot;x&quot;}"/>
+      <input type="hidden" name="$ACTION_KEY" value="k1"/>
+      <select name="page"><option value="home" selected="">โฮม</option><option value="about">บริษัท</option></select>
+      <select name="mode"><option value="draft">ร่าง</option></select>
+      <textarea name="note">ข้อความ &amp; อื่น ๆ</textarea>
+      <input type="file" name="file"/>
+      <input type="text" name="q" value="บะหมี่"/>
+      <button type="submit" name="go" value="1">ส่ง</button>
+    </form>
+    <form action="/admin/inbox" method="get"><input type="text" name="status"/></form>`;
+
+  const forms = formsOf(html);
+  assert.equal(forms.length, 2, "ต้องเจอทั้งสองฟอร์ม");
+  const fields = formFieldsOf(forms[0] ?? "");
+  const asRecord = Object.fromEntries(fields);
+
+  assert.equal(asRecord["page"], "home", "select: ต้องเอาตัวที่ selected (เคสจริงที่เคยตกหล่น)");
+  assert.equal(asRecord["mode"], "draft", "select ที่ไม่มี selected: เอาตัวแรก");
+  assert.equal(asRecord["note"], "ข้อความ & อื่น ๆ", "textarea + unescape");
+  assert.equal(asRecord["q"], "บะหมี่");
+  assert.equal(asRecord["$ACTION_REF_1"], "", "$ACTION_REF ไม่มีค่า ⇒ ส่งเป็นค่าว่าง");
+  assert.equal(asRecord["$ACTION_1:0"], '{"id":"x"}', "unescape &quot; ให้เป็น JSON ที่ใช้ได้");
+  assert.equal(asRecord["file"], undefined, "ไฟล์ไม่เก็บใน fields (ผู้เรียกเติมเอง)");
+  assert.equal(asRecord["go"], undefined, "ปุ่ม submit ไม่ถูกส่ง");
+
+  assert.ok(hasServerActionFields(forms[0] ?? ""), "ฟอร์ม Server Action ต้องตรวจจับได้");
+  assert.ok(!hasServerActionFields(forms[1] ?? ""), "ฟอร์มตัวกรอง GET ต้องไม่ถูกนับเป็น Server Action");
+  assert.equal(formWithFileInput(forms), forms[0], "หาฟอร์มที่มีช่องไฟล์ได้");
+  assert.equal(formWithField(forms, "page"), forms[0], "หาฟอร์มที่มีช่องตามชื่อได้");
+  assert.equal(formWithField(forms, "nope"), undefined);
+});
+
+test("probe: flow หลายขั้น — มีครบ 4 flow · เลือกได้ · และ **ปฏิเสธเซิร์ฟเวอร์ไกล** โดยค่าเริ่มต้น", () => {
+  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link"]);
+  assert.equal(PROBE_FLOWS.length, 4);
+  assert.equal(selectProbeFlows().length, 4);
+  assert.equal(selectProbeFlows("upload").length, 1);
+  assert.equal(selectProbeFlows("ไม่มีทางเจอ").length, 0);
+  /* flow ที่แตะข้อมูลจริงต้องถูกกำกับว่าต้องมีเซสชัน (ยกเว้น rate limit ที่ยิงสาธารณะได้) */
+  assert.equal(PROBE_FLOWS.filter((flow) => flow.needsSession).length, 3);
+
+  for (const local of ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost", "http://[::1]:3000"]) {
+    assert.equal(isLocalProbeUrl(local), true, `${local} ต้องถือว่าในเครื่อง`);
+  }
+  for (const remote of ["https://waiwai-co-th-demo.vercel.app", "http://192.168.1.9:3000", "https://www.waiwai.com", "ไม่ใช่ url"]) {
+    assert.equal(isLocalProbeUrl(remote), false, `${remote} ต้องถือว่าไกล (flow ต้องไม่รันโดยไม่ยืนยัน)`);
+  }
+});
+
+test("probe: ยิงซ้ำเมื่อเจอ 5xx (dev warm-up) — แต่ 5xx ที่คาดไว้ต้องไม่ยิงซ้ำ และต้องรายงานว่าได้ยิงซ้ำ", () => {
+  const normal = target({ url: "/a", expect: [200] });
+  assert.equal(shouldRetryAfter5xx(normal, 500), true, "500 ที่ไม่ได้คาด = ยิงซ้ำได้ (dev warm-up)");
+  assert.equal(shouldRetryAfter5xx(normal, 404), false);
+  assert.equal(shouldRetryAfter5xx(target({ expect: [503] }), 503), false, "503 ของโหมดปิดปรับปรุง = คาดไว้ ไม่ยิงซ้ำ");
+
+  const passed = evaluateProbeResponse(normal, { status: 200, body: "ok", ms: 5, retriedAfter5xx: true });
+  assert.equal(passed.problems.length, 0);
+  assert.equal(passed.retriedAfter5xx, true);
+  assert.ok(formatProbeLine(passed).includes("ยิงซ้ำหลัง 5xx"), "ต้องบอกผู้อ่านว่าได้ยิงซ้ำ ไม่ใช่ผ่านเงียบ ๆ");
+
+  const stillBroken = evaluateProbeResponse(normal, { status: 500, body: "", ms: 9, retriedAfter5xx: true });
+  assert.ok(
+    stillBroken.problems.some((problem) => problem.includes("พังจริง")),
+    "ยิงซ้ำแล้วยัง 5xx ต้องบอกว่าเป็นของจริง ไม่ใช่ warm-up",
+  );
+});
+
+test("probe: flow ต้องมีวินัยความปลอดภัย — เก็บกวาดเสมอ · ไม่พิมพ์คุกกี้ · ไม่แตะข้อมูลจริงของเจ้าของ", () => {
+  const flows = codeOf("scripts/probe-flows.ts");
+  const cli = codeOf("scripts/probe-routes.ts");
+
+  assert.ok(flows.includes("finally {"), "ทุก flow ต้องเก็บกวาดใน finally");
+  assert.ok(flows.includes("isLocalProbeUrl"), "ต้องมีประตูกันรันกับเซิร์ฟเวอร์ไกล");
+  assert.ok(flows.includes("releaseProbeSession"), "ต้องเพิกถอนเซสชันที่มินต์ไว้");
+  assert.ok(flows.includes("storeImageFile"), "ตรวจเหตุผลระดับฟังก์ชัน (ไม่เดาจากข้อความบนจอ)");
+  assert.ok(!/(console\.log|stdout\.write)\([^)]*\bcookie\b/.test(flows), "ห้ามพิมพ์ค่าคุกกี้");
+  assert.ok(cli.includes("options.flows"), "CLI ต้องมีทางเรียกโหมด flow");
+  assert.ok(flows.includes("probe-%"), "ของที่สร้างต้องใช้ชื่อที่ระบุได้ (probe-…) เพื่อลบได้ตรง");
+
+  /* flow ต้องไม่แตะเนื้อหาจริง: อนุญาตให้ลบเฉพาะแถวที่ตัวเองสร้าง */
+  assert.ok(
+    !/delete\s+from\s+(product|recipe|news|job_posting|page_document)/i.test(flows),
+    "flow ห้ามลบเนื้อหาจริง (สินค้า/เมนู/ข่าว/งาน/เอกสารหน้า)",
+  );
+});
+
+test("หลังบ้าน: 404 ต้องเป็นหน้าของเรา (ทั้ง URL ที่ไม่รู้จักและหน้าที่เรียก notFound) — กันถอยกลับไปใช้ของ Next", () => {
+  const read = (relative: string): string => codeOf(relative);
+
+  const notFound = read("app/admin/not-found.tsx");
+  assert.ok(notFound.includes("pageNotFoundTitle") && notFound.includes("pageNotFoundBody"), "หน้า 404 ต้องใช้ข้อความจากพจนานุกรม");
+  assert.ok(notFound.includes('href="/admin"'), "ต้องมีทางกลับหน้าภาพรวม");
+  /* `codeOf()` ตัดคอมเมนต์ให้แล้ว ⇒ ถ้ายังเจออักษรไทย = เป็นข้อความที่ผู้ใช้เห็นจริง (ผิดกติกา i18n) */
+  assert.ok(
+    !/[\u0E00-\u0E7F]/.test(notFound),
+    "ห้ามมีข้อความไทยใน .tsx — ข้อความต้องมาจากพจนานุกรม",
+  );
+
+  const catchAll = read("app/admin/[...rest]/page.tsx");
+  assert.ok(catchAll.includes("requireAdminUser("), "URL ที่ไม่รู้จักต้องตรวจสิทธิ์ก่อน (ยังไม่ล็อกอิน = เด้งไปล็อกอิน)");
+  assert.ok(catchAll.includes("notFound()"), "แล้วจึงสั่ง 404 ให้ตัวจับของหลังบ้านทำงาน");
+
+  /* เส้นทางในทะเบียน probe ต้องคุมพฤติกรรมนี้ไว้ (ทั้งมี/ไม่มีเซสชัน) */
+  assert.ok(PROBE_TARGETS.some((entry) => entry.url === "/admin/nope-nope" && entry.admin === true && entry.expect.includes(404)));
+  assert.ok(PROBE_TARGETS.some((entry) => entry.url === "/admin/nope-nope" && entry.expect.includes(307)));
 });

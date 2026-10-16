@@ -19,6 +19,10 @@ export type ProbeOptions = {
   /** เก็บเซสชันที่มินต์ไว้ (ค่าเริ่มต้น = เพิกถอนทิ้งเมื่อจบ) */
   readonly keepSession: boolean;
   readonly concurrency: number;
+  /** รัน "flow หลายขั้น" (rate limit · เพิกถอนเซสชัน · อัปโหลด · ลิงก์พรีวิว) แทนการยิงเส้นทาง */
+  readonly flows: boolean;
+  /** ยอมให้ flow รันกับเซิร์ฟเวอร์ที่ไม่ใช่ในเครื่อง (อันตราย — flow เขียนแถวจริง) */
+  readonly allowRemote: boolean;
 };
 
 export type ProbeResult = {
@@ -26,6 +30,8 @@ export type ProbeResult = {
   readonly status: number;
   readonly ms: number;
   readonly problems: readonly string[];
+  /** ผลนี้ได้หลัง **ยิงซ้ำเพราะเจอ 5xx** (dev warm-up) — ต้องรายงาน ไม่ใช่กลืน */
+  readonly retriedAfter5xx?: boolean;
 };
 
 /** อ่านตัวเลือกจาก argv (ค่าที่ไม่รู้จัก = โยน error พร้อมข้อความไทย ไม่เงียบ) */
@@ -37,6 +43,8 @@ export function parseProbeArgs(argv: readonly string[], env: Record<string, stri
   let useSession = true;
   let keepSession = false;
   let concurrency = DEFAULT_PROBE_CONCURRENCY;
+  let flows = false;
+  let allowRemote = false;
 
   for (const arg of argv) {
     if (arg.trim() === "") continue;
@@ -53,6 +61,10 @@ export function parseProbeArgs(argv: readonly string[], env: Record<string, stri
       useSession = false;
     } else if (arg === "--keep-session") {
       keepSession = true;
+    } else if (arg === "--flows") {
+      flows = true;
+    } else if (arg === "--allow-remote") {
+      allowRemote = true;
     } else if (arg.startsWith("--concurrency=")) {
       const parsed = Number.parseInt(arg.slice("--concurrency=".length), 10);
       if (!Number.isFinite(parsed) || parsed < 1 || parsed > 16) throw new Error("--concurrency ต้องเป็นจำนวนเต็ม 1–16");
@@ -64,12 +76,34 @@ export function parseProbeArgs(argv: readonly string[], env: Record<string, stri
 
   if (baseUrl === "") throw new Error("--url= ต้องไม่ว่าง (เช่น --url=http://localhost:3000)");
 
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), only, maintenance, json, useSession, keepSession, concurrency };
+  return {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    only,
+    maintenance,
+    json,
+    useSession,
+    keepSession,
+    concurrency,
+    flows,
+    allowRemote,
+  };
 }
 
 /** เส้นที่จะยิงจริงตามตัวเลือก (ห่อ `selectProbeTargets` ให้ที่เดียว) */
 export function targetsForOptions(options: ProbeOptions): readonly ProbeTarget[] {
   return selectProbeTargets({ only: options.only, maintenance: options.maintenance });
+}
+
+/**
+ * ควรยิงซ้ำไหมเมื่อได้ 5xx (ปิดหนี้ D-292-1)
+ *
+ * **dev** ตอบ 500 ได้หนึ่งครั้งสำหรับหน้าที่เพิ่งถูก compile ครั้งแรก (เจอจริงรอบ 292:
+ * `/th/products/instant-noodles` = 500 ครั้งแรก → ยิงซ้ำ = 200 · prod ไม่เป็น)
+ * ⇒ ยิงซ้ำได้ **หนึ่งครั้ง** แล้วรายงานให้ชัดว่า "ผ่านเพราะยิงซ้ำ" (ไม่กลืนหาย)
+ * ⚠️ 5xx ที่ **คาดไว้** (เช่น 503 ของโหมดปิดปรับปรุง) ไม่ต้องยิงซ้ำ
+ */
+export function shouldRetryAfter5xx(target: ProbeTarget, status: number): boolean {
+  return status >= 500 && !target.expect.includes(status);
 }
 
 /** หน้ารวมผลลัพธ์เป็นบรรทัดเดียว (ใช้พิมพ์และใช้ทดสอบ) */
@@ -78,7 +112,8 @@ export function formatProbeLine(result: ProbeResult): string {
   const mark = result.problems.length === 0 ? "✓" : "✗";
   const status = String(result.status).padEnd(3);
   const ms = String(result.ms).padStart(5);
-  return `${auth} ${mark} ${status} ${ms}ms  ${result.target.url}`;
+  const retryNote = result.retriedAfter5xx === true ? "  · ยิงซ้ำหลัง 5xx" : "";
+  return `${auth} ${mark} ${status} ${ms}ms  ${result.target.url}${retryNote}`;
 }
 
 export type ProbeSummary = {
@@ -101,12 +136,20 @@ export function summarizeProbeResults(results: readonly ProbeResult[]): ProbeSum
 /** ตัดสินผลจาก HTTP หนึ่งครั้ง (เรียก `probeProblems` ของทะเบียน — ที่เดียว ไม่เขียนตรรกะซ้ำ) */
 export function evaluateProbeResponse(
   target: ProbeTarget,
-  response: { readonly status: number; readonly body: string; readonly ms: number },
+  response: { readonly status: number; readonly body: string; readonly ms: number; readonly retriedAfter5xx?: boolean },
 ): ProbeResult {
+  const problems = probeProblems({ status: response.status, body: response.body }, target);
+  const retried = response.retriedAfter5xx === true;
+
   return {
     target,
     status: response.status,
     ms: response.ms,
-    problems: probeProblems({ status: response.status, body: response.body }, target),
+    /* ยิงซ้ำแล้วยัง 5xx = พังจริง ไม่ใช่ warm-up ⇒ บอกให้ชัด (กันอ่านผิดว่าเป็นเรื่องชั่วคราว) */
+    problems:
+      retried && response.status >= 500 && !target.expect.includes(response.status)
+        ? [...problems, "ยิงซ้ำแล้วยัง 5xx = พังจริง (ไม่ใช่ dev warm-up)"]
+        : problems,
+    ...(retried ? { retriedAfter5xx: true } : {}),
   };
 }

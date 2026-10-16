@@ -19,4 +19,7 @@ export const enAdminNav = {
   navToggleClose: "Close sidebar",
   navLabel: "Admin menu",
   navRoleHint: "Menu items depend on your permissions",
+  /* Round 293: admin 404 page (used to be Next's default error document) */
+  pageNotFoundTitle: "This admin page does not exist",
+  pageNotFoundBody: "The link may have moved, or the address is incomplete — pick a screen from the sidebar, or go back to the dashboard.",
 };
