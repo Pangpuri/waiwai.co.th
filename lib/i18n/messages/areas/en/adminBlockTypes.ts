@@ -27,13 +27,6 @@ export const adminBlockTypes = {
   /* Map */
   blockMapLink: "Map link (https://…)",
   blockMapLinkText: "Button label (optional)",
-  /* Job board (round 88) */
-  blockJobNumber: "Position {n}",
-  blockJobTitle: "Job title",
-  blockJobDepartment: "Department (used for grouping)",
-  blockJobOpenings: "Openings (0 = not specified)",
-  blockJobQualifications: "Qualifications",
-  blockJobExperience: "Experience (optional)",
   blockShowcaseCtaHref: "Section button link (empty = no button), e.g. /products",
   blockRecipeLimit: "Recipes shown",
   blockRecipeDates: "Show publish date",

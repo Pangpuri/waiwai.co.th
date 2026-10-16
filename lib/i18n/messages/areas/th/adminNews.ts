@@ -44,8 +44,6 @@ export const adminNews = {
   newsAdminFieldBody: "เนื้อหา",
   newsAdminBodyHint:
     "เว้นบรรทัดว่าง = ขึ้นย่อหน้าใหม่ · ขึ้นต้นบรรทัดด้วย ## = หัวข้อย่อย · แทรกภาพจากคลังได้ด้วยปุ่มด้านล่าง",
-  newsAdminImageSelect: "ภาพจากคลัง",
-  newsAdminInsertImage: "แทรกภาพนี้",
   newsAdminNoImages: "ยังไม่มีภาพในคลัง",
   newsAdminFieldCover: "ภาพปก",
   newsAdminCoverNone: "— ไม่ใช้ภาพปก —",
@@ -59,7 +57,6 @@ export const adminNews = {
   newsAdminErrorBody: "บันทึกไม่ได้ — เนื้อหายาวเกินกำหนด (ลดจำนวนย่อหน้า/รูป)",
   newsAdminErrorDatabase: "บันทึกไม่ได้ — ยังไม่ได้ตั้งค่าฐานข้อมูล",
   newsAdminErrorNotFound: "ไม่พบข่าวที่ต้องการแก้ไข",
-  newsAdminTokenHelp: "ภาพที่แทรกจะอยู่ในเนื้อหาเป็น [[img:รหัสภาพ|คำบรรยาย]] แล้วระบบจะแทนด้วยรูปจริงบนเว็บ",
   newsAdminTrashHint: "ข่าวที่ย้ายเข้าถังขยะจะยังไม่ถูกลบถาวร — กู้คืนได้จากแท็บถังขยะ",
   newsAdminCoverAlt: "ภาพปกข่าว",
   auditNewsSave: "บันทึกข่าว",

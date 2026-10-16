@@ -232,3 +232,30 @@ export function blockCoverageGaps(page: string): readonly BlockCoveragePartId[] 
   if (!hasBlockTemplate(page)) return [];
   return COVERAGE[page as MenuTemplatePageId];
 }
+
+/**
+ * ปลายทางของแต่ละ "ส่วนที่เทมเพลตไม่ครอบคลุม" (หนี้ D-252-2)
+ *
+ * ปัญหาเดิม: คำเตือนบอกว่า "ส่วนนี้จะหายจากหน้าเว็บ" แต่ **กดไม่ได้** ⇒ ผู้ใช้ไม่รู้จะไปแก้ที่ไหน
+ * ⇒ ทุกส่วนต้องมีปลายทางที่ **มีจริง** (มีเทสต์พิสูจน์ทุกค่า):
+ *   · `#…` = สมอย (anchor) **ในหน้าจอเดียวกัน** — ต้องมี `id="…"` อยู่ในตัวสร้างหน้าเว็บ
+ *   · `/admin/…` = ส่วนนั้นมีเจ้าของเป็นหน้าจออื่น (ลิงก์ข้ามจอ — route ต้องมีไฟล์จริง)
+ *
+ * ℹ️ ทุกวันนี้ `COVERAGE` ของทุกหน้าเป็น `[]` (ครอบคลุมครบ) ⇒ ยังไม่มีรายการให้กดบนจอจริง
+ *    แต่ตารางนี้พร้อมใช้ทันทีที่มีช่องว่างใหม่ และเทสต์กันการใส่ค่าที่กดแล้วเงียบ
+ */
+export const BLOCK_COVERAGE_PART_TARGETS: Readonly<Record<BlockCoveragePartId, string>> = {
+  /* เจ้าของคือหน้าจอเนื้อหาหน้าแรก (ไม่ใช่บล็อก) — ดูเหตุผลใน `COVERAGE`/`BLOCK_COVERAGE_PART_IDS` */
+  whereToBuy: "/admin/content/home",
+  /* ส่วนที่เกิดจาก "ชนิดบล็อก" ⇒ ปลายทางคือแผงเพิ่มบล็อกในตัวสร้าง (เลือกชนิดที่ขาดจากรายการ) */
+  gallery: "#builder-add-type",
+  lightbox: "#builder-add-type",
+  form: "#builder-add-type",
+  map: "#builder-add-type",
+  rosterText: "#builder-add-type",
+};
+
+/** ปลายทางของส่วนนั้น (ผู้เรียกใช้เรนเดอร์เป็นลิงก์ — ห้ามว่างเปล่า) */
+export function coveragePartTarget(part: BlockCoveragePartId): string {
+  return BLOCK_COVERAGE_PART_TARGETS[part];
+}

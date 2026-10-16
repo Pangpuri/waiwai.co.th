@@ -32,7 +32,6 @@ export const adminMedia = {
   mediaUploadTitle: "อัปโหลดภาพใหม่",
   mediaUploadAction: "อัปโหลด",
   mediaNoResults: "ไม่พบภาพ",
-  mediaDimensions: "ขนาด",
   /* เลือกภาพจากคลังในหน้าแก้เนื้อหา (รอบที่ 93) */
   /* ย่อภาพอัตโนมัติก่อนอัปโหลด (รอบที่ 99) */
   imageShrunkHint: "ย่อภาพอัตโนมัติแล้ว:",

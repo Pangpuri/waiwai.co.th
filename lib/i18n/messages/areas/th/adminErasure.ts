@@ -25,8 +25,6 @@ export const adminErasure = {
   eraseVerifiedLabel: "ข้าพเจ้าได้ยืนยันตัวตนของผู้ขอตามขั้นตอนข้างต้นแล้ว",
   eraseSubmit: "ลบข้อมูลของอีเมลนี้ถาวร",
   eraseInvalidEmail: "อีเมลไม่ถูกต้อง (ต้องมี @ และโดเมนที่มีจุด)",
-  eraseMismatch: "อีเมลที่พิมพ์ซ้ำไม่ตรงกับช่องแรก",
-  eraseNotVerified: "ต้องยืนยันตัวตนของผู้ขอก่อน (ติ๊กช่องยืนยัน)",
   eraseDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — เครื่องมือนี้ต้องมี DATABASE_URL",
   auditEraseSubject: "ลบข้อมูลตามคำขอใช้สิทธิ์",
 };

@@ -26,6 +26,7 @@ export const adminTemplate = {
   templateCoverageNote:
     "Once you turn on “use with the live site”, the page shows only blocks — the parts listed below disappear from it. Add blocks first if you need them.",
   templateCoverageNone: "This template covers every part of this page",
+  templateCoverageJumpHint: "Click a part to go where it is edited (the add-block panel, or the screen that owns it)",
   coverageGallery: "Curated image gallery / real photos",
   coverageLightbox: "Full-screen image viewer",
   coverageForm: "Forms (contact / job application)",

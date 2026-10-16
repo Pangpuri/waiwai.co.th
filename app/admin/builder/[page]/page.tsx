@@ -10,7 +10,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { publishGoesLive } from "@/lib/blocks/live-scope";
-import { blockCoverageGaps, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage, type BlockCoveragePartId } from "@/lib/blocks/templates";
+import { blockCoverageGaps, coveragePartTarget, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage, type BlockCoveragePartId } from "@/lib/blocks/templates";
 import { isProductDetailPageLike, productDetailCategoryIdOfPageId } from "@/lib/blocks/product-detail";
 import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
@@ -194,7 +194,16 @@ export default async function AdminBuilderPage({
     title: strings.templateCoverageTitle,
     note: strings.templateCoverageNote,
     noneLabel: strings.templateCoverageNone,
-    parts: blockCoverageGaps(page).map((part) => coveragePartLabel(part, strings)),
+    jumpHint: strings.templateCoverageJumpHint,
+    /*
+      แต่ละส่วนพา "ไปถึงที่แก้ได้จริง" (หนี้ D-252-2) — ปลายทางมาจากทะเบียนกลาง
+      ไม่ใช่ข้อความเฉย ๆ ที่กดแล้วเงียบ (เดิมผู้ใช้ไม่รู้ว่าส่วนที่ขาดต้องไปเพิ่มที่ไหน)
+    */
+    parts: blockCoverageGaps(page).map((part) => ({
+      id: part,
+      label: coveragePartLabel(part, strings),
+      href: coveragePartTarget(part),
+    })),
   };
 
   return (

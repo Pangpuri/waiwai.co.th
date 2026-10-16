@@ -1,7 +1,7 @@
 /**
  * `npm run check:i18n`
  *
- * ตรวจสี่เรื่อง
+ * ตรวจห้าเรื่อง
  *  1. พจนานุกรมทุกภาษามีคีย์ชุดเดียวกัน (สำรองจากด่าน TypeScript)
  *  2. ไม่มีข้อความไทยฝังในไฟล์ .tsx (ต้องดึงจากพจนานุกรมเสมอ)
  *     ยกเว้นได้ด้วยคอมเมนต์ `i18n-allow` พร้อมเหตุผล
@@ -9,12 +9,15 @@
  *     และทุกไฟล์พื้นที่ต้องถูก import ในไฟล์พจนานุกรมของภาษานั้น (ไฟล์ที่ไม่มีใครใช้ = ตัวเลขหลอก)
  *     · ยอดรวมทั้งระบบเป็น "ตัวเลขเฝ้าดู" ไม่ได้บังคับ (แต่พิมพ์ให้เห็นทุกครั้ง)
  *  4. ภาษา th กับ en ต้องมีชุดพื้นที่ตรงกัน
+ *  5. **ไม่มีคีย์ที่ไม่มีใครอ้าง** (orphan) — กันซากของโมดูลที่ถอดไปแล้ว (หนี้ D-252-1)
+ *     รายละเอียดเกณฑ์อยู่ที่ `scripts/i18n-orphans.ts`
  */
 import type { Dirent } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ORPHAN_SCAN_ROOTS, ORPHAN_SOURCE_FILE, findOrphanKeys, topLevelKeysOfArea } from "./i18n-orphans.ts";
 import { stripComments } from "./source-scan.ts";
 import { en } from "../lib/i18n/messages/en.ts";
 import { th } from "../lib/i18n/messages/th.ts";
@@ -67,6 +70,27 @@ async function* walkTsx(directory: string): AsyncGenerator<string> {
       continue;
     }
     if (entry.name.endsWith(".tsx")) {
+      yield path.join(directory, entry.name);
+    }
+  }
+}
+
+/** เดินหาไฟล์ซอร์สทุกชนิดที่อาจอ้างคีย์พจนานุกรม (ไม่รวมตัวพจนานุกรม — กรองที่ผู้เรียก) */
+async function* walkSources(directory: string): AsyncGenerator<string> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (IGNORED_DIRECTORIES.has(entry.name)) continue;
+      yield* walkSources(path.join(directory, entry.name));
+      continue;
+    }
+    if (ORPHAN_SOURCE_FILE.test(entry.name)) {
       yield path.join(directory, entry.name);
     }
   }
@@ -179,6 +203,41 @@ async function main() {
   }
 
   notes.push(`จำนวนคีย์: ${thKeys.length} คีย์ · สแกน ${scanned} ไฟล์ .tsx`);
+
+  /*
+    5. คีย์ที่ไม่มีใครอ้าง (orphan) — กันซากของโมดูลที่ถอดไปแล้ว (หนี้ D-252-1)
+
+    ใช้คีย์ระดับรากของ **ไฟล์พื้นที่ภาษาไทย** (ภาษาอังกฤษต้องมีชุดเดียวกัน — ตรวจไปแล้วในข้อ 1)
+    แล้วสแกนซอร์สทั้งโปรเจกต์หลังตัดคอมเมนต์ · เหตุผล/ข้อจำกัดทั้งหมดอยู่ใน `scripts/i18n-orphans.ts`
+  */
+  const thAreaDir = path.join(PROJECT_ROOT, "lib/i18n/messages", "areas", "th");
+  const areaKeys = new Set<string>();
+  for (const file of areaFilesByLocale.th ?? []) {
+    const source = await readFile(path.join(thAreaDir, file), "utf8");
+    for (const key of topLevelKeysOfArea(source)) areaKeys.add(key);
+  }
+
+  const orphanSources: string[] = [];
+  for (const root of ORPHAN_SCAN_ROOTS) {
+    for await (const filePath of walkSources(path.join(PROJECT_ROOT, root))) {
+      const relative = path.relative(PROJECT_ROOT, filePath).replaceAll("\\", "/");
+      if (relative.startsWith("lib/i18n/messages/")) continue; /* ตัวพจนานุกรมเอง */
+      orphanSources.push(stripComments(await readFile(filePath, "utf8")));
+    }
+  }
+  /* ไฟล์ที่รากโปรเจกต์ (proxy.ts · next.config.ts · …) ก็อ้างคีย์ได้ */
+  for (const entry of await readdir(PROJECT_ROOT, { withFileTypes: true })) {
+    if (!entry.isFile() || !ORPHAN_SOURCE_FILE.test(entry.name)) continue;
+    orphanSources.push(stripComments(await readFile(path.join(PROJECT_ROOT, entry.name), "utf8")));
+  }
+
+  const orphanKeys = findOrphanKeys([...areaKeys], orphanSources);
+  for (const key of orphanKeys) {
+    problems.push(`คีย์พจนานุกรมที่ไม่มีใครอ้าง: ${key} → ลบทิ้ง (หรือใส่ ALLOWED_ORPHAN_KEYS พร้อมเหตุผล)`);
+  }
+  notes.push(
+    `คีย์ระดับราก ${areaKeys.size} คีย์ · สแกน ${orphanSources.length} ไฟล์ · ไม่ถูกอ้าง ${orphanKeys.length}`,
+  );
 
   /* ผลลัพธ์ */
   for (const note of notes) {

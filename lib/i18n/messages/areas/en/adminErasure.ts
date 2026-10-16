@@ -26,8 +26,6 @@ export const adminErasure = {
   eraseVerifiedLabel: "I have verified the requester's identity using the steps above",
   eraseSubmit: "Permanently delete this email's data",
   eraseInvalidEmail: "That email is not valid (needs @ and a domain with a dot)",
-  eraseMismatch: "The email you typed again does not match the first field",
-  eraseNotVerified: "You must confirm the requester's identity first (tick the box)",
   eraseDbMissing: "No database configured — this tool needs DATABASE_URL",
   auditEraseSubject: "Deletion under a rights request",
 };

@@ -24,7 +24,6 @@ export const adminChromePreset = {
   chromePresetApplyHint: "เขียนทับเฉพาะฉบับร่าง · ของเก่าที่เว็บใช้อยู่ไม่ถูกแตะ",
   chromePresetDelete: "ลบชุดนี้",
   chromePresetDeleted: "ย้ายเข้าถังขยะแล้ว (กู้คืนได้ที่หน้าถังขยะ)",
-  chromePresetDeleteWarning: "ลบแล้วเข้าถังขยะกลาง — กู้คืนได้ภายในเวลาที่กำหนดที่หน้าถังขยะ",
   chromePresetSavedAt: "บันทึกเมื่อ {time}",
   chromePresetCountNavbar: "{items} เมนู · {buttons} ปุ่ม",
   chromePresetCountFooter: "{groups} กลุ่ม · {socials} โซเชียล",

@@ -23,7 +23,6 @@ export const adminRbac = {
   rbacNameLabel: "Display name",
   rbacNamePlaceholder: "First and last name",
   rbacCreate: "Create account",
-  rbacCreating: "Creating…",
   rbacCreated: "Account created for {email}",
   rbacPasswordOnce: "Temporary password (shown once — copy it before leaving this page):",
   rbacDuplicate: "That email already has an account",

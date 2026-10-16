@@ -10,11 +10,12 @@ import { decideTemplateApply } from "@/lib/blocks/template-apply";
 import { HOME_SECTIONS_OWNED_HERE, ownerOfSection } from "@/lib/content/home-section-owners";
 import { HOME_SECTIONS } from "@/lib/content/model";
 import { isProductDetailPageId } from "@/lib/blocks/product-detail";
-import { BLOCK_COVERAGE_PART_IDS, BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage } from "@/lib/blocks/templates";
+import { BLOCK_COVERAGE_PART_IDS, BLOCK_TEMPLATE_PAGE_IDS, TEMPLATED_PAGE_IDS, blockCoverageGaps, buildBlockTemplate, coveragePartTarget, hasBlockTemplate, isBlockBuilderPage, isImportedContentPage } from "@/lib/blocks/templates";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { MAX_BLOCKS_TOTAL } from "@/lib/blocks/types";
 import { PAGE_PATHS, PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
+import { stripComments } from "@/scripts/source-scan";
 
 /**
  * เทสต์ S2 — ตัวสร้างหน้าเว็บรองรับหลายหน้า (รอบที่ 82)
@@ -25,6 +26,7 @@ import { PAGE_PATHS, PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages
  * 2. ทะเบียนเป็น **แหล่งความจริงเดียว**: ปุ่มในหลังบ้าน · รายการพรีวิว · ตัวเลือกลิงก์พรีวิว
  * 3. หน้าที่แปลงแล้ว **ต้องเรนเดอร์เอกสารที่เผยแพร่ได้จริง** และยังมีเลย์เอาต์เดิมเป็นทางถอย
  * 4. หน้าที่ไม่มีเทมเพลตต้องไม่ถูกเปิดพรีวิว/ไม่ถูกเขียนทับด้วยเทมเพลต
+ * 5. คำเตือน "ส่วนที่ยังไม่ครอบคลุม" ต้อง **พาไปถึงที่แก้ได้จริง** (หนี้ D-252-2)
  */
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -570,4 +572,58 @@ test("★ builder: แถวในรายการบล็อกคลิก�
     guardCount >= 2,
     "ปุ่มย่อย + ช่อง \"ย้ายไป\" ต้องหยุดการคลิกไม่ให้ทะลุไปเลือกบล็อก",
   );
+});
+
+/* ── 4) คำเตือน "ส่วนที่เทมเพลตยังไม่ครอบคลุม" ต้องพาไปถึงที่แก้ได้จริง (หนี้ D-252-2) ──────────
+ *
+ * เคสจริง: กล่องคำเตือนบอกว่า "ส่วนนี้จะหายจากหน้าเว็บ" แต่รายการในกล่องเป็นข้อความเฉย ๆ
+ * ⇒ ผู้ใช้รู้ว่ามีอะไรขาด แต่ไม่รู้จะไปเพิ่ม/แก้ที่ไหน ⇒ กดแล้วต้อง "ไปถึง" เสมอ
+ */
+
+test("★ coverage: ทุกส่วนที่ขาดมีปลายทางที่ 'มีจริง' (สมอยในจอตัวสร้าง หรือ route ที่มีไฟล์)", () => {
+  const builder = readFileSync("features/admin/ui/block-builder.tsx", "utf8");
+
+  for (const part of BLOCK_COVERAGE_PART_IDS) {
+    const target = coveragePartTarget(part);
+    assert.ok(target.trim() !== "", `${part}: ปลายทางต้องไม่ว่าง (ว่าง = กดแล้วเงียบ)`);
+
+    if (target.startsWith("#")) {
+      const id = target.slice(1);
+      assert.ok(
+        builder.includes(`id="${id}"`),
+        `${part}: ปลายทาง "${target}" ต้องมี id นี้จริงในตัวสร้างหน้าเว็บ`,
+      );
+      continue;
+    }
+
+    assert.ok(target.startsWith("/admin/"), `${part}: ลิงก์ข้ามจอต้องเป็น route ของหลังบ้าน`);
+    const segments = target.split("/").filter((segment) => segment !== "");
+    assert.ok(
+      existsSync(path.join(ROOT, "app", ...segments, "page.tsx")),
+      `${part}: ไม่พบไฟล์ route ของ "${target}"`,
+    );
+  }
+});
+
+test("★ coverage: จอเรนเดอร์รายการที่ขาดเป็น 'ลิงก์' + มีคำใบ้ว่ากดได้ + หน้าจอส่งปลายทางจากทะเบียนกลาง", () => {
+  /* ⚠️ ตัดคอมเมนต์ก่อนตรวจ — ไม่งั้นชื่อแท็ก/คีย์ที่พูดถึงในคอมเมนต์จะทำให้ด่านผ่านทั้งที่โค้ดไม่มี */
+  const note = stripComments(sourceOf("features/admin/ui/template-coverage-note.tsx"));
+  assert.ok(note.includes("<a"), "รายการที่ขาดต้องเป็นลิงก์ ไม่ใช่ข้อความเฉย ๆ");
+  assert.ok(note.includes("href={part.href}"), "ลิงก์ต้องใช้ปลายทางที่ส่งเข้ามา (ไม่คิดเองในคอมโพเนนต์)");
+  assert.ok(note.includes("jumpHint"), "ต้องมีคำใบ้ว่ารายการกดได้");
+  assert.ok(!note.includes("<li key={part}>{part}</li>"), "ห้ามกลับไปเรนเดอร์เป็นข้อความเฉย ๆ");
+  /* ⚠️ ต้องเป็น <a href> ธรรมดา — ใช้ onClick/scrollIntoView = กดไม่ได้ก่อนไฮเดรต */
+  assert.ok(!note.includes("scrollIntoView"), "ห้ามพึ่ง JavaScript (ต้องกดได้แม้ยังไม่ไฮเดรต)");
+
+  const page = stripComments(sourceOf("app/admin/builder/[page]/page.tsx"));
+  assert.ok(page.includes("href: coveragePartTarget(part)"), "หน้าจอต้องดึงปลายทางจากทะเบียนกลาง");
+  assert.ok(page.includes("jumpHint: strings.templateCoverageJumpHint"), "หน้าจอต้องส่งคำใบ้จากพจนานุกรม");
+
+  /* คำใบ้ต้องมีทั้งสองภาษา (คีย์อยู่ในพื้นที่ย่อย adminTemplate) */
+  for (const locale of ["th", "en"]) {
+    assert.ok(
+      sourceOf(`lib/i18n/messages/areas/${locale}/adminTemplate.ts`).includes("templateCoverageJumpHint:"),
+      `${locale}: ขาดคำใบ้ templateCoverageJumpHint`,
+    );
+  }
 });

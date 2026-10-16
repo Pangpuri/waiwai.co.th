@@ -36,7 +36,6 @@ export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaUploadTitle: "Upload a new image",
   mediaUploadAction: "Upload",
   mediaNoResults: "No images found",
-  mediaDimensions: "Size",
   /* Pick from the library inside the content editor (round 93) */
   /* Automatic shrink before upload (round 99) */
   imageShrunkHint: "Shrunk automatically:",

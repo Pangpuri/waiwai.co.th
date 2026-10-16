@@ -74,7 +74,6 @@ export const adminHero = {
   prCardSaveHint: "Saving updates the site immediately",
   feedbackCardSaved: "PR card saved — the site is updated",
   heroAdminNoImage: "No image yet",
-  heroAdminImagePlaceholder: "/media/... or /slide/...",
   /* ── The home hero row in the builder (round 250) ── */
   builderHeroRowTitle: "Home hero (slides + text)",
   builderHeroRowHint:

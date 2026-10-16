@@ -2227,7 +2227,9 @@ export function BlockBuilder({
                 id="builder-add-type"
                 value={newBlockType}
                 onChange={(event) => setNewBlockType(event.target.value as BlockType)}
-                className="border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                /* `scroll-mt-28` = สมอยเป้าหมายของป้าย "ส่วนที่เทมเพลตยังไม่ครอบคลุม" (D-252-2)
+                   ให้พาไปที่แผงนี้โดยไม่ถูกหัวเว็บแบบติดหนึบของหลังบ้านบัง */
+                className="border-line bg-surface text-fg focus-visible:ring-ring w-full scroll-mt-28 rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
               >
                 {BLOCK_CATALOG.map((entry) => (
                   <option key={entry.type} value={entry.type}>

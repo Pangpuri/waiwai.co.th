@@ -28,13 +28,6 @@ export const adminBlockTypes = {
   /* แผนที่ */
   blockMapLink: "ลิงก์เปิดแผนที่ (https://…)",
   blockMapLinkText: "ข้อความบนปุ่ม (ไม่บังคับ)",
-  /* กระดานรับสมัครงาน (รอบที่ 88) */
-  blockJobNumber: "ตำแหน่งที่ {n}",
-  blockJobTitle: "ชื่อตำแหน่ง",
-  blockJobDepartment: "ฝ่าย (ใช้จัดกลุ่ม)",
-  blockJobOpenings: "จำนวนอัตรา (0 = ไม่ระบุ)",
-  blockJobQualifications: "คุณสมบัติ",
-  blockJobExperience: "ประสบการณ์ (ไม่บังคับ)",
   blockShowcaseCtaHref: "ลิงก์ปุ่มท้ายส่วน (เว้นว่าง = ไม่มีปุ่ม) เช่น /products",
   blockRecipeLimit: "จำนวนเมนูที่แสดง",
   blockRecipeDates: "แสดงวันที่เผยแพร่",

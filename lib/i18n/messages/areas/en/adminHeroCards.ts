@@ -1,29 +1,14 @@
 /**
- * Dictionary area: admin — slides & campaigns (round 188 · revisited in round 194)
+ * Dictionary area: admin — feedback copy for the "Slides" screen (round 188 · 194 · cleanup 290)
  *
  * Split out of the `adminHero` area per the check:i18n rule.
- * ⚠️ Card copy (title/body) is entered by the admin — we do not translate content for them.
- * ⚠️ Round 194 removed the 1:1 slide-card keys (7 unused keys) — the rest is campaign copy.
+ *
+ * ⚠️ Cleanup history (do not assume a "campaign card" still exists from the file name)
+ *    · Round 194 removed the 1:1 slide-card keys (7 keys)
+ *    · Round 205 removed the whole "campaign / card-on-slide" module (tables dropped)
+ *    · Round 290 removed the remaining unreferenced campaign-card keys (18 keys per locale) — guarded by check:i18n check 5
  */
 export const adminHeroCards = {
-  heroCardTitle: "Title",
-  heroCardBody: "Body",
-  heroCardCtaLabel: "Button label",
-  heroCardCtaHref: "Button link (optional)",
-  heroCardPosition: "Position on the image",
-  heroCardPositionLeft: "Left",
-  heroCardPositionCenter: "Center",
-  heroCardPositionRight: "Right",
-  heroCardStarts: "Show from",
-  heroCardEnds: "Show until",
-  heroCardWindowHint: "Leave empty for no limit · the server clock decides when it appears/disappears",
-  heroCardStateAlways: "Always shown",
-  heroCardStateScheduled: "Scheduled",
-  heroCardStateLive: "Live now",
-  heroCardStateExpired: "Expired",
-  heroCardSave: "Save card",
-  heroCardRemove: "Remove card",
-  heroCardTitleRequired: "Thai title is required (a card without text is not saved)",
   feedbackSlideAdded: "Slide added",
   feedbackSlideRemoved: "Slide moved to trash",
   feedbackSlideMoved: "Slide order updated",

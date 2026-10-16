@@ -23,7 +23,6 @@ export const adminRbac = {
   rbacNameLabel: "ชื่อที่แสดง",
   rbacNamePlaceholder: "ชื่อ-นามสกุล",
   rbacCreate: "สร้างบัญชี",
-  rbacCreating: "กำลังสร้าง…",
   rbacCreated: "สร้างบัญชีให้ {email} แล้ว",
   rbacPasswordOnce: "รหัสผ่านชั่วคราว (แสดงครั้งเดียว — คัดลอกเก็บก่อนออกจากหน้านี้):",
   rbacDuplicate: "อีเมลนี้มีบัญชีอยู่แล้ว",

@@ -28,7 +28,6 @@ export const adminChromePreset: Pick<Messages["admin"], keyof typeof thAdminChro
   chromePresetApplyHint: "Only the draft is replaced · the live version stays untouched",
   chromePresetDelete: "Delete this set",
   chromePresetDeleted: "Moved to the trash (restore it from the trash page)",
-  chromePresetDeleteWarning: "Deleting sends it to the shared trash — you can restore it from the trash page.",
   chromePresetSavedAt: "saved {time}",
   chromePresetCountNavbar: "{items} items · {buttons} buttons",
   chromePresetCountFooter: "{groups} groups · {socials} socials",

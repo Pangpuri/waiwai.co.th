@@ -48,8 +48,6 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminFieldBody: "Body",
   newsAdminBodyHint:
     "Blank line = new paragraph · start a line with ## for a sub-heading · insert images from the library with the button below",
-  newsAdminImageSelect: "Library image",
-  newsAdminInsertImage: "Insert this image",
   newsAdminNoImages: "No images in the library yet",
   newsAdminFieldCover: "Cover image",
   newsAdminCoverNone: "— No cover image —",
@@ -63,7 +61,6 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminErrorBody: "Cannot save — the body is too long (reduce paragraphs/images).",
   newsAdminErrorDatabase: "Cannot save — the database is not configured.",
   newsAdminErrorNotFound: "The news item to edit was not found.",
-  newsAdminTokenHelp: "Inserted images appear in the body as [[img:mediaId|alt]] and are replaced by the real image on the site.",
   newsAdminTrashHint: "Items in trash are not deleted permanently — restore them from the Trash tab.",
   auditNewsSave: "News saved",
   auditNewsTrash: "News moved to trash",

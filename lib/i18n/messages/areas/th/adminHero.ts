@@ -74,7 +74,6 @@ export const adminHero = {
   prCardSaveHint: "บันทึกแล้วหน้าเว็บอัปเดตทันที",
   feedbackCardSaved: "บันทึกการ์ด PR แคมเปญแล้ว — หน้าเว็บอัปเดตทันที",
   heroAdminNoImage: "ยังไม่ได้เลือกภาพ",
-  heroAdminImagePlaceholder: "/media/... หรือ /slide/...",
   /* ── แถว "แถบเปิดหน้าแรก" ในตัวสร้าง (รอบที่ 250 · เคสจริง: ผู้ใช้คิดว่าบล็อกหาย) ── */
   builderHeroRowTitle: "แถบเปิดหน้าแรก (สไลด์ + ข้อความ)",
   builderHeroRowHint:

@@ -52,7 +52,6 @@ export const adminTrash: Pick<Messages["admin"], keyof typeof thAdminTrash> = {
   trashCardHint: "Deleted items stay restorable until the retention window ends.",
   trashCardCount: "{count} items in the trash",
   trashCardEmpty: "Trash is empty",
-  trashCardDbMissing: "Database not configured",
   /* Combined table (รอบที่ 176 · slides added รอบที่ 237) */
   trashTableHint: "All trash types in one table (images · presets · slides · products · recipes · news) — restore or delete permanently right here.",
   trashContentTitle: "Content trash",
