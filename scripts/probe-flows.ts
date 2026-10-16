@@ -18,7 +18,7 @@ import { mintProbeSession, releaseProbeSession, type ProbeSession } from "./prob
  * flow หลายขั้นของเครื่องมือ probe (รอบที่ 293) — **ฝั่งเซิร์ฟเวอร์เท่านั้น (แตะ DB)**
  *
  * flow ที่เคยพิสูจน์ด้วยสคริปต์ชั่วคราวใน `.next` (รอบ 292) แล้วถูกย้ายมาเป็นของถาวร:
- * จำกัดการล็อกอิน · เพิกถอนเซสชัน · ด่านอัปโหลดภาพ · ลิงก์พรีวิว · **SQL injection (รอบ 294)**
+ * จำกัดการล็อกอิน · เพิกถอนเซสชัน · ด่านอัปโหลดภาพ · ลิงก์พรีวิว · **SQL injection (รอบ 294)** · **ฟอร์มติดต่อถึงกล่องข้อความ (รอบ 296)**
  *
  * วินัยที่บังคับในไฟล์นี้
  * - **refuse ถ้าไม่ใช่เซิร์ฟเวอร์ในเครื่อง** (ยกเว้น `--allow-remote`) — flow มีการเขียนแถวจริง
@@ -512,6 +512,71 @@ async function runSqlInjectionFlow(deps: FlowDeps): Promise<FlowOutcome> {
   return { id: "sql-injection", title: "SQL injection", steps, cleanup: "อ่านอย่างเดียว ไม่มีอะไรต้องเก็บ", ok: steps.every((step) => step.ok) };
 }
 
+/* ── flow 6: ฟอร์มติดต่อถึงกล่องข้อความจริง (รอบที่ 296) ─────────────────────── */
+
+/**
+ * 🐞 บั๊กจริงที่ทำให้ flow นี้เกิด (2026-10-16 · เจ้าของแจ้ง):
+ * *"ทดสอบยิงฟอร์มติดต่อ หน้า contact ผมทดสอบกรอกฟอร์มแล้วยังไม่มีข้อความเข้าหลังบ้าน"*
+ * ต้นเหตุ 2 ชั้น:
+ *  ① หน้าจอตั้งชื่อช่องข้อความว่า `details` แต่ validator อ่าน `message` ⇒ **กรอกครบแล้วระบบตอบ
+ *     "ข้อมูลไม่ครบ" และไม่บันทึกอะไรเลย** (silent-ish failure — ผู้ใช้คิดว่าส่งแล้ว)
+ *  ② บนเดโม การเขียนฐานข้อมูลถูกปฏิเสธ (`DATABASE_URL` เป็น role อ่านอย่างเดียว) ⇒ "ระบบขัดข้องชั่วคราว"
+ *
+ * ⇒ flow นี้ยิงฟอร์มจริงแบบ no-JS **ด้วยชื่อช่องที่หน้าเว็บส่งเอง** แล้วตรวจว่า "มีแถวเกิดขึ้นจริง"
+ *    (ไม่ใช่ดูแค่ข้อความบนจอ — บทเรียนรอบ 117/291/292) · เก็บกวาดแถวที่สร้างทิ้งทุกครั้ง
+ */
+async function runContactFormFlow(deps: FlowDeps): Promise<FlowOutcome> {
+  const steps: FlowStep[] = [];
+  const email = `probe-form-${String(Date.now())}@example.com`;
+  const stamp = `ทดสอบอัตโนมัติ ${new Date().toISOString()}`;
+
+  try {
+    const page = await getStatus(`${deps.baseUrl}/th/contact`, null);
+    const form = formsOf(page.body).find((candidate) => /textarea|name="(message|details)"/.test(candidate));
+
+    if (form === undefined) {
+      steps.push({ label: "หาฟอร์มติดต่อบน /th/contact", ok: false, detail: `ไม่พบฟอร์ม (HTTP ${String(page.status)})` });
+      return { id: "contact-form", title: "ฟอร์มติดต่อ → กล่องข้อความ", steps, cleanup: "ไม่มีอะไรต้องเก็บ", ok: false };
+    }
+
+    /* ชื่อช่องข้อความที่ "หน้าเว็บส่งจริง" — ถ้าเป็น `details` (รุ่นเก่า) ต้องถูกแปลงที่ประตูเดียวของ action */
+    const textareaName = /name="(message|details)"/.exec(/<textarea\b[^>]*>/.exec(form)?.[0] ?? "")?.[1] ?? "(ไม่พบ)";
+    const before = await countRows("form_submission", "email = $1", [email]);
+
+    const posted = await postForm(`${deps.baseUrl}/th/contact`, form, null, {
+      topic: "สอบถามสินค้า",
+      name: "ทดสอบอัตโนมัติ (probe)",
+      email,
+      subject: stamp,
+      message: "ข้อความทดสอบจากเครื่องมือ probe — ระบบจะลบให้อัตโนมัติหลังตรวจเสร็จ",
+      consent: "on",
+    });
+
+    const box = /<p[^>]*role="(alert|status)"[^>]*>([\s\S]*?)<\/p>/.exec(posted.body);
+    const state = box?.[1] ?? "(ไม่พบกล่องผลลัพธ์)";
+    steps.push({
+      label: "หน้าเว็บแจ้งผลว่าส่งสำเร็จ (role=status) และช่องข้อความถูกอ่านเจอ",
+      ok: state === "status" && textareaName !== "(ไม่พบ)",
+      detail: state === "status" ? `ช่องข้อความชื่อ "${textareaName}"` : `role=${state} · ${box?.[2]?.trim().slice(0, 60) ?? ""}`,
+    });
+
+    const after = await countRows("form_submission", "email = $1", [email]);
+    steps.push({
+      label: "เกิดแถวในฐานข้อมูลจริง (ไม่ใช่แค่ข้อความบนจอ)",
+      ok: after === before + 1,
+      detail: `แถว ${String(before)} → ${String(after)}`,
+    });
+
+    const stored = await countRows("form_submission", "email = $1 and status = 'new' and form = 'contact'", [email]);
+    steps.push({ label: "แถวที่ได้เป็น form=contact · status=new (เข้าถล่องข้อความ)", ok: stored === 1, detail: `${String(stored)} แถว` });
+
+    return { id: "contact-form", title: "ฟอร์มติดต่อ → กล่องข้อความ", steps, cleanup: "ยังไม่ได้เก็บ (จะเก็บในขั้นถัดไป)", ok: steps.every((step) => step.ok) };
+  } finally {
+    const removed = await deleteRows("form_submission", "email = $1", [email]);
+    cleanupNotes.push(`ลบข้อความทดสอบ ${String(removed)} แถว`);
+  }
+}
+
 /* ── จุดเข้าใช้ ────────────────────────────────────────────────────────────── */
 
 export type RunProbeFlowsOptions = {
@@ -547,7 +612,8 @@ export async function runProbeFlows(options: RunProbeFlowsOptions): Promise<Flow
     else if (flow.id === "session-revoke") outcomes.push(await runSessionRevokeFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "upload-guard") outcomes.push(await runUploadGuardFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "preview-link") outcomes.push(await runPreviewLinkFlow({ baseUrl: options.baseUrl, session }));
-    else outcomes.push(await runSqlInjectionFlow({ baseUrl: options.baseUrl, session }));
+    else if (flow.id === "sql-injection") outcomes.push(await runSqlInjectionFlow({ baseUrl: options.baseUrl, session }));
+    else outcomes.push(await runContactFormFlow({ baseUrl: options.baseUrl, session }));
 
     const last = outcomes[outcomes.length - 1];
     if (last !== undefined) {

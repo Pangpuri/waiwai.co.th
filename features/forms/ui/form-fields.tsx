@@ -138,7 +138,7 @@ export function ContactFormFields({ strings }: { readonly strings: ContactFieldS
           </label>
           <textarea
             id="contact-details"
-            name="details"
+            name="message"
             required
             rows={6}
             placeholder={strings.detailsPlaceholder}

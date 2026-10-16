@@ -9,7 +9,14 @@
  *    (บทเรียนรอบ 117/291/292: ข้อความพจนานุกรมถูก serialize ลงทุกหน้า ⇒ grep ข้อความ = หลักฐานปลอม)
  */
 
-export const PROBE_FLOW_IDS = ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection"] as const;
+export const PROBE_FLOW_IDS = [
+  "rate-limit",
+  "session-revoke",
+  "upload-guard",
+  "preview-link",
+  "sql-injection",
+  "contact-form",
+] as const;
 export type ProbeFlowId = (typeof PROBE_FLOW_IDS)[number];
 
 export const PROBE_FLOWS: readonly { readonly id: ProbeFlowId; readonly title: string; readonly needsSession: boolean }[] = [
@@ -18,6 +25,7 @@ export const PROBE_FLOWS: readonly { readonly id: ProbeFlowId; readonly title: s
   { id: "upload-guard", title: "ด่านอัปโหลดภาพ (ขนาด 5MB · sniff หัวไฟล์ · ไฟล์ว่าง)", needsSession: true },
   { id: "preview-link", title: "ลิงก์พรีวิว 24 ชม. (เปิดได้โดยไม่มีบัญชี · ยกเลิก/หมดอายุ = 404)", needsSession: true },
   { id: "sql-injection", title: "SQL injection: payload ต้องถูกมองเป็น \"ค่า\" ไม่ใช่คำสั่ง (อ่านอย่างเดียว)", needsSession: true },
+  { id: "contact-form", title: "ฟอร์มติดต่อ → ต้องมีการ์ดข้อความเข้าหลังบ้านจริง (ไม่ใช่แค่ข้อความบนจอ)", needsSession: false },
 ];
 
 export function isProbeFlowId(value: string): value is ProbeFlowId {

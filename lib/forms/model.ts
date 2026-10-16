@@ -61,6 +61,29 @@ export type ValidationResult =
  * - ฟอร์มไหนต้องการอะไร: ติดต่อ = ชื่อ/อีเมล/หัวข้อ/รายละเอียด · รับข่าวสาร = อีเมล · สมัครงาน = ชื่อ/อีเมล/ตำแหน่ง
  * - **ต้องยินยอม (PDPA) ทุกฟอร์ม** — ไม่ยินยอม = ไม่รับ
  */
+/**
+ * ปรับชื่อช่องจาก "หน้าเว็บรุ่นเก่า" ให้เป็นชื่อที่ validator ใช้ (รอบที่ 296)
+ *
+ * 🐞 ต้นเหตุของบั๊กจริง: ฟอร์มติดต่อที่หน้าจอเคยตั้งชื่อช่องข้อความว่า `details`
+ * แต่ `validateSubmission` อ่าน `message` ⇒ **กรอกครบแล้วระบบตอบ "ข้อมูลไม่ครบ" และไม่บันทึกอะไรเลย**
+ * (นักการตลาดกรอกฟอร์มจริงแล้วไม่มีข้อความเข้าหลังบ้าน)
+ *
+ * ทำไมต้องมีตัวช่วยนี้ ไม่ใช่แก้ที่หน้าจออย่างเดียว
+ * - หน้าเว็บถูก cache (ISR 300 วิ) + เบราว์เซอร์ที่เปิดค้างไว้จะยังส่ง `details` อยู่ช่วงหนึ่ง
+ * - ฟอร์มในบล็อกของหน้าตัวสร้างใช้คอมโพเนนต์เดียวกัน ⇒ ต้องกันทั้งสองทาง
+ * - ที่นี่คือ "ประตูเดียว" ที่ทุกฟอร์มผ่านก่อนตรวจ (ทั้งหน้าจอโค้ดและบล็อก)
+ */
+export function normalizeSubmissionFields(fields: Readonly<Record<string, string>>): Record<string, string> {
+  const next: Record<string, string> = { ...fields };
+
+  /* ชื่อช่องข้อความ: `message` = ชื่อจริง · `details` = ชื่อเดิมของฟอร์มติดต่อ (เก็บไว้เพื่อความเข้ากันได้) */
+  if (read(next, "message", MAX_MESSAGE_LENGTH) === "" && read(next, "details", MAX_MESSAGE_LENGTH) !== "") {
+    next["message"] = next["details"] ?? "";
+  }
+
+  return next;
+}
+
 export function validateSubmission(form: unknown, fields: Readonly<Record<string, string>>): ValidationResult {
   const issues: FieldIssue[] = [];
   const spam = read(fields, "website", 200) !== "";

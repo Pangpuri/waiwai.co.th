@@ -4,7 +4,7 @@ import { recordAudit } from "@/lib/audit/log";
 import type { PublicFormState } from "@/features/forms/state";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { MAX_ATTACHMENT_BYTES, readAttachmentInfo, safeAttachmentName } from "@/lib/forms/attachment";
-import { evaluateSubmissionRate, validateSubmission } from "@/lib/forms/model";
+import { evaluateSubmissionRate, normalizeSubmissionFields, validateSubmission } from "@/lib/forms/model";
 import { insertAttachment, insertSubmission, recentSubmissionTimes } from "@/lib/forms/repository";
 
 /**
@@ -26,7 +26,12 @@ export async function submitPublicFormAction(_previous: PublicFormState, formDat
   }
 
   const consent = fields["consent"] === "1" || fields["consent"] === "on" || fields["consent"] === "true";
-  const result = validateSubmission(formData.get("form"), fields);
+
+  /*
+    รับชื่อช่องจากหน้าเว็บรุ่นเก่าด้วย (รอบที่ 296) — ฟอร์มติดต่อเคยส่งช่องข้อความชื่อ `details`
+    แต่ validator อ่าน `message` ⇒ กรอกครบแล้วไม่ถูกบันทึก (บั๊กจริง: ไม่มีข้อความเข้าหลังบ้าน)
+  */
+  const result = validateSubmission(formData.get("form"), normalizeSubmissionFields(fields));
 
   if (!result.ok) {
     return {

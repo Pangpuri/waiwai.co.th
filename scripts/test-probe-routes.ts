@@ -196,9 +196,9 @@ test("probe: อ่านช่องฟอร์มแบบที่เบร�
 });
 
 test("probe: flow หลายขั้น — มีครบ 4 flow · เลือกได้ · และ **ปฏิเสธเซิร์ฟเวอร์ไกล** โดยค่าเริ่มต้น", () => {
-  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection"]);
-  assert.equal(PROBE_FLOWS.length, 5);
-  assert.equal(selectProbeFlows().length, 5);
+  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection", "contact-form"]);
+  assert.equal(PROBE_FLOWS.length, 6);
+  assert.equal(selectProbeFlows().length, 6);
   assert.equal(selectProbeFlows("upload").length, 1);
   assert.equal(selectProbeFlows("ไม่มีทางเจอ").length, 0);
   /* flow ที่ต้องใช้เซสชัน (ยกเว้น rate limit ที่ยิงสาธารณะได้) */
@@ -281,7 +281,17 @@ test("probe: flow SQL injection ต้อง 'อ่านอย่างเด�
   const flowBlock = flowStart === -1 ? "" : flows.slice(flowStart, flows.indexOf("/* ── จุดเข้าใช้ ─", flowStart));
   assert.ok(flowBlock.includes("searchMedia"), "ต้องยิงผ่านชั้นข้อมูลจริง (ไม่ใช่ SQL ที่เขียนเอง)");
 
-  const destructive = [/drop\s+table/i, /delete\s+from/i, /insert\s+into/i, /update\s+\w+\s+set/i, /truncate/i, /alter\s+table/i];
+  const destructive = [/\bdrop\s+table\b/i, /\bdelete\s+from\b/i, /\binsert\s+into\b/i, /\bupdate\s+\w+\s+set\b/i, /\btruncate\b/i, /\balter\s+table\b/i];
+
+  /*
+    ⚠️ กัน "เทสต์หลอกตัวเอง" (เจอจริงรอบ 296): รูปแบบเคยถูกเขียนจน `\b` กลายเป็นอักขระ backspace
+    ⇒ ไม่จับอะไรเลย ⇒ เทสต์ผ่านทั้งที่ไม่ได้ตรวจอะไร · ต้องพิสูจน์ว่ารูปแบบ **จับตัวอย่างจริงได้**
+  */
+  const badSamples = ["drop table media", "delete from form_submission", "insert into admin_user", "update admin_user set x", "truncate news", "alter table news"];
+  for (const sample of badSamples) {
+    assert.ok(destructive.some((pattern) => pattern.test(sample)), `รูปแบบต้องจับ "${sample}" ได้ (กัน regex ที่เขียนผิดจนไม่จับอะไรเลย)`);
+  }
+
   for (const pattern of destructive) {
     assert.ok(!pattern.test(payloadBlock), `payload ห้ามมีคำสั่งที่เขียน/ทำลายข้อมูล (พบ ${String(pattern)})`);
     assert.ok(!pattern.test(flowBlock), `ตัว flow ต้องอ่านอย่างเดียว (พบ ${String(pattern)})`);

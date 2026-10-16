@@ -7,8 +7,10 @@ import {
   MAX_SUBMISSIONS_PER_WINDOW,
   SUBMISSION_WINDOW_MS,
   evaluateSubmissionRate,
+  normalizeSubmissionFields,
   validateSubmission,
 } from "@/lib/forms/model";
+import { codeOf } from "./source-scan.ts";
 
 /** เทสต์ฟอร์มหน้าเว็บ (X1.9) — ตรรกะล้วน ไม่ต้องมี DB */
 
@@ -279,3 +281,41 @@ test("ฟอร์ม: ทั้งโปรเจกต์ห้ามใส่
   for (const dir of ["app", "features", "lib"]) walk(join(root, dir));
   assert.deepEqual(offenders, [], "ห้ามใส่ encType/method บนฟอร์มที่ action เป็นฟังก์ชัน (React จัดการให้เอง)");
 });
+
+/* ── รอบที่ 296: บั๊กจริง "กรอกฟอร์มติดต่อแล้วไม่มีข้อความเข้าหลังบ้าน" ──────────────── */
+
+test("★ บั๊กจริง 2026-10-16: ฟอร์มติดต่อส่งช่องชื่อ `details` แต่ validator อ่าน `message` (ทำให้ไม่ถูกบันทึก)", () => {
+  const long = "ข้อความยาวพอสมควรสำหรับทดสอบระบบ";
+  const base = { topic: "สอบถามสินค้า", name: "ทดสอบ", email: "a@waiwai.co.th", subject: "หัวข้อ", consent: "on" };
+
+  /* สภาพเดิม (ก่อนแก้): ส่ง details แล้ว validator ไม่เห็น message ⇒ ถูกตีกลับแบบเงียบ ๆ */
+  const legacy = validateSubmission("contact", { ...base, details: long });
+  assert.equal(legacy.ok, false, "ของเดิมถูกตีกลับ (นี่คือบั๊กที่เจ้าของเจอ)");
+  assert.ok(legacy.ok === false && legacy.issues.some((issue) => issue.field === "message"));
+
+  /* ประตูเดียวที่ action ใช้: แปลงชื่อช่องเดิม → ชื่อจริง แล้วต้องผ่าน */
+  const normalized = normalizeSubmissionFields({ ...base, details: long });
+  assert.equal(validateSubmission("contact", normalized).ok, true, "หลังแปลงชื่อช่องแล้วต้องผ่าน");
+  assert.equal(normalized.details, long, "ยังเก็บค่าดิบไว้ใน payload ได้ (ไม่ทำข้อมูลหาย)");
+
+  /* ถ้าส่ง message มาตรง ๆ อยู่แล้ว ต้องไม่ถูกทับด้วย details */
+  assert.equal(normalizeSubmissionFields({ message: "ใหม่", details: "เก่า" }).message, "ใหม่");
+  /* details ว่าง + message ว่าง = ยังไม่ผ่าน (ไม่กลายเป็นผ่านเพราะตัวแปลง) */
+  assert.equal(validateSubmission("contact", normalizeSubmissionFields({ ...base, details: "" })).ok, false);
+  /* ไม่แก้ค่าที่ผู้เรียกส่งมา (immutable) */
+  const input: Record<string, string> = { ...base, details: long };
+  normalizeSubmissionFields(input);
+  assert.equal(input.message, undefined);
+});
+
+test("★ ฟอร์มติดต่อ: ชื่อช่องบนหน้าจอ ต้องตรงกับที่ validator บังคับ (กันบั๊กเดิมกลับมา)", () => {
+  const fields = codeOf("features/forms/ui/form-fields.tsx");
+  const action = codeOf("app/forms/actions.ts");
+  const model = codeOf("lib/forms/model.ts");
+
+  assert.ok(fields.includes('name="message"'), "ช่องข้อความของฟอร์มติดต่อต้องชื่อ message");
+  assert.ok(!fields.includes('name="details"'), "ห้ามกลับไปใช้ชื่อ details (validator ไม่รู้จัก → ฟอร์มจะไม่ถูกบันทึก)");
+  assert.ok(action.includes("normalizeSubmissionFields("), "action ต้องผ่านประตูแปลงชื่อช่องเดิม");
+  assert.ok(model.includes("export function normalizeSubmissionFields"), "ตัวแปลงต้องอยู่ที่ชั้นโมเดล (ทดสอบได้)");
+});
+
