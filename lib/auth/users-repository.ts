@@ -2,7 +2,13 @@ import { randomBytes } from "node:crypto";
 
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { isAdminRole, type AdminRole, type AdminUser } from "@/lib/auth/types";
+import {
+  MIN_ADMIN_PASSWORD_LENGTH,
+  isAdminRole,
+  isUsableAdminPassword,
+  type AdminRole,
+  type AdminUser,
+} from "@/lib/auth/types";
 import type { AdminAccount, AdminUserStore } from "@/lib/auth/user-store";
 import { recordAudit } from "@/lib/audit/log";
 import { revokeSessionsForUser } from "@/lib/auth/sessions-repository";
@@ -41,11 +47,8 @@ export function isUsableAdminEmail(email: string): boolean {
 }
 
 /** ความยาวรหัสผ่านขั้นต่ำของผู้ดูแล (สคริปต์/หน้าจอสร้างบัญชีใช้ค่าเดียวกัน) */
-export const MIN_ADMIN_PASSWORD_LENGTH = 12;
-
-export function isUsableAdminPassword(password: string): boolean {
-  return password.length >= MIN_ADMIN_PASSWORD_LENGTH;
-}
+/* `MIN_ADMIN_PASSWORD_LENGTH` / `isUsableAdminPassword` นิยามที่ `lib/auth/types.ts` (แหล่งเดียว) */
+export { MIN_ADMIN_PASSWORD_LENGTH, isUsableAdminPassword };
 
 type AdminUserRow = {
   readonly id: string;

@@ -16,6 +16,7 @@
     "check:content": "node --import ./scripts/alias-hook.mjs scripts/check-content.ts",
     "db:seed": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/seed-home.ts",
     "admin:create": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/admin-create.ts",
+    "admin:passwd": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/admin-passwd.ts",
     "check:db": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/check-db.ts",
     "db:migrate": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/migrate.ts",
     "db:roles": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-roles.ts",

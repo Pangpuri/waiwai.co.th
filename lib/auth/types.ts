@@ -9,6 +9,19 @@ export type AdminRole = "editor" | "publisher" | "admin";
 
 export const ADMIN_ROLES: readonly AdminRole[] = ["editor", "publisher", "admin"];
 
+/**
+ * ความยาวรหัสผ่านขั้นต่ำของบัญชีในตาราง `admin_user` (รอบที่ 295 ย้ายมาไว้ที่นี่ = แหล่งความจริงเดียว)
+ *
+ * ⚠️ บัญชี **env** (`admin:create`) ไม่ได้บังคับเกณฑ์นี้ — แต่บัญชีรายคนในตารางบังคับ
+ *    (ถ้าอยากใช้ "รหัสพนักงานล้วน" กับบัญชีรายคน ต้องมีมติให้ลดเกณฑ์นี้ก่อน)
+ */
+export const MIN_ADMIN_PASSWORD_LENGTH = 12;
+
+/** ตรวจรหัสผ่านที่ระบบยอมรับสำหรับบัญชีผู้ดูแล (ตอนนี้ใช้เกณฑ์ความยาวเท่านั้น) */
+export function isUsableAdminPassword(password: string): boolean {
+  return password.length >= MIN_ADMIN_PASSWORD_LENGTH;
+}
+
 /** บัญชีผู้ดูแล — ไม่มีรหัสผ่าน (เก็บแยกเป็น hash) */
 export type AdminUser = {
   readonly id: string;

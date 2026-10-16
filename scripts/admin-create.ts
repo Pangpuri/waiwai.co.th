@@ -14,6 +14,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { accountPasswordHint } from "@/lib/auth/account-cli";
 import { ADMIN_LOGIN_PATH, buildEnvSnippet, buildLoginUrl, generatePassword } from "@/lib/auth/credentials";
 import { LOCAL_ENV_FILE, mergeEnvText, readEnvValue } from "@/lib/auth/env-file";
 import { PASSWORD_HASH_PARAMS, hashPassword } from "@/lib/auth/password";
@@ -39,15 +40,7 @@ function readArg(args: readonly string[], name: string): string | undefined {
   return found === undefined ? undefined : found.slice(prefix.length);
 }
 
-/** เตือน (ไม่ปฏิเสธ) เมื่อรหัสที่เจ้าของเลือกอ่อน — เจ้าของเป็นผู้ตัดสิน แต่ต้องรู้ความเสี่ยง */
-function weaknessOf(password: string): string | null {
-  if (password.length < 12) {
-    return `สั้นกว่า 12 ตัวอักษร (${password.length}) — เดาได้ง่ายมากถ้าเปิดสู่อินเทอร์เน็ต`;
-  }
-  if (/^[0-9]+$/.test(password)) return "เป็นตัวเลขล้วน — เดาง่าย";
-  if (/^(.)\1+$/.test(password)) return "เป็นตัวอักษรซ้ำกันทั้งหมด — เดาง่าย";
-  return null;
-}
+/** เตือน (ไม่ปฏิเสธ) เมื่อรหัสที่เจ้าของเลือกอ่อน — ใช้ตัวกลาง `accountPasswordHint()` จาก `lib/auth/account-cli.ts` (รอบที่ 295: เลิกเขียนซ้ำสองที่) */
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -113,7 +106,7 @@ async function main(): Promise<void> {
     lines.push(`  รหัสผ่าน      : ${password}`, "", "  ⚠️ รหัสผ่านนี้แสดงครั้งเดียว — คัดลอกเก็บก่อนปิดหน้าต่างนี้");
   }
 
-  const weakness = passwordWasChosen ? weaknessOf(password) : null;
+  const weakness = passwordWasChosen ? accountPasswordHint(password) : null;
   if (weakness !== null) {
     lines.push(
       "",
