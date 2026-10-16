@@ -40,6 +40,7 @@
     "contact:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-contact.ts",
     "about:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about.ts",
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",
+    "db:sync": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-sync.ts",
     "env:vercel": "node --import ./scripts/alias-hook.mjs scripts/env-vercel.ts",
     "check:deploy": "node --import ./scripts/alias-hook.mjs scripts/check-deploy.ts",
     "hero:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-hero-slides.ts",
