@@ -3,10 +3,13 @@ import { test } from "node:test";
 
 import {
   SYNC_FORBIDDEN_TABLES,
+  SYNC_PRUNE_TABLES,
   SYNC_TABLES,
+  buildDeleteSql,
   buildUpsertSql,
   copyColumnsOf,
   needsOverriding,
+  needsSequenceSync,
   rowKeyOf,
   type UpsertColumn,
 } from "@/lib/db/sync";
@@ -93,5 +96,62 @@ test("db:sync — ตัวสคริปต์ต้อง dry-run โดย�
   assert.ok(!/delete\s+from|truncate|drop\s+table/i.test(script), "ห้ามมีคำสั่งลบ/ทำลายข้อมูล");
   assert.ok(script.includes("redactUrl"), "ต้องใช้ redactUrl (ห้ามพิมพ์รหัสผ่าน)");
   assert.ok(!/\$\{LOCAL_URL\}|\$\{TARGET_URL\}/.test(script.replace(/redactUrl\((LOCAL_URL|TARGET_URL)\)/g, "REDACTED")), "ห้ามพิมพ์ URL ดิบ");
-  assert.ok(!/delete\s+from/i.test(raw), "ตัวสร้าง SQL ต้องไม่มีคำสั่งลบ");
+  /* ตัวสร้าง SQL มี buildDeleteSql ได้ (ใช้เฉพาะ --prune) — ขอแค่ สคริปต์ ลบเมื่อ mayPrune เท่านั้น (เทสต์ข้อถัดไป) */
+  assert.ok(raw.includes("buildDeleteSql"), "คำสั่งลบต้องมาจากตัวสร้างกลาง ไม่เขียนสดในสคริปต์");
+});
+
+/* ── รอบที่ 298 (ต่อ): --prune + บทเรียนจริง 2 ข้อ ─────────────────────────────── */
+
+test("db:sync — ตั้ง sequence ต่อเฉพาะ id ที่เป็น identity จริง (id ข้อความต้องข้าม)", () => {
+  const numericId: readonly UpsertColumn[] = [
+    { name: "id", identityAlways: true },
+    { name: "form", identityAlways: false },
+  ];
+  assert.equal(needsSequenceSync({ table: "form_submission", conflictOn: ["id"] }, numericId), true);
+
+  /* ⚠️ เจอจริง: hero_slide.id เป็น "ข้อความ" (event/flavours) ⇒ setval จะพังด้วย
+     "COALESCE types text and integer cannot be matched" */
+  const textId: readonly UpsertColumn[] = [
+    { name: "id", identityAlways: false },
+    { name: "media_path", identityAlways: false },
+  ];
+  assert.equal(needsSequenceSync({ table: "hero_slide", conflictOn: ["id"] }, textId), false);
+  assert.equal(
+    needsSequenceSync({ table: "content_field", conflictOn: ["page", "section", "item_key", "field"] }, numericId),
+    false,
+    "ตารางที่คีย์ไม่ใช่ id ไม่ต้องยุ่งกับ sequence",
+  );
+});
+
+test("db:sync --prune — ลบได้เฉพาะตารางที่ประกาศไว้ และคำสั่งลบต้องผูก parameter", () => {
+  for (const table of SYNC_PRUNE_TABLES) {
+    assert.ok(
+      SYNC_TABLES.some((plan) => plan.table === table),
+      `ตารางที่อนุญาตให้ลบ (${table}) ต้องอยู่ในรายการที่เครื่องมือดันข้อมูลด้วย`,
+    );
+  }
+
+  const sql = buildDeleteSql({ table: "hero_slide", conflictOn: ["id"] });
+  assert.equal(sql, 'delete from "hero_slide" where "id" = $1', "ต้องลบด้วยคีย์แบบ parameter ไม่ต่อค่าดิบ");
+  assert.equal(
+    buildDeleteSql({ table: "content_field", conflictOn: ["page", "section", "item_key", "field"] }),
+    'delete from "content_field" where "page" = $1 and "section" = $2 and "item_key" = $3 and "field" = $4',
+  );
+});
+
+test("db:sync — สคริปต์ต้องลบ 'เมื่อสั่ง --prune + ตารางอยู่ในรายการ' เท่านั้น และลบให้ครบทุกแถว", () => {
+  const script = codeOf("scripts/db-sync.ts");
+
+  assert.ok(script.includes("SYNC_PRUNE_TABLES.includes(plan.table)"), "ต้องเช็ค allowlist ก่อนลบ");
+  assert.ok(script.includes("const mayPrune = PRUNE &&"), "ต้องมีทั้ง --prune และ allowlist");
+  /* บทเรียนจริง: เคยจำกัดการลบไว้แค่ 10 แถว (เพราะใช้ตัวเดียวกับที่พิมพ์) ⇒ ลบไม่ครบแต่ดูเหมือนสำเร็จ */
+  assert.ok(script.includes("for (const row of extra)"), "ต้องลบทุกแถวที่เกิน ไม่ใช่แค่ที่พิมพ์ออกจอ");
+  assert.ok(script.includes("for (const row of printable)"), "การพิมพ์จำกัดจำนวนได้ (อ่านง่าย)");
+
+  /* คำสั่งลบต้องอยู่ในลูปของ "แถวที่เกินทั้งหมด" (extra) ไม่ใช่ลิสต์ที่จำกัดเพื่อพิมพ์ (printable) */
+  const deleteAt = script.indexOf("buildDeleteSql(plan)");
+  const loopAt = script.indexOf("for (const row of extra)");
+  const printableAt = script.indexOf("for (const row of printable)");
+  assert.ok(deleteAt > loopAt, "คำสั่งลบต้องอยู่ในลูป extra");
+  assert.ok(!(deleteAt > printableAt && deleteAt < loopAt), "ห้ามลบจากลิสต์ printable");
 });

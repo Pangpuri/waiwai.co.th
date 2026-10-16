@@ -19,6 +19,17 @@ export type UpsertColumn = {
   readonly identityAlways: boolean;
 };
 
+/**
+ * ต้องดัน sequence ของ id ต่อไหม
+ *
+ * เงื่อนไข: ใช้ id เป็นคีย์ชน **และ** id เป็น identity จริง (numeric)
+ * ⚠️ เจอจริงรอบ 298: `hero_slide.id` เป็น **ข้อความ** (event/flavours) ⇒ `setval(pg_get_serial_sequence(...),`
+ *    จะพังด้วย "COALESCE types text and integer cannot be matched" ถ้าไม่กันไว้
+ */
+export function needsSequenceSync(plan: UpsertPlan, columns: readonly UpsertColumn[]): boolean {
+  return plan.conflictOn.includes("id") && columns.some((column) => column.name === "id" && column.identityAlways);
+}
+
 export type UpsertPlan = {
   readonly table: string;
   readonly conflictOn: readonly string[];
@@ -28,9 +39,27 @@ export type UpsertPlan = {
 export const SYNC_TABLES: readonly UpsertPlan[] = [
   { table: "page_document", conflictOn: ["page", "status"] },
   { table: "page_document_revision", conflictOn: ["page", "revision"] },
+  { table: "hero_slide", conflictOn: ["id"] },
+  /* หน้าแรกแบบฟิลด์: คีย์ของแถวคือ (page, section, item_key, field) — ตรงกับกติกาใน AGENTS */
+  { table: "content_field", conflictOn: ["page", "section", "item_key", "field"] },
   { table: "form_submission", conflictOn: ["id"] },
   { table: "form_attachment", conflictOn: ["id"] },
 ];
+
+/**
+ * ตารางที่ยอมให้ **ลบแถวที่ปลายทางมีเกิน** เมื่อสั่ง `--prune` เท่านั้น
+ * (มติเจ้าของ 2026-10-16: "ลบให้ตรงกับเครื่องเลย")
+ *
+ * ทำไมต้องมีรายการนี้แยก: การลบบนคลาวด์ต้องเป็น "การตัดสินใจที่ประกาศไว้ล่วงหน้า"
+ * ไม่ใช่ผลข้างเคียงของคำสั่งทั่วไป ⇒ ตารางที่ไม่อยู่ในรายการนี้จะถูกรายงานแต่ **ห้ามลบ**
+ */
+export const SYNC_PRUNE_TABLES: readonly string[] = ["hero_slide", "content_field"];
+
+/** คำสั่งลบแถวเดียวด้วยคีย์ (ใช้เฉพาะเมื่อผู้ใช้สั่ง `--prune` และตารางอยู่ในรายการที่อนุญาต) */
+export function buildDeleteSql(plan: UpsertPlan): string {
+  const where = plan.conflictOn.map((key, index) => `${quote(key)} = $${String(index + 1)}`).join(" and ");
+  return `delete from ${quote(plan.table)} where ${where}`;
+}
 
 const quote = (name: string): string => `"${name.replace(/"/g, '""')}"`;
 
@@ -72,7 +101,11 @@ export function buildUpsertSql(plan: UpsertPlan, columns: readonly UpsertColumn[
   );
 }
 
-/** ชื่อตารางที่เครื่องมือนี้ "ห้ามแตะ" (ของแต่ละสภาพแวดล้อม/ข้อมูลส่วนบุคคล) — มีไว้ให้เทสต์ยืนยัน */
+/**
+ * ชื่อตารางที่เครื่องมือนี้ **ห้ามแตะ** — ข้อมูลของแต่ละสภาพแวดล้อม/ส่วนบุคคล และตารางเนื้อหา
+ * ที่มีเครื่องมือเฉพาะของตัวเอง (นำเข้า/หลังบ้าน) การดันด้วยเครื่องมือนี้จะทำให้ id ไม่ตรงกัน
+ * (เช่น `media` ภาพชุดเดียวกันแต่คนละ id — ตัวชี้ใน `product_category` จะพัง)
+ */
 export const SYNC_FORBIDDEN_TABLES: readonly string[] = [
   "audit_log",
   "admin_session",
@@ -84,6 +117,4 @@ export const SYNC_FORBIDDEN_TABLES: readonly string[] = [
   "news",
   "recipe",
   "job_posting",
-  "hero_slide",
-  "content_field",
 ];
