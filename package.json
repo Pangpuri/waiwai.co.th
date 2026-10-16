@@ -44,6 +44,7 @@
     "hero:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-hero-slides.ts",
     "about:media": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about-media.ts",
     "check:target": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/check-target.ts",
+    "probe:routes": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/probe-routes.ts",
     "pages:publish": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/publish-pages.ts"
   },
   "dependencies": {
