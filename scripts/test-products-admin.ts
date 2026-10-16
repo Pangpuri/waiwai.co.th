@@ -259,7 +259,11 @@ test("products admin: ปุ่มลบถาวร/กู้คืนโผล
     "ปุ่มเดียวสลับ ย้าย/กู้คืน ตามสถานะ",
   );
   assert.ok(listPage.includes("adminProductCounts"), "หัวแท็บต้องมีตัวนับจากฐานข้อมูล");
-  assert.ok(listPage.includes('query.tab === "trash"'), "ต้องอ่านแท็บจาก query (ไม่เชื่อค่าดิบ)");
+  assert.ok(
+    listPage.includes('searchParamText(query.tab) === "trash"'),
+    "ต้องอ่านแท็บจาก query ผ่าน searchParamText (ค่าซ้ำ = array ⇒ เคย 500 · รอบที่ 291)",
+  );
+  assert.ok(!/query\.tab === "trash"/.test(listPage), "ห้ามเทียบค่าดิบจาก URL ตรง ๆ (array ได้)");
   assert.ok(editorPage.includes("trashProductAction"), "จอแก้ต้องกู้คืนของที่อยู่ในถังได้");
   assert.ok(editorPage.includes("adminProductsTrashedNotice"), "ต้องบอกว่าอยู่ในถังและหน้าเว็บไม่แสดง");
   assert.ok(listPage.includes("adminProductsDeleteForeverWarning"), "ปุ่มลบถาวรต้องมีคำเตือนกำกับ");

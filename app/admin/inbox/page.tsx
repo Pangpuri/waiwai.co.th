@@ -11,6 +11,7 @@ import { erasureIsEmpty, erasureTotal, isPlausibleEmail } from "@/lib/privacy/er
 import { erasurePreview } from "@/lib/privacy/repository";
 import { jobTitleByTopic, jobTitle } from "@/lib/careers/model";
 import { listJobPostingsForAdmin } from "@/lib/careers/repository";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * กล่องข้อความหลังบ้าน (X1.9) — ผู้ติดต่อ/ผู้สมัครจากฟอร์มหน้าเว็บ
@@ -39,21 +40,24 @@ function formLabel(strings: Awaited<ReturnType<typeof getMessagesFor>>["admin"],
 export default async function AdminInboxPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly status?: string; readonly form?: string; readonly erase?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("inbox");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
 
   const query = await searchParams;
-  const status: SubmissionStatus | "all" = query.status === "handled" || query.status === "spam" || query.status === "new" ? query.status : "all";
-  const formFilter = query.form === "newsletter" || query.form === "careers" || query.form === "contact" ? query.form : "all";
+  /* ⚠️ ผ่าน `searchParamText` เท่านั้น — `?status=a&status=b` / `?erase=a&erase=b` เคยทำให้ 500 (รอบที่ 291) */
+  const statusParam = searchParamText(query.status);
+  const status: SubmissionStatus | "all" = statusParam === "handled" || statusParam === "spam" || statusParam === "new" ? statusParam : "all";
+  const formParam = searchParamText(query.form);
+  const formFilter = formParam === "newsletter" || formParam === "careers" || formParam === "contact" ? formParam : "all";
 
   /*
     คำขอใช้สิทธิ์ (ลบข้อมูลของอีเมลนี้) — อ่านจาก query string
     ⚠️ ขั้นนี้ **อ่านล้วน** (นับว่าจะลบอะไร) · การลบจริงเกิดใน server action หลังผ่านการตรวจ 3 ด่าน
   */
-  const eraseEmail = (query.erase ?? "").trim();
+  const eraseEmail = searchParamText(query.erase, 200);
   const eraseCheckOk = eraseEmail !== "" && isPlausibleEmail(eraseEmail);
   const eraseDbMissing = !isDatabaseConfigured();
   const preview = eraseCheckOk && !eraseDbMissing ? await erasurePreview(eraseEmail) : null;

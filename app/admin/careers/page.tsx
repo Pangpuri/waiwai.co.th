@@ -7,6 +7,7 @@ import { fillTemplate } from "@/lib/i18n/template";
 import { jobDepartment, jobStats, type JobPosting } from "@/lib/careers/model";
 import { listJobPostingsForAdmin, type AdminJobPosting } from "@/lib/careers/repository";
 import { SortableList } from "@/features/admin/ui/sortable-list";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * หลังบ้าน — "ประกาศรับสมัครงาน" ของหน้า /careers (รอบที่ 265 · มติเจ้าของ D26)
@@ -48,15 +49,16 @@ function inTab(posting: AdminJobPosting, tab: TabId): boolean {
 export default async function AdminCareersPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly tab?: string; readonly q?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
 
   const query = await searchParams;
-  const tab = tabOf(query.tab);
-  const search = (query.q ?? "").trim();
+  /* ⚠️ ผ่าน `searchParamText` เท่านั้น (ค่าซ้ำ = array · อักขระควบคุม/NUL ต้องถูกตัด) — รอบที่ 291 */
+  const tab = tabOf(searchParamText(query.tab));
+  const search = searchParamText(query.q, 80);
 
   const all = await listJobPostingsForAdmin();
   const visible = all.filter((posting) => inTab(posting, tab) && matches(posting, search));

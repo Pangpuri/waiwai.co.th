@@ -6,6 +6,7 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
 import { formatRecipeDate } from "@/lib/recipes/model";
 import { adminRecipeCounts, listRecipesForAdmin, type AdminRecipeTab } from "@/lib/recipes/repository";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * หลังบ้าน — รายการเมนูอาหาร (รอบที่ 135 · แบบ WordPress "Posts")
@@ -25,15 +26,16 @@ function tabOf(value: string | undefined): AdminRecipeTab {
 export default async function AdminRecipesPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly tab?: string; readonly q?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
   const query = await searchParams;
-  const tab = tabOf(query.tab);
-  const search = (query.q ?? "").trim();
+  /* ⚠️ ผ่าน `searchParamText` เท่านั้น (ค่าซ้ำ = array · อักขระควบคุม/NUL ต้องถูกตัด) — รอบที่ 291 */
+  const tab = tabOf(searchParamText(query.tab));
+  const search = searchParamText(query.q, 80);
 
   const [counts, listed, library] = await Promise.all([
     adminRecipeCounts(),

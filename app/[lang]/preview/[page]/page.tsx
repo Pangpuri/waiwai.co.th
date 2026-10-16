@@ -19,6 +19,7 @@ import { isLocale } from "@/lib/i18n/config";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { isPreviewablePage } from "@/lib/pages/paths";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * พรีวิว "ในเปลือกหน้าเว็บจริง" — อยู่ใต้ `[lang]` จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม/โหมดมืด เหมือนหน้าจริงทุกอย่าง
@@ -46,7 +47,7 @@ export default async function PreviewPage({
   searchParams,
 }: {
   readonly params: Promise<{ readonly lang: string; readonly page: string }>;
-  readonly searchParams: Promise<{ readonly mode?: string; readonly parts?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("content");
 
@@ -56,7 +57,8 @@ export default async function PreviewPage({
 
   const messages = await getMessagesFor(lang);
   const query = await searchParams;
-  const requested = query.mode;
+  /* ⚠️ รอบที่ 291: ค่าจาก URL ต้องผ่าน `searchParamText` (ค่าซ้ำ = array · อักขระควบคุม/NUL) */
+  const requested = searchParamText(query.mode);
   const status: DocumentStatus = requested === "published" ? "published" : "draft";
   /*
     `?parts=nav` = พรีวิว "เฉพาะส่วน" (ผู้ใช้สั่ง รอบที่ 57)
@@ -73,7 +75,7 @@ export default async function PreviewPage({
     ⚠️ รายชื่อโหมดทั้งหมดอยู่ที่ `PREVIEW_PARTS` (lib/chrome/workspace-url.ts) — ห้ามพิมพ์ซ้ำที่นี่
     ⚠️ หน้านี้เรนเดอร์ **เอกสารฉบับร่าง** (ไม่ดึงข้อมูลหน้าเว็บจริง) ⇒ สิ่งที่เห็น = สิ่งที่จะบันทึก
   */
-  const partsQuery = (query.parts ?? "").trim();
+  const partsQuery = searchParamText(query.parts);
   const requestedParts = isPreviewPart(partsQuery) ? partsQuery : null;
 
   /*

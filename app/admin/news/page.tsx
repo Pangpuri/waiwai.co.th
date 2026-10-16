@@ -11,6 +11,7 @@ import {
   listNewsForAdmin,
   type AdminNewsTab,
 } from "@/lib/news/repository";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * หลังบ้าน — รายการข่าว/กิจกรรม (รอบที่ 123 · แบบ WordPress "Posts")
@@ -34,16 +35,17 @@ function pageOf(value: string | undefined): number {
 export default async function AdminNewsPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly tab?: string; readonly q?: string; readonly page?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
   const query = await searchParams;
-  const tab = tabOf(query.tab);
-  const search = (query.q ?? "").trim();
-  const page = pageOf(query.page);
+  /* ⚠️ ผ่าน `searchParamText` เท่านั้น (ค่าซ้ำ = array · อักขระควบคุม/NUL ต้องถูกตัด) — รอบที่ 291 */
+  const tab = tabOf(searchParamText(query.tab));
+  const search = searchParamText(query.q, 80);
+  const page = pageOf(searchParamText(query.page));
 
   const [counts, listed, library] = await Promise.all([
     adminNewsCounts(),

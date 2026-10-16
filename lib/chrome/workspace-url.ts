@@ -14,6 +14,8 @@
  * ⚠️ ลำดับพารามิเตอร์คงที่ (`part` ก่อน `mode`) และไม่ใส่ค่าที่เป็นค่าเริ่มต้น ⇒ URL สั้นและเทียบกันได้
  */
 
+import { searchParamText } from "@/lib/search/params";
+
 export const CHROME_WORKSPACE_PATH = "/admin/builder/chrome";
 
 export const CHROME_PARTS = ["navbar", "notice", "footer"] as const;
@@ -80,10 +82,16 @@ export function isPreviewPart(value: string): boolean {
   return PREVIEW_PARTS.includes(value);
 }
 
-/** อ่านค่าจาก query → สถานะแท็บ (ค่าที่ไม่รู้จัก = ค่าเริ่มต้น ไม่โยน error) */
-export function chromeTabOf(query: { readonly part?: string; readonly mode?: string }): ChromeTabState {
-  const part = (query.part ?? "").trim();
-  const mode = (query.mode ?? "").trim();
+/**
+ * อ่านค่าจาก query → สถานะแท็บ (ค่าที่ไม่รู้จัก = ค่าเริ่มต้น ไม่โยน error)
+ *
+ * ⚠️ รอบที่ 291: ของเดิมเขียน `(query.part ?? "").trim()` ⇒ `?part=a&part=b` (ค่าซ้ำ = **array**)
+ * ทำหน้า `/admin/builder/chrome` **500** ⇒ ต้องผ่าน `searchParamText()` เท่านั้น
+ * (ตัวช่วยนี้เป็นตรรกะล้วน ไม่มี dependency ฝั่งเซิร์ฟเวอร์ ⇒ ใช้ได้ทั้ง server และ client component)
+ */
+export function chromeTabOf(query: Readonly<Record<string, string | readonly string[] | undefined>>): ChromeTabState {
+  const part = searchParamText(query.part);
+  const mode = searchParamText(query.mode);
   return {
     part: isChromePart(part) ? part : DEFAULT_CHROME_PART,
     mode: isChromeMode(mode) ? mode : DEFAULT_CHROME_MODE,

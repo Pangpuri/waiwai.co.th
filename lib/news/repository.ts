@@ -3,6 +3,7 @@ import { readQuery } from "@/lib/db/read";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { parseNewsBody, type NewsBlock } from "@/lib/news/body";
 import type { NewsInput } from "@/lib/news/model";
+import { normalizeSearchText } from "@/lib/search/params";
 
 /**
  * อ่าน/เขียน "ข่าวสาร & กิจกรรม" ในฐานข้อมูล (หน้า /news · รอบที่ 105 · หลังบ้าน รอบที่ 123)
@@ -461,7 +462,8 @@ export async function listNewsForAdmin(input: {
   const perPage = Math.max(1, Math.min(100, input.perPage ?? ADMIN_NEWS_PER_PAGE));
   const page = Math.max(1, input.page);
   const offset = (page - 1) * perPage;
-  const term = input.search.trim();
+  /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ห้ามให้อักขระควบคุม/NUL ถึง SQL */
+  const term = normalizeSearchText(input.search, 80);
 
   const params: unknown[] = [];
   let where = conditionForTab(input.tab);

@@ -10,6 +10,7 @@ import { fillTemplate } from "@/lib/i18n/template";
 import { listMedia } from "@/lib/media/repository";
 import { isCatalogCategoryId } from "@/lib/products/model";
 import { adminProductCounts, listProductCategoriesForAdmin, listProductsForAdmin, type AdminProductTab } from "@/lib/products/repository";
+import { searchParamText } from "@/lib/search/params";
 import { deleteProductForeverAction, trashProductAction } from "./actions";
 
 /**
@@ -31,17 +32,18 @@ import { deleteProductForeverAction, trashProductAction } from "./actions";
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly category?: string; readonly q?: string; readonly tab?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
   const query = await searchParams;
-  const search = (query.q ?? "").trim();
-  const rawCategory = (query.category ?? "").trim();
+  /* ⚠️ ผ่าน `searchParamText` เท่านั้น — ค่าจาก URL ซ้ำได้ (`?q=a&q=b` = array) และมีอักขระควบคุมได้ (รอบที่ 291) */
+  const search = searchParamText(query.q, 80);
+  const rawCategory = searchParamText(query.category);
   const categoryId = isCatalogCategoryId(rawCategory) ? rawCategory : "";
-  const tab: AdminProductTab = query.tab === "trash" ? "trash" : "all";
+  const tab: AdminProductTab = searchParamText(query.tab) === "trash" ? "trash" : "all";
 
   const [listed, categoryRows, media, counts] = await Promise.all([
     listProductsForAdmin({ categoryId, search, tab }),

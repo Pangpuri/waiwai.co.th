@@ -24,6 +24,7 @@ import { listMedia } from "@/lib/media/repository";
 import { fillTemplate } from "@/lib/i18n/template";
 import { feedbackOf, type HeroErrorCode, type HeroSavedCode } from "@/lib/hero/feedback";
 import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
+import { searchParamText } from "@/lib/search/params";
 
 /**
  * หลังบ้าน "สไลด์ & แคมเปญ" (รอบที่ 184 · เฟส 3 ส่วนแรก)
@@ -39,7 +40,7 @@ import { TRASH_RETENTION_DAYS } from "@/lib/retention/plan";
 export default async function AdminHeroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ readonly tab?: string; readonly saved?: string; readonly error?: string; readonly fields?: string }>;
+  searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
@@ -51,10 +52,14 @@ export default async function AdminHeroPage({
   /* แท็บในหน้าเดียว (มติเจ้าของ): สไลด์ | แคมเปญ — จำแท็บใน URL */
   const query = await searchParams;
 
-  /* ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07) */
-  const feedback = feedbackOf({ saved: query.saved, error: query.error });
+  /*
+    ผลการบันทึกล่าสุด (action ส่งกลับมาเป็นรหัส) — ผู้ใช้ต้องเห็นเสมอว่าสำเร็จหรือไม่ (มติเจ้าของ 2026-10-07)
+    ⚠️ รอบที่ 291: `?saved=a&saved=b` / `?error=…` / `?fields=…` เคยทำให้หน้านี้ **500** (ค่าซ้ำ = array)
+    ⇒ ทุกค่าต้องผ่าน `searchParamText` ก่อนใช้
+  */
+  const feedback = feedbackOf({ saved: searchParamText(query.saved), error: searchParamText(query.error) });
   /* รอบที่ 251: ช่องที่ต้องแก้ ส่งมากับ ?fields= (Server Action ตรวจไม่ผ่าน) */
-  const problemFieldsRaw = query.fields;
+  const problemFieldsRaw = searchParamText(query.fields, 300);
   const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
     "slide-added": s.feedbackSlideAdded,
     "slide-removed": s.feedbackSlideRemoved,

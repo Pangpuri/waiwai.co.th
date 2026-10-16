@@ -2,6 +2,7 @@ import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { isYouTubeVideoId, type RecipeInput } from "@/lib/recipes/model";
+import { normalizeSearchText } from "@/lib/search/params";
 
 /**
  * อ่าน/เขียน "เมนูอาหาร (วิดีโอ)" ในฐานข้อมูล (S3 ส่วนที่ 4 · รอบที่ 104 · หลังบ้าน รอบที่ 135) — ฝั่งเซิร์ฟเวอร์เท่านั้น
@@ -327,7 +328,8 @@ export async function listRecipesForAdmin(input: {
 }): Promise<{ readonly items: readonly AdminRecipeListItem[]; readonly total: number }> {
   if (!isDatabaseConfigured()) return { items: [], total: 0 };
 
-  const term = input.search.trim();
+  /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ห้ามให้อักขระควบคุม/NUL ถึง SQL */
+  const term = normalizeSearchText(input.search, 80);
   const params: unknown[] = [];
   let where = conditionForTab(input.tab);
   if (term !== "") {

@@ -8,6 +8,7 @@ import { formatBytes } from "@/lib/format/bytes";
 import { findMediaUsage, mediaStats, searchMedia, type MediaUsageKind } from "@/lib/media/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
+import { searchParamText } from "@/lib/search/params";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -57,7 +58,11 @@ export default async function AdminMediaPage({
   const strings = messages.admin;
 
   const query = await searchParams;
-  const search = typeof query.q === "string" ? query.q.slice(0, 80) : "";
+  /*
+    ⚠️ รอบที่ 291: `?q=%00` เคยทำให้หน้านี้ **500** (Postgres ไม่รับ NUL ในข้อความ ⇒ `ilike` โยน error)
+    ⇒ ต้องผ่าน `searchParamText` เสมอ (ตัดอักขระควบคุม + ค่าซ้ำ + จำกัด 80 ตัวอักษร)
+  */
+  const search = searchParamText(query.q, 80);
 
   const [items, stats] = await Promise.all([searchMedia(search), mediaStats()]);
 

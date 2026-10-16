@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
 import type { AllowedImageMime } from "@/lib/media/image-info";
+import { normalizeSearchText } from "@/lib/search/params";
 
 /**
  * คลังภาพ — ที่เก็บไฟล์ในฐานข้อมูล (มติ D11)
@@ -369,7 +370,8 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
 
 /** รายการภาพแบบมีคำค้น (ชื่อไฟล์/คำอธิบายภาพ) — เรียงใหม่สุดก่อน */
 export async function searchMedia(query: string, limit = 60): Promise<readonly MediaListItem[]> {
-  const trimmed = query.trim();
+  /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ตัดอักขระควบคุม/NUL เสมอ — Postgres รับ `\u0000` ในข้อความไม่ได้ */
+  const trimmed = normalizeSearchText(query, 80);
   const result = await getPool().query<{
     id: string;
     filename: string;

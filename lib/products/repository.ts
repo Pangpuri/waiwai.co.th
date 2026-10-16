@@ -6,6 +6,7 @@ import { readQuery } from "@/lib/db/read";
 /* ลำดับตั้งต้นของหมวด = ลำดับในโค้ด (migration 0039 · รอบที่ 264) */
 import { defaultSortOrderOf } from "@/lib/products/categories";
 import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
+import { normalizeSearchText } from "@/lib/search/params";
 
 /**
  * อ่าน/เขียน "สินค้า" ในฐานข้อมูล (S3 ส่วนที่ 3 · รอบที่ 103 · ถังขยะ รอบที่ 139) — ฝั่งเซิร์ฟเวอร์เท่านั้น
@@ -954,7 +955,8 @@ export async function listProductsForAdmin(input: {
     params.push(category);
     where.push(`p.category_id = $${String(params.length)}`);
   }
-  const term = (input.search ?? "").trim();
+  /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ห้ามให้อักขระควบคุม/NUL ถึง SQL */
+  const term = normalizeSearchText(input.search ?? "", 80);
   if (term !== "") {
     params.push(`%${term}%`);
     const index = params.length;

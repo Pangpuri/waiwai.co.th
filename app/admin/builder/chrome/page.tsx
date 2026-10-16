@@ -50,7 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ChromePage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly part?: string; readonly mode?: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
   const user = await requireAdminUser("presets");
 
