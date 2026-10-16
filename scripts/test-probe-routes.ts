@@ -196,13 +196,13 @@ test("probe: อ่านช่องฟอร์มแบบที่เบร�
 });
 
 test("probe: flow หลายขั้น — มีครบ 4 flow · เลือกได้ · และ **ปฏิเสธเซิร์ฟเวอร์ไกล** โดยค่าเริ่มต้น", () => {
-  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link"]);
-  assert.equal(PROBE_FLOWS.length, 4);
-  assert.equal(selectProbeFlows().length, 4);
+  assert.deepEqual([...PROBE_FLOW_IDS], ["rate-limit", "session-revoke", "upload-guard", "preview-link", "sql-injection"]);
+  assert.equal(PROBE_FLOWS.length, 5);
+  assert.equal(selectProbeFlows().length, 5);
   assert.equal(selectProbeFlows("upload").length, 1);
   assert.equal(selectProbeFlows("ไม่มีทางเจอ").length, 0);
-  /* flow ที่แตะข้อมูลจริงต้องถูกกำกับว่าต้องมีเซสชัน (ยกเว้น rate limit ที่ยิงสาธารณะได้) */
-  assert.equal(PROBE_FLOWS.filter((flow) => flow.needsSession).length, 3);
+  /* flow ที่ต้องใช้เซสชัน (ยกเว้น rate limit ที่ยิงสาธารณะได้) */
+  assert.equal(PROBE_FLOWS.filter((flow) => flow.needsSession).length, 4);
 
   for (const local of ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost", "http://[::1]:3000"]) {
     assert.equal(isLocalProbeUrl(local), true, `${local} ต้องถือว่าในเครื่อง`);
@@ -268,4 +268,27 @@ test("หลังบ้าน: 404 ต้องเป็นหน้าขอ�
   /* เส้นทางในทะเบียน probe ต้องคุมพฤติกรรมนี้ไว้ (ทั้งมี/ไม่มีเซสชัน) */
   assert.ok(PROBE_TARGETS.some((entry) => entry.url === "/admin/nope-nope" && entry.admin === true && entry.expect.includes(404)));
   assert.ok(PROBE_TARGETS.some((entry) => entry.url === "/admin/nope-nope" && entry.expect.includes(307)));
+});
+
+test("probe: flow SQL injection ต้อง 'อ่านอย่างเดียว' — payload และตัว flow ห้ามมีคำสั่งที่เขียน/ทำลายข้อมูล", () => {
+  const flows = codeOf("scripts/probe-flows.ts");
+
+  const payloadBlock = /const SQL_INJECTION_PAYLOADS[\s\S]*?\];/.exec(flows)?.[0] ?? "";
+  assert.ok(payloadBlock.includes("' or 1=1--"), "ต้องพบชุด payload (กันเทสต์ผ่านเพราะอ่านไม่เจอ)");
+
+  /* ตัว flow เอง (ตั้งแต่ชื่อฟังก์ชันถึงตัวคั่นถัดไป) — payload + โค้ดในฟังก์ชันต้องไม่เขียน/ทำลายข้อมูล */
+  const flowStart = flows.indexOf("async function runSqlInjectionFlow");
+  const flowBlock = flowStart === -1 ? "" : flows.slice(flowStart, flows.indexOf("/* ── จุดเข้าใช้ ─", flowStart));
+  assert.ok(flowBlock.includes("searchMedia"), "ต้องยิงผ่านชั้นข้อมูลจริง (ไม่ใช่ SQL ที่เขียนเอง)");
+
+  const destructive = [/drop\s+table/i, /delete\s+from/i, /insert\s+into/i, /update\s+\w+\s+set/i, /truncate/i, /alter\s+table/i];
+  for (const pattern of destructive) {
+    assert.ok(!pattern.test(payloadBlock), `payload ห้ามมีคำสั่งที่เขียน/ทำลายข้อมูล (พบ ${String(pattern)})`);
+    assert.ok(!pattern.test(flowBlock), `ตัว flow ต้องอ่านอย่างเดียว (พบ ${String(pattern)})`);
+  }
+
+  assert.ok(flows.includes("sql-injection"), "flow ต้องถูกลงทะเบียนในแผน");
+  /* เกณฑ์ตัดสิน: เทียบจำนวนแถวจริงกับ "คำที่ไม่ตรง" และต้องไม่คืนทั้งคลัง (ไม่ใช่แค่ดูสถานะ HTTP) */
+  assert.ok(flows.includes("baselineMedia") && flows.includes("allMedia.length"), "ต้องเทียบจำนวนแถวจริง");
+  assert.ok(flows.includes("SQL_ERROR_SIGNS"), "ต้องตรวจสัญญาณ error ของ Postgres ในคำตอบด้วย");
 });

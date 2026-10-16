@@ -6,7 +6,10 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { hashSessionId } from "@/lib/auth/sessions-repository";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { th } from "@/lib/i18n/messages/th";
+import { searchMedia } from "@/lib/media/repository";
 import { storeImageFile } from "@/lib/media/upload";
+import { findPage } from "@/lib/pages/repository";
+import { listProductsForAdmin } from "@/lib/products/repository";
 import { formFieldsOf, formWithField, formWithFileInput, formsOf } from "@/lib/probe/forms";
 import { isLocalProbeUrl, selectProbeFlows, type ProbeFlowId } from "@/lib/probe/flow-plan";
 import { mintProbeSession, releaseProbeSession, type ProbeSession } from "./probe-session.ts";
@@ -14,8 +17,8 @@ import { mintProbeSession, releaseProbeSession, type ProbeSession } from "./prob
 /**
  * flow หลายขั้นของเครื่องมือ probe (รอบที่ 293) — **ฝั่งเซิร์ฟเวอร์เท่านั้น (แตะ DB)**
  *
- * 4 flow ที่เคยพิสูจน์ด้วยสคริปต์ชั่วคราวใน `.next` (รอบ 292) แล้วถูกย้ายมาเป็นของถาวร:
- * จำกัดการล็อกอิน · เพิกถอนเซสชัน · ด่านอัปโหลดภาพ · ลิงก์พรีวิว
+ * flow ที่เคยพิสูจน์ด้วยสคริปต์ชั่วคราวใน `.next` (รอบ 292) แล้วถูกย้ายมาเป็นของถาวร:
+ * จำกัดการล็อกอิน · เพิกถอนเซสชัน · ด่านอัปโหลดภาพ · ลิงก์พรีวิว · **SQL injection (รอบ 294)**
  *
  * วินัยที่บังคับในไฟล์นี้
  * - **refuse ถ้าไม่ใช่เซิร์ฟเวอร์ในเครื่อง** (ยกเว้น `--allow-remote`) — flow มีการเขียนแถวจริง
@@ -407,6 +410,108 @@ async function newestLinkLifetimeHours(): Promise<number | null> {
   }
 }
 
+/* ── flow 5: SQL injection (อ่านอย่างเดียว · รอบที่ 294) ──────────────────────── */
+
+/**
+ * payload ที่ถ้าถูก "ต่อสตริงเข้า SQL" จะต้องพังหรือคืนทุกแถว
+ * ⚠️ ใช้กับ **การอ่านเท่านั้น** (ห้ามใส่ DDL/DML ที่เขียนจริงลงในชุดทดสอบ)
+ */
+const SQL_INJECTION_PAYLOADS: readonly string[] = [
+  "' or 1=1--",
+  "' OR '1'='1",
+  "1' union select null--",
+  "'; select pg_sleep(0);--",
+  "' or ''='",
+];
+
+const SQL_ERROR_SIGNS: readonly string[] = [
+  "syntax error at or near",
+  "unterminated quoted string",
+  "invalid input syntax",
+  "SQLSTATE",
+  "pg_",
+  "must be owner of",
+];
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+/**
+ * ตรวจว่า payload ถูกส่งเป็น **ค่า (parameter)** ไม่ใช่ถูกต่อเป็น SQL
+ *
+ * หลักฐานที่ใช้: จำนวนแถวที่ได้ต้องเท่ากับ "คำที่ไม่มีทางตรง" และ **น้อยกว่าทั้งคลัง**
+ * (ถ้าฉีดได้จริง `' or 1=1--` จะคืนทุกแถว · ถ้าต่อสตริงตรง ๆ มักได้ error ของ Postgres)
+ */
+async function runSqlInjectionFlow(deps: FlowDeps): Promise<FlowOutcome> {
+  const steps: FlowStep[] = [];
+
+  if (!isDatabaseConfigured()) {
+    steps.push({ label: "ต้องมีฐานข้อมูล", ok: false, detail: "ไม่ตั้ง DATABASE_URL" });
+    return { id: "sql-injection", title: "SQL injection", steps, cleanup: "อ่านอย่างเดียว ไม่มีอะไรต้องเก็บ", ok: false };
+  }
+
+  const impossible = "zzz-ไม่มีทางตรง-zzz";
+  const baselineMedia = await searchMedia(impossible, 200);
+  const allMedia = await searchMedia("", 200);
+
+  if (allMedia.length === 0) {
+    steps.push({ label: "ต้องมีภาพในคลังอย่างน้อย 1 ใบ", ok: false, detail: "คลังว่าง — เทียบไม่ได้" });
+    return { id: "sql-injection", title: "SQL injection", steps, cleanup: "อ่านอย่างเดียว ไม่มีอะไรต้องเก็บ", ok: false };
+  }
+
+  const mediaHits: number[] = [];
+  for (const payload of SQL_INJECTION_PAYLOADS) mediaHits.push((await searchMedia(payload, 200)).length);
+
+  steps.push({
+    label: `ค้นหาภาพด้วย payload ${String(SQL_INJECTION_PAYLOADS.length)} ตัว → ต้องได้เท่าคำที่ไม่ตรง (${String(baselineMedia.length)}) และน้อยกว่าทั้งคลัง (${String(allMedia.length)})`,
+    ok: mediaHits.every((count) => count === baselineMedia.length && count < allMedia.length),
+    detail: mediaHits.join(" · "),
+  });
+
+  const productTotal: number[] = [];
+  for (const payload of SQL_INJECTION_PAYLOADS) {
+    const result = await listProductsForAdmin({ search: payload, tab: "all" });
+    productTotal.push(result.total);
+  }
+  steps.push({
+    label: "ค้นหาสินค้า (เส้นทางหลังบ้าน) ด้วย payload เดียวกัน → ต้องได้ 0 รายการ",
+    ok: productTotal.every((total) => total === 0),
+    detail: productTotal.join(" · "),
+  });
+
+  const pages = await Promise.all(SQL_INJECTION_PAYLOADS.map((payload) => findPage(payload)));
+  steps.push({
+    label: "หาหน้าด้วยรหัสที่เป็น payload → ต้องไม่เจอ (null)",
+    ok: pages.every((page) => page === null),
+    detail: `${String(pages.filter((page) => page === null).length)}/${String(pages.length)} เป็น null`,
+  });
+
+  /* ผ่าน HTTP จริงด้วย (ทางที่ผู้ใช้ยิงได้) — ต้อง 200 และไม่มีสัญญาณ error ของ Postgres */
+  if (deps.session !== null) {
+    const badStatus: string[] = [];
+    const leaked: string[] = [];
+
+    for (const payload of SQL_INJECTION_PAYLOADS.slice(0, 3)) {
+      const url = `${deps.baseUrl}/admin/media?q=${encodeURIComponent(payload)}`;
+      const response = await getStatus(url, deps.session);
+      if (response.status !== 200) badStatus.push(`${String(response.status)}`);
+      for (const sign of SQL_ERROR_SIGNS) if (response.body.includes(sign)) leaked.push(sign);
+
+      const hits = countOccurrences(response.body, "/media/");
+      if (hits >= allMedia.length) leaked.push(`คืนทุกแถว (${String(hits)})`);
+    }
+
+    steps.push({
+      label: "ยิงทาง URL จริง (/admin/media?q=payload) → 200 · ไม่มีข้อความ error ของ Postgres · ไม่คืนทั้งคลัง",
+      ok: badStatus.length === 0 && leaked.length === 0,
+      detail: badStatus.length === 0 && leaked.length === 0 ? "สะอาดทั้ง 3 payload" : [...badStatus, ...leaked].join(" · "),
+    });
+  }
+
+  return { id: "sql-injection", title: "SQL injection", steps, cleanup: "อ่านอย่างเดียว ไม่มีอะไรต้องเก็บ", ok: steps.every((step) => step.ok) };
+}
+
 /* ── จุดเข้าใช้ ────────────────────────────────────────────────────────────── */
 
 export type RunProbeFlowsOptions = {
@@ -441,7 +546,8 @@ export async function runProbeFlows(options: RunProbeFlowsOptions): Promise<Flow
     if (flow.id === "rate-limit") outcomes.push(await runRateLimitFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "session-revoke") outcomes.push(await runSessionRevokeFlow({ baseUrl: options.baseUrl, session }));
     else if (flow.id === "upload-guard") outcomes.push(await runUploadGuardFlow({ baseUrl: options.baseUrl, session }));
-    else outcomes.push(await runPreviewLinkFlow({ baseUrl: options.baseUrl, session }));
+    else if (flow.id === "preview-link") outcomes.push(await runPreviewLinkFlow({ baseUrl: options.baseUrl, session }));
+    else outcomes.push(await runSqlInjectionFlow({ baseUrl: options.baseUrl, session }));
 
     const last = outcomes[outcomes.length - 1];
     if (last !== undefined) {
