@@ -91,15 +91,21 @@ export function ProductListSection({
         </h2>
         <p className="text-fg-muted mt-1 text-sm">{fillTemplate(strings.count, { count: products.length })}</p>
 
-        <ul className="product-card-grid mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/*
+          ⚠️ บทเรียน 2026-10-17 (เจ้าของ: "มุมมองมือถือ … รายละเอียดสินค้าล้นจอ"): กริดต้องมี **คอลัมน์ขั้นต่ำแบบหดได้**
+          (`grid-cols-1` = `minmax(0, 1fr)`) — เดิมปล่อยเป็นคอลัมน์อัตโนมัติ ⇒ การ์ดขยายตามตารางส่วนผสม `min-w-[26rem]`
+          ⇒ ที่ 390px หน้าเว็บกว้าง 496px (ล้นแนวนอน) · ตอนนี้ตารางเลื่อนในกรอบ `overflow-x-auto` ของการ์ดแทน
+        */}
+        <ul className="product-card-grid mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((product) => {
             const label = productNameOf(product, language);
             const group = productGroupOf(product, language);
             const tagline = productTaglineOf(product, language);
             const details = productDetailsOf(product, language);
 
+            /* `min-w-0` = การ์ดยอมหดต่ำกว่า min-content ของตารางส่วนผสม (กันล้นจอบนมือถือ) */
             return (
-              <li key={product.id} className="border-line bg-bg flex flex-col rounded-2xl border p-4">
+              <li key={product.id} className="border-line bg-bg flex min-w-0 flex-col rounded-2xl border p-4">
                 {product.imagePath === null ? (
                   <p className="text-fg-muted flex h-40 items-center justify-center text-xs">{strings.noImage}</p>
                 ) : (

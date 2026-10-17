@@ -186,3 +186,22 @@ test("findCatalogItem / catalogSlugs: หา slug ได้ถูก และ�
   assert.equal(findCatalogItem("ไม่มีหมวดนี้"), undefined);
   assert.equal(findCatalogItem(""), undefined);
 });
+
+test("products UI: กริด/การ์ดต้องหดได้บนจอมือถือ (กันหน้าล้นแนวนอนจากตารางส่วนผสม)", () => {
+  /*
+    บทเรียน 2026-10-17 (เจ้าของ: "มุมมองฝั่งมือถือ … ดูรายละเอียดสินค้าล้นจอ"):
+    ที่ 390px หน้าเว็บกว้าง 496px เพราะกริดไม่มีคอลัมน์ขั้นต่ำแบบหดได้ + การ์ดมี min-width:auto
+    ⇒ ตารางส่วนผสม min-w-[26rem] ดันการ์ดกว้างกว่าจอ ทั้งที่ควรเลื่อนในกรอบ overflow-x-auto
+  */
+  const source = readFileSync("features/products/ui/product-list.tsx", "utf8");
+
+  assert.ok(
+    source.includes("grid grid-cols-1 gap-4"),
+    "กริดต้องมี grid-cols-1 (= minmax(0,1fr)) เพื่อให้การ์ดหดได้",
+  );
+  assert.ok(
+    /<li[^>]*className="[^"]*\bmin-w-0\b/.test(source),
+    "การ์ดต้องมี min-w-0 (ไม่งั้นตารางส่วนผสมดันการ์ดให้กว้างกว่าจอ)",
+  );
+  assert.ok(source.includes("overflow-x-auto"), "ตารางส่วนผสมต้องเลื่อนในกรอบของตัวเอง");
+});
