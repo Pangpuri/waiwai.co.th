@@ -60,6 +60,34 @@ test("preview rail: PreviewFrame ต้องกัน re-render ซ้ำเม
   );
 });
 
+test("preview rail: ตัวสร้างหน้าเว็บยืดช่องพรีวิวเต็มคอลัมน์ + iframe สูงพอดีช่อง", () => {
+  /*
+    รอบที่ 302 (เจ้าของ): "ส่วนล่างไม่ได้ยืดลงมา" — จอตัวสร้างหน้าเว็บ
+    ⇒ กล่องพรีวิวต้องกินทุกแถวของคอลัมน์ตั้งค่า และช่อง iframe ต้องสูงพอดีช่อง (ไม่ใช่สูงคงที่ตามอุปกรณ์)
+  */
+  const builder = codeOf("features/admin/ui/block-builder.tsx");
+
+  assert.ok(builder.includes("md:row-span-5"), "กล่องพรีวิวต้องกินทุกแถวของคอลัมน์ตั้งค่า (ปัจจุบัน 5 แถว)");
+  assert.ok(builder.includes("admin-preview-pane"), "ช่องพรีวิวต้องใช้คลาสกลาง (overflow + scrollbar-gutter)");
+  assert.ok(builder.includes("md:min-h-0 md:flex-1"), "ช่องพรีวิวต้องยืดเต็มที่เหลือบนจอใหญ่");
+  assert.ok(builder.includes("const renderedHeight ="), "ต้องคำนวณความสูง iframe จากความสูงช่องพรีวิว");
+  assert.ok(builder.includes("floor(paneInnerHeight / scale)"), "ความสูง iframe ต้องมาจาก paneInnerHeight / scale");
+  assert.ok(builder.includes("height: `${renderedHeight}px`"), "iframe ต้องใช้ renderedHeight (ไม่ใช่ความสูงอุปกรณ์)");
+  assert.ok(
+    !builder.includes("height: `${previewSize.height}px`"),
+    "ห้ามกลับไปตั้ง iframe สูงคงที่ตามขนาดอุปกรณ์ (ทำให้ไม่ยืด)",
+  );
+
+  const paneRule = CSS.match(/\.admin-preview-pane\s*\{([^}]*)\}/);
+  assert.ok(paneRule !== null, "ต้องมีกฎ .admin-preview-pane ใน app/globals.css");
+  const paneBody = paneRule[1] ?? "";
+  assert.ok(paneBody.includes("overflow: auto"), "ช่องพรีวิวต้องเลื่อนในตัวเองได้");
+  assert.ok(
+    paneBody.includes("scrollbar-gutter: stable"),
+    "ห้ามลืม scrollbar-gutter: stable (กันลูปวัดขนาดของช่องพรีวิว)",
+  );
+});
+
 const SCREENS: readonly { readonly file: string; readonly label: string }[] = [
   { file: "features/admin/ui/product-editor-form.tsx", label: "สินค้า" },
   { file: "features/admin/ui/recipe-editor-form.tsx", label: "เมนูอาหาร" },

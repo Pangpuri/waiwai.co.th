@@ -804,6 +804,18 @@ html[data-preview-parts="content"] html[data-mourning="shown"] [data-mourning-no
 }
 
 /*
+  ช่องพรีวิวของ **ตัวสร้างหน้าเว็บ** (รอบที่ 302 · ฟีดแบ็กเจ้าของ "ส่วนล่างไม่ได้ยืดลงมา")
+  - ช่องนี้ถูกทำให้ `flex-1` บนจอใหญ่ ⇒ สูงเท่าคอลัมน์ตั้งค่า และ iframe เรนเดอร์สูงพอดีช่อง
+  - ต้องเลื่อนในช่องได้เมื่อหน้าเว็บที่เลือกสูงกว่าช่อง
+  - `scrollbar-gutter: stable` กันลูปวัดขนาด (แถบเลื่อนโผล่/หาย ⇒ ความกว้างเปลี่ยน ⇒ ResizeObserver วน)
+    — บทเรียนเดียวกับ `.admin-preview-rail` รอบ 301
+*/
+.admin-preview-pane {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+/*
   โหมดพรีวิว "เฉพาะ navbar" (รอบที่ 158 · ฟีดแบ็กเจ้าของ)
   "ตอนนี้ไม่ได้โชว์แค่ Navbar หลังจากเข้าโหมด Navbar ดันมี footer โผล่มา"
 

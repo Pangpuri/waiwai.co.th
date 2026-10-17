@@ -900,9 +900,22 @@ export function BlockBuilder({
   }, [dirty, unsavedCount, strings.draftWarnLeave]);
   /* ── คำนวณขนาด/สเกลของพรีวิว (ห้ามให้ iframe แคบกว่าขนาดจริง ไม่งั้นเว็บเข้าสู่เลย์เอาต์มือถือ/แท็บเล็ต) ── */
   const previewSize = PREVIEW_SIZES.find((entry) => entry.key === previewWidth) ?? PREVIEW_SIZES[1];
-  const scale = Math.min(1, paneSize.width / previewSize.width);
+  /* ช่องพรีวิวมี padding `p-2` (8px × 2) — ต้องหักออกก่อนคิดสเกล ไม่งั้น iframe กว้างเกินช่อง 16px */
+  const PANE_PADDING = 16;
+  const paneInnerWidth = Math.max(0, paneSize.width - PANE_PADDING);
+  const paneInnerHeight = Math.max(0, paneSize.height - PANE_PADDING);
+  const scale = Math.min(1, paneInnerWidth > 0 ? paneInnerWidth / previewSize.width : 1);
+  /*
+    หน้าเว็บ (iframe) ต้องสูงพอที่จะ **เต็มความสูงช่องพรีวิวหลังย่อ** — ไม่ใช่สูงคงที่ตามขนาดอุปกรณ์
+    ⇒ คอลัมน์ตั้งค่ายาวเท่าไร ช่องพรีวิวก็สูงเท่านั้น (เห็นหน้าเว็บมากขึ้น ไม่มีที่ว่างด้านล่าง)
+    · อย่างน้อย = ความสูงของอุปกรณ์ที่เลือก (จอเตี้ย/มือถือ ยังเห็นเต็มขนาดเดิม)
+    ⚠️ ห้ามให้ความสูง "ช่อง" ขึ้นกับ iframe (ลูปวัดขนาด) — ช่องสูงจาก layout (flex/grid) เท่านั้น
+       ตัวเลขนี้ใช้ตั้งความสูง **iframe ภายใน** เท่านั้น และช่องมี `scrollbar-gutter: stable`
+       (`.admin-preview-pane`) กันแถบเลื่อนทำให้ความกว้างสลับ
+  */
+  const renderedHeight = Math.max(previewSize.height, Math.floor(paneInnerHeight / scale));
   const scaledWidth = Math.round(previewSize.width * scale);
-  const scaledHeight = Math.round(previewSize.height * scale);
+  const scaledHeight = Math.round(renderedHeight * scale);
   const scalePercent = Math.round(scale * 100);
 
   /**
@@ -2363,7 +2376,12 @@ export function BlockBuilder({
           className={
             fullscreen
               ? "bg-bg fixed inset-0 z-50 flex h-dvh flex-col gap-2 overflow-hidden p-2 sm:p-3"
-              : "border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-span-3 md:row-start-1"
+              /*
+                `md:row-span-5` = กินความสูง **ทุกแถวของคอลัมน์ตั้งค่า** (เลเยอร์ · ตรวจสอบ · ประวัติ · คำเตือน)
+                ⇒ กล่องพรีวิวยืดลงไปเท่ากล่องตั้งค่าจริง ไม่จบก่อนแล้วเหลือที่ว่าง
+                ⚠️ ถ้าเพิ่มการ์ดฝั่งขวาใหม่ ต้องขยับเลขนี้ตาม (มีเทสต์ล็อกไว้ที่ `scripts/test-preview-rail.ts`)
+              */
+              : "border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-span-5 md:row-start-1"
           }
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2424,7 +2442,7 @@ export function BlockBuilder({
                 ? strings.fullscreenHint
                 : fillTemplate(strings.previewSizeHint, {
                     width: previewSize.width,
-                    height: previewSize.height,
+                    height: renderedHeight,
                     percent: scalePercent,
                   })}
             </span>
@@ -2438,7 +2456,11 @@ export function BlockBuilder({
                  เดิมตั้งความสูง iframe = ความสูงช่องที่วัดได้ ⇒ วัด → ตั้ง → วัด วนกันไม่จบ (feedback loop กับ ResizeObserver)
                  แก้โดยไม่คำนวณขนาดในโหมดเต็มหน้าจอเลย ⇒ ลูปเกิดขึ้นไม่ได้เชิงโครงสร้าง
           */}
-          <div ref={paneRef} className={`bg-bg-subtle overflow-auto rounded-xl p-2 ${fullscreen ? "min-h-0 flex-1" : ""}`}>
+          {/* ช่องพรีวิว: เดสก์ท็อปให้กินความสูงที่เหลือของคอลัมน์ (flex-1) ⇒ ยืดลงเท่ากล่องตั้งค่า · เลื่อนในช่องได้ */}
+          <div
+            ref={paneRef}
+            className={`admin-preview-pane bg-bg-subtle rounded-xl p-2 ${fullscreen ? "min-h-0 flex-1" : "md:min-h-0 md:flex-1"}`}
+          >
             {fullscreen ? (
               <iframe
                 key={`${previewMode}-${frameKey}`}
@@ -2458,7 +2480,7 @@ export function BlockBuilder({
                   title={strings.previewTitle}
                   style={{
                     width: `${previewSize.width}px`,
-                    height: `${previewSize.height}px`,
+                    height: `${renderedHeight}px`,
                     transform: `scale(${scale})`,
                     transformOrigin: "top left",
                   }}
