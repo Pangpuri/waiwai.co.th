@@ -1,16 +1,14 @@
 "use client";
 
 import { PreviewFrame, SITE_RECIPE_CARD_WIDTH } from "@/features/admin/ui/preview-frame";
-import Image from "next/image";
 import { useActionState, useState } from "react";
 
 import { saveRecipeAction, uploadRecipeImageAction } from "@/app/admin/recipes/actions";
 import { INITIAL_RECIPE_SAVE_STATE, INITIAL_RECIPE_UPLOAD_STATE } from "@/features/admin/recipe-state";
-import { ImageFileInput } from "@/features/admin/ui/image-file-input";
+import { CoverImagePicker } from "@/features/admin/ui/cover-image-picker";
 import { RecipeVideoList, type RecipeVideoListStrings } from "@/features/recipes/ui/recipe-video-list";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
-import { mediaIdFromPath } from "@/lib/media/usage";
 import { youTubeIdFromInput } from "@/lib/recipes/model";
 import type { RecipeRecord } from "@/lib/recipes/repository";
 
@@ -54,8 +52,6 @@ type RecipeEditorFormProps = {
 const INPUT_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 const LABEL_CLASS = "text-fg-muted mb-1 block text-xs font-semibold";
-const BUTTON_CLASS =
-  "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none";
 const PRIMARY_CLASS =
   "bg-accent text-accent-fg hover:bg-accent-strong focus-visible:ring-ring inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2";
 
@@ -72,36 +68,11 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     coverPath: props.initial.coverPath,
     status: props.initial.status as "draft" | "published",
   });
-  const [uploadState, setUploadState] = useState(INITIAL_RECIPE_UPLOAD_STATE);
-  const [uploading, setUploading] = useState(false);
   /* ภาษาของพรีวิว (รอบที่ 137) — แยกจากค่าที่บันทึก: ดูด่าน EN ได้โดยไม่ต้องสลับทั้งหน้าจอ */
   const [previewLanguage, setPreviewLanguage] = useState<"th" | "en">("th");
 
   function setField(key: keyof typeof fields, value: string): void {
     setFields((current) => ({ ...current, [key]: value }));
-  }
-
-  /** อัปโหลดภาพปกจากเครื่อง — เรียก Server Action เอง (ห้ามใช้ <form> ซ้อน) */
-  async function submitUpload(event: React.MouseEvent<HTMLButtonElement>): Promise<void> {
-    const wrapper = event.currentTarget.closest("div");
-    const input = wrapper?.querySelector<HTMLInputElement>('input[type="file"]') ?? null;
-    const file = input?.files?.item(0) ?? null;
-    if (file === null) {
-      setUploadState({ ...INITIAL_RECIPE_UPLOAD_STATE, status: "invalid", reason: "missing" });
-      return;
-    }
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.set("file", file);
-      const result = await uploadRecipeImageAction(INITIAL_RECIPE_UPLOAD_STATE, formData);
-      setUploadState(result);
-      if (result.status === "ok" && mediaIdFromPath(result.path) !== null) setField("coverPath", result.path);
-    } catch {
-      setUploadState({ ...INITIAL_RECIPE_UPLOAD_STATE, status: "failed", reason: "failed" });
-    } finally {
-      setUploading(false);
-    }
   }
 
   /*
@@ -252,54 +223,28 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
           </label>
         </div>
 
-        {/* ภาพปก: เลือกจากคลัง + อัปโหลดจากเครื่อง (ไม่ใช้ <form> ซ้อน) */}
-        <div className="border-line rounded-xl border p-3">
-          <span className={LABEL_CLASS}>{m.recipesAdminFieldCover}</span>
-          <div className="flex flex-wrap items-start gap-3">
-            <span className="border-line bg-bg-subtle block h-24 w-40 shrink-0 overflow-hidden rounded-lg border">
-              {fields.coverPath === "" ? (
-                <span className="text-fg-muted flex h-full items-center justify-center px-2 text-center text-xs">
-                  {m.recipesAdminNoCover}
-                </span>
-              ) : (
-                <Image
-                  src={fields.coverPath}
-                  alt={fields.titleTh}
-                  width={320}
-                  height={180}
-                  className="h-full w-full object-cover"
-                  unoptimized
-                />
-              )}
-            </span>
-            <div className="min-w-56 flex-1">
-              <select
-                name="coverPath"
-                value={fields.coverPath}
-                onChange={(event) => setField("coverPath", event.target.value)}
-                className={INPUT_CLASS}
-              >
-                <option value="">{m.recipesAdminNoCoverOption}</option>
-                {props.library.map((item) => (
-                  <option key={item.id} value={item.path}>
-                    {item.filename}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <div className="min-w-48 flex-1">
-                  <ImageFileInput className={INPUT_CLASS} label={m.recipesAdminUpload} hint={m.recipesAdminUploadHint} />
-                </div>
-                <button type="button" onClick={submitUpload} className={BUTTON_CLASS} disabled={uploading}>
-                  {uploading ? m.recipesAdminUploading : m.recipesAdminUpload}
-                </button>
-              </div>
-              {uploadState.status === "invalid" || uploadState.status === "failed" ? (
-                <p className="text-danger mt-2 text-xs">{m.recipesAdminUploadFailed}</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        {/* ภาพปก (รอบที่ 299): อัปโหลดจากเครื่องเป็นทางหลัก + เลือกจากคลังเป็นทางสำรอง — ตัวเดียวกับจอข่าว */}
+        <CoverImagePicker
+          labels={{
+            field: m.recipesAdminFieldCover,
+            empty: m.recipesAdminNoCover,
+            previewAlt: m.recipesAdminFieldCover,
+            upload: m.recipesAdminUpload,
+            uploadHint: m.recipesAdminUploadHint,
+            uploading: m.recipesAdminUploading,
+            uploadFailed: m.recipesAdminUploadFailed,
+            pickFromLibrary: m.recipesAdminPickImage,
+            cancel: m.recipesAdminCancel,
+            remove: m.recipesAdminCoverRemove,
+            storedInLibrary: m.recipesAdminCoverStoredInLibrary,
+            noImages: m.recipesAdminNoImages,
+          }}
+          value={fields.coverPath}
+          onChange={(next) => setField("coverPath", next)}
+          library={props.library}
+          uploadAction={uploadRecipeImageAction}
+          initialUploadState={INITIAL_RECIPE_UPLOAD_STATE}
+        />
 
         <div>
           <button type="submit" disabled={pending} className={PRIMARY_CLASS}>

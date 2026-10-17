@@ -1,15 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import { useActionState, useState } from "react";
 
-import { saveNewsAction } from "@/app/admin/news/actions";
+import { saveNewsAction, uploadNewsImageAction } from "@/app/admin/news/actions";
 import type { Messages } from "@/lib/i18n/messages/th";
+import { CoverImagePicker } from "@/features/admin/ui/cover-image-picker";
 import { NewsBodyBlocks } from "@/features/admin/ui/news-body-blocks";
 import { NewsPreview, type NewsPreviewSize } from "@/features/admin/ui/news-preview";
 import { newsBlocksToEditor, parseNewsEditorBlocks, type NewsEditorBlock } from "@/lib/news/editor-blocks";
 import type { NewsBlock } from "@/lib/news/body";
-import { INITIAL_NEWS_SAVE_STATE } from "@/features/admin/news-state";
+import { INITIAL_NEWS_SAVE_STATE, INITIAL_NEWS_UPLOAD_STATE } from "@/features/admin/news-state";
 
 /**
  * ฟอร์มแก้ข่าว/กิจกรรม (รอบที่ 123) — **client component** เพราะต้อง
@@ -145,30 +145,29 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
         </label>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <label className="block">
-          <span className={LABEL_CLASS}>{m.newsAdminFieldCover}</span>
-          <select name="coverPath" value={cover} onChange={(event) => setCover(event.target.value)} className={INPUT_CLASS}>
-            <option value="">{m.newsAdminCoverNone}</option>
-            {props.library.map((item) => (
-              <option key={item.id} value={item.path}>
-                {item.filename}
-              </option>
-            ))}
-          </select>
-          {cover === "" ? null : (
-            <span className="border-line bg-bg-subtle mt-2 block h-24 w-36 overflow-hidden rounded-lg border">
-              <Image
-                src={cover}
-                alt={m.newsAdminCoverAlt}
-                width={288}
-                height={192}
-                className="h-full w-full object-cover"
-                unoptimized
-              />
-            </span>
-          )}
-        </label>
+      <CoverImagePicker
+        labels={{
+          field: m.newsAdminFieldCover,
+          empty: m.newsAdminCoverNone,
+          previewAlt: m.newsAdminCoverAlt,
+          upload: m.newsAdminUpload,
+          uploadHint: m.newsAdminUploadHint,
+          uploading: m.newsAdminUploading,
+          uploadFailed: m.newsAdminUploadFailed,
+          pickFromLibrary: m.newsAdminPickImage,
+          cancel: m.newsAdminCancel,
+          remove: m.newsAdminCoverRemove,
+          storedInLibrary: m.newsAdminCoverStoredInLibrary,
+          noImages: m.newsAdminNoImages,
+        }}
+        value={cover}
+        onChange={setCover}
+        library={props.library}
+        uploadAction={uploadNewsImageAction}
+        initialUploadState={INITIAL_NEWS_UPLOAD_STATE}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <label className="block">
           <span className={LABEL_CLASS}>{m.newsAdminFieldPublished}</span>
           <input

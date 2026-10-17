@@ -70,6 +70,8 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminDeleteForever: "Delete forever",
   newsAdminDeleteForeverWarning: "Deleting forever cannot be undone (news images stay in the library)",
   newsAdminCoverAlt: "News cover image",
+  newsAdminCoverRemove: "Remove cover image",
+  newsAdminCoverStoredInLibrary: "Uploaded images are also saved to the media library (reusable as a cover for other news items).",
   newsAdminBlocksEmpty: "No content yet — start with the buttons below",
   newsAdminBlockParagraph: "Paragraph",
   newsAdminBlockHeading: "Sub-heading",

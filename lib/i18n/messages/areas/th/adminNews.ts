@@ -59,6 +59,8 @@ export const adminNews = {
   newsAdminErrorNotFound: "ไม่พบข่าวที่ต้องการแก้ไข",
   newsAdminTrashHint: "ข่าวที่ย้ายเข้าถังขยะจะยังไม่ถูกลบถาวร — กู้คืนได้จากแท็บถังขยะ",
   newsAdminCoverAlt: "ภาพปกข่าว",
+  newsAdminCoverRemove: "เอาภาพปกออก",
+  newsAdminCoverStoredInLibrary: "ภาพที่อัปโหลดจะถูกเก็บไว้ในคลังภาพด้วย (ใช้เป็นภาพปกของข่าวอื่นได้)",
   auditNewsSave: "บันทึกข่าว",
   auditNewsTrash: "ย้ายข่าวเข้าถังขยะ",
   auditNewsRestore: "กู้คืนข่าว",

@@ -133,7 +133,10 @@ test("recipes admin: พรีวิวต้องใช้ตัวเรน�
 
 test("recipes admin: ห้ามมี <form> ซ้อน <form> (บทเรียนรอบที่ 129)", () => {
   assert.equal(formTags(editorForm), 1, "จอแก้เมนูมีแท็ก <form> ได้เพียงตัวเดียว (ฟอร์มบันทึก)");
-  assert.ok(editorForm.includes("uploadRecipeImageAction("), "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>)");
+  assert.ok(
+    editorForm.includes("uploadAction={uploadRecipeImageAction}"),
+    "ปุ่มอัปโหลดต้องเรียก Server Action เอง (ไม่ใช้ <form>) ผ่านช่องภาพปกกลาง",
+  );
   /* หน้ารายการมี 2 ฟอร์ม: ค้นหา (GET) + ย้ายเข้าถังขยะ (action) — ต้องเป็นพี่น้องกัน ไม่ซ้อนกัน */
   assert.equal(formTags(listPage), 3, "หน้ารายการมี <form> 3 ตัว (ค้นหา + ย้าย/กู้คืน + ลบถาวร) เป็นพี่น้องกัน");
   const searchFormEnd = listPage.indexOf("</form>");
@@ -143,6 +146,24 @@ test("recipes admin: ห้ามมี <form> ซ้อน <form> (บทเร
     listPage.indexOf("action={deleteRecipeForeverAction}") > searchFormEnd,
     "ฟอร์มลบถาวรต้องอยู่นอกฟอร์มค้นหา",
   );
+});
+
+test("recipes admin: ภาพปกอัปโหลดจากเครื่องได้ + คลังภาพยังเลือกได้ (แบบเดียวกับข่าว)", () => {
+  /*
+    เจ้าของ (2026-10-17): "ภาพปกของ เมนูอาหาร เอาแบบเดียวกับข่าวครับเผื่ออัพโหลดจากเครื่อง"
+    ⇒ ใช้คอมโพเนนต์กลาง `CoverImagePicker` ตัวเดียวกับจอข่าว (อัปโหลดจากเครื่อง + คลังเป็นทางสำรอง)
+  */
+  assert.ok(editorForm.includes("<CoverImagePicker"), "จอเมนูอาหารต้องใช้ช่องภาพปกกลาง");
+  assert.ok(
+    editorForm.includes("uploadAction={uploadRecipeImageAction}"),
+    "ต้องส่ง Server Action อัปโหลดของเมนูอาหารเข้าช่องภาพปก",
+  );
+  assert.equal(
+    (editorForm.match(/<select name="coverPath"/g) ?? []).length,
+    0,
+    "ต้องเลิกใช้ select ที่เลือกภาพปกได้แค่ในอัลบั้ม",
+  );
+  assert.equal(formTags(editorForm), 1, "ช่องภาพปกต้องไม่เพิ่ม <form> ซ้อน");
 });
 
 test("recipes admin: กันสร้างเมนูซ้ำ — หลังสร้างสำเร็จต้องใช้ id ที่เซิร์ฟเวอร์คืนมา", () => {

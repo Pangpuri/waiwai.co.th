@@ -195,6 +195,33 @@ test("news admin: อัปโหลดภาพจากเครื่อง �
   assert.ok(blocks.includes("mediaIdFromPath"), "ต้องแปลงพาธ /media/<id> เป็นรหัสภาพก่อนเก็บลงบล็อก (มติ D9)");
 });
 
+test("news admin: ภาพปกอัปโหลดจากเครื่องได้ + อัลบั้มภาพยังเลือกได้เป็นทางสำรอง", () => {
+  /*
+    เจ้าของ (2026-10-17): "ภาพปกมันจะสามารถถูกเลือกได้แค่ในอัลบั้ม ผมขอเป็นกดอัพโหลดจากเครื่องได้ดีกว่า
+    ใช้ลอจิกอัพโหลดแบบภาพเนื้อหาก็ได้ … แต่อัลบั้มภาพยังเก็บภาพปกให้ไว้สำรองข้อมูลอยู่นะ"
+    ⇒ ช่องภาพปกต้องมี **อัปโหลดจากเครื่อง** (ท่อเดียวกับภาพเนื้อหา) และ **คลังภาพยังเลือกได้**
+    (รอบที่ 299: ย้ายเป็นคอมโพเนนต์กลาง `CoverImagePicker` ที่จอเมนูอาหารใช้ตัวเดียวกัน)
+  */
+  const picker = codeOf("features/admin/ui/cover-image-picker.tsx");
+  const form = codeOf("features/admin/ui/news-editor-form.tsx");
+
+  assert.ok(picker.includes("uploadAction("), "ปุ่มอัปโหลดภาพปกต้องเรียก Server Action ที่ผู้เรียกส่งมา");
+  assert.ok(
+    form.includes("uploadAction={uploadNewsImageAction}"),
+    "จอข่าวต้องส่ง action ตัวเดียวกับภาพเนื้อหาเข้าช่องภาพปก",
+  );
+  assert.ok(picker.includes("ImageFileInput"), "ช่องไฟล์ต้องใช้ ImageFileInput (ย่อภาพในเบราว์เซอร์ก่อนส่ง)");
+  assert.ok(picker.includes("mediaIdFromPath"), "ต้องแปลงพาธ /media/<id> เป็นรหัสภาพ (มติ D9)");
+  assert.ok(picker.includes("<ImageGridPicker"), "อัลบั้มภาพยังเลือกภาพปกได้เป็นทางสำรอง");
+  assert.ok(picker.includes('name="coverPath"'), "ค่าภาพปกต้องถูกส่งไปเซิร์ฟเวอร์ในช่อง coverPath");
+  assert.ok(form.includes("<CoverImagePicker"), "หน้าจอแก้ข่าวต้องใช้ตัวเลือกภาพปกกลาง");
+  assert.equal(
+    (form.match(/<select name="coverPath"/g) ?? []).length,
+    0,
+    "ต้องเลิกใช้ select ที่เลือกภาพปกได้แค่ในอัลบั้ม",
+  );
+});
+
 test("news admin: พรีวิวต้องใช้ตัวเรนเดอร์เดียวกับหน้าเว็บจริง (กัน 'พรีวิวโกหก')", () => {
   const preview = readFileSync("features/admin/ui/news-preview.tsx", "utf8");
   const form = readFileSync("features/admin/ui/news-editor-form.tsx", "utf8");

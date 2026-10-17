@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { uploadNewsImageAction } from "@/app/admin/news/actions";
 import { INITIAL_NEWS_UPLOAD_STATE } from "@/features/admin/news-state";
 import { ImageFileInput } from "@/features/admin/ui/image-file-input";
+import { ImageGridPicker } from "@/features/admin/ui/image-grid-picker";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import type { NewsEditorBlock } from "@/lib/news/editor-blocks";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -295,33 +296,6 @@ export function NewsImagePicker({
   readonly onPick: (mediaId: string) => void;
   readonly strings: Messages["admin"];
 }) {
-  if (library.length === 0) {
-    return <p className="text-fg-muted text-sm">{m.newsAdminNoImages}</p>;
-  }
-
-  return (
-    <ul className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-4">
-      {library.map((item) => (
-        <li key={item.id}>
-          <button
-            type="button"
-            onClick={() => onPick(item.id)}
-            className="border-line hover:bg-bg-subtle focus-visible:ring-ring block w-full rounded-lg border p-1 text-left focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <span className="bg-bg-subtle block h-20 w-full overflow-hidden rounded">
-              <Image
-                src={item.path}
-                alt={item.filename}
-                width={200}
-                height={160}
-                className="h-full w-full object-cover"
-                unoptimized
-              />
-            </span>
-            <span className="text-fg-muted mt-1 block truncate text-xs">{item.filename}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
+  /* รอบที่ 299: ย้ายตารางจริงไปที่ตัวกลาง `ImageGridPicker` (ใช้ร่วมกับจอเมนูอาหาร) — ที่นี่เหลือแค่ห่อ */
+  return <ImageGridPicker library={library} onPick={onPick} noImages={m.newsAdminNoImages} />;
 }
