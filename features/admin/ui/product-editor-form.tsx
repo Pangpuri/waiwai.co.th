@@ -214,7 +214,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
         : "";
 
   return (
-    <form action={formAction} className="flex flex-col gap-8 lg:flex-row lg:items-start">
+    <form action={formAction} className="flex flex-col gap-8 lg:flex-row">
       <input type="hidden" name="id" value={props.initial.id} />
       <input type="hidden" name="sourceId" value={props.initial.sourceId} />
       <input
@@ -550,7 +550,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
       </div>
 
       <aside className="lg:w-[420px] lg:shrink-0">
-        <div className="border-line bg-bg-subtle rounded-2xl border p-3 lg:sticky lg:top-6">
+        <div className="border-line bg-bg-subtle admin-preview-rail rounded-2xl border p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-fg-muted text-xs font-semibold uppercase">{m.adminProductsPreview}</h2>
             <span className="flex items-center gap-1" role="group" aria-label={m.adminProductsPreview}>

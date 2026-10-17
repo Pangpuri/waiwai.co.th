@@ -79,7 +79,7 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
           : "";
 
   return (
-    <form action={formAction} className="flex flex-col gap-8 lg:flex-row lg:items-start">
+    <form action={formAction} className="flex flex-col gap-8 lg:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-6">
       <input type="hidden" name="id" value={props.id} />
 
@@ -201,7 +201,7 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
       </div>
 
       <aside className="lg:w-[380px] lg:shrink-0">
-        <div className="lg:sticky lg:top-6">
+        <div className="admin-preview-rail">
           <NewsPreview
             strings={m}
             titleTh={titleTh}

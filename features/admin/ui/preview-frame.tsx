@@ -74,10 +74,18 @@ export function PreviewFrame({
 
     const update = () => {
       const available = host.clientWidth;
-      setScale(available === 0 ? 1 : Math.min(1, available / width));
-      setInnerHeight(inner.scrollHeight);
+      const nextScale = available === 0 ? 1 : Math.min(1, available / width);
+      const nextHeight = inner.scrollHeight;
+      /*
+        รอบที่ 301 (เจ้าของรายงาน "แรนเดอร์ไม่หยุด"): ResizeObserver ยิงถี่กว่าที่คิด —
+        ถ้าค่าที่วัดได้เปลี่ยนแค่เสี้ยวพิกเซล การ setState ทุกครั้งจะทำให้ re-render ไม่จบ
+        ⇒ เทียบกับค่าล่าสุดก่อนเสมอ (functional update) · คืนค่าเดิม = React ไม่เรนเดอร์
+        ⚠️ คู่กับการกันลูปที่ต้นเหตุจริง: `.admin-preview-rail` ต้องมี `scrollbar-gutter: stable`
+           (ไม่งั้นแถบเลื่อนโผล่/หาย ⇒ ความกว้างเปลี่ยน ⇒ วนจริง)
+      */
+      setScale((current) => (Math.abs(current - nextScale) > 0.0005 ? nextScale : current));
+      setInnerHeight((current) => (Math.abs(current - nextHeight) >= 1 ? nextHeight : current));
     };
-
     update();
     const observer = new ResizeObserver(update);
     observer.observe(host);
