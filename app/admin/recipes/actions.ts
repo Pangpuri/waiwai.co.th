@@ -5,6 +5,8 @@ import { recipeRestoreOf, recipeSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import { INITIAL_RECIPE_UPLOAD_STATE, type RecipeSaveState, type RecipeUploadState } from "@/features/admin/recipe-state";
+import type { ReorderState } from "@/features/admin/ui/sortable-list";
+import { parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
@@ -240,4 +242,33 @@ export async function restoreRecipeRevisionAction(formData: FormData): Promise<v
   revalidateAdminPath(LIST_PATH);
   revalidateAdminPath(`${LIST_PATH}/${id}`);
   await refreshPublicSite("page");
+}
+
+/**
+ * จัดลำดับเมนูอาหาร (รอบที่ 300) — ย้ายมาจากจอ `/admin/sort` ที่ถูกถอดออก
+ *
+ * ที่มา: เจ้าของสั่ง *"เมนูอาหาร ก็ไปอยู่กับเมนูอาหาร … เพิ่มแท็บจัดการในส่วนนั้น ๆ แทน"*
+ * - `kind` ถูกล็อกที่ `"recipe"` (ไม่รับจากเบราว์เซอร์)
+ * - ค่าลำดับตรวจด้วย `parseOrderCsv` + เขียนด้วยพารามิเตอร์ใน `reorderRows`
+ */
+export async function reorderRecipesAction(_previous: ReorderState, formData: FormData): Promise<ReorderState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { saved: 0, failed: true };
+
+  const ids = parseOrderCsv(field(formData, "order"));
+  if (ids.length === 0) return { saved: 0, failed: true };
+
+  const changed = await reorderRows("recipe", ids, user.email);
+  if (changed === 0) return { saved: 0, failed: true };
+
+  await recordAudit({
+    action: "content-reorder",
+    actorEmail: user.email,
+    target: "recipe",
+    detail: `rows=${String(changed)}`,
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { saved: changed, failed: false };
 }

@@ -4,14 +4,27 @@ import Link from "next/link";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { ProductCategoryForm } from "@/features/admin/ui/product-category-form";
 import type { ProductLibraryItem } from "@/features/admin/ui/product-editor-form";
+import { SortableList } from "@/features/admin/ui/sortable-list";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
+import { listReorderCategoryIds, listReorderItems } from "@/lib/admin/reorder";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { listMedia } from "@/lib/media/repository";
 import { isCatalogCategoryId } from "@/lib/products/model";
 import { adminProductCounts, listProductCategoriesForAdmin, listProductsForAdmin, type AdminProductTab } from "@/lib/products/repository";
 import { searchParamText } from "@/lib/search/params";
-import { deleteProductForeverAction, trashProductAction } from "./actions";
+import { deleteProductForeverAction, reorderProductsAction, trashProductAction } from "./actions";
+
+/**
+ * แท็บของจอสินค้า (รอบที่ 300) — เพิ่ม `sort` จากจอ `/admin/sort` ที่ถูกถอดออก
+ * ⚠️ `sort` ไม่ใช่แท็บของ repository (`AdminProductTab = all | trash`) ⇒ ต้องแมปก่อนส่งคิวรี
+ */
+const VIEW_IDS = ["all", "trash", "sort"] as const;
+type AdminProductView = (typeof VIEW_IDS)[number];
+
+function viewOf(value: string): AdminProductView {
+  return VIEW_IDS.find((view) => view === value) ?? "all";
+}
 
 /**
  * หลังบ้าน — รายการ "สินค้า" (รอบที่ 133) + ส่วน "คำอธิบาย/ภาพปก 6 หมวด" (รอบที่ 134)
@@ -43,14 +56,27 @@ export default async function AdminProductsPage({
   const search = searchParamText(query.q, 80);
   const rawCategory = searchParamText(query.category);
   const categoryId = isCatalogCategoryId(rawCategory) ? rawCategory : "";
-  const tab: AdminProductTab = searchParamText(query.tab) === "trash" ? "trash" : "all";
+  const view = viewOf(searchParamText(query.tab));
+  /* ลำดับในฐานข้อมูลแยก `sort` ออกจากแท็บของ repository */
+  const listTab: AdminProductTab = view === "trash" ? "trash" : "all";
 
-  const [listed, categoryRows, media, counts] = await Promise.all([
-    listProductsForAdmin({ categoryId, search, tab }),
+  const [listed, categoryRows, media, counts, sortCategoryIds] = await Promise.all([
+    listProductsForAdmin({ categoryId, search, tab: listTab }),
     listProductCategoriesForAdmin(),
     listMedia(60),
     adminProductCounts(),
+    view === "sort" ? listReorderCategoryIds() : Promise.resolve<readonly string[]>([]),
   ]);
+
+  /* หมวดที่ใช้จัดลำดับ — ค่าใน URL ต้องเป็นหมวดที่มีสินค้าจริง (ไม่เชื่อค่าจากเบราว์เซอร์) */
+  const sortCategory =
+    view === "sort"
+      ? sortCategoryIds.includes(rawCategory)
+        ? rawCategory
+        : (sortCategoryIds[0] ?? "")
+      : "";
+  const sortItems =
+    view === "sort" && sortCategory !== "" ? await listReorderItems("product", { categoryId: sortCategory }) : [];
 
   const library: readonly ProductLibraryItem[] = media.map((item) => ({
     id: item.id,
@@ -68,17 +94,24 @@ export default async function AdminProductsPage({
     return row.nameTh.trim() !== "" ? row.nameTh : fallback;
   };
 
-  const tabs: readonly { readonly id: AdminProductTab; readonly label: string; readonly count: number }[] = [
+  const tabs: readonly { readonly id: AdminProductView; readonly label: string; readonly count: number | null }[] = [
     { id: "all", label: m.adminProductsTabAll, count: counts.all },
     { id: "trash", label: m.adminProductsTabTrash, count: counts.trash },
+    /* แท็บที่ย้ายมาจากจอ /admin/sort (รอบที่ 300) — ไม่มีตัวนับ */
+    { id: "sort", label: m.sortNavLabel, count: null },
   ];
 
   /* เก็บเงื่อนไขค้นหาไว้ในลิงก์แท็บ (สลับแท็บแล้วไม่หลุดตัวกรอง) */
-  const tabHref = (id: AdminProductTab): string => {
+  const tabHref = (id: AdminProductView): string => {
     const params = new URLSearchParams();
     if (id === "trash") params.set("tab", "trash");
-    if (categoryId !== "") params.set("category", categoryId);
-    if (search !== "") params.set("q", search);
+    if (id === "sort") {
+      params.set("tab", "sort");
+      if (sortCategory !== "") params.set("category", sortCategory);
+    } else {
+      if (categoryId !== "") params.set("category", categoryId);
+      if (search !== "") params.set("q", search);
+    }
     const queryString = params.toString();
     return queryString === "" ? "/admin/products" : `/admin/products?${queryString}`;
   };
@@ -98,25 +131,80 @@ export default async function AdminProductsPage({
         </Link>
       </div>
 
-      {/* แท็บ: ใช้งาน / ถังขยะ (ลิงก์ธรรมดา ไม่ต้องมี JS · ตัวนับมาจากฐานข้อมูล) */}
+      {/* แท็บ: ใช้งาน / ถังขยะ / จัดลำดับ (ลิงก์ธรรมดา ไม่ต้องมี JS · ตัวนับมาจากฐานข้อมูล) */}
       <nav className="mt-6 flex flex-wrap items-center gap-2" aria-label={m.adminProductsTitle}>
         {tabs.map((item) => (
           <Link
             key={item.id}
             href={tabHref(item.id)}
-            aria-current={tab === item.id ? "page" : undefined}
+            aria-current={view === item.id ? "page" : undefined}
             className={`rounded-full border px-3 py-1 text-xs font-semibold no-underline ${
-              tab === item.id ? "border-line bg-surface text-fg" : "border-line text-fg-muted"
+              view === item.id ? "border-line bg-surface text-fg" : "border-line text-fg-muted"
             }`}
           >
-            {fillTemplate(m.adminProductsTabCount, { label: item.label, count: String(item.count) })}
+            {item.count === null
+              ? item.label
+              : fillTemplate(m.adminProductsTabCount, { label: item.label, count: String(item.count) })}
           </Link>
         ))}
       </nav>
 
+      {view === "sort" ? (
+        <section className="border-line bg-bg-subtle mt-6 rounded-2xl border p-4">
+          <h2 className="text-fg text-base font-semibold">{m.sortTitle}</h2>
+          <p className="text-fg-muted mt-1 text-sm">{m.sortHint}</p>
+
+          {sortCategoryIds.length === 0 ? (
+            <p className="text-fg-muted mt-3 text-sm">{m.sortEmpty}</p>
+          ) : (
+            <>
+              <nav aria-label={m.sortCategoryLabel} className="mt-4 flex flex-wrap gap-2">
+                {sortCategoryIds.map((id) => (
+                  <Link
+                    key={id}
+                    href={`/admin/products?tab=sort&category=${encodeURIComponent(id)}`}
+                    aria-current={id === sortCategory ? "true" : undefined}
+                    className={
+                      id === sortCategory
+                        ? "bg-brand-red text-on-brand rounded-full px-3 py-1 text-xs font-semibold"
+                        : "border-line text-fg-muted rounded-full border px-3 py-1 text-xs font-semibold"
+                    }
+                  >
+                    {categoryName(id)}
+                  </Link>
+                ))}
+              </nav>
+              <p className="text-fg-muted mt-2 text-xs">{m.sortCategoryHint}</p>
+
+              {sortItems.length === 0 ? (
+                <p className="text-fg-muted mt-3 text-sm">{m.sortEmpty}</p>
+              ) : (
+                <div className="mt-3">
+                  <SortableList
+                    kind="product"
+                    key={`${sortCategory}:${sortItems.map((item) => item.id).join(",")}`}
+                    items={sortItems}
+                    action={reorderProductsAction}
+                    strings={{
+                      up: m.sortUp,
+                      down: m.sortDown,
+                      save: m.sortSave,
+                      saveHint: m.sortSaveHint,
+                      handle: m.sortHandle,
+                      saved: m.sortSaved,
+                      failed: m.sortFailed,
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <>
       {/* กรองหมวด + ค้นหา (ฟอร์ม GET ธรรมดา ไม่ต้องมี JS) */}
       <form method="get" action="/admin/products" className="mt-4 flex flex-wrap items-end gap-2">
-        {tab === "trash" ? <input type="hidden" name="tab" value="trash" /> : null}
+        {view === "trash" ? <input type="hidden" name="tab" value="trash" /> : null}
         <label className="block">
           <span className="text-fg-muted mb-1 block text-xs font-semibold">{m.adminProductsFieldCategory}</span>
           <select
@@ -150,7 +238,7 @@ export default async function AdminProductsPage({
         </button>
         {search === "" && categoryId === "" ? null : (
           <Link
-            href={tab === "trash" ? "/admin/products?tab=trash" : "/admin/products"}
+            href={view === "trash" ? "/admin/products?tab=trash" : "/admin/products"}
             className="text-fg-muted px-2 py-2 text-sm underline underline-offset-4"
           >
             {m.adminProductsClear}
@@ -164,7 +252,7 @@ export default async function AdminProductsPage({
 
       {listed.items.length === 0 ? (
         <p className="border-line bg-bg-subtle text-fg-muted mt-4 rounded-xl border px-4 py-6 text-sm">
-          {tab === "trash" ? m.adminProductsTrashEmpty : m.adminProductsEmpty}
+          {view === "trash" ? m.adminProductsTrashEmpty : m.adminProductsEmpty}
         </p>
       ) : (
         <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -244,6 +332,8 @@ export default async function AdminProductsPage({
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
 
       {/* ── ส่วน "คำอธิบาย/ภาพปก 6 หมวด" (รอบที่ 134) ────────────────────────────

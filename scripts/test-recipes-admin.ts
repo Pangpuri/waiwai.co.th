@@ -92,11 +92,11 @@ test("recipes admin: ฝั่งเว็บสาธารณะต้อง�
 
 test("recipes admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 6, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    5,
-    "ไฟล์นี้มี 5 action (บันทึก · ย้าย/กู้คืนถังขยะ · อัปโหลดภาพ · ลบถาวร · กู้คืนประวัติ)",
+    6,
+    "ไฟล์นี้มี 6 action (บันทึก · ย้าย/กู้คืนถังขยะ · อัปโหลดภาพ · ลบถาวร · กู้คืนประวัติ · จัดลำดับ)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
@@ -291,8 +291,9 @@ test("recipes admin: พรีวิวต้องเรนเดอร์ท�
 
 test("reorder: whitelist ชนิด + parse ค่าลำดับ + มี action ที่ตรวจสิทธิ์/audit/refresh", () => {
   const lib = readFileSync("lib/admin/reorder.ts", "utf8");
-  const actions = readFileSync("app/admin/sort/actions.ts", "utf8");
-  const page = readFileSync("app/admin/sort/page.tsx", "utf8");
+  /* รอบที่ 300: จอรวม /admin/sort ถูกถอด ⇒ action/หน้าจออยู่ที่จอเมนูอาหารเอง */
+  const actions = readFileSync("app/admin/recipes/actions.ts", "utf8");
+  const page = readFileSync("app/admin/recipes/page.tsx", "utf8");
   const ui = readFileSync("features/admin/ui/sortable-list.tsx", "utf8");
 
   /* ความปลอดภัย: ชื่อตารางมาจาก whitelist + ค่าลำดับส่งเป็นพารามิเตอร์ */
@@ -304,8 +305,11 @@ test("reorder: whitelist ชนิด + parse ค่าลำดับ + มี 
   assert.ok(actions.includes('requireAdminUser("content")'), "action ต้องตรวจสิทธิ์ content");
   assert.ok(actions.includes("content-reorder"), "ต้องบันทึก audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
+  assert.ok(actions.includes('reorderRows("recipe"'), "action ต้องล็อก kind = recipe (ไม่รับจากเบราว์เซอร์)");
 
   assert.ok(page.includes("requireAdminUser"), "หน้าจอต้องตรวจสิทธิ์");
+  assert.ok(page.includes("<SortableList"), "แท็บจัดลำดับต้องใช้เครื่องมือกลาง");
+  assert.ok(page.includes('kind="recipe"'), "แท็บจัดลำดับของเมนูอาหารต้องล็อก kind = recipe");
   assert.ok(ui.includes("draggable"), "ต้องลากได้ (drag & drop)");
   assert.ok(ui.includes('name="order"'), "ต้องส่งลำดับทั้งชุดไปบันทึก");
   assert.ok(ui.includes("aria-label"), "ปุ่มเลื่อนต้องมี aria-label (a11y · ลากอย่างเดียวใช้กับคีย์บอร์ดไม่ได้)");

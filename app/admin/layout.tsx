@@ -72,7 +72,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       items: [
         { href: "/admin/media", label: messages.admin.mediaTitle },
         { href: "/admin/inbox", label: messages.admin.inboxTitle },
-        { href: "/admin/sort", label: messages.admin.sortNavLabel },
         { href: "/admin/preview-links", label: messages.admin.previewLinkTitle },
         { href: "/admin/trash", label: messages.admin.trashTitle },
       ],
@@ -98,7 +97,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "/admin/trash": "trash",
     "/admin/settings": "settings",
     "/admin/users": "users",
-    "/admin/sort": "content",
   };
 
   const visibleGroups: readonly AdminNavGroup[] = sidebarGroups

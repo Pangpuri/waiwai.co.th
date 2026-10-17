@@ -10,6 +10,8 @@ import {
   type CategorySaveState,
   type ProductSaveState,
 } from "@/features/admin/product-state";
+import type { ReorderState } from "@/features/admin/ui/sortable-list";
+import { parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath, refreshPublicSite } from "@/lib/cache/refresh";
@@ -317,4 +319,35 @@ export async function restoreProductRevisionAction(formData: FormData): Promise<
   revalidateAdminPath(LIST_PATH);
   revalidateAdminPath(`${LIST_PATH}/${id}`);
   await refreshPublicSite("page");
+}
+
+/**
+ * จัดลำดับสินค้า **ภายในหมวด** (รอบที่ 300) — ย้ายมาจากจอ `/admin/sort` ที่ถูกถอดออก
+ *
+ * ที่มา: เจ้าของสั่ง *"ที่เมนูจัดลำดับ … เป็นไปได้อยากลบเมนูนี้ออกไปแต่ไปเพิ่มแท็บตั้งค่าตามหมวดหมู่
+ * ที่จัดการแต่ละส่วนงานแทน … สินค้า ก็ไปอยู่กับสินค้า"*
+ * - `kind` ถูกล็อกที่ `"product"` (ไม่รับจากเบราว์เซอร์) ⇒ จอนี้แตะได้เฉพาะตารางสินค้า
+ * - ค่าลำดับมาจากช่อง `order=id1,id2,…` ที่ถูกตรวจด้วย `parseOrderCsv` + เขียนด้วยพารามิเตอร์ใน `reorderRows`
+ * - บันทึกแล้วต้องบอกเว็บให้สร้างหน้าใหม่ (ISR) เหมือนเดิม
+ */
+export async function reorderProductsAction(_previous: ReorderState, formData: FormData): Promise<ReorderState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { saved: 0, failed: true };
+
+  const ids = parseOrderCsv(field(formData, "order"));
+  if (ids.length === 0) return { saved: 0, failed: true };
+
+  const changed = await reorderRows("product", ids, user.email);
+  if (changed === 0) return { saved: 0, failed: true };
+
+  await recordAudit({
+    action: "content-reorder",
+    actorEmail: user.email,
+    target: "product",
+    detail: `rows=${String(changed)}`,
+  });
+
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { saved: changed, failed: false };
 }

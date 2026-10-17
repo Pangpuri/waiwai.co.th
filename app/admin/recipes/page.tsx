@@ -1,6 +1,8 @@
 import Link from "next/link";
 
-import { deleteRecipeForeverAction, trashRecipeAction } from "@/app/admin/recipes/actions";
+import { deleteRecipeForeverAction, reorderRecipesAction, trashRecipeAction } from "@/app/admin/recipes/actions";
+import { SortableList } from "@/features/admin/ui/sortable-list";
+import { listReorderItems, type ReorderItem } from "@/lib/admin/reorder";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
@@ -11,16 +13,20 @@ import { searchParamText } from "@/lib/search/params";
 /**
  * หลังบ้าน — รายการเมนูอาหาร (รอบที่ 135 · แบบ WordPress "Posts")
  *
- * รูปแบบตาม WP: แท็บ (ทั้งหมด/ฉบับร่าง/เผยแพร่/ถังขยะ) → ค้นหา → ตาราง
+ * รูปแบบตาม WP: แท็บ (ทั้งหมด/ฉบับร่าง/เผยแพร่/ถังขยะ/จัดลำดับ) → ค้นหา → ตาราง
  * - ฟอร์ม "ย้ายเข้าถังขยะ/กู้คืน" เป็น **ฟอร์มธรรมดา** (ไม่ต้องมี JS) — ใช้ Server Action ตรง ๆ
  * - ทุกอย่างตรวจสิทธิ์ด้วย `requireAdminUser("content")` ก่อนอ่านข้อมูล
  * - **ไม่มีแบ่งหน้าโดยเจตนา** — เมนูมีหลักสิบรายการ (ต่างจากข่าว 151 ชิ้น)
+ * - **แท็บ "จัดลำดับ" (รอบที่ 300)** — ย้ายมาจากจอ `/admin/sort` ที่ถูกถอดออก
  */
 
 const TAB_IDS = ["all", "draft", "published", "trash"] as const;
+/** แท็บทั้งหมดของจอ (รวม `sort` ที่ไม่ใช่แท็บของ repository) */
+const VIEW_IDS = [...TAB_IDS, "sort"] as const;
+type AdminRecipeView = (typeof VIEW_IDS)[number];
 
-function tabOf(value: string | undefined): AdminRecipeTab {
-  return TAB_IDS.find((tab) => tab === value) ?? "all";
+function viewOf(value: string | undefined): AdminRecipeView {
+  return VIEW_IDS.find((tab) => tab === value) ?? "all";
 }
 
 export default async function AdminRecipesPage({
@@ -34,32 +40,38 @@ export default async function AdminRecipesPage({
 
   const query = await searchParams;
   /* ⚠️ ผ่าน `searchParamText` เท่านั้น (ค่าซ้ำ = array · อักขระควบคุม/NUL ต้องถูกตัด) — รอบที่ 291 */
-  const tab = tabOf(searchParamText(query.tab));
+  const tab = viewOf(searchParamText(query.tab));
   const search = searchParamText(query.q, 80);
+  /* แท็บ `sort` ไม่ใช่แท็บของ repository ⇒ คิวรีรายการใช้ `all` แทน (แท็บ sort ไม่แสดงตาราง) */
+  const listTab: AdminRecipeTab = tab === "sort" ? "all" : tab;
 
-  const [counts, listed, library] = await Promise.all([
+  const [counts, listed, library, reorderItems] = await Promise.all([
     adminRecipeCounts(),
-    listRecipesForAdmin({ tab, search }),
+    listRecipesForAdmin({ tab: listTab, search }),
     listMedia(1),
+    tab === "sort" ? listReorderItems("recipe") : Promise.resolve<readonly ReorderItem[]>([]),
   ]);
 
-  const tabLabel: Record<AdminRecipeTab, string> = {
+  const tabLabel: Record<AdminRecipeView, string> = {
     all: m.recipesAdminTabAll,
     draft: m.recipesAdminTabDraft,
     published: m.recipesAdminTabPublished,
     trash: m.recipesAdminTabTrash,
+    /* แท็บที่ย้ายมาจากจอ /admin/sort (รอบที่ 300) */
+    sort: m.sortNavLabel,
   };
-  const tabCount: Record<AdminRecipeTab, number> = {
+  const tabCount: Record<AdminRecipeView, number | null> = {
     all: counts.all,
     draft: counts.draft,
     published: counts.published,
     trash: counts.trashed,
+    sort: null,
   };
 
-  function tabHref(target: AdminRecipeTab): string {
+  function tabHref(target: AdminRecipeView): string {
     const params = new URLSearchParams();
     if (target !== "all") params.set("tab", target);
-    if (search !== "") params.set("q", search);
+    if (search !== "" && target !== "sort") params.set("q", search);
     const qs = params.toString();
     return qs === "" ? "/admin/recipes" : `/admin/recipes?${qs}`;
   }
@@ -80,7 +92,7 @@ export default async function AdminRecipesPage({
       </div>
 
       <nav aria-label={m.recipesAdminTitle} className="mt-6 flex flex-wrap items-center gap-2">
-        {TAB_IDS.map((item) => (
+        {VIEW_IDS.map((item) => (
           <Link
             key={item}
             href={tabHref(item)}
@@ -89,11 +101,39 @@ export default async function AdminRecipesPage({
               item === tab ? "border-line bg-bg-subtle text-fg" : "border-line text-fg-muted hover:bg-bg-subtle"
             }`}
           >
-            {tabLabel[item]} ({tabCount[item]})
+            {tabCount[item] === null ? tabLabel[item] : `${tabLabel[item]} (${String(tabCount[item])})`}
           </Link>
         ))}
       </nav>
 
+      {tab === "sort" ? (
+        <section className="border-line bg-bg-subtle mt-6 rounded-2xl border p-4">
+          <h2 className="text-fg text-base font-semibold">{m.sortTitle}</h2>
+          <p className="text-fg-muted mt-1 text-sm">{m.sortHint}</p>
+          {reorderItems.length === 0 ? (
+            <p className="text-fg-muted mt-3 text-sm">{m.sortEmpty}</p>
+          ) : (
+            <div className="mt-3">
+              <SortableList
+                kind="recipe"
+                key={reorderItems.map((item) => item.id).join(",")}
+                items={reorderItems}
+                action={reorderRecipesAction}
+                strings={{
+                  up: m.sortUp,
+                  down: m.sortDown,
+                  save: m.sortSave,
+                  saveHint: m.sortSaveHint,
+                  handle: m.sortHandle,
+                  saved: m.sortSaved,
+                  failed: m.sortFailed,
+                }}
+              />
+            </div>
+          )}
+        </section>
+      ) : (
+        <>
       <form method="get" action="/admin/recipes" className="mt-4 flex flex-wrap items-end gap-2">
         {tab === "all" ? null : <input type="hidden" name="tab" value={tab} />}
         <label className="block min-w-64 flex-1">
@@ -212,6 +252,8 @@ export default async function AdminRecipesPage({
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
 
       <p className="text-fg-muted mt-8 text-xs">{m.recipesAdminTrashHint}</p>

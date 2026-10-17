@@ -123,8 +123,10 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
   { url: "/admin/trash/thumbnail/nope", admin: true, expect: [404], group: "admin" },
   { url: "/admin/preview-links", admin: true, expect: [200], group: "admin" },
   { url: "/admin/users", admin: true, expect: [200], must: ["สร้างบัญชี"], group: "admin" },
-  { url: "/admin/sort", admin: true, expect: [200], group: "admin" },
-  { url: "/admin/sort?kind=nope", admin: true, expect: [200], group: "admin" },
+  { url: "/admin/products?tab=sort", admin: true, expect: [200], must: ["จัดลำดับ"], group: "admin" },
+  { url: "/admin/recipes?tab=sort", admin: true, expect: [200], must: ["จัดลำดับ"], group: "admin" },
+  /* รอบที่ 300: จอรวม "จัดลำดับ" ถูกถอด — ย้ายเข้าแท็บของแต่ละส่วน */
+  { url: "/admin/sort", admin: true, expect: [404], note: "ถอดจอรวมแล้ว (รอบ 300)", group: "admin" },
   { url: "/admin/denied", admin: true, expect: [200], group: "admin" },
   { url: "/admin/careers", admin: true, expect: [200], must: ["ตำแหน่ง"], group: "admin" },
   { url: "/admin/careers?tab=nope", admin: true, expect: [200], group: "admin" },
@@ -210,7 +212,8 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
   { url: "/admin/products/p14704?revision=a&revision=b", admin: true, expect: [200], group: "fuzz" },
   { url: "/admin/news/n148398?revision=a&revision=b", admin: true, expect: [200], group: "fuzz" },
   { url: "/admin/recipes/r134712?revision=a&revision=b", admin: true, expect: [200], group: "fuzz" },
-  { url: "/admin/sort?kind=a&kind=b&category=a&category=b", admin: true, expect: [200], group: "fuzz" },
+  { url: "/admin/products?tab=sort&category=a&category=b", admin: true, expect: [200], group: "fuzz" },
+  { url: "/admin/recipes?tab=sort&q=a&q=b", admin: true, expect: [200], group: "fuzz" },
 ];
 
 /**

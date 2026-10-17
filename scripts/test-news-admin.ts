@@ -338,9 +338,13 @@ test("news admin: ต้องไม่มีทาง 'จัดลำดับ
   assert.ok(!reorder.includes('news: "news"'), "ห้ามมี kind news ในทะเบียนจัดลำดับ");
   assert.ok(!/^  news: "/m.test(reorder), "ห้ามเหลือคอลัมน์ของข่าวในทะเบียนจัดลำดับ");
 
-  const sortPage = readFileSync("app/admin/sort/page.tsx", "utf8");
-  assert.ok(!sortPage.includes('kind: "news"'), "จอจัดลำดับต้องไม่มีแท็บข่าว");
-
-  /* ยังมี kind อื่นให้จัดลำดับตามปกติ (ไม่เผลอปิดทั้งจอ) */
-  assert.ok(sortPage.includes('kind: "product"'), "จอจัดลำดับยังต้องมีสินค้า/เมนู/หมวดให้จัด");
+  /*
+    รอบที่ 300: จอรวม `/admin/sort` ถูกถอด ⇒ ตรวจที่จอของแต่ละส่วนแทน
+    (สินค้า/เมนูอาหาร ยังมีแท็บจัดลำดับของตัวเอง · ข่าวต้องไม่มี)
+  */
+  const productsPage = readFileSync("app/admin/products/page.tsx", "utf8");
+  const recipesPage = readFileSync("app/admin/recipes/page.tsx", "utf8");
+  assert.ok(productsPage.includes('kind="product"'), "จอสินค้ายังต้องมีจัดลำดับของตัวเอง");
+  assert.ok(recipesPage.includes('kind="recipe"'), "จอเมนูอาหารยังต้องมีจัดลำดับของตัวเอง");
+  assert.ok(!productsPage.includes('"news"') && !recipesPage.includes('kind="news"'), "ห้ามมีแท็บจัดลำดับข่าว");
 });

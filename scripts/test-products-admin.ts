@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -86,13 +86,30 @@ const publicList = readFileSync("features/products/ui/product-list.tsx", "utf8")
 /** นับแท็กฟอร์มจริง (`<form` + ช่องว่าง/ขึ้นบรรทัดใหม่) — ไม่นับที่พูดถึงในคอมเมนต์ */
 const formTags = (value: string): number => (value.match(/<form[ \n]/g) ?? []).length;
 
+test("products admin: แท็บ \"จัดลำดับ\" อยู่ในจอสินค้า + ไม่มีเมนู/เส้นทาง /admin/sort แล้ว (รอบที่ 300)", () => {
+  /* เจ้าของ: "สินค้า ก็ไปอยู่กับสินค้า … เพิ่มแท็บจัดการในส่วนนั้น ๆ แทน" */
+  assert.ok(listPage.includes('{ id: "sort"'), "จอสินค้าต้องมีแท็บจัดลำดับ");
+  assert.ok(listPage.includes("<SortableList"), "ต้องใช้เครื่องมือจัดลำดับกลาง");
+  assert.ok(listPage.includes('kind="product"'), "ต้องล็อกชนิดเป็นสินค้า");
+  assert.ok(listPage.includes("reorderProductsAction"), "ต้องใช้ action ของจอสินค้าเอง");
+  assert.ok(actions.includes('reorderRows("product"'), "action ต้องล็อก kind = product");
+
+  const layout = codeOf("app/admin/layout.tsx");
+  assert.ok(!layout.includes("/admin/sort"), "เมนูด้านข้างต้องไม่มี /admin/sort แล้ว");
+  assert.equal(
+    existsSync(path.join(PROJECT_ROOT, "app/admin/sort/page.tsx")),
+    false,
+    "เส้นทางเดิมต้องถูกถอดออก (ไม่เหลือจอซ้ำ)",
+  );
+});
+
 test("products admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 6, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 7, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    6,
-    "ไฟล์นี้มี 6 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ · ย้าย/กู้คืนถังขยะ · ลบถาวร · กู้คืนประวัติ)",
+    7,
+    "ไฟล์นี้มี 7 action (บันทึกสินค้า · บันทึกหมวด · อัปโหลดภาพ · ย้าย/กู้คืนถังขยะ · ลบถาวร · กู้คืนประวัติ · จัดลำดับ)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");
@@ -260,7 +277,7 @@ test("products admin: ปุ่มลบถาวร/กู้คืนโผล
   );
   assert.ok(listPage.includes("adminProductCounts"), "หัวแท็บต้องมีตัวนับจากฐานข้อมูล");
   assert.ok(
-    listPage.includes('searchParamText(query.tab) === "trash"'),
+    listPage.includes("viewOf(searchParamText(query.tab))"),
     "ต้องอ่านแท็บจาก query ผ่าน searchParamText (ค่าซ้ำ = array ⇒ เคย 500 · รอบที่ 291)",
   );
   assert.ok(!/query\.tab === "trash"/.test(listPage), "ห้ามเทียบค่าดิบจาก URL ตรง ๆ (array ได้)");

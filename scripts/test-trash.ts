@@ -372,8 +372,15 @@ test("trash-content: ทะเบียนหน้าจอของถัง�
     assert.ok(file !== undefined, `${kind}: ต้องประกาศไฟล์หน้าจอในเทสต์ด้วย`);
     const source = sourceOf(file);
 
-    /* แท็บต้องมีจริงในหน้าจอนั้น — ตรวจทั้งแบบ TAB_IDS และแบบเทียบสตริงตรง (products ใช้แบบหลัง) */
-    const hasTabId = /\["all", "draft", "published", "trash"\]/.test(source) || source.includes('tab === "trash"');
+    /*
+      แท็บต้องมีจริงในหน้าจอนั้น — ตรวจ 3 รูปแบบที่โปรเจกต์ใช้จริง:
+      · `TAB_IDS` (recipes/news) · `tab === "trash"` (เดิมของ products) · `view === "trash"` (products หลังรอบ 300
+      ที่แยก `sort` ออกจากแท็บของ repository)
+    */
+    const hasTabId =
+      /\["all", "draft", "published", "trash"\]/.test(source) ||
+      source.includes('tab === "trash"') ||
+      source.includes('view === "trash"');
     assert.ok(hasTabId, `${file}: ต้องรองรับแท็บ "trash"`);
 
     /* พาธฐานต้องตรงกับทะเบียนกลาง
