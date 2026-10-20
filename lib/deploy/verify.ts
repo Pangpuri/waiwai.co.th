@@ -24,6 +24,8 @@ export type DeployAssessment = {
     readonly categoryLinks: number;
     readonly newsLinks: number;
     readonly productCounts: readonly number[];
+    /** จำนวนภาพจากคลัง (`/media/<id>`) ที่พบในหน้า — หลักฐานว่า "อ่านตาราง media ได้" */
+    readonly mediaImages: number;
     readonly hasTestData: boolean;
     readonly hasBrandLogo: boolean;
   };
@@ -31,18 +33,27 @@ export type DeployAssessment = {
 
 const CATEGORY_PATTERN = /\/(?:th|en)\/products\/(?:instant-noodles|dried-vermicelli|serda|quick-zabb|noodie|rod-ded)/g;
 const NEWS_LINK_PATTERN = /\/(?:th|en)\/news\/\d+/g;
-const COUNT_PATTERN = /(\d+)\s*(?:รายการ|items)/g;
+/*
+ * ⚠️ บทเรียน 2026-10-20 (ด่านเคย "เขียวหลอก"): แพตเทิร์นเดิม `(\d+)\s*(?:รายการ|items)`
+ * ไปแมตช์ **คลาส CSS `items-…` ของ Tailwind** (`h-16 items-center` ⇒ ได้ `16`)
+ * ⇒ เงื่อนไข "ไม่พบจำนวนสินค้า > 0" ไม่มีทางตกเลย (ทุกหน้าแรกมีคลาสนั้น)
+ * ⇒ แก้ให้ตัวหน่วยต้องไม่ตามด้วยตัวอักษร/ขีด (`(?![\w-])`) และเพิ่มหลักฐานที่สอง:
+ *   **ภาพจากคลัง `/media/<id>`** ซึ่งมีได้ก็ต่อเมื่ออ่านตาราง `media` ได้
+ *   (หน้าแรกยุคบล็อกแสดงจำนวนเป็น `(4)` ไม่ใช่ "N รายการ" ⇒ ข้อความจำนวนอาจไม่มีจริง)
+ */
+const COUNT_PATTERN = /(\d+)\s*(?:รายการ|items)(?![\w-])/g;
 
 /**
  * ตรวจหน้าแรก (TH หรือ EN) ว่าดึงข้อมูลจริงจากฐานข้อมูลได้ไหม
- * ใช้ "ร่องรอยที่พิสูจน์ได้" จากการเรนเดอร์จริง: ลิงก์หมวดสินค้า 6 ใบ · จำนวนสินค้า · ลิงก์ข่าว · ไม่มีข้อความทดสอบ
+ * ใช้ "ร่องรอยที่พิสูจน์ได้" จากการเรนเดอร์จริง: ลิงก์หมวดสินค้า 6 ใบ · จำนวนสินค้า/ภาพจากคลัง · ลิงก์ข่าว · ไม่มีข้อความทดสอบ
  */
 export function assessHomePage(html: string): DeployAssessment {
   const categoryLinks = new Set(html.match(CATEGORY_PATTERN) ?? []).size;
   const newsLinks = new Set(html.match(NEWS_LINK_PATTERN) ?? []).size;
   const productCounts = [...html.matchAll(COUNT_PATTERN)].map((match) => Number(match[1] ?? "0"));
-  /* มีข้อมูลจริง = มีอย่างน้อยหนึ่งหมวดที่บอกจำนวน > 0 */
-  const hasNumbers = productCounts.some((value) => value > 0);
+  const mediaImages = mediaImageIds(html).length;
+  /* มีข้อมูลจริง = มีจำนวนสินค้า > 0 (ถ้าหน้านั้นแสดงตัวเลข) หรือมีภาพจากคลังที่ต้องอ่านจาก DB */
+  const hasNumbers = productCounts.some((value) => value > 0) || mediaImages > 0;
   const hasTestData = /ข้อมูลทดสอบ|Test data|รส XXX/.test(html);
   const hasBrandLogo = html.includes("/brand/logo-navbar.png") || html.includes("logo-navbar");
 
@@ -59,7 +70,7 @@ export function assessHomePage(html: string): DeployAssessment {
     issues.push({
       code: "no-product-count",
       message:
-        "ไม่พบจำนวนสินค้าที่มากกว่า 0 — น่าจะอ่านฐานข้อมูลไม่ได้ " +
+        "ไม่พบร่องรอยข้อมูลสินค้าจากฐานข้อมูล (ทั้งจำนวนสินค้าและภาพจากคลัง /media/) — น่าจะอ่านฐานข้อมูลไม่ได้ " +
         "(ตรวจ: ตั้ง DATABASE_URL แล้วหรือยัง · ต้องเป็น endpoint ตรง ไม่ใช่ URL ของ pooler)",
     });
   }
@@ -76,15 +87,20 @@ export function assessHomePage(html: string): DeployAssessment {
     issues.push({ code: "no-brand", message: "ไม่พบโลโก้แบรนด์ในหน้า (โครงเว็บอาจเพี้ยน)" });
   }
 
-  const facts = { categoryLinks, newsLinks, productCounts, hasTestData, hasBrandLogo };
+  const facts = { categoryLinks, newsLinks, productCounts, mediaImages, hasTestData, hasBrandLogo };
   const ok = issues.length === 0;
+  const positiveCounts = productCounts.filter((value) => value > 0);
+  const evidence =
+    positiveCounts.length > 0
+      ? `จำนวนที่อ่านได้ ${positiveCounts.slice(0, 6).join("/")}`
+      : `ภาพจากคลัง ${mediaImages} ใบ (จำนวนสินค้าแสดงเป็นวงเล็บ)`;
 
   return {
     ok,
     issues,
     facts,
     summary: ok
-      ? `✓ หน้าเว็บดึงข้อมูลจริงได้ — หมวดสินค้า ${categoryLinks}/6 · จำนวนที่อ่านได้ ${productCounts.slice(0, 6).join("/")} · ข่าว ${newsLinks} ใบ`
+      ? `✓ หน้าเว็บดึงข้อมูลจริงได้ — หมวดสินค้า ${categoryLinks}/6 · ${evidence} · ข่าว ${newsLinks} ใบ`
       : `✗ หน้าเว็บดูเหมือน "ว่างเงียบ" (${issues.length} จุด) — ดูรายละเอียดด้านบน`,
   };
 }
@@ -163,6 +179,34 @@ export function isVercelProtectionPage(html: string): boolean {
 }
 
 /**
+ * เก็บ id ของภาพในคลังจาก HTML แยกเป็น 2 ทาง (เรียงตามที่พบ)
+ * 1) เส้นทางที่แอปใช้จริง: `next/image` ครอบพาธ `/media/<id>`
+ * 2) path ตรง ๆ — ต้องไม่ใช่ของ Next (`_next/static/media/…`) และต้องไม่ลงท้ายด้วยนามสกุลไฟล์
+ */
+function mediaIdsOf(html: string): { readonly nextImage: readonly string[]; readonly direct: readonly string[] } {
+  const nextImage = [...html.matchAll(/\/_next\/image\?url=%2Fmedia%2F([A-Za-z0-9_-]+)/g)]
+    .map((match) => match[1])
+    .filter((id): id is string => id !== undefined);
+
+  const direct: string[] = [];
+  for (const match of html.matchAll(/(?:^|["'(])\/media\/([A-Za-z0-9_-]+)["')?]/g)) {
+    const id = match[1];
+    if (id !== undefined && !/\.[a-z0-9]{2,4}$/i.test(id)) direct.push(id);
+  }
+
+  return { nextImage, direct };
+}
+
+/**
+ * id ของภาพในคลัง**ทั้งหมด** (ไม่ซ้ำ) — ใช้เป็นหลักฐานว่า "อ่านตาราง `media` ได้"
+ * (หน้าแรกยุคบล็อกไม่แสดงข้อความ "N รายการ" แล้ว ⇒ ใช้ภาพจากคลังเป็นร่องรอยข้อมูลจริงแทน)
+ */
+export function mediaImageIds(html: string): readonly string[] {
+  const { nextImage, direct } = mediaIdsOf(html);
+  return [...new Set([...nextImage, ...direct])];
+}
+
+/**
  * ดึง id ของภาพในคลัง (`/media/<id>`) จาก HTML เพื่อยิงตรวจจริง 1 รูป
  *
  * ⚠️ บทเรียนรอบที่ 122: ตัวดึงรุ่นแรกใช้แพตเทิร์นหลวม `/media/…` ⇒ ไปโดน path ของ **ฟอนต์** ที่ Next
@@ -171,15 +215,6 @@ export function isVercelProtectionPage(html: string): boolean {
  *   และถ้าจะดูจาก path ตรง ๆ ต้องไม่ใช่ `/_next/static/...` และต้องไม่ลงท้ายด้วยนามสกุลไฟล์
  */
 export function mediaIdFromHtml(html: string): string | null {
-  /* 1) เส้นทางที่แอปใช้จริง: next/image ครอบพาธ /media/<id> */
-  const viaNextImage = html.match(/\/_next\/image\?url=%2Fmedia%2F([A-Za-z0-9_-]+)/);
-  if (viaNextImage?.[1] !== undefined) return viaNextImage[1];
-
-  /* 2) path ตรง ๆ — ต้องไม่ใช่ของ Next (_next/static/media/…) และต้องไม่ใช่นามสกุลไฟล์ (ฟอนต์/ไอคอน) */
-  for (const match of html.matchAll(/(?:^|["'(])\/media\/([A-Za-z0-9_-]+)["')?]/g)) {
-    const id = match[1];
-    if (id !== undefined && !/\.[a-z0-9]{2,4}$/i.test(id)) return id;
-  }
-
-  return null;
+  const { nextImage, direct } = mediaIdsOf(html);
+  return nextImage[0] ?? direct[0] ?? null;
 }

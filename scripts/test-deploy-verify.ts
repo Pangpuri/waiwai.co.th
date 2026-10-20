@@ -7,6 +7,7 @@ import {
   assessNewsListPage,
   isVercelProtectionPage,
   mediaIdFromHtml,
+  mediaImageIds,
   pooledEndpointWarning,
 } from "@/lib/deploy/verify";
 
@@ -54,6 +55,56 @@ test("deploy: หน้าแรกที่ไม่มีข้อมูล = 
   const message = result.issues.find((issue) => issue.code === "no-product-count")?.message ?? "";
   assert.ok(message.includes("DATABASE_URL"), "ต้องชี้ให้ตรวจ DATABASE_URL");
   assert.ok(message.includes("pooler"), "ต้องเตือนเรื่อง URL ของ pooler");
+});
+
+test("deploy: คลาส CSS `items-…` ต้องไม่ถูกนับเป็นจำนวนสินค้า (บทเรียน 2026-10-20)", () => {
+  /*
+   * เคสจริง: แพตเทิร์นเดิม `(\d+)\s*(?:รายการ|items)` แมตช์ `h-16 items-center` ⇒ ได้ 16
+   * ⇒ ด่าน "ไม่พบจำนวนสินค้า" เขียวตลอดกาล (ทั้งที่หน้าเว็บไม่มีข้อมูล)
+   * หน้านี้มีโครงครบ (โลโก้ · 6 หมวด · ข่าว 3) แต่ไม่มีข้อมูลสินค้า/ภาพจากคลังเลย ⇒ ต้องตก
+   */
+  const cssOnly = `
+    <img src="/_next/image?url=%2Fbrand%2Flogo-navbar.png&w=640" alt="">
+    ${["instant-noodles", "dried-vermicelli", "serda", "quick-zabb", "noodie", "rod-ded"]
+      .map((slug) => `<a href="/th/products/${slug}">x</a>`)
+      .join("")}
+    <span class="flex h-16 items-center justify-center"><span class="items-end h-40"></span></span>
+    <a href="/th/news/148398">ข่าว</a><a href="/th/news/148175">ข่าว</a><a href="/th/news/148172">ข่าว</a>
+  `;
+  const result = assessHomePage(cssOnly);
+  assert.equal(result.ok, false, "คลาส CSS ไม่ใช่หลักฐานว่ามีข้อมูลสินค้า");
+  assert.deepEqual(result.facts.productCounts, [], "ต้องไม่อ่านเลขจากคลาส items-center/items-end");
+  assert.ok(result.issues.some((issue) => issue.code === "no-product-count"));
+});
+
+test("deploy: หน้าแรกแบบบล็อก (จำนวนเป็นวงเล็บ) ผ่านได้ด้วยภาพจากคลัง /media/", () => {
+  /*
+   * หน้าแรกยุคปัจจุบัน (block builder) แสดงจำนวนสินค้าเป็น `(4)` ไม่ใช่ "N รายการ"
+   * หลักฐานข้อมูลจริงจึงเป็นภาพจากคลัง ซึ่งมีได้ก็ต่อเมื่ออ่านตาราง media ได้
+   */
+  const blockHtml = `
+    <img src="/_next/image?url=%2Fbrand%2Flogo-navbar.png&w=640" alt="">
+    ${["instant-noodles", "dried-vermicelli", "serda", "quick-zabb", "noodie", "rod-ded"]
+      .map((slug) => `<a href="/th/products/${slug}">x</a>`)
+      .join("")}
+    <span class="flex h-16 items-center"></span><span class="text-[11px]">(<!-- -->4<!-- -->)</span>
+    <img src="/_next/image?url=%2Fmedia%2FJIIKynFuOs4j&w=3840&q=75" alt="">
+    <a href="/th/news/148398">ข่าว</a><a href="/th/news/148175">ข่าว</a><a href="/th/news/148172">ข่าว</a>
+  `;
+  const result = assessHomePage(blockHtml);
+  assert.equal(result.ok, true);
+  assert.equal(result.facts.mediaImages, 1);
+  assert.ok(result.summary.includes("ภาพจากคลัง 1 ใบ"), result.summary);
+});
+
+test("deploy: นับภาพจากคลังไม่ซ้ำ และต้องไม่นับฟอนต์ของ Next", () => {
+  const html =
+    '<img src="/_next/image?url=%2Fmedia%2Faaa111&w=32&amp;q=75">' +
+    '<img src="/_next/image?url=%2Fmedia%2Faaa111&amp;w=64&amp;q=75">' +
+    '<img src="/_next/image?url=%2Fmedia%2Fbbb222&amp;w=32&amp;q=75">' +
+    '<link rel="preload" href="/_next/static/media/411573def610439a-s.p.woff2" as="font">';
+  assert.deepEqual([...mediaImageIds(html)].sort(), ["aaa111", "bbb222"]);
+  assert.equal(mediaIdFromHtml('<link rel="preload" href="/_next/static/media/x.woff2" as="font">'), null);
 });
 
 test("deploy: ข้อมูลทดสอบหลุดขึ้นเว็บจริง = ไม่ผ่าน", () => {
