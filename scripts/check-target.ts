@@ -1,4 +1,5 @@
 import { getPool, closePool } from "@/db/pool";
+import { describeMediaRefIssue, mediaRefIssues, type MediaCatalogEntry, type PageDocumentRow } from "@/lib/db/media-refs";
 import { describePlan, planMigrations, type MigrationState } from "@/lib/db/migrations";
 import { FORM_ROLE, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, READ_ROLE } from "./db-roles.ts";
 import { loadMigrationFiles } from "./migration-files.ts";
@@ -100,6 +101,30 @@ async function readMissingRoles(): Promise<readonly string[]> {
   return wanted.filter((role) => !found.has(role));
 }
 
+/**
+ * อ่านเอกสารหน้าเว็บ (ทุกแถว) + รายการภาพในคลัง — **อ่านอย่างเดียว**
+ * ใช้ตรวจว่า `/media/<id>` ที่เอกสารอ้างยังมีจริงบนปลายทาง (เคสจริง 2026-10-20: ภาพ /about หายทั้งชุด)
+ */
+async function readMediaReferenceData(): Promise<{
+  readonly rows: readonly PageDocumentRow[];
+  readonly catalog: readonly MediaCatalogEntry[];
+}> {
+  const docs = await getPool().query<{ page: string; status: string; document: unknown }>(
+    `select page, status, document from page_document order by page, status`,
+  );
+  const media = await getPool().query<{ id: string; deleted_at: Date | string | null }>(
+    `select id, deleted_at from media`,
+  );
+  return {
+    rows: docs.rows.map((row) => ({ page: row.page, status: row.status, document: row.document })),
+    /* ⚠️ `timestamptz` มาจาก pg เป็น Date ⇒ แปลงเป็น ISO ก่อนใช้เป็นค่าในตรรกะบริสุทธิ์ */
+    catalog: media.rows.map((row) => ({
+      id: row.id,
+      deletedAt: row.deleted_at === null ? null : new Date(row.deleted_at).toISOString(),
+    })),
+  };
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
@@ -165,6 +190,20 @@ async function main(): Promise<void> {
     for (const line of outcome.failures) failures.push(`${label}: ${line}`);
   }
 
+  /*
+    ── ④ ภาพที่เอกสารอ้างต้องมีจริงบนปลายทาง (รอบที่ 305 · เคสจริง 2026-10-20) ─────────────
+    `db:sync` ไม่ซิงก์ตาราง `media` (id คนละชุดระหว่างเครื่อง/คลาวด์)
+    ⇒ เอกสารที่ขึ้นคลาวด์อาจอ้าง `/media/<id>` ที่ไม่มีอยู่ ⇒ หน้าเว็บ 200 แต่ **ภาพ 404 ทุกใบ**
+    published = ตก (เว็บจริงเสีย) · draft = เตือน (พรีวิวเสียแต่ยังไม่ขึ้นเว็บ)
+  */
+  const mediaData = await readMediaReferenceData();
+  const mediaIssues = mediaRefIssues(mediaData.rows, mediaData.catalog);
+  for (const issue of mediaIssues) {
+    const line = describeMediaRefIssue(issue);
+    if (issue.status === "published") failures.push(line);
+    else warnings.push(`${line} — ฉบับร่าง (พรีวิวจะเสีย แต่ยังไม่ขึ้นเว็บ)`);
+  }
+
   if (options.strict && warnings.length > 0) {
     failures.push(...warnings);
     warnings.length = 0;
@@ -189,6 +228,16 @@ async function main(): Promise<void> {
           publicTables: tableCount,
           missingRoles,
           probes: { read: probeJson(readProbe), form: probeJson(formProbe) },
+          mediaRefs: {
+            documents: mediaData.rows.length,
+            catalog: mediaData.catalog.length,
+            issues: mediaIssues.map((issue) => ({
+              page: issue.page,
+              status: issue.status,
+              reason: issue.reason,
+              ids: issue.ids,
+            })),
+          },
           failures,
           warnings,
         },
@@ -204,6 +253,11 @@ async function main(): Promise<void> {
       process.stdout.write("  (ยังไม่มีตาราง schema_migration — ยังไม่เคยรันด้วยระบบนี้)\n");
     }
     process.stdout.write(`ตารางใน schema public: ${String(tableCount)}\n`);
+    process.stdout.write(
+      mediaIssues.length === 0
+        ? `ภาพที่เอกสารอ้าง: ครบ (${String(mediaData.rows.length)} เอกสาร · คลัง ${String(mediaData.catalog.length)} ภาพ)\n`
+        : `ภาพที่เอกสารอ้าง: มีปัญหา ${String(mediaIssues.length)} แถว (${String(mediaData.rows.length)} เอกสาร · คลัง ${String(mediaData.catalog.length)} ภาพ)\n`,
+    );
     process.stdout.write(
       missingRoles.length === 0
         ? "role least privilege: ครบ (waiwai_public_ro · waiwai_public_form)\n"
