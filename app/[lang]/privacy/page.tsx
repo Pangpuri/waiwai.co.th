@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
-import { SampleNotice } from "@/features/shell/ui/sample-notice";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -30,7 +29,8 @@ export const revalidate = 300;
  * - หน้านี้ **ไม่ใช่แถวในตาราง `page`** (ตารางนั้นผูกกับเมนูหลัก 9 รายการ) ⇒ ไม่มีช่องแก้ SEO จากหลังบ้าน
  *   และไม่ปรากฏในเมนู — ปรากฏใน sitemap ผ่านรายการ "หน้าในโค้ด" ที่ `lib/pages/paths.ts`
  *
- * ⚠️ เนื้อหาเป็น "ร่าง" รอเจ้าของ/ที่ปรึกษากฎหมายตรวจ (มีกล่องแจ้งบนหน้า)
+ * ℹ️ ฉบับนี้ปรับถ้อยคำจากนโยบายเดิมของบริษัท + ตรวจให้ตรงกับสิ่งที่ระบบทำจริง (ระยะเก็บ/ผู้ให้บริการ)
+ *    และมีวันที่มีผลแล้ว — ไม่มีป้าย "ร่าง" บนหน้าจออีก
  */
 
 /** ป้ายชื่อชั้นข้อมูลเป็นภาษาไทย/อังกฤษ — Record ทำให้เพิ่มชั้นข้อมูลใหม่แล้วลืมป้าย = compile error */
@@ -77,6 +77,13 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
 
   const labels = retentionLabels(m);
 
+  const definitions = [
+    { title: m.definitionCompanyTitle, body: m.definitionCompanyBody },
+    { title: m.definitionPersonalTitle, body: m.definitionPersonalBody },
+    { title: m.definitionSensitiveTitle, body: m.definitionSensitiveBody },
+    { title: m.definitionCommitteeTitle, body: m.definitionCommitteeBody },
+  ];
+
   const collected = [
     { title: m.collectContactTitle, body: m.collectContactBody },
     { title: m.collectNewsletterTitle, body: m.collectNewsletterBody },
@@ -89,23 +96,33 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
     { title: m.rightAccessTitle, body: m.rightAccessBody },
     { title: m.rightCorrectTitle, body: m.rightCorrectBody },
     { title: m.rightDeleteTitle, body: m.rightDeleteBody },
+    { title: m.rightRestrictTitle, body: m.rightRestrictBody },
+    { title: m.rightPortabilityTitle, body: m.rightPortabilityBody },
     { title: m.rightObjectTitle, body: m.rightObjectBody },
     { title: m.rightWithdrawTitle, body: m.rightWithdrawBody },
     { title: m.rightComplainTitle, body: m.rightComplainBody },
   ];
 
-  const controller = [
-    { label: m.controllerNameLabel, value: org.legalName[lang], href: null as string | null },
+  /* ช่องทางที่ยังว่าง (เช่น อีเมล) ไม่ต้องแสดงแถวว่างบนหน้าเว็บ */
+  const controller: readonly {
+    readonly label: string;
+    readonly value: string;
+    readonly href: string | null;
+  }[] = [
+    { label: m.controllerNameLabel, value: org.legalName[lang], href: null },
     { label: m.controllerAddressLabel, value: org.address[lang], href: null },
     { label: m.controllerPhoneLabel, value: org.phone, href: org.phone === "" ? null : `tel:${org.phone}` },
-    { label: m.controllerEmailLabel, value: org.email, href: org.email === "" ? null : `mailto:${org.email}` },
+    ...(org.email === ""
+      ? []
+      : [{ label: m.controllerEmailLabel, value: org.email, href: `mailto:${org.email}` }]),
+    { label: m.controllerDpoLabel, value: m.controllerDpoValue, href: null },
   ];
 
   const sections: readonly { readonly title: string; readonly body: string }[] = [
     { title: m.sharingTitle, body: m.sharingBody },
     { title: m.cookiesTitle, body: m.cookiesBody },
     { title: m.securityTitle, body: m.securityBody },
-    { title: m.contactTitle, body: m.contactBody },
+    { title: m.reviewTitle, body: m.reviewBody },
   ];
 
   return (
@@ -130,8 +147,6 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">{m.intro}</p>
-
-          <SampleNotice text={m.draftNotice} />
         </div>
       </section>
 
@@ -163,6 +178,20 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
           </dl>
         </section>
 
+        {/* คำนิยาม — ปรับถ้อยคำจากนโยบายเดิมของบริษัท */}
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-2xl font-bold text-fg">{m.definitionsTitle}</h2>
+          <p className="text-base leading-relaxed text-fg-muted">{m.definitionsIntro}</p>
+          <ul className="flex flex-col gap-3">
+            {definitions.map((item) => (
+              <li key={item.title} className="rounded-2xl border border-line bg-surface p-5">
+                <p className="text-fg text-sm font-semibold">{item.title}</p>
+                <p className="text-fg-muted mt-1 text-sm leading-relaxed">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         {/* เก็บข้อมูลอะไร */}
         <section className="flex flex-col gap-3">
           <h2 className="font-display text-2xl font-bold text-fg">{m.collectTitle}</h2>
@@ -175,6 +204,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
               </li>
             ))}
           </ul>
+          <p className="text-fg-muted text-sm leading-relaxed">{m.collectNote}</p>
         </section>
 
         {/* ใช้ทำอะไร */}
@@ -189,6 +219,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
               </li>
             ))}
           </ul>
+          <p className="text-fg-muted text-sm leading-relaxed">{m.purposeBasis}</p>
         </section>
 
         {/* ระยะเวลาเก็บ — ดึงจากค่ากลางเดียวกับตัวลบข้อมูล */}
@@ -234,6 +265,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
               </li>
             ))}
           </ul>
+          <p className="text-fg-muted text-sm leading-relaxed">{m.rightsNote}</p>
         </section>
 
         {sections.map((section) => (
@@ -242,6 +274,17 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
             <p className="text-base leading-relaxed text-fg-muted">{section.body}</p>
           </section>
         ))}
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-display text-2xl font-bold text-fg">{m.contactTitle}</h2>
+          <p className="text-base leading-relaxed text-fg-muted">{m.contactBody}</p>
+          <Link
+            href={localePath(lang, "/contact")}
+            className="text-link focus-visible:ring-ring w-fit text-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {m.contactFormLabel}
+          </Link>
+        </section>
 
         <section className="flex flex-col gap-2 rounded-2xl border border-line bg-surface-raised p-5 sm:p-6">
           <h2 className="text-fg text-sm font-semibold">{m.updatedTitle}</h2>

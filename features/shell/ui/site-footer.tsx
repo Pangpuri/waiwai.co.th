@@ -37,7 +37,11 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       links: column.links.map((link) => ({ id: `${column.id}-${link.labelKey}`, label: messages.footer.links[link.labelKey], href: link.href })),
     })),
     socials: social.map((item) => ({ id: item.id, label: item.label, href: item.href })),
-    contact: { address: siteContact.address, phone: siteContact.phone, email: siteContact.email },
+    contact: {
+      address: locale === "en" && siteContact.addressEn.trim() !== "" ? siteContact.addressEn : siteContact.address,
+      phone: siteContact.phone,
+      email: siteContact.email,
+    },
   });
 
   const contact = view.contact;

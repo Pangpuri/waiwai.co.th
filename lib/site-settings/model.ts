@@ -60,8 +60,8 @@ export function defaultSiteSettings(messages: Messages): SiteSettings {
     defaultOgImage: "",
     favicon: "",
     organization: {
-      legalName: { th: SITE.legalName, en: SITE.legalName },
-      address: { th: SITE.contact.address, en: SITE.contact.address },
+      legalName: { th: SITE.legalName, en: SITE.legalNameEn },
+      address: { th: SITE.contact.address, en: SITE.contact.addressEn },
       phone: SITE.contact.phone,
       email: SITE.contact.email,
       hours: { th: "", en: "" },

@@ -1,22 +1,20 @@
 /**
  * Dictionary area: the /privacy page (privacy policy) — X2b
  *
- * ⚠️ This copy is a **draft** written from "what the system actually does" (the retention periods come from
- *    lib/retention/plan.ts). It must be reviewed by the site owner / legal adviser before it goes live — see
- *    PRODUCT_ROADMAP.md § 9.
+ * ⚠️ This version adapts the company's **previous policy** and checks it against what the system
+ *    actually does (the retention periods come from `lib/retention/plan.ts`). It has an effective
+ *    date and version, so there is no "draft" badge on the page.
  */
 export const privacyPage = {
   meta: {
     title: "Privacy policy",
     description:
-      "Wai Wai's privacy policy — what we collect, why we use it, how long we keep it, and how to exercise your rights.",
+      "Thai Food Products Factory's personal data protection policy for the Wai Wai website — what we collect, why we use it, how long we keep it, who we share it with, and how to exercise your rights.",
   },
   eyebrow: "Privacy",
   title: "Privacy policy",
   intro:
-    "This policy explains what personal data the Wai Wai website collects from you, what we use it for, how long we keep it, and how you can exercise your rights.",
-  draftNotice:
-    "Draft — this page is written from what the system actually does (the retention periods below come from the same values the deletion job uses), but the wording still needs review by the site owner and a legal adviser before it is used with real visitors.",
+    "Thai Food Products Factory Co., Ltd. (“the Company”) recognises the importance of personal data. This policy explains how the Wai Wai website (waiwai.com) collects, uses, discloses and retains personal data, and the rights of data subjects. This policy applies to personal data collected through this website.",
 
   controllerTitle: "Data controller",
   controllerIntro: "The data controller under this policy is",
@@ -24,7 +22,23 @@ export const privacyPage = {
   controllerAddressLabel: "Address",
   controllerPhoneLabel: "Phone",
   controllerEmailLabel: "Email",
+  controllerDpoLabel: "Personal data contact",
+  controllerDpoValue: "Data Protection Officer",
   controllerMissing: "Not filled in under site settings yet — an administrator can add it on the settings screen.",
+
+  definitionsTitle: "Definitions",
+  definitionsIntro: "Key terms in this policy have the following meanings",
+  definitionCompanyTitle: "The Company",
+  definitionCompanyBody: "Thai Food Products Factory Co., Ltd.",
+  definitionPersonalTitle: "Personal data",
+  definitionPersonalBody:
+    "Information relating to a person that enables that person to be identified, directly or indirectly, but excluding information about deceased persons specifically",
+  definitionSensitiveTitle: "Sensitive personal data",
+  definitionSensitiveBody:
+    "Personal information of an inherently private and sensitive nature under Section 26 of the Personal Data Protection Act B.E. 2562 (2019), such as racial or ethnic origin, political opinions, religious or philosophical beliefs, sexual behaviour, criminal records, health data, disability, trade union membership, genetic data and biometric data",
+  definitionCommitteeTitle: "Personal Data Protection Committee",
+  definitionCommitteeBody:
+    "The committee appointed under the Personal Data Protection Act B.E. 2562 (2019), responsible for supervising and issuing rules on personal data protection",
 
   collectTitle: "What we collect",
   collectIntro: "We collect only the information you enter in the forms on this website.",
@@ -35,6 +49,8 @@ export const privacyPage = {
   collectCareersTitle: "Job application form",
   collectCareersBody:
     "Your name, the position you applied for, email, phone number, a short introduction, and the résumé file you attach (if any)",
+  collectNote:
+    "We do not collect sensitive personal data through this website, and we do not collect data from sources other than you · Our hosting provider may keep access logs (such as IP address and time) as part of standard system security",
 
   purposeTitle: "What we use it for",
   purposeIntro: "We use your information only for the purposes below — nothing else",
@@ -42,6 +58,8 @@ export const privacyPage = {
   purposeNews: "To send you news and activities from Wai Wai — only with your consent, which you can withdraw at any time",
   purposeRecruit: "To consider your application and get in touch about recruitment",
   purposeSecurity: "To keep the system secure and to audit content changes (staff of the site operator only)",
+  purposeBasis:
+    "Legal bases: contact form — your consent when you submit the form, or the Company's legitimate interest in responding to your enquiry · newsletter — your consent (withdrawable at any time) · job application — your consent or steps taken before entering into an employment contract · system security — the Company's legitimate interest",
 
   retentionTitle: "How long we keep it",
   retentionIntro:
@@ -56,41 +74,53 @@ export const privacyPage = {
   retentionLabelEntityRevision: "Product/recipe/news revision history",
   retentionLabelLoginAttempt: "Back-office sign-in attempts (staff only)",
   retentionLabelAuditLog: "Content change log (staff only)",
-  /* Back-office sessions (round 95) */
   retentionLabelAdminSession: "Back-office sign-in sessions (staff only)",
   retentionNote:
     "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · the latest revision of each page is always kept so mistakes can be restored · if you want your data deleted earlier, contact us using the details below",
 
   rightsTitle: "Your rights",
-  rightsIntro: "Under personal data protection law you have the following rights",
+  rightsIntro: "Under the Personal Data Protection Act B.E. 2562 (2019) you have the following rights",
   rightAccessTitle: "Access and copies",
   rightAccessBody: "Ask what data we hold about you and request a copy",
   rightCorrectTitle: "Correction",
   rightCorrectBody: "Ask us to correct data that is inaccurate or out of date",
   rightDeleteTitle: "Erasure",
   rightDeleteBody: "Ask us to delete your data where we no longer have a lawful reason to keep it",
-  rightObjectTitle: "Object or restrict",
-  rightObjectBody: "Object to our use of your data, or ask us to restrict it temporarily",
+  rightRestrictTitle: "Restriction",
+  rightRestrictBody:
+    "Ask us to restrict the use of your data temporarily, for example while you ask us to verify its accuracy, or where we no longer need it but you need it to establish a legal claim",
+  rightPortabilityTitle: "Data portability",
+  rightPortabilityBody:
+    "Receive the data you provided to us in a machine-readable format, or ask us to transfer it to another data controller, subject to the conditions set by law",
+  rightObjectTitle: "Objection",
+  rightObjectBody: "Object to the collection, use or disclosure of your personal data",
   rightWithdrawTitle: "Withdraw consent",
-  rightWithdrawBody: "Withdraw consent at any time (for example, unsubscribe from news) without affecting earlier use",
+  rightWithdrawBody:
+    "Withdraw consent at any time (for example, unsubscribe from news) without affecting earlier use",
   rightComplainTitle: "Complain",
   rightComplainBody:
-    "Lodge a complaint with the Personal Data Protection Committee (PDPC) if you believe we have used your data unlawfully",
+    "Lodge a complaint with the Office of the Personal Data Protection Committee (PDPC) if you believe we have used your data unlawfully",
+  rightsNote:
+    "Your rights may be limited by law in some cases, for example where we must comply with a court order · We will act on your request within the period required by law",
 
   sharingTitle: "Who we share it with",
   sharingBody:
-    "We do not sell your data and do not give it to anyone else for marketing. Only our contracted website hosting and database providers process it, and only on our instructions. (The full processor list is still to be confirmed by the site owner.)",
-  cookiesTitle: "Cookies",
+    "We do not sell your data or disclose it for marketing · We disclose it only as necessary to service providers engaged by the Company, who process it on our instructions: our website hosting provider (Vercel) and our database provider (Neon — the database is located in Singapore) · When you press play on a YouTube video on the recipes page, your browser connects directly to YouTube (no connection is made before you press play) · We may disclose data to government or regulatory authorities where required by law",
+  cookiesTitle: "Cookies and similar technologies",
   cookiesBody:
-    "This website uses no marketing or analytics cookies and no third-party tracking scripts. It uses only the cookie required for back-office staff to sign in, which ordinary visitors never receive. Your choice to dismiss the cookie notice is stored in your own browser and is not sent back to us.",
-  securityTitle: "Security",
+    "This website uses no marketing or analytics cookies and no third-party tracking scripts · We use localStorage in your browser to remember your theme, the dismissal of the cookie notice, the announcement notice and the PR card — this stays in your browser and is not sent back to us · A session cookie is used only by back-office staff to sign in",
+  securityTitle: "Security measures",
   securityBody:
-    "Staff passwords are stored as one-way hashes (never the password itself) · back-office access is limited to authorised people · sign-in attempts are rate limited and activity is logged for auditing",
+    "We apply security measures for personal data, including role-based access control · staff passwords stored as one-way hashes · sign-in rate limiting · activity logging for content changes · separate database credentials for the public site, public forms and the back office · data backups and restore testing",
+  reviewTitle: "Review and changes to this policy",
+  reviewBody:
+    "The Company may update or amend this policy from time to time to reflect changes to its services, the law or its operations · Where a change is material, we will announce it on this page and state the effective date of the new version",
 
   contactTitle: "Contacting us about your data",
   contactBody:
-    "To exercise your rights or ask about your personal data, use the data controller details shown above.",
-  updatedTitle: "Status of this policy",
-  updatedBody: "Status: draft — no effective date yet (pending confirmation from the site owner before it applies to real visitors).",
+    "To exercise your rights or ask about your personal data, contact the Data Protection Officer using the data controller details above, or send us a message through the contact form",
+  contactFormLabel: "Go to the contact form",
+  updatedTitle: "Effective date and version",
+  updatedBody: "Effective 22 October 2026 · Version 1.0 · Last updated 22 October 2026",
   backHome: "Back to home",
 };

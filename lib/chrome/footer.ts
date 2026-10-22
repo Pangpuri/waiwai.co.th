@@ -97,7 +97,7 @@ export function defaultFooterConfig(messages: Messages): FooterConfig {
     logo: null,
     about: { th: messages.footer.about, en: messages.footer.about },
     contact: {
-      address: { th: SITE.contact.address, en: SITE.contact.address },
+      address: { th: SITE.contact.address, en: SITE.contact.addressEn },
       phone: SITE.contact.phone,
       email: SITE.contact.email,
     },
