@@ -124,7 +124,7 @@ function LayerItem({
           ⚠️ ปุ่มย่อย (↑ ↓ ทำซ้ำ ลบ) ยังทำงานของตัวเอง — คลิกจะไม่ทะลุมาถึงแถวเพราะปุ่มเรียก stopPropagation
         */
         onClick={() => handlers.onSelect(block.id)}
-        className={`flex flex-col gap-1 rounded-lg border p-2 transition-colors ${
+        className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-2 transition-colors ${
           selected ? "border-brand-red bg-surface-raised" : "border-line hover:border-brand-red/60"
         } ${dragging === block.id ? "opacity-40" : ""} ${isDropping ? "border-t-brand-red border-t-4" : ""}`}
       >

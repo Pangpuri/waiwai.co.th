@@ -112,6 +112,44 @@
 }
 
 /*
+  ── Pointer ของสิ่งที่กดได้ ─────────────────────────────────────────────────────
+  Tailwind preflight ไม่ได้ตั้ง `cursor: pointer` ให้ <button> (เบราว์เซอร์ใช้ลูกศรปกติ)
+  ⇒ ตั้งที่ base ที่เดียวเพื่อให้ **ทุกปุ่ม/ทุกหน้าที่มีอยู่และที่จะเพิ่มในอนาคต** ได้พฤติกรรมเดียวกัน
+  (เดิมมีเฉพาะบาง <summary>/<label> ที่เขียน cursor-pointer รายจุด ⇒ ปุ่มส่วนใหญ่ยังเป็นลูกศร)
+
+  กติกา
+  - ปุ่มที่กดได้ · role=button · summary · select · checkbox/radio/file → pointer
+  - ปุ่มที่ปิดใช้ · aria-disabled = not-allowed (utilities อย่าง disabled:cursor-not-allowed ยังชนะได้)
+*/
+@layer base {
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  label:has(input[type="checkbox"]:not(:disabled)),
+  label:has(input[type="radio"]:not(:disabled)),
+  label:has(input[type="file"]:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  button[aria-disabled="true"],
+  [role="button"][aria-disabled="true"],
+  select:disabled,
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled,
+  input[type="file"]:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/*
   แถบขอความยินยอมคุกกี้ซ่อนตัวเองด้วย CSS
   เมื่อสคริปต์ก่อน paint ตรวจพบว่าผู้ใช้เคยตอบแล้ว (ดู lib/cookie-consent.ts)
   → ไม่ต้องรอ hydrate และไม่มีอาการแถบวาบขึ้นมา
@@ -451,6 +489,14 @@ html[data-hero-card="shown"] [data-hero-card-panel] {
   outline: 2px dashed var(--color-brand-red);
   outline-offset: 2px;
   border-radius: 0.5rem;
+}
+
+/*
+  ส่วนที่คลิกเลือกได้ในพรีวิวหลังบ้าน → แสดง pointer เฉพาะโหมดแก้ไข
+  (หน้าเว็บจริงไม่มี `data-editable` ⇒ ไม่โดนกฎนี้)
+*/
+[data-editable] [data-block-id] {
+  cursor: pointer;
 }
 
 /* ส่วนที่กำลังเลือกอยู่ (คลิกแล้ว) — ตีกรอบทึบให้รู้ว่ากำลังแก้ส่วนไหน */
