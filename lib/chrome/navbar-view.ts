@@ -40,7 +40,8 @@ export type NavbarView = {
 
 const LOGO_HEIGHTS: Readonly<Record<NavbarConfig["logoSize"], string>> = {
   sm: "h-7 sm:h-8",
-  md: "h-9 sm:h-10",
+  /* md = ค่าเริ่มต้น — ต้องตรงกับ BrandMark (โลโก้ในโค้ด) เพื่อไม่ให้ภาพจาก DB เล็กกว่าเดิม */
+  md: "h-8 sm:h-9 lg:h-12",
   lg: "h-11 sm:h-12",
 };
 

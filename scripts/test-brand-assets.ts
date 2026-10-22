@@ -129,12 +129,12 @@ test("brand: navbar/footer ใช้โลโก้ภาพจริง (ไม
 
 /*
   รอบที่ 113 — เจ้าของแจ้งว่า "โลโก้ใน navbar ล้นจอบนมือถือ"
-  สาเหตุจริง: โลโก้กว้าง 5.52 เท่าของความสูง (ไม่ใช่สี่เหลี่ยมจัตุรัส) ⇒ ต้องคิด "ความกว้าง" ไม่ใช่ดูแค่ความสูง
+  สาเหตุจริง: โลโก้กว้าง 4.57 เท่าของความสูง (ไม่ใช่สี่เหลี่ยมจัตุรัส) ⇒ ต้องคิด "ความกว้าง" ไม่ใช่ดูแค่ความสูง
   เทสต์นี้คำนวณความกว้างที่ต้องใช้จริงเทียบกับจอแคบสุดที่ต้องรองรับ (320px) โดยใช้ "สัดส่วนไฟล์จริง"
-  ⇒ ถ้าใครขยับขนาดโลโก้บนมือถือให้ใหญ่ขึ้น (เช่นกลับไป h-8/h-9) เทสต์จะฟ้องทันทีพร้อมตัวเลข
+  ⇒ ถ้าใครขยับขนาดโลโก้บนมือถือให้ใหญ่ขึ้น (เช่นกลับไป h-9/h-10) เทสต์จะฟ้องทันทีพร้อมตัวเลข
 */
 test("brand: โลโก้ใน navbar ต้องพอดีจอแคบ (คำนวณจากสัดส่วนไฟล์จริง)", () => {
-  const ratio = BRAND_LOGO.width / BRAND_LOGO.height; // 800/145 = 5.52
+  const ratio = BRAND_LOGO.width / BRAND_LOGO.height; // 988/216 = 4.57
   /** ความกว้างที่ต้องใช้ = ความสูงโลโก้ × สัดส่วน + ระยะห่าง/ปุ่มที่แชร์แถวเดียวกัน */
   const widthAt = (heightPx: number): number =>
     heightPx * ratio +
@@ -144,23 +144,23 @@ test("brand: โลโก้ใน navbar ต้องพอดีจอแค�
     40; // padding ของ container-site (1.25rem × 2)
 
   const NARROWEST_PHONE = 320; // จอแคบสุดที่ต้องรองรับ (iPhone SE รุ่นแรก และมือถือรุ่นเล็ก)
-  const mobileWidth = widthAt(28); // h-7 = 28px = ค่าที่ใช้บนมือถือ
+  const mobileWidth = widthAt(32); // h-8 = 32px = ค่าที่ใช้บนมือถือ
 
   assert.ok(
     mobileWidth <= NARROWEST_PHONE,
-    `โลโก้บนมือถือ (h-7) ต้องพอดีจอ ${NARROWEST_PHONE}px — คำนวณได้ ${mobileWidth.toFixed(1)}px`,
+    `โลโก้บนมือถือ (h-8) ต้องพอดีจอ ${NARROWEST_PHONE}px — คำนวณได้ ${mobileWidth.toFixed(1)}px`,
   );
   assert.ok(
-    widthAt(32) > NARROWEST_PHONE,
-    "ยืนยันโจทย์เดิม: h-8 (ค่าก่อนแก้) ต้องล้นจอ 320px — ถ้าเลขนี้ไม่ล้น แปลว่าสูตรคำนวณผิด",
+    widthAt(40) > NARROWEST_PHONE,
+    "ยืนยันโจทย์เดิม: h-10 ต้องล้นจอ 320px — ถ้าเลขนี้ไม่ล้น แปลว่าสูตรคำนวณผิด",
   );
 
   /* ต้องมีตัวกันล้นสำรองสำหรับจอเล็กกว่า 320px (เช่น Galaxy Fold ปิดฝา = 280px) */
   const brandMark = sourceOf("features/shell/ui/brand-mark.tsx");
   assert.ok(brandMark.includes("max-w-[46vw]"), "ต้องจำกัดความกว้างโลโก้เป็นสัดส่วนของจอ (กันล้น)");
   assert.ok(brandMark.includes("object-contain"), "ย่อแล้วห้ามยืด/ตัดสัดส่วนรูป");
-  /* ขนาดต้องไล่บันได h-7 (มือถือ) → sm:h-8 → lg:h-11 (ตรวจทีละคลาส ไม่ผูกกับลำดับในสตริง) */
-  for (const sizeClass of ["h-7", "sm:h-8", "lg:h-11"]) {
+  /* ขนาดต้องไล่บันได h-8 (มือถือ) → sm:h-9 → lg:h-12 (ตรวจทีละคลาส ไม่ผูกกับลำดับในสตริง) */
+  for (const sizeClass of ["h-8", "sm:h-9", "lg:h-12"]) {
     assert.ok(brandMark.includes(sizeClass), `ขนาดโลโก้ต้องมีคลาส ${sizeClass}`);
   }
 
@@ -184,4 +184,21 @@ test("brand: favicon/OG ตั้งเป็นค่าเริ่มต้�
     layout.includes('settings.defaultOgImage === ""'),
     "ยังต้องให้ค่าจากหลังบ้าน override การ์ดแชร์ได้",
   );
+});
+
+test("brand: สคริปต์ตั้งโลโก้เริ่มต้นใช้ sha256 + draft/publish (ไม่ hardcode media id)", () => {
+  const script = sourceOf("scripts/import-brand-logo.ts");
+
+  assert.ok(script.includes("findMediaIdBySha256"), "ต้องหาภาพเดิมด้วย sha256 (id ต่างกันในแต่ละ DB)");
+  assert.ok(script.includes("saveJsonDraft") && script.includes("publishDraft"), "ต้องเขียนผ่านเส้นทางเดียวกับหลังบ้าน");
+  assert.ok(script.includes("prepareTargetRun"), "ต้องรองรับ --target");
+  assert.ok(script.includes("--dry-run"), "ต้องมีโหมดดูแผนก่อนเขียน");
+  assert.ok(script.includes("--force"), "ต้องมีประตูสำหรับทับโลโก้ที่ตั้งเอง");
+  assert.ok(
+    !/\/media\/[A-Za-z0-9_-]{12}/.test(script),
+    "ห้าม hardcode media id — ต้องอ่าน id จากฐานข้อมูลปลายทาง",
+  );
+
+  const pkg = sourceOf("package.json");
+  assert.ok(pkg.includes('"brand:logo"'), "ต้องมี npm script brand:logo");
 });

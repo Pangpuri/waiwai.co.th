@@ -39,6 +39,7 @@
     "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts",
     "contact:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-contact.ts",
     "about:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about.ts",
+    "brand:logo": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-brand-logo.ts",
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",
     "db:sync": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-sync.ts",
     "env:vercel": "node --import ./scripts/alias-hook.mjs scripts/env-vercel.ts",
