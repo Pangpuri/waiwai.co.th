@@ -10,21 +10,25 @@ export const adminTemplate = {
   previewPartsNav: "Header nav only",
   previewPartsFooter: "Footer only",
   previewPartsNotice: "Announcement notice only",
-  startFromTemplate: "Start from the current content",
-  startFromTemplateReplace: "Start over from the current content (replaces the draft)",
+  startFromTemplateTitle: "Start from the built-in template",
+  startFromTemplate: "Use the built-in template",
+  startFromTemplateReplace: "Use the built-in template (replaces the draft)",
   startFromTemplateOverwrite: "Tick to confirm replacing the current draft",
   startFromTemplateNeedsConfirm: "Not applied — you did not tick the confirmation. Your draft is unchanged",
-  startFromTemplateHint: "Pulls the same copy the live site uses as a starting point — then edit freely.",
+  startFromTemplateHint:
+    "Builds the content from this page's “template in code” — it is not a copy of the published page, so it may differ from the live site. Edit freely afterwards; your chosen layout is kept.",
+  startFromTemplateSourceNote:
+    "To go back to content that was published before, use “Publish history” below — this button creates a fresh set from the template; it does not restore the old one.",
   templateMissingBody: "This page has no block template yet — keep editing it with the field-based content screen for now.",
   /* Round 260: pages built by an importer have no "start from template" button on purpose */
   importedContentTitle: "This page is built by an importer (no starting template)",
   importedContentBody:
     "This page's content comes from the reviewed content set, so there is no “start from template” button — that button would overwrite every part that has been reviewed and edited. You can still edit each block's text and images from the preview on the right. To rebuild the whole page, run this page's import script locally, then publish here.",
   templateMissingList:
-    "Pages with a block template today: Home · Careers · Contact · Products · Recipes · News · Certifications · Executives · Product category pages (About is not built from a template)",
+    "Pages with a block template today: Home · Contact · Certifications · Executives · Product category pages (About is built by an importer and is not built from a template)",
   templateCoverageTitle: "Not covered by this template yet",
   templateCoverageNote:
-    "Once you turn on “use with the live site”, the page shows only blocks — the parts listed below disappear from it. Add blocks first if you need them.",
+    "Once published, the page shows only blocks — the parts listed below disappear from it. Add blocks first if you need them.",
   templateCoverageNone: "This template covers every part of this page",
   templateCoverageJumpHint: "Click a part to go where it is edited (the add-block panel, or the screen that owns it)",
   coverageGallery: "Curated image gallery / real photos",

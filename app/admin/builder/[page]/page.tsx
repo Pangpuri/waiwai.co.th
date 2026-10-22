@@ -32,8 +32,8 @@ import type { Messages } from "@/lib/i18n/messages/th";
  *   1. `requireAdminUser("content")` — ต้องมีสิทธิ์จัดเนื้อหา (ไม่ล็อกอิน = ไปหน้าล็อกอิน · สิทธิ์ไม่พอ = ไป `/admin/denied`)
  *   2. **ตรวจว่าเป็นหน้าที่รู้จัก** (`listPages` = ตาราง `page` หรือรายการหน้าในโค้ด) — ที่เหลือ 404
  *      ⚠️ บทเรียน รอบที่ 62: เดิมล็อกไว้ `["home"]` แต่แท็บรายหน้ามี 9 หน้า ⇒ กดแท็บอื่นแล้ว **404**
- *   3. อ่าน **ฉบับร่าง** จาก DB → ถ้าไม่มี: หน้าที่มีเทมเพลตแสดงปุ่ม "เริ่มจากเนื้อหาปัจจุบัน" + คำเตือนส่วนที่ไม่ครอบคลุม
- *      (หน้าที่ไม่มีเทมเพลต: บอกตรง ๆ ให้ใช้หน้าจอเนื้อหาแบบฟิลด์ไปก่อน — ไม่ปล่อยให้กดแล้วเงียบ)
+ *   3. อ่าน **ฉบับร่าง** จาก DB → ถ้าไม่มี: หน้าที่มีเทมเพลตแสดงปุ่ม "ใช้เทมเพลตตั้งต้น" + คำเตือนส่วนที่ไม่ครอบคลุม
+ *      (เทมเพลต = ชุดข้อความในโค้ด ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่ · หน้าที่ไม่มีเทมเพลต: บอกตรง ๆ ให้ใช้หน้าจอเนื้อหาแบบฟิลด์ไปก่อน)
  *   4. ส่งฉบับร่าง + เวลาที่เผยแพร่ + ประวัติ ให้หน้าจอแก้ไข (client)
  *
  * ทำไมอ่าน "ฉบับร่าง" เป็นค่าตั้งต้น: ผู้แก้ต้องเห็นงานที่ค้างไว้ของตัวเอง ไม่ใช่ของที่เผยแพร่อยู่
@@ -223,9 +223,10 @@ export default async function AdminBuilderPage({
 
 
       {/*
-        รอบที่ 225 (เคลียร์หนี้ UX): แผง "เริ่มจากเนื้อหาปัจจุบัน" แสดง**เสมอ** สำหรับหน้าที่มีเทมเพลต
+        รอบที่ 225 (เคลียร์หนี้ UX): แผง "เทมเพลตตั้งต้น" แสดง**เสมอ** สำหรับหน้าที่มีเทมเพลต
         · ยังไม่มีฉบับร่าง ⇒ กดได้เลย · มีฉบับร่างแล้ว ⇒ ต้องติ๊กยืนยันก่อนทับ
         · ด่านจริงอยู่ที่ Server Action (`decideTemplateApply` — ไม่ติ๊ก = ไม่ทำอะไรเลย)
+        ⚠️ รอบนี้แก้ "ความเข้าใจผิด": ปุ่มนี้สร้างจาก **เทมเพลตในโค้ด** ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่
       */}
       {isImportedContentPage(page) ? (
         /*
@@ -243,9 +244,13 @@ export default async function AdminBuilderPage({
       ) : hasBlockTemplate(page) ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
           <h2 className="text-fg text-lg font-semibold">
-            {draftRow === null ? strings.emptyPage : strings.startFromTemplateReplace}
+            {draftRow === null ? strings.startFromTemplateTitle : strings.startFromTemplateReplace}
           </h2>
           <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
+          {/* รอบนี้: บอกตรง ๆ ว่าปุ่มนี้ไม่ใช่การกู้คืนของเดิม — ไปใช้ประวัติการเผยแพร่แทน */}
+          <p className="text-fg-muted text-xs" data-template-source-note="">
+            {strings.startFromTemplateSourceNote}
+          </p>
           <TemplateCoverageNote {...coverage} />
           {templateNotice ? (
             <p className="text-brand-red text-sm" data-template-notice="">

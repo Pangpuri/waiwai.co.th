@@ -473,6 +473,43 @@ test("★ templates: ใช้เทมเพลตทับฉบับร่�
   assert.ok(!page.includes("{draftRow === null ? (\n        <section"), "แผงต้องไม่อยู่ในเงื่อนไข 'ไม่มีฉบับร่าง' อีกต่อไป");
 });
 
+/**
+ * ★ รอบนี้ — แก้ "ความเข้าใจผิด" ของปุ่มเทมเพลต
+ *
+ * ปุ่มเดิมชื่อ "เริ่มจากเนื้อหาปัจจุบัน" และคำโปรยบอกว่า "ดึงข้อความชุดเดียวกับหน้าเว็บที่ใช้อยู่"
+ * แต่ของจริงสร้างจาก **เทมเพลตในโค้ด** ⇒ เคยทำให้เข้าใจว่าเป็นสำเนาหน้าที่เผยแพร่ (ทั้งที่ home/certifications ต่างกันจริง)
+ * ด่านนี้ล็อกถ้อยคำไว้: ห้ามกลับไปเรียก "เนื้อหาปัจจุบัน" และห้ามอ้างสวิตช์ "ใช้กับหน้าเว็บจริง" ที่ถูกถอดตั้งแต่รอบ 240
+ */
+test("★ templates: ปุ่มเทมเพลตต้องบอกความจริงว่าเป็น 'เทมเพลตในโค้ด' ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่", () => {
+  const th = sourceOf("lib/i18n/messages/areas/th/adminTemplate.ts");
+  const en = sourceOf("lib/i18n/messages/areas/en/adminTemplate.ts");
+
+  for (const [locale, dict] of [["th", th], ["en", en]] as const) {
+    assert.ok(dict.includes("startFromTemplateTitle"), `${locale}: ต้องมีหัวข้อของแผงเทมเพลต`);
+    assert.ok(dict.includes("startFromTemplateSourceNote"), `${locale}: ต้องบอกว่าไม่ใช่การกู้คืนของเดิม`);
+    assert.ok(!dict.includes("เนื้อหาปัจจุบัน"), `${locale}: ห้ามกลับไปเรียก "เนื้อหาปัจจุบัน"`);
+    assert.ok(!dict.includes("current content"), `${locale}: ห้ามกลับไปเรียก "current content"`);
+    assert.ok(!dict.includes("ใช้กับหน้าเว็บจริง"), `${locale}: สวิตช์นี้ถูกถอดตั้งแต่รอบ 240 — ห้ามอ้างถึง`);
+    assert.ok(!dict.includes("use with the live site"), `${locale}: สวิตช์นี้ถูกถอดตั้งแต่รอบ 240 — ห้ามอ้างถึง`);
+  }
+
+  assert.ok(th.includes("เทมเพลตที่เขียนไว้ในโค้ด"), "TH: คำโปรยต้องบอกว่าเป็นเทมเพลตในโค้ด");
+  assert.ok(th.includes("ไม่ใช่สำเนาของหน้าที่เผยแพร่อยู่"), "TH: คำโปรยต้องบอกว่าไม่ใช่สำเนาหน้าที่เผยแพร่");
+  assert.ok(en.includes("template in code"), "EN: คำโปรยต้องบอกว่าเป็นเทมเพลตในโค้ด");
+  assert.ok(en.includes("not a copy of the published page"), "EN: คำโปรยต้องบอกว่าไม่ใช่สำเนาหน้าที่เผยแพร่");
+
+  /* รายชื่อหน้าที่มีเทมเพลตต้องไม่ล้าสมัย (careers/products/recipes/news ถูกถอดจากตัวสร้างแล้ว) */
+  assert.ok(!th.includes("ร่วมงานกับไวไว"), "TH: รายการต้องไม่ล้าสมัย");
+  assert.ok(!en.includes("Careers"), "EN: รายการต้องไม่ล้าสมัย");
+
+  /* UI: ใช้หัวข้อใหม่ + แสดงหมายเหตุว่าไม่ใช่การกู้คืนของเดิม */
+  const page = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(page.includes("startFromTemplateTitle"), "หน้าจอต้องใช้หัวข้อใหม่");
+  assert.ok(page.includes("startFromTemplateSourceNote"), "ข้อความหมายเหตุต้องมาจากพจนานุกรม");
+  assert.ok(page.includes("data-template-source-note="), "หน้าจอต้องแสดงหมายเหตุให้เห็นจริง");
+  assert.ok(!page.includes("draftRow === null ? strings.emptyPage : strings.startFromTemplateReplace"), "ห้ามกลับไปใช้หัวข้อเดิม");
+});
+
 /** ★ รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่") + รอบที่ 252 (ปิดหนี้ให้จบ) — หน้าจอเนื้อหาหน้าแรกต้องไม่หลอกตา */
 test("★ content: ทุกส่วนของหน้าแรกถูกตัดสิน (เจ้าของที่นี่ · ย้ายที่ · เลิกใช้แล้ว) และหน้าจอแสดงตรงตามนั้น", () => {
   /*
