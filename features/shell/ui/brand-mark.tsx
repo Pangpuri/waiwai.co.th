@@ -48,6 +48,7 @@ export function BrandMark({ locale, label, eager = false }: BrandMarkProps) {
       <Image
         src={BRAND_LOGO.path}
         alt=""
+        data-site-logo=""
         width={BRAND_LOGO.width}
         height={BRAND_LOGO.height}
         sizes="(max-width: 640px) 160px, 230px"

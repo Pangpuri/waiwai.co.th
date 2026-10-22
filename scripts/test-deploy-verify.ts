@@ -46,6 +46,16 @@ test("deploy: หน้าแรกที่มีข้อมูลจริง
   assert.ok(result.summary.startsWith("✓"));
 });
 
+test("deploy: โลโก้ที่มาจากคลังภาพ (/media) ต้องถือว่ามีโลโก้แบรนด์", () => {
+  const mediaLogoHtml = GOOD_HTML.replace(
+    /<img[^>]*logo-navbar[^>]*>/,
+    '<img src="/_next/image?url=%2Fmedia%2FX6O6xE6pLM9V&w=640" alt="โลโก้ไวไว" data-site-logo="">',
+  );
+  const result = assessHomePage(mediaLogoHtml);
+  assert.equal(result.ok, true);
+  assert.equal(result.facts.hasBrandLogo, true);
+});
+
 test("deploy: หน้าแรกที่ไม่มีข้อมูล = ไม่ผ่าน (และบอกให้ไปเช็ค env/endpoint)", () => {
   const result = assessHomePage(EMPTY_HTML);
   assert.equal(result.ok, false);

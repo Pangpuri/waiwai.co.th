@@ -55,7 +55,18 @@ export function assessHomePage(html: string): DeployAssessment {
   /* มีข้อมูลจริง = มีจำนวนสินค้า > 0 (ถ้าหน้านั้นแสดงตัวเลข) หรือมีภาพจากคลังที่ต้องอ่านจาก DB */
   const hasNumbers = productCounts.some((value) => value > 0) || mediaImages > 0;
   const hasTestData = /ข้อมูลทดสอบ|Test data|รส XXX/.test(html);
-  const hasBrandLogo = html.includes("/brand/logo-navbar.png") || html.includes("logo-navbar");
+  /*
+   * โลโก้แบรนด์อาจมาจาก 3 ทาง:
+   * - ไฟล์ในโค้ด `/brand/logo-navbar*.png`
+   * - ไฟล์ที่อัปโหลด/นำเข้า DB `/media/<id>` (หลังรอบ 309) ⇒ ใช้ `data-site-logo` เป็นร่องรอยที่มั่นคง
+   * - HTML รุ่นเก่าที่มีคำว่า `logo-navbar`
+   */
+  const hasBrandLogo =
+    html.includes("data-site-logo") ||
+    html.includes("/brand/logo-navbar") ||
+    html.includes("logo-navbar") ||
+    html.includes("โลโก้ไวไว") ||
+    html.includes("Wai Wai logo");
 
   const issues: DeployIssue[] = [];
 
