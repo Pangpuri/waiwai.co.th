@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { publishFooterAction, saveFooterDraftAction } from "@/app/admin/builder/footer/actions";
 import { INITIAL_BUILDER_STATE } from "@/features/admin/builder-state";
+import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { NavIcon } from "@/features/shell/ui/nav-icon";
 import {
   FOOTER_BACKGROUNDS,
@@ -13,7 +14,6 @@ import {
   MAX_FOOTER_SOCIALS,
   MAX_FOOTER_TEXT_LENGTH,
   footerErrorsOf,
-  untranslatedFooterFields,
   validateFooterConfig,
   type FooterConfig,
   type FooterGroup,
@@ -49,8 +49,9 @@ type Strings = {
   /* รอบที่ 311 — ช่องภาษาอังกฤษ */
   readonly footerLangTh: string;
   readonly footerLangEn: string;
-  readonly footerUntranslatedLabel: string;
-  readonly footerUntranslatedHint: string;
+  /* รอบที่ 316 — โลโก้ท้ายเว็บ (อัปโหลด/เลือกจากคลัง เหมือนหัวเว็บ) */
+  readonly footerLogo: string;
+  readonly footerNoLogo: string;
   /* ⚠️ ใช้คีย์ของ navbar ซ้ำโดยตั้งใจ — ข้อความ "ขนาดโลโก้ / เล็ก-กลาง-ใหญ่" เหมือนกัน
      (เลี่ยงคีย์ซ้ำซ้อนในพจนานุกรม และกันด่าน check:i18n ฟ้องคีย์ที่ไม่มีใครอ้าง) */
   readonly navbarLogoSize: string;
@@ -89,7 +90,6 @@ export function FooterEditor({
 
   const issues = validateFooterConfig(config);
   const errors = footerErrorsOf(issues);
-  const untranslated = untranslatedFooterFields(config);
 
   const payload = JSON.stringify(config);
 
@@ -119,19 +119,35 @@ export function FooterEditor({
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-fg-muted text-xs">{strings.footerHint}</p>
 
-      {/* รอบที่ 311 — บอกว่ายังมีช่องไหนที่เว็บอังกฤษจะแสดงภาษาไทยแทน */}
-      <div className="border-line bg-surface-raised rounded-lg border px-2 py-1.5">
-        <p className="text-fg text-xs font-semibold">
-          {strings.footerUntranslatedLabel} ({untranslated.length})
-        </p>
-        <p className="text-fg-muted mt-0.5 text-[11px]">{strings.footerUntranslatedHint}</p>
-        {untranslated.length > 0 ? (
-          <ul className="text-fg-muted mt-1 list-disc space-y-0.5 pl-4 text-[11px]">
-            {untranslated.slice(0, 6).map((entry) => (
-              <li key={entry.path}>{entry.th}</li>
-            ))}
-          </ul>
-        ) : null}
+      {/* ── โลโก้ (รอบที่ 316) — อัปโหลด/ลากวาง/เลือกจากคลังภาพ เหมือนตัวแก้แถบเมนู ── */}
+      <div className="flex flex-col gap-1">
+        <p className="text-fg text-xs font-semibold">{strings.footerLogo}</p>
+        <ImageDrop
+          strings={strings as unknown as Parameters<typeof ImageDrop>[0]["strings"]}
+          compact
+          /* ท้ายเว็บไม่ได้ใช้ลายน้ำ ⇒ ไม่ต้องมีช่องที่กดแล้วไม่มีผล (บทเรียนรอบที่ 195) */
+          showWatermark={false}
+          label={strings.footerLogo}
+          value={
+            config.logo === null
+              ? null
+              : { path: config.logo.path, altTh: config.logo.altTh, altEn: config.logo.altEn, hasWatermark: false }
+          }
+          onChange={(patch) =>
+            setConfig({
+              ...config,
+              logo:
+                patch.path === undefined
+                  ? null
+                  : {
+                      path: patch.path,
+                      altTh: patch.altTh ?? config.logo?.altTh ?? "",
+                      altEn: patch.altEn ?? config.logo?.altEn ?? "",
+                    },
+            })
+          }
+        />
+        {config.logo === null ? <p className="text-fg-muted text-[11px]">{strings.footerNoLogo}</p> : null}
       </div>
 
       {/* ── ข้อความ + ข้อมูลติดต่อ + พื้นหลัง ── */}

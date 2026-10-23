@@ -172,6 +172,8 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
         <ImageDrop
           strings={rawStrings as unknown as Parameters<typeof ImageDrop>[0]["strings"]}
           compact
+          /* แถบเมนูไม่ได้ใช้ลายน้ำ ⇒ ไม่มีช่องที่กดแล้วไม่มีผล (บทเรียนรอบที่ 195) */
+          showWatermark={false}
           label={strings.navbarLogo}
           value={config.logo === null ? null : { path: config.logo.path, altTh: config.logo.altTh, altEn: config.logo.altEn, hasWatermark: false }}
           onChange={(patch) =>

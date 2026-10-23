@@ -4,12 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { buildFooterColumns } from "@/features/shell/nav";
-import {
-  defaultFooterConfig,
-  parseFooterConfig,
-  untranslatedFooterFields,
-  type FooterConfig,
-} from "@/lib/chrome/footer";
+import { defaultFooterConfig, parseFooterConfig, type FooterConfig } from "@/lib/chrome/footer";
 import { resolveFooterView } from "@/lib/chrome/footer-view";
 import { th } from "@/lib/i18n/messages/th";
 import { SITE } from "@/lib/site";
@@ -23,7 +18,7 @@ import { SITE } from "@/lib/site";
  * เทสต์ชุดนี้ล็อก 3 อย่าง:
  *  1. ชั้นข้อมูลรับ/เก็บค่า EN ได้ครบทุกช่อง (ไม่ถูกตัดทิ้งตอน parse)
  *  2. ตัวเรนเดอร์เลือก EN เมื่อมี และถอยไปไทยเมื่อว่าง (ห้ามแสดงช่องว่าง)
- *  3. หน้าจอแก้มีช่อง EN ครบทุกจุด + บอกจำนวนช่องที่ยังไม่ได้แปล
+ *  3. หน้าจอแก้มีช่อง EN ครบทุกจุด และ **ไม่มี** หน้าต่างเตือน "ช่องที่ยังไม่ได้แปล" (ถอดออกตามคำสั่งเจ้าของ รอบที่ 316)
  */
 
 const ROOT = process.cwd();
@@ -110,48 +105,7 @@ test("footer EN: ช่องอังกฤษว่าง = ถอยไปใ
   assert.equal(thView.contact.address, "42/1 ถนนเพชรเกษม");
 });
 
-test("untranslatedFooterFields: แปลครบแล้ว = 0 ช่อง", () => {
-  assert.deepEqual(untranslatedFooterFields(fullyTranslated()), []);
-});
-
-test("untranslatedFooterFields: ค่าเริ่มต้น (en = สำเนาไทย) = ถูกนับว่ายังไม่แปลครบทุกช่อง", () => {
-  const base = defaultFooterConfig(th);
-  const found = untranslatedFooterFields(base);
-
-  const paths = found.map((entry) => entry.path);
-  assert.ok(paths.includes("about"), "about ต้องถูกนับ");
-  /* ที่อยู่: ค่าเริ่มต้นมี EN อยู่แล้ว (ทับศัพท์จาก SITE.contact.addressEn) ⇒ ไม่ถูกนับว่ายังไม่แปล */
-  assert.ok(!paths.includes("contact.address"), "ที่อยู่ที่มี EN แล้วต้องไม่ถูกนับ");
-  assert.ok(paths.includes("groups[0].title"), "หัวข้อคอลัมน์ต้องถูกนับ");
-  assert.ok(paths.includes("groups[0].links[0].label"), "ชื่อลิงก์ต้องถูกนับ");
-  assert.ok(paths.includes("rights"), "ลิขสิทธิ์ต้องถูกนับ");
-
-  /* ทุกช่องที่ถูกนับต้องมีข้อความไทยให้เจ้าของเห็นว่าคือช่องไหน */
-  for (const entry of found) {
-    assert.notEqual(entry.th.trim(), "", `${entry.path}: ต้องมีข้อความไทยประกอบ`);
-  }
-});
-
-test("untranslatedFooterFields: แยกแยะ 'ว่าง' กับ 'ซ้ำไทย' และไม่นับช่องที่ไทยว่าง", () => {
-  const base = fullyTranslated();
-
-  const emptyEn = untranslatedFooterFields({ ...base, rights: { th: "ลิขสิทธิ์", en: "" } });
-  assert.deepEqual(emptyEn.map((entry) => entry.path), ["rights"]);
-
-  const duplicate = untranslatedFooterFields({ ...base, rights: { th: "ลิขสิทธิ์", en: "ลิขสิทธิ์" } });
-  assert.deepEqual(duplicate.map((entry) => entry.path), ["rights"]);
-
-  const blankTh = untranslatedFooterFields({ ...base, rights: { th: "  ", en: "" } });
-  assert.deepEqual(blankTh, [], "ช่องที่ไทยว่างไม่ต้องเตือน (ไม่มีอะไรให้แปล)");
-
-  const socialMissing = untranslatedFooterFields({
-    ...base,
-    socials: base.socials.map((social) => ({ ...social, label: { ...social.label, en: "" } })),
-  });
-  assert.ok(socialMissing.some((entry) => entry.path.startsWith("socials[")));
-});
-
-test("หน้าจอหลังบ้าน: มีช่องอังกฤษครบทุกจุด + แสดงจำนวนช่องที่ยังไม่แปล", () => {
+test("หน้าจอหลังบ้าน: มีช่องอังกฤษครบทุกจุด + ไม่มีหน้าต่างเตือน 'ยังไม่ได้แปล' แล้ว", () => {
   const editor = sourceOf("features/admin/ui/footer-editor.tsx");
 
   const bindings = [
@@ -166,17 +120,27 @@ test("หน้าจอหลังบ้าน: มีช่องอังก
     assert.ok(editor.includes(binding), `ต้องมีช่องอังกฤษ: ${binding}`);
   }
 
-  assert.ok(editor.includes("untranslatedFooterFields("), "ต้องใช้ตรรกะกลางนับช่องที่ยังไม่แปล");
-  assert.ok(editor.includes("strings.footerUntranslatedLabel"), "ต้องมีหัวข้อบอกจำนวนช่องที่ยังไม่แปล");
-  assert.ok(editor.includes("strings.footerUntranslatedHint"), "ต้องอธิบายว่าเว็บอังกฤษจะถอยไปใช้ไทย");
+  /*
+    รอบที่ 316 (เจ้าของ): *"หน้าต่างเตือนส่วนนี้เอาออกได้เลยจากการตั้งค่าท้ายเว็บ"*
+    ⇒ ห้ามมีกล่องนับ "ช่องที่ยังไม่ได้แปล" กลับมา + ห้ามเรียกตรรกะกลางที่ถอดออกแล้ว
+  */
+  assert.ok(!editor.includes("untranslatedFooterFields"), "ต้องไม่เหลือตรรกะนับช่องที่ยังไม่แปล");
+  assert.ok(!editor.includes("footerUntranslatedLabel"), "ต้องไม่เหลือหัวข้อ 'ช่องที่ยังไม่ได้แปล'");
+  assert.ok(!editor.includes("footerUntranslatedHint"), "ต้องไม่เหลือคำอธิบายที่ถอดออกแล้ว");
 });
 
 test("พจนานุกรม: ป้ายภาษาไทย/อังกฤษของท้ายเว็บมีทั้งสองภาษา (ไม่มีคีย์กำพร้า)", () => {
   const thSource = sourceOf("lib/i18n/messages/areas/th/admin.ts");
   const enSource = sourceOf("lib/i18n/messages/areas/en/admin.ts");
 
-  for (const key of ["footerLangTh", "footerLangEn", "footerUntranslatedLabel", "footerUntranslatedHint"]) {
+  for (const key of ["footerLangTh", "footerLangEn", "footerLogo", "footerNoLogo"]) {
     assert.ok(thSource.includes(`${key}:`), `th: ขาดคีย์ ${key}`);
     assert.ok(enSource.includes(`${key}:`), `en: ขาดคีย์ ${key}`);
+  }
+
+  /* คีย์ที่ถอดออกในรอบ 316 ต้องไม่ค้างอยู่ในพจนานุกรม (ด่าน check:i18n จะฟ้อง orphan) */
+  for (const key of ["footerUntranslatedLabel", "footerUntranslatedHint"]) {
+    assert.ok(!thSource.includes(`${key}:`), `th: ยังมีคีย์ที่ถอดออกแล้ว ${key}`);
+    assert.ok(!enSource.includes(`${key}:`), `en: ยังมีคีย์ที่ถอดออกแล้ว ${key}`);
   }
 });

@@ -338,8 +338,9 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   /* Round 311 — English fields for the footer */
   footerLangTh: "Thai",
   footerLangEn: "English",
-  footerUntranslatedLabel: "Fields without an English version",
-  footerUntranslatedHint: "The English site falls back to Thai text when a field is empty or still identical to Thai.",
+  /* Round 316 — footer logo (same uploader as the navbar) */
+  footerLogo: "Footer logo",
+  footerNoLogo: "No logo file yet — the brand logo from code is used",
   footerSaveDraft: "Save draft",
   footerPublish: "Publish",
   footerIssues: "To fix",
