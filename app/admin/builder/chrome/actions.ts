@@ -5,6 +5,7 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
 
 import { requireAdminUser } from "@/lib/auth/dal";
 import { loadDocumentRow, publishDraft } from "@/lib/blocks/repository";
+import { FOOTER_PAGE_KEY } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY } from "@/lib/chrome/navbar";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { MOURNING_PAGE_KEY } from "@/lib/mourning/config";
@@ -20,13 +21,16 @@ import { MOURNING_PAGE_KEY } from "@/lib/mourning/config";
 
 const CHROME_PATH = "/admin/builder/chrome";
 
-const CHROME_KEYS: readonly string[] = [NAVBAR_PAGE_KEY, MOURNING_PAGE_KEY];
+/**
+ * ทุกส่วนของ "ส่วนกลาง" ที่ปุ่ม **"ใช้กับเว็บจริงเลย"** ต้องครอบ
+ * ⚠️ รอบที่ 315: เดิมตกหล่น `chrome-footer` ⇒ กดปุ่มนี้แล้วการแก้ "ท้ายเว็บ" ไม่ขึ้นเว็บ
+ *    (ป้าย/แถบเมนูขึ้น แต่ท้ายเว็บเงียบ) — มีเทสต์ `scripts/test-chrome-publish.ts` คุมไว้
+ */
+const CHROME_KEYS: readonly string[] = [NAVBAR_PAGE_KEY, MOURNING_PAGE_KEY, FOOTER_PAGE_KEY];
 
 export async function publishChromeAction(): Promise<void> {
-  await requireAdminUser("presets");
-  if (!isDatabaseConfigured()) return;
-
   const user = await requireAdminUser("presets");
+  if (!isDatabaseConfigured()) return;
 
   for (const key of CHROME_KEYS) {
     const draft = await loadDocumentRow(key, "draft");
