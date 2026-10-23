@@ -1046,7 +1046,7 @@ export function BlockBuilder({
           label={strings.styleLabels.background}
           value={block.style.background}
           options={STYLE_CHOICES.background}
-          onChange={(next) => update(setBlockStyle(document, block.id, { background: next as "none" | "cream" | "subtle" | "brand" }))}
+          onChange={(next) => update(setBlockStyle(document, block.id, { background: next as "none" | "cream" | "subtle" | "white" | "brand" }))}
         />
         <SelectField
           idBase={`${base}-size`}

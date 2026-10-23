@@ -8,9 +8,12 @@ import { NavIcon } from "@/features/shell/ui/nav-icon";
 import {
   FOOTER_BACKGROUNDS,
   MAX_FOOTER_GROUPS,
+  MAX_FOOTER_LABEL_LENGTH,
   MAX_FOOTER_LINKS,
   MAX_FOOTER_SOCIALS,
+  MAX_FOOTER_TEXT_LENGTH,
   footerErrorsOf,
+  untranslatedFooterFields,
   validateFooterConfig,
   type FooterConfig,
   type FooterGroup,
@@ -43,6 +46,11 @@ type Strings = {
   readonly footerSocialLabel: string;
   readonly footerRights: string;
   readonly footerBackground: string;
+  /* รอบที่ 311 — ช่องภาษาอังกฤษ */
+  readonly footerLangTh: string;
+  readonly footerLangEn: string;
+  readonly footerUntranslatedLabel: string;
+  readonly footerUntranslatedHint: string;
   /* ⚠️ ใช้คีย์ของ navbar ซ้ำโดยตั้งใจ — ข้อความ "ขนาดโลโก้ / เล็ก-กลาง-ใหญ่" เหมือนกัน
      (เลี่ยงคีย์ซ้ำซ้อนในพจนานุกรม และกันด่าน check:i18n ฟ้องคีย์ที่ไม่มีใครอ้าง) */
   readonly navbarLogoSize: string;
@@ -81,6 +89,7 @@ export function FooterEditor({
 
   const issues = validateFooterConfig(config);
   const errors = footerErrorsOf(issues);
+  const untranslated = untranslatedFooterFields(config);
 
   const payload = JSON.stringify(config);
 
@@ -110,29 +119,80 @@ export function FooterEditor({
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-fg-muted text-xs">{strings.footerHint}</p>
 
+      {/* รอบที่ 311 — บอกว่ายังมีช่องไหนที่เว็บอังกฤษจะแสดงภาษาไทยแทน */}
+      <div className="border-line bg-surface-raised rounded-lg border px-2 py-1.5">
+        <p className="text-fg text-xs font-semibold">
+          {strings.footerUntranslatedLabel} ({untranslated.length})
+        </p>
+        <p className="text-fg-muted mt-0.5 text-[11px]">{strings.footerUntranslatedHint}</p>
+        {untranslated.length > 0 ? (
+          <ul className="text-fg-muted mt-1 list-disc space-y-0.5 pl-4 text-[11px]">
+            {untranslated.slice(0, 6).map((entry) => (
+              <li key={entry.path}>{entry.th}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
       {/* ── ข้อความ + ข้อมูลติดต่อ + พื้นหลัง ── */}
       <div className="grid gap-2">
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLASS}>{strings.footerAbout}</span>
-          <textarea
-            value={config.about.th}
-            onChange={(event) => setConfig({ ...config, about: { ...config.about, th: event.target.value } })}
-            rows={3}
-            className={FIELD_CLASS}
-          />
-        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>
+              {strings.footerAbout} · {strings.footerLangTh}
+            </span>
+            <textarea
+              value={config.about.th}
+              onChange={(event) => setConfig({ ...config, about: { ...config.about, th: event.target.value } })}
+              rows={3}
+              maxLength={MAX_FOOTER_TEXT_LENGTH}
+              className={FIELD_CLASS}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>
+              {strings.footerAbout} · {strings.footerLangEn}
+            </span>
+            <textarea
+              value={config.about.en}
+              onChange={(event) => setConfig({ ...config, about: { ...config.about, en: event.target.value } })}
+              rows={3}
+              maxLength={MAX_FOOTER_TEXT_LENGTH}
+              className={FIELD_CLASS}
+            />
+          </label>
+        </div>
 
-        <label className="flex flex-col gap-1">
-          <span className={LABEL_CLASS}>{strings.footerContactAddress}</span>
-          <textarea
-            value={config.contact.address.th}
-            onChange={(event) =>
-              setConfig({ ...config, contact: { ...config.contact, address: { ...config.contact.address, th: event.target.value } } })
-            }
-            rows={2}
-            className={FIELD_CLASS}
-          />
-        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>
+              {strings.footerContactAddress} · {strings.footerLangTh}
+            </span>
+            <textarea
+              value={config.contact.address.th}
+              onChange={(event) =>
+                setConfig({ ...config, contact: { ...config.contact, address: { ...config.contact.address, th: event.target.value } } })
+              }
+              rows={2}
+              maxLength={MAX_FOOTER_TEXT_LENGTH}
+              className={FIELD_CLASS}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={LABEL_CLASS}>
+              {strings.footerContactAddress} · {strings.footerLangEn}
+            </span>
+            <textarea
+              value={config.contact.address.en}
+              onChange={(event) =>
+                setConfig({ ...config, contact: { ...config.contact, address: { ...config.contact.address, en: event.target.value } } })
+              }
+              rows={2}
+              maxLength={MAX_FOOTER_TEXT_LENGTH}
+              className={FIELD_CLASS}
+            />
+          </label>
+        </div>
 
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
@@ -235,34 +295,74 @@ export function FooterEditor({
                 </div>
               </div>
 
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.footerGroupTitle}</span>
-                <input
-                  type="text"
-                  value={group.title.th}
-                  onChange={(event) => setGroup(index, { title: { ...group.title, th: event.target.value } })}
-                  className={FIELD_CLASS}
-                />
-              </label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    {strings.footerGroupTitle} · {strings.footerLangTh}
+                  </span>
+                  <input
+                    type="text"
+                    value={group.title.th}
+                    onChange={(event) => setGroup(index, { title: { ...group.title, th: event.target.value } })}
+                    maxLength={MAX_FOOTER_LABEL_LENGTH}
+                    className={FIELD_CLASS}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    {strings.footerGroupTitle} · {strings.footerLangEn}
+                  </span>
+                  <input
+                    type="text"
+                    value={group.title.en}
+                    onChange={(event) => setGroup(index, { title: { ...group.title, en: event.target.value } })}
+                    maxLength={MAX_FOOTER_LABEL_LENGTH}
+                    className={FIELD_CLASS}
+                  />
+                </label>
+              </div>
 
               <ul className="flex flex-col gap-1.5">
                 {group.links.map((link, linkIndex) => (
                   <li key={link.id} className="bg-surface-raised flex flex-col gap-1 rounded-lg p-2">
-                    <label className="flex flex-col gap-1">
-                      <span className={LABEL_CLASS}>{strings.footerLinkLabel}</span>
-                      <input
-                        type="text"
-                        value={link.label.th}
-                        onChange={(event) =>
-                          setGroup(index, {
-                            links: group.links.map((entry, position) =>
-                              position === linkIndex ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry,
-                            ),
-                          })
-                        }
-                        className={FIELD_CLASS}
-                      />
-                    </label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="flex flex-col gap-1">
+                        <span className={LABEL_CLASS}>
+                          {strings.footerLinkLabel} · {strings.footerLangTh}
+                        </span>
+                        <input
+                          type="text"
+                          value={link.label.th}
+                          maxLength={MAX_FOOTER_LABEL_LENGTH}
+                          onChange={(event) =>
+                            setGroup(index, {
+                              links: group.links.map((entry, position) =>
+                                position === linkIndex ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry,
+                              ),
+                            })
+                          }
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className={LABEL_CLASS}>
+                          {strings.footerLinkLabel} · {strings.footerLangEn}
+                        </span>
+                        <input
+                          type="text"
+                          value={link.label.en}
+                          maxLength={MAX_FOOTER_LABEL_LENGTH}
+                          onChange={(event) =>
+                            setGroup(index, {
+                              links: group.links.map((entry, position) =>
+                                position === linkIndex ? { ...entry, label: { ...entry.label, en: event.target.value } } : entry,
+                              ),
+                            })
+                          }
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                    </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       <label className="flex flex-col gap-1">
                         <span className={LABEL_CLASS}>{strings.footerLinkHref}</span>
@@ -353,22 +453,46 @@ export function FooterEditor({
           {config.socials.map((social, index) => (
             <li key={social.id} className="border-line flex flex-wrap items-end gap-1.5 rounded-lg border p-2">
               <NavIcon name={social.icon} className="text-fg-muted mb-1" />
-              <label className="flex min-w-24 flex-1 flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.footerSocialLabel}</span>
-                <input
-                  type="text"
-                  value={social.label.th}
-                  onChange={(event) =>
-                    setConfig({
-                      ...config,
-                      socials: config.socials.map((entry, position) =>
-                        position === index ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry,
-                      ),
-                    })
-                  }
-                  className={FIELD_CLASS}
-                />
-              </label>
+              <div className="grid min-w-24 flex-1 gap-1 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    {strings.footerSocialLabel} · {strings.footerLangTh}
+                  </span>
+                  <input
+                    type="text"
+                    value={social.label.th}
+                    maxLength={MAX_FOOTER_LABEL_LENGTH}
+                    onChange={(event) =>
+                      setConfig({
+                        ...config,
+                        socials: config.socials.map((entry, position) =>
+                          position === index ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry,
+                        ),
+                      })
+                    }
+                    className={FIELD_CLASS}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className={LABEL_CLASS}>
+                    {strings.footerSocialLabel} · {strings.footerLangEn}
+                  </span>
+                  <input
+                    type="text"
+                    value={social.label.en}
+                    maxLength={MAX_FOOTER_LABEL_LENGTH}
+                    onChange={(event) =>
+                      setConfig({
+                        ...config,
+                        socials: config.socials.map((entry, position) =>
+                          position === index ? { ...entry, label: { ...entry.label, en: event.target.value } } : entry,
+                        ),
+                      })
+                    }
+                    className={FIELD_CLASS}
+                  />
+                </label>
+              </div>
               <label className="flex min-w-32 flex-1 flex-col gap-1">
                 <span className={LABEL_CLASS}>{strings.footerLinkHref}</span>
                 <input
@@ -417,15 +541,32 @@ export function FooterEditor({
       </div>
 
       {/* ── ลิขสิทธิ์ ── */}
-      <label className="flex flex-col gap-1">
-        <span className={LABEL_CLASS}>{strings.footerRights}</span>
-        <input
-          type="text"
-          value={config.rights.th}
-          onChange={(event) => setConfig({ ...config, rights: { ...config.rights, th: event.target.value } })}
-          className={FIELD_CLASS}
-        />
-      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>
+            {strings.footerRights} · {strings.footerLangTh}
+          </span>
+          <input
+            type="text"
+            value={config.rights.th}
+            onChange={(event) => setConfig({ ...config, rights: { ...config.rights, th: event.target.value } })}
+            maxLength={MAX_FOOTER_TEXT_LENGTH}
+            className={FIELD_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>
+            {strings.footerRights} · {strings.footerLangEn}
+          </span>
+          <input
+            type="text"
+            value={config.rights.en}
+            onChange={(event) => setConfig({ ...config, rights: { ...config.rights, en: event.target.value } })}
+            maxLength={MAX_FOOTER_TEXT_LENGTH}
+            className={FIELD_CLASS}
+          />
+        </label>
+      </div>
 
       {/* ── สิ่งที่ต้องแก้ ── */}
       {errors.length > 0 ? (

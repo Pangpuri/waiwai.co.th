@@ -20,6 +20,14 @@ export const MAX_FOOTER_GROUPS = 4;
 export const MAX_FOOTER_LINKS = 8;
 export const MAX_FOOTER_SOCIALS = 6;
 export const MAX_FOOTER_LABEL_LENGTH = 40;
+/**
+ * เพดานของ "ข้อความยาว" (คำอธิบายท้ายเว็บ · ที่อยู่ · ข้อความลิขสิทธิ์)
+ *
+ * 🐞 รอบที่ 312 (เคสจริงจากเจ้าของ): ที่อยู่เต็ม "42/1 ถนนเพชรเกษม ตำบลอ้อมใหญ่ อำเภอสามพราน จ.นครปฐม"
+ * ถูกตัดเหลือ "…อำเภอสามพร" เพราะ **ทุกช่อง** ใช้เพดาน 40 ตัวอักษรของ label ป้ายสั้น
+ * ⇒ แยกเพดานของข้อความยาวออกจาก label และ **ไม่ตัดเงียบ ๆ** (เกินเพดาน = รายงานปัญหา ไม่บันทึก)
+ */
+export const MAX_FOOTER_TEXT_LENGTH = 600;
 
 export type FooterBackground = "surface" | "cream" | "ink" | "brand";
 
@@ -118,11 +126,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function toText(value: unknown, fallback: LocalizedValue): LocalizedValue {
+/**
+ * อ่านข้อความสองภาษา + บังคับเพดานความยาว
+ *
+ * ⚠️ รอบที่ 312: **ห้ามตัดเงียบ ๆ** — ถ้าเกินเพดานให้ใส่ปัญหาเพื่อให้การบันทึกล้มเหลว
+ * (ผู้ใช้เห็นข้อความบอกชื่อช่อง) แทนที่จะเก็บข้อความที่ถูกตัดแล้วเข้าใจผิดว่าบันทึกครบ
+ */
+function toText(
+  value: unknown,
+  fallback: LocalizedValue,
+  limit: number,
+  path: string,
+  problems: string[],
+): LocalizedValue {
   if (!isRecord(value)) return fallback;
-  const th = typeof value["th"] === "string" ? value["th"].slice(0, MAX_FOOTER_LABEL_LENGTH) : fallback.th;
-  const en = typeof value["en"] === "string" ? value["en"].slice(0, MAX_FOOTER_LABEL_LENGTH) : fallback.en;
-  return { th, en };
+  const th = typeof value["th"] === "string" ? value["th"] : fallback.th;
+  const en = typeof value["en"] === "string" ? value["en"] : fallback.en;
+
+  if (th.length > limit) problems.push(`${path}.th: ยาวเกิน ${limit} ตัวอักษร (มี ${th.length})`);
+  if (en.length > limit) problems.push(`${path}.en: ยาวเกิน ${limit} ตัวอักษร (มี ${en.length})`);
+
+  return { th: th.slice(0, limit), en: en.slice(0, limit) };
 }
 
 export type FooterParseResult =
@@ -167,7 +191,7 @@ export function parseFooterConfig(raw: unknown, messages: Messages): FooterParse
       }
       links.push({
         id: typeof link["id"] === "string" && link["id"] !== "" ? link["id"] : `${index}-${linkIndex}`,
-        label: toText(link["label"], { th: "", en: "" }),
+        label: toText(link["label"], { th: "", en: "" }, MAX_FOOTER_LABEL_LENGTH, `groups[${index}].links[${linkIndex}].label`, problems),
         href: typeof link["href"] === "string" ? link["href"].trim() : "",
         icon: isNavIconKey(link["icon"]) ? link["icon"] : "none",
       });
@@ -175,7 +199,7 @@ export function parseFooterConfig(raw: unknown, messages: Messages): FooterParse
 
     groups.push({
       id: typeof entry["id"] === "string" && entry["id"] !== "" ? entry["id"] : `group-${index + 1}`,
-      title: toText(entry["title"], { th: "", en: "" }),
+      title: toText(entry["title"], { th: "", en: "" }, MAX_FOOTER_LABEL_LENGTH, `groups[${index}].title`, problems),
       links,
     });
   });
@@ -192,7 +216,7 @@ export function parseFooterConfig(raw: unknown, messages: Messages): FooterParse
     }
     socials.push({
       id: typeof entry["id"] === "string" && entry["id"] !== "" ? entry["id"] : `social-${index + 1}`,
-      label: toText(entry["label"], { th: "", en: "" }),
+      label: toText(entry["label"], { th: "", en: "" }, MAX_FOOTER_LABEL_LENGTH, `socials[${index}].label`, problems),
       href: typeof entry["href"] === "string" ? entry["href"].trim() : "",
       icon: isNavIconKey(entry["icon"]) ? entry["icon"] : "none",
     });
@@ -203,15 +227,15 @@ export function parseFooterConfig(raw: unknown, messages: Messages): FooterParse
   const config: FooterConfig = {
     logo,
     logoSize: isLogoSize(raw["logoSize"]) ? raw["logoSize"] : fallback.logoSize,
-    about: toText(raw["about"], fallback.about),
+    about: toText(raw["about"], fallback.about, MAX_FOOTER_TEXT_LENGTH, "about", problems),
     contact: {
-      address: toText(rawContact["address"], fallback.contact.address),
+      address: toText(rawContact["address"], fallback.contact.address, MAX_FOOTER_TEXT_LENGTH, "contact.address", problems),
       phone: typeof rawContact["phone"] === "string" ? rawContact["phone"].slice(0, 40) : fallback.contact.phone,
       email: typeof rawContact["email"] === "string" ? rawContact["email"].slice(0, 80) : fallback.contact.email,
     },
     groups,
     socials,
-    rights: toText(raw["rights"], fallback.rights),
+    rights: toText(raw["rights"], fallback.rights, MAX_FOOTER_TEXT_LENGTH, "rights", problems),
     background: (["surface", "cream", "ink", "brand"] as const).includes(raw["background"] as FooterBackground)
       ? (raw["background"] as FooterBackground)
       : fallback.background,
@@ -282,4 +306,53 @@ export function validateFooterConfig(config: FooterConfig): readonly FooterIssue
 
 export function footerErrorsOf(issues: readonly FooterIssue[]): readonly FooterIssue[] {
   return issues.filter((entry) => entry.severity === "error");
+}
+
+/* ── ภาษาอังกฤษของท้ายเว็บ (รอบที่ 311) ────────────────────────────────────── */
+
+export type UntranslatedFooterField = {
+  /** ที่อยู่ของช่องในโครงข้อมูล (เช่น `groups[0].links[1].label`) */
+  readonly path: string;
+  /** ข้อความไทยของช่องนั้น — ใช้ให้เจ้าของเห็นว่าช่องไหนยังไม่ได้แปล */
+  readonly th: string;
+};
+
+/**
+ * หา "ช่องที่ยังไม่ได้แปลเป็นอังกฤษ" ของท้ายเว็บ
+ *
+ * ที่มา (รอบที่ 311): หน้าจอแก้ท้ายเว็บเดิมแก้ได้ **แค่ภาษาไทย** และค่า `en` ในฐานข้อมูล
+ * เป็นสำเนาของไทยทุกช่อง ⇒ `/en` แสดงท้ายเว็บภาษาไทยทั้งแถบ
+ *
+ * กติกา (ไม่บล็อกการเผยแพร่ — ตามมติ D3 ที่ EN บังคับเฉพาะระดับส่วน/หน้า):
+ * - `en` ว่าง = ยังไม่แปล (เว็บอังกฤษจะถอยไปใช้ไทย)
+ * - `en` เท่ากับ `th` เป๊ะ ๆ = ถือว่ายังไม่แปล (ของเดิมที่ถูกคัดลอกมา)
+ * - `th` ว่าง = ไม่นับ (ไม่มีอะไรให้แปล)
+ */
+export function untranslatedFooterFields(config: FooterConfig): readonly UntranslatedFooterField[] {
+  const found: UntranslatedFooterField[] = [];
+
+  const check = (path: string, value: LocalizedValue): void => {
+    const th = value.th.trim();
+    if (th === "") return;
+    const en = value.en.trim();
+    if (en === "" || en === th) found.push({ path, th });
+  };
+
+  check("about", config.about);
+  check("contact.address", config.contact.address);
+
+  config.groups.forEach((group, groupIndex) => {
+    check(`groups[${groupIndex}].title`, group.title);
+    group.links.forEach((link, linkIndex) => {
+      check(`groups[${groupIndex}].links[${linkIndex}].label`, link.label);
+    });
+  });
+
+  config.socials.forEach((social, index) => {
+    check(`socials[${index}].label`, social.label);
+  });
+
+  check("rights", config.rights);
+
+  return found;
 }

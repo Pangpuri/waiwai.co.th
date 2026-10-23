@@ -19,9 +19,11 @@ type MobileNavProps = {
   readonly toggleLabel: { readonly open: string; readonly close: string };
   /** ปุ่มจากหลังบ้าน (ถ้าไม่ส่งมา = ใช้ cta เดิม) */
   readonly buttons?: readonly NavbarButtonView[];
+  /** true = หัวเว็บอยู่บนพื้นเข้ม/พื้นแดง (ปุ่มเปิดเมนูต้องเป็น on-brand) — รอบที่ 313 */
+  readonly onDark?: boolean;
 };
 
-export function MobileNav({ links, cta, labels, toggleLabel, buttons }: MobileNavProps) {
+export function MobileNav({ links, cta, labels, toggleLabel, buttons, onDark = false }: MobileNavProps) {
   const actionButtons: readonly { readonly id: string; readonly href: string; readonly label: string; readonly className: string; readonly icon: NavbarButtonView["icon"] }[] =
     buttons === undefined || buttons.length === 0
       ? [{ id: cta.id, href: cta.href, label: labels[cta.id] ?? cta.id, className: "bg-brand-red text-on-brand", icon: "none" }]
@@ -64,7 +66,12 @@ export function MobileNav({ links, cta, labels, toggleLabel, buttons }: MobileNa
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="mobile-nav-panel"
-        className="grid h-10 w-10 place-items-center rounded-lg border border-line text-fg transition-colors hover:bg-bg-subtle lg:hidden"
+        className={[
+          "grid h-10 w-10 place-items-center rounded-lg border transition-colors lg:hidden",
+          onDark
+            ? "border-on-brand/50 text-on-brand hover:bg-on-brand/10"
+            : "border-line text-fg hover:bg-bg-subtle",
+        ].join(" ")}
       >
         <span className="sr-only">{open ? toggleLabel.close : toggleLabel.open}</span>
         <svg

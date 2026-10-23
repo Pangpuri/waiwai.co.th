@@ -63,13 +63,13 @@ export const LEGACY_BLOCK_SCHEMA_VERSION = 1;
 export type BlockAlign = "left" | "center";
 export type BlockWidth = "narrow" | "normal" | "wide" | "full";
 export type BlockSpacing = "none" | "sm" | "md" | "lg";
-export type BlockBackground = "none" | "cream" | "subtle" | "brand";
+export type BlockBackground = "none" | "cream" | "subtle" | "white" | "brand";
 export type BlockSize = "sm" | "md" | "lg";
 
 export const BLOCK_ALIGNS: readonly BlockAlign[] = ["left", "center"];
 export const BLOCK_WIDTHS: readonly BlockWidth[] = ["narrow", "normal", "wide", "full"];
 export const BLOCK_SPACINGS: readonly BlockSpacing[] = ["none", "sm", "md", "lg"];
-export const BLOCK_BACKGROUNDS: readonly BlockBackground[] = ["none", "cream", "subtle", "brand"];
+export const BLOCK_BACKGROUNDS: readonly BlockBackground[] = ["none", "cream", "subtle", "white", "brand"];
 export const BLOCK_SIZES: readonly BlockSize[] = ["sm", "md", "lg"];
 
 /**

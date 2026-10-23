@@ -284,6 +284,11 @@ export const admin = {
   footerSocialLabel: "ชื่อที่แสดง",
   footerRights: "ข้อความลิขสิทธิ์",
   footerBackground: "พื้นหลัง",
+  /* รอบที่ 311 — ช่องภาษาอังกฤษของท้ายเว็บ */
+  footerLangTh: "ไทย",
+  footerLangEn: "อังกฤษ",
+  footerUntranslatedLabel: "ช่องที่ยังไม่ได้แปลเป็นอังกฤษ",
+  footerUntranslatedHint: "เว็บภาษาอังกฤษจะแสดงข้อความไทยแทนช่องที่เว้นว่างหรือยังซ้ำกับไทย",
   footerSaveDraft: "บันทึกฉบับร่าง",
   footerPublish: "เผยแพร่",
   footerIssues: "สิ่งที่ต้องแก้",

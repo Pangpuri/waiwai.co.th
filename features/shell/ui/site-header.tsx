@@ -104,10 +104,11 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
             ))}
 
             <div className="hidden md:block">
-              <LangSwitch current={locale} />
+              <LangSwitch current={locale} onDark={view.onDark} />
             </div>
 
             <ThemeToggle
+              onDark={view.onDark}
               labels={{
                 label: messages.theme.label,
                 light: messages.theme.light,
@@ -127,6 +128,7 @@ export function SiteHeader({ locale, messages, navbar = null, layoutHeader = fal
 
             <MobileNav
               links={links}
+              onDark={view.onDark}
               cta={fallbackCta}
               buttons={view.mobileButtons}
               labels={navLabels}

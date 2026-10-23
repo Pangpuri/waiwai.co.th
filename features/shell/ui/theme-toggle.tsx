@@ -33,7 +33,14 @@ const ICONS: Record<Theme, string> = {
   system: "M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10M8 21h8m-4-4v4",
 };
 
-export function ThemeToggle({ labels }: { readonly labels: ThemeToggleLabels }) {
+export function ThemeToggle({
+  labels,
+  onDark = false,
+}: {
+  readonly labels: ThemeToggleLabels;
+  /** true = วางบนพื้นเข้ม/พื้นแดง (รอบที่ 313) */
+  readonly onDark?: boolean;
+}) {
   /*
     อ่านค่าที่ผู้ใช้เลือกผ่าน useSyncExternalStore
     ฝั่งเซิร์ฟเวอร์ได้ค่าเริ่มต้น แล้ว client จะอัปเดตเป็นค่าจริงหลัง hydrate
@@ -73,7 +80,10 @@ export function ThemeToggle({ labels }: { readonly labels: ThemeToggleLabels }) 
     <div
       role="group"
       aria-label={labels.label}
-      className="inline-flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5"
+      className={[
+        "inline-flex items-center gap-0.5 rounded-full p-0.5",
+        onDark ? "border border-on-brand/40" : "border border-line bg-surface",
+      ].join(" ")}
     >
       {THEMES.map((option) => {
         const active = theme === option;
@@ -88,7 +98,9 @@ export function ThemeToggle({ labels }: { readonly labels: ThemeToggleLabels }) 
               "grid h-8 w-8 place-items-center rounded-full transition-colors",
               active
                 ? "bg-brand-yellow text-accent-on-yellow"
-                : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
+                : onDark
+                  ? "text-on-brand/85 hover:bg-on-brand/10 hover:text-on-brand"
+                  : "text-fg-muted hover:bg-bg-subtle hover:text-fg",
             ].join(" ")}
           >
             <svg

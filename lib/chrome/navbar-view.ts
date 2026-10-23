@@ -68,13 +68,14 @@ const BACKGROUNDS: Readonly<Record<NavbarBackground, { readonly header: string; 
     onDark: false,
   },
   brand: {
-    header: "sticky top-0 z-40 border-b border-line bg-brand-red",
-    nav: "hidden border-t border-brand-red/40 lg:block",
+    /* เส้นคั่น/ขอบเป็น on-brand (แดงบนแดงเดิมมองไม่เห็น) — รอบที่ 313 */
+    header: "sticky top-0 z-40 border-b border-on-brand/25 bg-brand-red",
+    nav: "hidden border-t border-on-brand/25 lg:block",
     onDark: true,
   },
   ink: {
-    header: "sticky top-0 z-40 border-b border-line bg-fg",
-    nav: "hidden border-t border-line lg:block",
+    header: "sticky top-0 z-40 border-b border-line/25 bg-fg",
+    nav: "hidden border-t border-line/25 lg:block",
     onDark: true,
   },
 };
@@ -83,6 +84,18 @@ const BUTTON_TONES: Readonly<Record<NavbarButtonTone, string>> = {
   brand: "rounded-full bg-brand-red px-5 py-2.5 text-sm font-semibold text-on-brand transition-opacity hover:opacity-90",
   contrast: "rounded-full bg-fg px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90",
   outline: "rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-fg transition-colors hover:bg-bg-subtle",
+};
+
+/**
+ * ปุ่มบนพื้นเข้ม/พื้นแดง (รอบที่ 313 · เคสจริงจากเจ้าของ: "ตัวอักษรจม")
+ * - พื้นแดง: ปุ่มแดง (`bg-brand-red`) จะกลืนหายไปกับพื้น ⇒ กลับด้านเป็นปุ่มขาว + ตัวอักษรแดง (4.8:1)
+ * - พื้นดำ (`ink`): ตัวอักษร/เส้นขอบต้องเป็น on-brand ไม่ใช่ `text-fg`
+ */
+const BUTTON_TONES_ON_DARK: Readonly<Record<NavbarButtonTone, string>> = {
+  brand: "rounded-full bg-on-brand px-5 py-2.5 text-sm font-semibold text-brand-red transition-opacity hover:opacity-90",
+  contrast: "rounded-full bg-on-brand px-5 py-2.5 text-sm font-semibold text-fg transition-opacity hover:opacity-90",
+  outline:
+    "rounded-full border border-on-brand/50 px-5 py-2.5 text-sm font-semibold text-on-brand transition-colors hover:bg-on-brand/10",
 };
 
 /** แปลงปลายทาง: ลิงก์ในเว็บต้องเติม prefix ภาษา · ลิงก์นอก/mailto/tel/anchor คงเดิม */
@@ -154,13 +167,16 @@ export function resolveNavbarView(
     };
   });
 
+  /* บนพื้นเข้ม/พื้นแดงต้องใช้ชุดคลาสกลับด้าน ไม่งั้นปุ่มแดงจมไปกับพื้น */
+  const tones = background.onDark ? BUTTON_TONES_ON_DARK : BUTTON_TONES;
+
   const toButton = (button: NavbarConfig["buttons"][number]): NavbarButtonView => ({
     id: button.id,
     label: button.label[locale].trim() === "" ? button.label.th : button.label[locale],
     href: resolveHref(locale, button.href),
     icon: button.icon,
     tone: button.tone,
-    className: BUTTON_TONES[button.tone],
+    className: tones[button.tone],
   });
 
   const all = config.buttons.map(toButton);

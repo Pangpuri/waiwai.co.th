@@ -26,6 +26,12 @@
   --bg: #ffffff;
   --bg-subtle: #fdf8e9;
   --bg-cream: #fff6e0;
+  /*
+    เทาอ่อนจริง (เป็นกลาง ไม่ติดเหลือง) — รอบที่ 314
+    เดิมตัวเลือก "เทาอ่อน" ของบล็อกชี้ไปที่ --bg-subtle (#fdf8e9) ซึ่งเป็นโทนครีม
+    ⇒ ผู้ใช้เลือก "เทา" แล้วเห็นเป็นครีม (เคสจริงจากเจ้าของ)
+  */
+  --bg-muted: #f2f0eb;
   --surface: #ffffff;
   --surface-raised: #ffffff;
   --line: #ece4d2;
@@ -37,9 +43,10 @@
 
   /*
     ตัวอักษรบนพื้นแบรนด์ — คงที่ทั้งสองโหมด
-    (ขาวนวลบนแดง #e60012 → 4.6:1 ถ้าใช้ --fg ที่เป็นสีมืดในโหมดมืดจะได้แค่ 3.8:1)
+    ขาว #ffffff บนแดง #e60012 = 4.80:1 (ผ่าน AA) · ครีมเดิม #fffaf0 = 4.62:1 (เฉียด)
+    เทียบ: ดำ --fg (#17161a) บนแดง = 3.75:1 ⇒ ไม่ผ่าน AA = อาการ "ตัวอักษรจม" (เคสจริงเจ้าของ รอบที่ 313)
   */
-  --on-brand: #fffaf0;
+  --on-brand: #ffffff;
 
   /* เน้น — เลือกค่าให้ผ่าน WCAG AA ในแต่ละพื้น */
   --accent: #c8102e; /* บนพื้นขาว/ครีม → 5.9:1 */
@@ -60,6 +67,7 @@
   --bg: #14110c;
   --bg-subtle: #1c1811;
   --bg-cream: #1f1a11;
+  --bg-muted: #2b261d;
   --surface: #1c1811;
   --surface-raised: #241f15;
   --line: #362e20;
@@ -87,6 +95,7 @@
   --color-bg: var(--bg);
   --color-bg-subtle: var(--bg-subtle);
   --color-bg-cream: var(--bg-cream);
+  --color-bg-muted: var(--bg-muted);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-line: var(--line);

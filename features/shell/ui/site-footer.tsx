@@ -46,6 +46,17 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
 
   const contact = view.contact;
 
+  /*
+   * พื้นแดง/พื้นดำ (onDark) — รอบที่ 313 (เคสจริงเจ้าของ: "ตัวอักษรจม")
+   * ข้อความในท้ายเว็บเคยระบุสีเอง (`text-fg` / `text-fg-muted` / `border-line` = โทนสว่าง)
+   * ⇒ บนพื้นแดงจึงเป็นตัวอักษรดำบนแดง (3.75:1 ไม่ผ่าน AA) · โหมดนี้สลับเป็น on-brand ทั้งชุด
+   */
+  const onDark = view.onDark;
+  const textStrong = onDark ? "text-on-brand" : "text-fg";
+  const textSoft = onDark ? "text-on-brand/85" : "text-fg-muted";
+  const hoverStrong = onDark ? "hover:text-on-brand" : "hover:text-accent";
+  const divider = onDark ? "border-t border-on-brand/25" : "border-t border-line";
+
   return (
     <footer
       className={view.footerClass}
@@ -72,30 +83,33 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
               />
             </Link>
           )}
-          <p className="mt-5 max-w-sm text-sm leading-relaxed text-fg-muted">
+          <p className={`mt-5 max-w-sm text-sm leading-relaxed ${textSoft}`}>
             {view.about}
           </p>
 
           {/* แสดงเฉพาะช่องที่มีข้อมูลจริง — ไม่ใส่ข้อมูลติดต่อสมมติ */}
           {contact.address || contact.phone || contact.email ? (
-            <dl className="mt-6 space-y-2 text-sm text-fg-muted">
+            <dl className={`mt-6 space-y-2 text-sm ${textSoft}`}>
               {contact.address ? (
                 <div>
-                  <dt className="font-semibold text-fg">{view.labels.address}</dt>
+                  <dt className={`font-semibold ${textStrong}`}>{view.labels.address}</dt>
                   <dd className="mt-0.5 whitespace-pre-line">{contact.address}</dd>
                 </div>
               ) : null}
               {contact.phone ? (
                 <div>
-                  <dt className="font-semibold text-fg">{view.labels.phone}</dt>
+                  <dt className={`font-semibold ${textStrong}`}>{view.labels.phone}</dt>
                   <dd className="mt-0.5">{contact.phone}</dd>
                 </div>
               ) : null}
               {contact.email ? (
                 <div>
-                  <dt className="font-semibold text-fg">{view.labels.email}</dt>
+                  <dt className={`font-semibold ${textStrong}`}>{view.labels.email}</dt>
                   <dd className="mt-0.5">
-                    <a className="text-link underline underline-offset-4" href={`mailto:${contact.email}`}>
+                    <a
+                      className={`${onDark ? "text-on-brand" : "text-link"} underline underline-offset-4`}
+                      href={`mailto:${contact.email}`}
+                    >
                       {contact.email}
                     </a>
                   </dd>
@@ -108,7 +122,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
         <div className="grid gap-8 sm:grid-cols-3">
           {view.groups.map((column) => (
             <nav key={column.id} aria-label={column.title}>
-              <h2 className="font-display text-sm font-bold tracking-wide text-fg">
+              <h2 className={`font-display text-sm font-bold tracking-wide ${textStrong}`}>
                 {column.title}
               </h2>
               <ul className="mt-4 space-y-2.5">
@@ -118,8 +132,8 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
                       href={link.href}
                       className={
                         link.icon === "none"
-                          ? "text-sm text-fg-muted transition-colors hover:text-accent"
-                          : "inline-flex items-center gap-1.5 text-sm text-fg-muted transition-colors hover:text-accent"
+                          ? `text-sm ${textSoft} transition-colors ${hoverStrong}`
+                          : `inline-flex items-center gap-1.5 text-sm ${textSoft} transition-colors ${hoverStrong}`
                       }
                     >
                       {link.icon === "none" ? null : <NavIcon name={link.icon} />}
@@ -134,8 +148,8 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       </div>
 
       {view.socials.length > 0 ? (
-        <div className="container-site border-t border-line py-6">
-          <h2 className="font-display text-sm font-bold text-fg">{view.labels.follow}</h2>
+        <div className={`container-site ${divider} py-6`}>
+          <h2 className={`font-display text-sm font-bold ${textStrong}`}>{view.labels.follow}</h2>
           <ul className="mt-3 flex flex-wrap gap-2">
             {view.socials.map((item) => (
               <li key={item.id}>
@@ -143,7 +157,11 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
                   href={item.href}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="rounded-full border border-line-strong px-4 py-1.5 text-sm font-medium text-fg transition-colors hover:bg-surface"
+                  className={
+                    onDark
+                      ? "rounded-full border border-on-brand/50 px-4 py-1.5 text-sm font-medium text-on-brand transition-colors hover:bg-on-brand/10"
+                      : "rounded-full border border-line-strong px-4 py-1.5 text-sm font-medium text-fg transition-colors hover:bg-surface"
+                  }
                 >
                   {item.icon === "none" ? null : (
                     <span className="inline-flex items-center gap-1.5">
@@ -160,20 +178,20 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
         </div>
       ) : null}
 
-      <div className="border-t border-line">
+      <div className={divider}>
         <div className="container-site flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-fg-muted">
+          <p className={`text-xs ${textSoft}`}>
             © {year} {messages.meta.siteName}. {view.rights}
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
             <Link
               href={view.privacyHref}
-              className="text-xs text-fg-muted transition-colors hover:text-accent"
+              className={`text-xs ${textSoft} transition-colors ${hoverStrong}`}
             >
               {view.labels.privacy}
             </Link>
-            <LangSwitch current={locale} variant="footer" />
+            <LangSwitch current={locale} variant="footer" onDark={onDark} />
           </div>
         </div>
       </div>

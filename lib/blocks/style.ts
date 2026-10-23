@@ -18,11 +18,19 @@ import type {
  * - ถ้าจะเพิ่มสี/ระยะใหม่ ให้เพิ่ม "พรีเซ็ต" ที่นี่ + ใน `types.ts` (ไม่ใช่เปิดช่องให้พิมพ์ค่าเอง)
  */
 
+/*
+ * พื้นหลังของบล็อก — รอบที่ 314 (เคสจริงจากเจ้าของ)
+ *
+ * 🐞 ก่อนแก้: "เทาอ่อน" ชี้ไปที่ token โทนครีม (bg-bg-subtle) ⇒ เลือกเทาแล้วได้ครีม
+ *          "สีแบรนด์อ่อน" ชี้ไปที่พื้นผิวขาว (bg-surface-raised) ⇒ เลือกแล้วได้ขาว
+ * กติกา: ทุกตัวเลือกต้องได้สีที่ต่างกันจริงและตรงกับชื่อ (มีเทสต์ `test-block-backgrounds.ts` คุม)
+ */
 const BACKGROUND: Record<BlockBackground, string> = {
   none: "",
   cream: "bg-bg-cream",
-  subtle: "bg-bg-subtle",
-  brand: "bg-surface-raised",
+  subtle: "bg-bg-muted",
+  white: "bg-surface",
+  brand: "bg-brand-red/10",
 };
 
 const SPACING: Record<BlockSpacing, string> = {
@@ -137,10 +145,11 @@ export const STYLE_CHOICES = {
     { value: "lg", label: "มาก" },
   ],
   background: [
-    { value: "none", label: "โปร่ง" },
+    { value: "none", label: "โปร่ง (ไม่มีพื้น)" },
     { value: "cream", label: "ครีม" },
     { value: "subtle", label: "เทาอ่อน" },
-    { value: "brand", label: "สีแบรนด์อ่อน" },
+    { value: "white", label: "ขาว" },
+    { value: "brand", label: "แดงอ่อน" },
   ],
   size: [
     { value: "sm", label: "เล็ก" },

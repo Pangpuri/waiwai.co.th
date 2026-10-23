@@ -335,6 +335,11 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   footerSocialLabel: "Display name",
   footerRights: "Copyright line",
   footerBackground: "Background",
+  /* Round 311 — English fields for the footer */
+  footerLangTh: "Thai",
+  footerLangEn: "English",
+  footerUntranslatedLabel: "Fields without an English version",
+  footerUntranslatedHint: "The English site falls back to Thai text when a field is empty or still identical to Thai.",
   footerSaveDraft: "Save draft",
   footerPublish: "Publish",
   footerIssues: "To fix",
