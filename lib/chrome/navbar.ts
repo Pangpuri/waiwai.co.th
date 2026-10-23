@@ -1,5 +1,6 @@
 import { PRIMARY_NAV, HEADER_CTA } from "@/features/shell/nav";
 import { isSafeHref } from "@/lib/blocks/types";
+import { DEFAULT_LOGO_SIZE, isLogoSize, type LogoSize } from "@/lib/chrome/logo-size";
 import type { LocalizedValue } from "@/lib/content/types";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -125,7 +126,8 @@ export type NavbarButton = {
 
 export type NavbarConfig = {
   readonly logo: NavbarLogo | null;
-  readonly logoSize: "sm" | "md" | "lg";
+  /** ขนาดโลโก้ — แหล่งความจริงเดียวอยู่ที่ `lib/chrome/logo-size.ts` (รอบที่ 310) */
+  readonly logoSize: LogoSize;
   readonly background: NavbarBackground;
   readonly height: NavbarHeight;
   readonly items: readonly NavbarItem[];
@@ -155,7 +157,7 @@ export function defaultNavbarConfig(messages: Messages): NavbarConfig {
 
   return {
     logo: null,
-    logoSize: "md",
+    logoSize: DEFAULT_LOGO_SIZE,
     background: "surface",
     height: "normal",
     items,
@@ -282,7 +284,7 @@ export function parseNavbarConfig(raw: unknown, messages: Messages): NavbarParse
 
   const config: NavbarConfig = {
     logo,
-    logoSize: toChoice(raw["logoSize"], ["sm", "md", "lg"] as const, fallback.logoSize),
+    logoSize: isLogoSize(raw["logoSize"]) ? raw["logoSize"] : fallback.logoSize,
     background: toChoice(
       raw["background"],
       ["transparent", "surface", "cream", "brand", "ink"] as const,

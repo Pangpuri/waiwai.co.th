@@ -32,13 +32,27 @@ type BrandMarkProps = {
   readonly label: string;
   /** true = รูปอยู่ในจอแรก (header) ⇒ โหลดก่อน ; footer ไม่ต้อง */
   readonly eager?: boolean;
+  /**
+   * คลาสความสูงของโลโก้ (มาจากค่าตั้งในหลังบ้าน)
+   * รอบที่ 310: เพิ่มเข้ามาเพราะ "โลโก้ในโค้ด" เดิมฝังความสูงไว้ ⇒ เลือก "ใหญ่" แล้วไม่มีอะไรเปลี่ยน
+   * ค่าเริ่มต้น = บันได `md` ของ navbar (พฤติกรรมเดิมเป๊ะ — มีเทสต์เทียบกับ `NAVBAR_LOGO_HEIGHTS.md`)
+   */
+  readonly logoHeightClass?: string;
 };
 
 /**
  * ⚠️ รอบที่ 113: ตัด prop `size` ("sm" | "md") ออก — ไม่มีใครส่งค่านี้เลยหลังเปลี่ยนมาใช้ไฟล์โลโก้จริง
  * (header และ footer ใช้สเกลเดียวกัน) ⇒ เหลือสเกลเดียวที่คิดระยะจอมาแล้ว ลดความสับสน
+ *
+ * รอบที่ 310: กลับมารับขนาดได้อีกครั้ง **แต่รับเป็นคลาสความสูงจากตัวแปลงกลาง**
+ * (ไม่ใช่ "sm/md/lg" ดิบ ๆ) เพื่อให้แหล่งความจริงเดียวอยู่ที่ `lib/chrome/logo-size.ts`
  */
-export function BrandMark({ locale, label, eager = false }: BrandMarkProps) {
+export function BrandMark({
+  locale,
+  label,
+  eager = false,
+  logoHeightClass = "h-8 sm:h-9 lg:h-12",
+}: BrandMarkProps) {
   return (
     <Link
       href={localePath(locale)}
@@ -51,7 +65,7 @@ export function BrandMark({ locale, label, eager = false }: BrandMarkProps) {
         data-site-logo=""
         width={BRAND_LOGO.width}
         height={BRAND_LOGO.height}
-        sizes="(max-width: 640px) 160px, 230px"
+        sizes="(max-width: 640px) 220px, 300px"
         loading={eager ? "eager" : "lazy"}
         fetchPriority={eager ? "high" : "auto"}
         /*
@@ -63,16 +77,18 @@ export function BrandMark({ locale, label, eager = false }: BrandMarkProps) {
 
           | ความสูง | ความกว้าง | ใช้ที่ |
           |---|---|---|
-          | h-7 = 28px | 128px | (ไม่ใช้ — เล็กเกินไปสำหรับไฟล์ใหม่) |
-          | **h-8 = 32px** | **146px** | **มือถือ (< sm)** — จอ 320px: 146+8+12+88+40 = 294 ✓ |
+          | h-7 = 28px | 128px | ขั้น "เล็ก" |
+          | h-8 = 32px | 146px | มือถือ (< sm) ของขั้น "กลาง" — จอ 320px: 146+8+12+88+40 = 294 ✓ |
           | sm:h-9 = 36px | 165px | จอ ≥ 640px |
           | lg:h-12 = 48px | 220px | จอ ≥ 1024px (มีที่พอ เพราะเมนูหลักย้ายไปแถวที่ 2) |
+          | lg:h-14 = 56px | 256px | ขั้น "ใหญ่" (ยังอยู่ในแถบที่เตี้ยสุด = 64px) |
 
+          รอบที่ 310: ความสูง **มาจากค่าตั้งในหลังบ้าน** (`logoHeightClass`) — ไม่ฝังตายตัวอีก
           + **ตัวกันล้นสำรอง**: \`max-w-[46vw]\` — ไม่ว่าไฟล์/จอจะกว้างเท่าไร โลโก้กินได้ไม่เกิน 46% ของจอ
             (จำเป็นจริงบนจอแคบมาก เช่น Galaxy Fold ปิดฝา = 280px ⇒ เหลือที่ราว 129px)
             ใช้คู่กับ \`object-contain object-left\` เพื่อ **ย่อทั้งรูปโดยไม่ตัด/ไม่ยืดสัดส่วน**
         */
-        className="h-8 w-auto max-w-[46vw] object-contain object-left sm:h-9 lg:h-12"
+        className={`${logoHeightClass} w-auto max-w-[46vw] object-contain object-left`}
       />
     </Link>
   );

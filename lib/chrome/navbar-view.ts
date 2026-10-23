@@ -1,6 +1,7 @@
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import type { NavIconKey, NavbarConfig, NavbarHeight, NavbarBackground, NavbarButtonTone } from "@/lib/chrome/navbar";
+import { DEFAULT_LOGO_SIZE, NAVBAR_LOGO_HEIGHTS, logoHeightClass } from "@/lib/chrome/logo-size";
 import type { NavLink } from "@/features/shell/nav";
 
 /**
@@ -38,13 +39,11 @@ export type NavbarView = {
   readonly mobileButtons: readonly NavbarButtonView[];
 };
 
-const LOGO_HEIGHTS: Readonly<Record<NavbarConfig["logoSize"], string>> = {
-  sm: "h-7 sm:h-8",
-  /* md = ค่าเริ่มต้น — ต้องตรงกับ BrandMark (โลโก้ในโค้ด) เพื่อไม่ให้ภาพจาก DB เล็กกว่าเดิม */
-  md: "h-8 sm:h-9 lg:h-12",
-  lg: "h-11 sm:h-12",
-};
-
+/*
+ * ⚠️ บันไดขนาดโลโก้ย้ายไปอยู่ที่ `lib/chrome/logo-size.ts` (รอบที่ 310)
+ * ต้นเหตุที่ต้องย้าย: ของเดิม `md` = `h-8 sm:h-9 lg:h-12` และ `lg` = `h-11 sm:h-12`
+ * ⇒ ที่จอ ≥ 1024px ทั้งคู่ได้ 48px เท่ากัน ⇒ เลือก "ใหญ่" แล้วไม่เห็นความต่าง (เคสจริงจากเจ้าของ)
+ */
 const ROW_HEIGHTS: Readonly<Record<NavbarHeight, string>> = {
   compact: "h-14 lg:h-16",
   normal: "h-16 lg:h-[4.5rem]",
@@ -112,7 +111,7 @@ export function resolveNavbarView(
       onDark: false,
       navBarClass: BACKGROUNDS.surface.nav,
       logo: null,
-      logoHeightClass: LOGO_HEIGHTS.md,
+      logoHeightClass: logoHeightClass(NAVBAR_LOGO_HEIGHTS, DEFAULT_LOGO_SIZE),
       links: fallbackLinks,
       labels,
       buttonsLeft: [],
@@ -172,7 +171,7 @@ export function resolveNavbarView(
     onDark: background.onDark,
     navBarClass: background.nav,
     logo: config.logo,
-    logoHeightClass: LOGO_HEIGHTS[config.logoSize],
+    logoHeightClass: logoHeightClass(NAVBAR_LOGO_HEIGHTS, config.logoSize),
     links,
     labels,
     buttonsLeft: all.filter((_entry, index) => config.buttons[index]?.position === "left"),

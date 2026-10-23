@@ -1,5 +1,6 @@
 import { buildFooterColumns } from "@/features/shell/nav";
 import { isSafeHref } from "@/lib/blocks/types";
+import { DEFAULT_LOGO_SIZE, isLogoSize, type LogoSize } from "@/lib/chrome/logo-size";
 import type { NavIconKey } from "@/lib/chrome/navbar";
 import { isNavIconKey } from "@/lib/chrome/navbar";
 import type { LocalizedValue } from "@/lib/content/types";
@@ -57,6 +58,8 @@ export type FooterLogo = {
 
 export type FooterConfig = {
   readonly logo: FooterLogo | null;
+  /** ขนาดโลโก้ — แหล่งความจริงเดียวอยู่ที่ `lib/chrome/logo-size.ts` (รอบที่ 310) */
+  readonly logoSize: LogoSize;
   readonly about: LocalizedValue;
   readonly contact: {
     readonly address: LocalizedValue;
@@ -95,6 +98,7 @@ export function defaultFooterConfig(messages: Messages): FooterConfig {
 
   return {
     logo: null,
+    logoSize: DEFAULT_LOGO_SIZE,
     about: { th: messages.footer.about, en: messages.footer.about },
     contact: {
       address: { th: SITE.contact.address, en: SITE.contact.addressEn },
@@ -198,6 +202,7 @@ export function parseFooterConfig(raw: unknown, messages: Messages): FooterParse
 
   const config: FooterConfig = {
     logo,
+    logoSize: isLogoSize(raw["logoSize"]) ? raw["logoSize"] : fallback.logoSize,
     about: toText(raw["about"], fallback.about),
     contact: {
       address: toText(rawContact["address"], fallback.contact.address),

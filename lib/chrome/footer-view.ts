@@ -1,6 +1,7 @@
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import type { FooterBackground, FooterConfig } from "@/lib/chrome/footer";
+import { DEFAULT_LOGO_SIZE, FOOTER_LOGO_HEIGHTS, logoHeightClass } from "@/lib/chrome/logo-size";
 import type { NavIconKey } from "@/lib/chrome/navbar";
 
 /**
@@ -35,6 +36,8 @@ export type FooterView = {
   readonly footerClass: string;
   readonly onDark: boolean;
   readonly logo: FooterConfig["logo"];
+  /** คลาสความสูงของโลโก้ — มาจากค่าตั้ง "ขนาดโลโก้" (รอบที่ 310) */
+  readonly logoHeightClass: string;
   readonly about: string;
   readonly contact: { readonly address: string; readonly phone: string; readonly email: string };
   readonly groups: readonly FooterViewGroup[];
@@ -97,6 +100,7 @@ export function resolveFooterView(
       footerClass: BACKGROUNDS.cream.className,
       onDark: false,
       logo: null,
+      logoHeightClass: logoHeightClass(FOOTER_LOGO_HEIGHTS, DEFAULT_LOGO_SIZE),
       about: messages.footer.about,
       contact: fallback.contact,
       groups: fallback.columns.map((column) => ({
@@ -125,6 +129,7 @@ export function resolveFooterView(
     footerClass: background.className,
     onDark: background.onDark,
     logo: config.logo,
+    logoHeightClass: logoHeightClass(FOOTER_LOGO_HEIGHTS, config.logoSize),
     about: pick(config.about),
     contact: {
       address: pick(config.contact.address),

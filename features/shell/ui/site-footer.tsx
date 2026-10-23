@@ -58,7 +58,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       <div className="container-site grid gap-10 py-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:gap-16">
         <div>
           {view.logo === null ? (
-            <BrandMark locale={locale} label={messages.meta.siteName} />
+            <BrandMark locale={locale} label={messages.meta.siteName} logoHeightClass={view.logoHeightClass} />
           ) : (
             <Link href={localePath(locale, "/")} className="inline-flex items-center">
               {/* โลโก้ท้ายเว็บที่อัปโหลดจากหลังบ้าน */}
@@ -68,7 +68,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
                 alt={locale === "th" ? view.logo.altTh : view.logo.altEn.trim() === "" ? view.logo.altTh : view.logo.altEn}
                 data-site-logo=""
                 /* กันล้นมือถือ: โลโก้ท้ายเว็บอยู่แถวของตัวเอง แต่ยังกันไฟล์ที่กว้างผิดปกติ (46% ของจอ) */
-                className="h-9 w-auto max-w-[46vw] object-contain object-left sm:h-10"
+                className={`${view.logoHeightClass} w-auto max-w-[46vw] object-contain object-left`}
               />
             </Link>
           )}

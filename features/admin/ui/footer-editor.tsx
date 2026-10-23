@@ -43,6 +43,12 @@ type Strings = {
   readonly footerSocialLabel: string;
   readonly footerRights: string;
   readonly footerBackground: string;
+  /* ⚠️ ใช้คีย์ของ navbar ซ้ำโดยตั้งใจ — ข้อความ "ขนาดโลโก้ / เล็ก-กลาง-ใหญ่" เหมือนกัน
+     (เลี่ยงคีย์ซ้ำซ้อนในพจนานุกรม และกันด่าน check:i18n ฟ้องคีย์ที่ไม่มีใครอ้าง) */
+  readonly navbarLogoSize: string;
+  readonly sizeSm: string;
+  readonly sizeMd: string;
+  readonly sizeLg: string;
   readonly footerSaveDraft: string;
   readonly footerPublish: string;
   readonly footerIssues: string;
@@ -161,6 +167,19 @@ export function FooterEditor({
                 {entry.label}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>{strings.navbarLogoSize}</span>
+          <select
+            value={config.logoSize}
+            onChange={(event) => setConfig({ ...config, logoSize: event.target.value as FooterConfig["logoSize"] })}
+            className={FIELD_CLASS}
+          >
+            <option value="sm">{strings.sizeSm}</option>
+            <option value="md">{strings.sizeMd}</option>
+            <option value="lg">{strings.sizeLg}</option>
           </select>
         </label>
       </div>
