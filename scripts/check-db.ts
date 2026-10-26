@@ -1168,6 +1168,13 @@ async function checkChromePresets(): Promise<void> {
   const navbarDraftBefore = await loadDocumentRow(navbarKey, "draft");
   const navbarPublishedBefore = await loadDocumentRow(navbarKey, "published");
 
+  /*
+    ⚠️ ส่วนอื่น (footer) **อาจมีของจริงของผู้ใช้อยู่แล้ว** — ห้ามสมมติว่าตารางว่าง
+    (บทเรียนเดียวกับ cycle 16 รอบ 127) ⇒ จำสภาพไว้แล้วเทียบว่า "ไม่ถูกแตะ" แทนการเทียบกับ null
+  */
+  const footerDraftBefore = await loadDocumentRow(footerKey, "draft");
+  const footerPublishedBefore = await loadDocumentRow(footerKey, "published");
+
   try {
     /* เตรียม "ของใหม่" ให้มีจริง: ถ้ายังไม่มีฉบับร่าง ใช้ค่าเริ่มต้นของส่วนนั้น (แล้วลบทิ้งตอนจบ) */
     if (navbarDraftBefore === null) {
@@ -1277,7 +1284,16 @@ async function checkChromePresets(): Promise<void> {
       messages: th,
     });
     assert.equal(wrongKind.ok, false, "ชุดของส่วนอื่นต้องใช้ไม่ได้");
-    assert.equal(await loadDocumentRow(footerKey, "published"), null, "ห้ามสร้างแถวของส่วนอื่นขึ้นมาเอง");
+    assert.deepEqual(
+      await loadDocumentRow(footerKey, "published"),
+      footerPublishedBefore,
+      "ห้ามสร้าง/ทับฉบับเผยแพร่ของส่วนอื่น",
+    );
+    assert.deepEqual(
+      await loadDocumentRow(footerKey, "draft"),
+      footerDraftBefore,
+      "ห้ามสร้าง/ทับฉบับร่างของส่วนอื่น",
+    );
     done("ใช้ชุดข้ามส่วนไม่ได้", "กันความผิดพลาดจากค่าที่ส่งมา");
 
     /* ── 5) ลบ = เข้าถังขยะกลาง แล้วกู้คืนได้ ── */
@@ -1342,9 +1358,32 @@ async function checkChromePresets(): Promise<void> {
     await pool.query("delete from media where id = $1", ["check-db-preset-media"]);
     await pool.query("delete from audit_log where actor_email = $1", [CHROME_PRESET_TEST_ACTOR]);
 
-    if (navbarDraftBefore === null && navbarPublishedBefore === null) {
-      /* เราเป็นคนสร้างฉบับร่างชั่วคราวเอง (เพราะเดิมไม่มีแถวเลย) ⇒ ลบทิ้งให้สะอาด */
-      await pool.query("delete from page_document where page = $1 and updated_by = $2", [navbarKey, CHROME_PRESET_TEST_ACTOR]);
+    /*
+      ⚠️ บทเรียน 2026-10-26 (เคสจริง): ระหว่างวงจรนี้มีการ **เขียนทับฉบับร่าง** (ใช้ชุด / ใส่โลโก้ทดสอบ)
+      ถ้าด่านล้มกลางทางแล้ว finally ไม่คืนเอกสาร ⇒ ฉบับร่างของผู้ใช้ถูกทิ้งเป็นค่าเริ่มต้นของด่าน
+      (เจอจริง: en ของเมนูกลายเป็นไทย + โลโก้ชี้ /media ของทดสอบที่ถูกลบไปแล้ว)
+      ⇒ **ต้องคืนทั้ง `document` + `updated_at` + `updated_by`** จากภาพที่จำไว้ตอนเริ่ม แล้วค่อยตรวจ
+    */
+    if (navbarDraftBefore === null) {
+      await pool.query("delete from page_document where page = $1 and status = 'draft'", [navbarKey]);
+    } else {
+      await pool.query(
+        `update page_document
+            set document = $2::jsonb, updated_at = $3::timestamptz, updated_by = $4
+          where page = $1 and status = 'draft'`,
+        [navbarKey, JSON.stringify(navbarDraftBefore.raw), navbarDraftBefore.updatedAt, navbarDraftBefore.updatedBy],
+      );
+    }
+
+    if (navbarPublishedBefore === null) {
+      await pool.query("delete from page_document where page = $1 and status = 'published'", [navbarKey]);
+    } else {
+      await pool.query(
+        `update page_document
+            set document = $2::jsonb, updated_at = $3::timestamptz, updated_by = $4
+          where page = $1 and status = 'published'`,
+        [navbarKey, JSON.stringify(navbarPublishedBefore.raw), navbarPublishedBefore.updatedAt, navbarPublishedBefore.updatedBy],
+      );
     }
 
     assert.equal(
@@ -1356,6 +1395,11 @@ async function checkChromePresets(): Promise<void> {
       (await loadDocumentRow(navbarKey, "draft"))?.raw ?? null,
       navbarDraftBefore?.raw ?? null,
       "ฉบับร่างของแถบเมนูต้องกลับมาเหมือนก่อนทดสอบ",
+    );
+    assert.deepEqual(
+      (await loadDocumentRow(navbarKey, "published"))?.raw ?? null,
+      navbarPublishedBefore?.raw ?? null,
+      "ฉบับเผยแพร่ของแถบเมนูต้องไม่ถูกทดสอบแตะ",
     );
     done("คืนสภาพตารางพรีเซ็ตส่วนกลางแล้ว", "ไม่เหลือรอยทดสอบ");
   }
