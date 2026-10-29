@@ -52,6 +52,11 @@ type Strings = {
   readonly openInNewTab: string;
   readonly previewTitle: string;
   readonly footerPending: string;
+  /* ปุ่มควบคุมพรีวิว (รอบที่ 319) — จอเล็กใช้ซ่อน/ขยายได้ */
+  readonly showPreview: string;
+  readonly hidePreview: string;
+  readonly fullscreen: string;
+  readonly exitFullscreen: string;
 };
 
 export function ChromeWorkspace({
@@ -97,6 +102,15 @@ export function ChromeWorkspace({
   /* ค่าล่าสุดของป้ายประกาศที่กำลังแก้ (ยังไม่บันทึก) — รอบที่ 161 */
   const [liveNotice, setLiveNotice] = useState<{ readonly sent: boolean; readonly value: unknown }>({ sent: false, value: null });
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+
+  /*
+    การแสดงพรีวิว (รอบที่ 319)
+    - fullscreen = ขยายพรีวิวเต็มจอ (ใช้ได้ทุกขนาดจอ โดยเฉพาะจอเล็ก)
+    - hidden = ซ่อนพรีวิวเพื่อให้แผงตั้งค่าได้พื้นที่เต็ม (จอเล็กใช้มาก)
+    ⚠️ สองสถานะนี้ไม่เปิดพร้อมกัน — ซ่อน = ออกจากเต็มจอเสมอ
+  */
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewHidden, setPreviewHidden] = useState(false);
 
   /**
    * ส่งค่าที่กำลังแก้ (navbar/ท้ายเว็บ/ป้ายประกาศ) เข้า iframe พรีวิว
@@ -209,14 +223,86 @@ export function ChromeWorkspace({
   };
 
   const selectMode = (next: ChromeMode): void => {
+    /*
+      โหมดภาพรวมไม่มีปุ่มออกจากเต็มจอ (ปุ่มเต็มจออยู่ในแถบเครื่องมือของพรีวิว)
+      ⇒ ถ้าอยู่เต็มจอแล้วสลับมาภาพรวม ให้ย่อกลับก่อน กันติดอยู่ใน overlay โดยไม่มีปุ่มปิด
+    */
+    if (next === "overview") setPreviewFullscreen(false);
     setMode(next);
     syncTabUrl({ part, mode: next });
   };
 
+  /*
+    โหมดเต็มจอ: ล็อกการเลื่อนของหน้าเว็บ + ปิดด้วย Escape
+    ⚠️ ต้องคืนค่า overflow เดิมเสมอ (อาจไม่ใช่ "" ถ้ามีโค้ดอื่นตั้งไว้) — คืนใน cleanup
+  */
+  useEffect(() => {
+    if (!previewFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setPreviewFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [previewFullscreen]);
+
+  const togglePreviewFullscreen = (): void => {
+    setPreviewHidden(false);
+    setPreviewFullscreen((current) => !current);
+  };
+
+  const hidePreview = (): void => {
+    setPreviewFullscreen(false);
+    setPreviewHidden(true);
+  };
+
+  const showPreview = (): void => {
+    setPreviewHidden(false);
+  };
+
+  /*
+    Split view (รอบที่ 319)
+    - กล่องซ้าย/ขวาสูงเท่ากันและพอดีวิวพอร์ตบนจอใหญ่ ⇒ ไม่ต้องเลื่อนหน้าเว็บเวลากรอกฟอร์ม
+    - แผงตั้งค่าเลื่อนในตัวเอง (`overflow-y-auto`) ⇒ พรีวิวไม่หลุดจอ
+    - ซ่อนพรีวิวแล้วให้แผงตั้งค่ากว้างเต็ม (หนึ่งคอลัมน์)
+  */
+  const shellClass = previewHidden
+    ? "grid gap-4 lg:h-[calc(100dvh-8rem)] lg:min-h-[520px]"
+    : "grid gap-4 md:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px] lg:h-[calc(100dvh-8rem)] lg:min-h-[520px]";
+
+  const previewSectionClass = previewFullscreen
+    ? "bg-surface fixed inset-0 z-50 flex h-dvh min-h-0 flex-col gap-2 overflow-hidden rounded-none p-3"
+    : "admin-preview-rail border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-start-1 md:self-start lg:h-full";
+
+  const settingsSectionClass = [
+    "border-line bg-surface flex min-w-0 flex-col gap-2 self-start rounded-2xl border p-3",
+    previewHidden ? "" : "md:col-start-2 md:row-start-1",
+    "lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain",
+  ]
+    .filter((entry) => entry !== "")
+    .join(" ");
+
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div className={shellClass}>
       {/* ── ซ้าย: หน้าต่างใหญ่ (พรีวิว) — สลับมาไว้ซ้ายตามที่ผู้ใช้สั่ง รอบที่ 57 ── */}
-      <section className="border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-start-1">
+      {/*
+        รอบที่ 318–319: กล่องตั้งค่าของแถบเมนู/ป้ายประกาศ/ท้ายเว็บยาวกว่าพรีวิวมาก
+        - 318 ใช้ sticky rail ให้พรีวิวตามการเลื่อน
+        - 319 เปลี่ยนเป็น **split view**: กริดสูงพอดีวิวพอร์ต + แผงตั้งค่าเลื่อนในตัวเอง
+          ⇒ ไม่ต้องเลื่อนหน้าเว็บเลยระหว่างกรอกฟอร์ม
+        - จอเล็กซ่อนพรีวิวได้ (`previewHidden`) หรือขยายเต็มจอ (`previewFullscreen`)
+      */}
+      {previewHidden ? null : (
+        <section
+          className={previewSectionClass}
+          role={previewFullscreen ? "dialog" : undefined}
+          aria-modal={previewFullscreen ? true : undefined}
+          aria-label={previewFullscreen ? strings.previewTitle : undefined}
+        >
         <div className="flex flex-col gap-2">
           <p className="text-fg-muted text-xs font-semibold uppercase">{strings.viewLabel}</p>
           <div className="flex flex-wrap gap-1.5">
@@ -243,6 +329,13 @@ export function ChromeWorkspace({
               <button type="button" onClick={() => setReloadKey((current) => current + 1)} className={tabClass(false)}>
                 {strings.reloadPreview}
               </button>
+              {/* เต็มจอ/ซ่อน — ใช้ได้ทุกขนาดจอ แต่มีประโยชน์ที่สุดบนจอเล็ก (รอบที่ 319) */}
+              <button type="button" onClick={togglePreviewFullscreen} aria-pressed={previewFullscreen} className={tabClass(previewFullscreen)}>
+                {previewFullscreen ? strings.exitFullscreen : strings.fullscreen}
+              </button>
+              <button type="button" onClick={hidePreview} className={tabClass(false)}>
+                {strings.hidePreview}
+              </button>
               <a
                 href={src}
                 target="_blank"
@@ -253,7 +346,7 @@ export function ChromeWorkspace({
               </a>
             </div>
 
-            <div className="bg-bg-subtle min-h-0 overflow-auto rounded-xl p-2">
+            <div className={`bg-bg-subtle min-h-0 overflow-auto rounded-xl p-2 ${previewFullscreen ? "flex-1" : "lg:flex-1"}`}>
               <iframe
                 key={`${mode}-${reloadKey}`}
                 ref={frameRef}
@@ -264,35 +357,58 @@ export function ChromeWorkspace({
                 }}
                 src={src}
                 title={strings.previewTitle}
-                className="bg-bg h-[74vh] w-full rounded-lg border-0"
+                className={
+                  previewFullscreen
+                    ? "bg-bg h-full w-full rounded-lg border-0"
+                    : "bg-bg h-[74vh] w-full rounded-lg border-0 lg:h-full"
+                }
               />
             </div>
           </>
         )}
-      </section>
+        </section>
+      )}
 
       {/* ── ขวา: เมนูปรับแต่ง (ลิสต์ส่วนของเว็บ แล้วตัวแก้ของส่วนที่เลือกอยู่ด้านล่าง) ── */}
-      <section className="border-line bg-surface flex min-w-0 flex-col gap-2 self-start rounded-2xl border p-3 md:col-start-2 md:row-span-2 md:row-start-1">
-        <h2 className="text-fg text-sm font-semibold">{strings.partsLabel}</h2>
+      <section className={settingsSectionClass}>
+        {/*
+          หัวแผงตรึงขอบบน (รอบที่ 318–319) — เลื่อนแก้ฟอร์มยาว ๆ แล้วยังสลับ "แถบเมนู/ป้ายประกาศ/ท้ายเว็บ" ได้ทันที
+          ⚠️ ใช้ `top-0` + พื้นหลังทึบ เพื่อไม่ให้เนื้อหาที่เลื่อนผ่านมามองทะลุ
+          ⚠️ บนจอใหญ่แผงนี้เป็น scroll container ของตัวเอง (split view) ⇒ sticky เกาะขอบบนของแผง
+        */}
+        <div className="bg-surface border-line sticky top-0 z-10 -mx-3 -mt-3 flex flex-col gap-2 rounded-t-2xl border-b px-3 pt-3 pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-fg text-sm font-semibold">{strings.partsLabel}</h2>
+            {previewHidden ? (
+              <button
+                type="button"
+                onClick={showPreview}
+                className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring shrink-0 rounded-lg border px-2 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {strings.showPreview}
+              </button>
+            ) : null}
+          </div>
 
-        {/* ลิสต์ส่วนของเว็บ — กดเลือกแล้วตัวแก้ขึ้นด้านล่าง (แบบเดียวกับ "เลเยอร์" ของหน้าสร้างหน้าเว็บ) */}
-        <div className="flex flex-col gap-1">
-          {partTabs.map((entry) => (
-            <button
-              key={entry.key}
-              type="button"
-              onClick={() => selectPart(entry.key)}
-              aria-current={part === entry.key ? "true" : undefined}
-              className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left text-xs font-semibold focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none ${
-                part === entry.key ? "border-brand-red bg-surface-raised text-fg" : "border-line text-fg hover:bg-surface-raised"
-              }`}
-            >
-              <span className="break-words">{entry.label}</span>
-              <span aria-hidden="true" className="text-fg-muted text-[11px]">
-                {part === entry.key ? "▾" : "▸"}
-              </span>
-            </button>
-          ))}
+          {/* ลิสต์ส่วนของเว็บ — กดเลือกแล้วตัวแก้ขึ้นด้านล่าง (แบบเดียวกับ "เลเยอร์" ของหน้าสร้างหน้าเว็บ) */}
+          <div className="flex flex-col gap-1">
+            {partTabs.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                onClick={() => selectPart(entry.key)}
+                aria-current={part === entry.key ? "true" : undefined}
+                className={`flex w-full items-center justify-between gap-2 rounded-lg border p-2 text-left text-xs font-semibold focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none ${
+                  part === entry.key ? "border-brand-red bg-surface-raised text-fg" : "border-line text-fg hover:bg-surface-raised"
+                }`}
+              >
+                <span className="break-words">{entry.label}</span>
+                <span aria-hidden="true" className="text-fg-muted text-[11px]">
+                  {part === entry.key ? "▾" : "▸"}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="border-line min-w-0 border-t pt-2">

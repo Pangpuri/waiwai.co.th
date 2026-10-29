@@ -255,6 +255,9 @@ export const admin = {
   chromePartFooter: "ท้ายเว็บ",
   chromePartFooterPending: "ท้ายเว็บยังแก้ไม่ได้ในรอบนี้ — กำลังจะทำในรอบถัดไป (ตอนนี้แก้ได้: แถบเมนู · ป้ายประกาศ)",
   chromeViewLabel: "มุมมอง",
+  /* ปุ่มควบคุมพรีวิว (รอบที่ 319) — ใช้คู่กับ fullscreen/exitFullscreen ที่มีอยู่แล้ว */
+  chromeShowPreview: "แสดงพรีวิว",
+  chromeHidePreview: "ซ่อนพรีวิว",
   chromeModeCurrent: "หน้าเว็บปัจจุบัน",
   chromeModeDraft: "ที่กำลังแก้",
   chromeModeOverview: "ภาพรวม",

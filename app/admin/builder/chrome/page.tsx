@@ -230,9 +230,10 @@ export default async function ChromePage({
           <p className="text-fg-muted text-xs">{strings.chromeIntro}</p>
         </header>
 
-      {/* ส่งออก/นำเข้าคลังชุดทั้งก้อน (รอบที่ 91) — แสดงครั้งเดียว ไม่ใช่ต่อส่วน */}
-      <ChromePresetIoPanel strings={presetStrings} maxImport={MAX_CHROME_PRESET_IMPORT} />
-
+      {/*
+        ส่งออก/นำเข้าคลังชุด (รอบที่ 91) — **ย้ายไปท้ายหน้าถัดจากพรีเซ็ตแล้ว** (รอบที่ 319)
+        เดิมอยู่เหนือพื้นที่ทำงาน ~200px ทำให้พรีวิวเริ่มต่ำจนต้องเลื่อนหน้าเว็บตั้งแต่เปิดหน้า
+      */}
       <ChromeWorkspace
         initialPart={initialTab.part}
         initialMode={initialTab.mode}
@@ -252,6 +253,10 @@ export default async function ChromePage({
           openInNewTab: strings.openInNewTab,
           previewTitle: strings.previewTitle,
           footerPending: strings.chromePartFooterPending,
+          showPreview: strings.chromeShowPreview,
+          hidePreview: strings.chromeHidePreview,
+          fullscreen: strings.fullscreen,
+          exitFullscreen: strings.exitFullscreen,
         }}
         previewSrcCurrent="/th/preview/home?mode=published&parts=nav"
         previewSrcDraft="/th/preview/home?mode=draft&parts=nav"
@@ -281,6 +286,8 @@ export default async function ChromePage({
         noticeEditor={
           <MourningEditor
             key={noticeDraftRow?.updatedAt ?? "fresh-notice"}
+            /* แผงขวาของส่วนกลางกว้าง ~360–420px ⇒ ใช้โหมดกะทัดรัด (รอบที่ 318) */
+            compact
             initial={noticeConfig}
             draftUpdatedAt={noticeDraftRow?.updatedAt ?? null}
             publishedAt={noticePublishedRow?.publishedAt ?? null}
@@ -364,6 +371,11 @@ export default async function ChromePage({
               undoLabel={undoNotice}
             />
           </section>
+        </div>
+
+        {/* ส่งออก/นำเข้าคลังชุดทั้งก้อน (รอบที่ 91) — ย้ายมาอยู่ท้ายแผงพรีเซ็ตในรอบที่ 319 */}
+        <div className="border-line border-t pt-3">
+          <ChromePresetIoPanel strings={presetStrings} maxImport={MAX_CHROME_PRESET_IMPORT} />
         </div>
       </section>
       </main>

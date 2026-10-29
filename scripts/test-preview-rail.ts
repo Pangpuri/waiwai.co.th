@@ -108,3 +108,54 @@ test("preview rail: จอแก้ทุกจอใช้คลาสกลา
     );
   }
 });
+
+test("preview rail: ส่วนกลางของเว็บเป็น split view (พรีวิว + แผงตั้งค่าเลื่อนอิสระ)", () => {
+  /*
+    รอบที่ 318 (ฟีดแบ็กเจ้าของ): *"หน้าต่างตั้งค่ามันลากยาวลงมาจนพ้นตัวอย่างไปเลย"*
+    รอบที่ 319 (เจ้าของขอครบ 4 ข้อ): split view + accordion + ย้าย IO panel + ปุ่มเต็มจอ/ซ่อน
+    ⇒ กริดต้องสูงพอดีวิวพอร์ต และแผงตั้งค่าต้องมีสกรอลบาร์ของตัวเอง
+  */
+  const chrome = codeOf("features/admin/ui/chrome-workspace.tsx");
+
+  assert.ok(chrome.includes("admin-preview-rail"), "ส่วนกลางของเว็บต้องใช้คลาสกลาง admin-preview-rail");
+  assert.ok(chrome.includes("lg:h-[calc(100dvh-8rem)]"), "กริดบนจอใหญ่ต้องสูงพอดีวิวพอร์ต (split view)");
+  assert.ok(chrome.includes("lg:h-full"), "กล่องพรีวิว/แผงตั้งค่าต้องสูงเต็มกริด");
+  assert.ok(chrome.includes("lg:overflow-y-auto"), "แผงตั้งค่าต้องเลื่อนในตัวเอง ไม่ดันหน้าเว็บ");
+  assert.ok(chrome.includes("lg:flex-1"), "ช่อง iframe ต้องยืดเต็มที่เหลือของกล่องพรีวิว");
+  assert.ok(chrome.includes("lg:h-full"), "iframe ต้องยืดเต็มช่อง (ไม่ใช่ 74vh คงที่ตลอด)");
+
+  /*
+    หัวเลือก "แถบเมนู/ป้ายประกาศ/ท้ายเว็บ" ต้องตรึงขอบบนด้วย
+    ⇒ เลื่อนแก้ฟอร์มยาว ๆ แล้วสลับส่วนได้โดยไม่ต้องเลื่อนกลับขึ้นไป
+  */
+  assert.ok(chrome.includes("sticky top-0"), "หัวเลือกส่วนของเว็บต้อง sticky ขอบบน");
+
+  /* จอเล็ก: ซ่อนพรีวิว/ขยายเต็มจอได้ (รอบที่ 319) */
+  assert.ok(chrome.includes("previewHidden"), "ต้องมีสถานะซ่อนพรีวิว");
+  assert.ok(chrome.includes("previewFullscreen"), "ต้องมีสถานะขยายพรีวิวเต็มจอ");
+  assert.ok(chrome.includes("showPreview") && chrome.includes("hidePreview"), "ต้องมีปุ่มแสดง/ซ่อนพรีวิว");
+  assert.ok(chrome.includes("togglePreviewFullscreen"), "ต้องมีปุ่มสลับเต็มจอ");
+});
+
+test("preview rail: navbar editor พับเมนู/ปุ่มเป็น accordion ทีละรายการ", () => {
+  const navbar = codeOf("features/admin/ui/navbar-editor.tsx");
+  assert.ok(navbar.includes("toggleOpenId"), "ต้องใช้กติกา accordion จาก lib/chrome/accordion");
+  assert.ok(navbar.includes("openItemId") && navbar.includes("openButtonId"), "ต้องมีสถานะเปิดทีละรายการ");
+  assert.ok(navbar.includes("aria-expanded"), "ปุ่มเปิด/ปิดต้องประกาศสถานะให้ screen reader");
+});
+
+test("preview rail: แผง export/import ถูกย้ายไปหลังพื้นที่ทำงาน", () => {
+  const page = codeOf("app/admin/builder/chrome/page.tsx");
+  assert.ok(
+    page.indexOf("<ChromeWorkspace") < page.indexOf("<ChromePresetIoPanel"),
+    "ChromePresetIoPanel ต้องอยู่หลัง ChromeWorkspace (ไม่กินพื้นที่เหนือพรีวิว)",
+  );
+});
+
+test("preview rail: แผงป้ายประกาศในส่วนกลางใช้โหมดกะทัดรัด", () => {
+  const page = codeOf("app/admin/builder/chrome/page.tsx");
+  assert.ok(
+    page.includes("<MourningEditor") && page.includes("compact"),
+    "MourningEditor ในแผงขวาต้องส่ง compact (คอลัมน์แคบ ~360px)",
+  );
+});

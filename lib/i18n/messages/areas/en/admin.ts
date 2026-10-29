@@ -306,6 +306,9 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   chromePartFooter: "Footer",
   chromePartFooterPending: "The footer is not editable yet — coming in the next round (nav bar and entry notice are editable now).",
   chromeViewLabel: "View",
+  /* Preview controls (round 319) — paired with the existing fullscreen/exitFullscreen keys */
+  chromeShowPreview: "Show preview",
+  chromeHidePreview: "Hide preview",
   chromeModeCurrent: "Live site",
   chromeModeDraft: "Being edited",
   chromeModeOverview: "Overview",

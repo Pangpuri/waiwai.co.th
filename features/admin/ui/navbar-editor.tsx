@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { publishNavbarAction, saveNavbarDraftAction } from "@/app/admin/builder/navbar/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
+import { toggleOpenId } from "@/lib/chrome/accordion";
 import {
   MAX_NAV_BUTTONS,
   MAX_NAV_ITEMS,
@@ -113,6 +114,13 @@ const LABEL_CLASS = "text-fg-muted text-xs";
 export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publishedAt, strings: rawStrings }: Props) {
   const strings = asStrings(rawStrings);
   const [config, setConfig] = useState<NavbarConfig>(initial);
+  /*
+    Accordion (รอบที่ 319) — เปิดได้ทีละรายการทั้งลิสต์เมนูและลิสต์ปุ่ม
+    ค่าเริ่มต้น = เปิดรายการแรก (ถ้ามี) เพื่อให้เห็นฟิลด์ทันทีโดยไม่ต้องเดาว่าต้องกดตรงไหน
+    ฟังก์ชันกติกาอยู่ที่ `lib/chrome/accordion.ts` (มีเทสต์แยก)
+  */
+  const [openItemId, setOpenItemId] = useState<string | null>(initial.items[0]?.id ?? null);
+  const [openButtonId, setOpenButtonId] = useState<string | null>(initial.buttons[0]?.id ?? null);
   const [draftState, draftAction, draftPending] = useActionState(saveNavbarDraftAction, INITIAL_BUILDER_STATE);
   const [publishState, publishAction, publishPending] = useActionState(publishNavbarAction, INITIAL_BUILDER_STATE);
 
@@ -154,6 +162,45 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
     if (moved === undefined) return;
     next.splice(target, 0, moved);
     update({ ...config, items: next });
+  };
+
+  /** เพิ่มเมนูแล้วเปิดฟอร์มของรายการใหม่ทันที (ผู้ใช้ไม่ต้องกดซ้ำ) */
+  const addItem = (): void => {
+    if (config.items.length >= MAX_NAV_ITEMS) return;
+    const id = `item-${Date.now()}`;
+    update({
+      ...config,
+      items: [...config.items, { id, label: { th: "", en: "" }, href: "/", icon: "none" }],
+    });
+    setOpenItemId(id);
+  };
+
+  /** ลบเมนู — ถ้าลบรายการที่เปิดอยู่ ให้ปิด accordion ด้วย (ไม่ค้างชี้ id ที่หายไป) */
+  const removeItem = (index: number): void => {
+    const removed = config.items[index];
+    update({ ...config, items: config.items.filter((_entry, position) => position !== index) });
+    if (removed !== undefined && openItemId === removed.id) setOpenItemId(null);
+  };
+
+  /** เพิ่มปุ่มแล้วเปิดฟอร์มของปุ่มใหม่ทันที */
+  const addButton = (): void => {
+    if (config.buttons.length >= MAX_NAV_BUTTONS) return;
+    const id = `button-${Date.now()}`;
+    update({
+      ...config,
+      buttons: [
+        ...config.buttons,
+        { id, label: { th: "", en: "" }, href: "/", icon: "none", tone: "brand", position: "right" },
+      ],
+    });
+    setOpenButtonId(id);
+  };
+
+  /** ลบปุ่ม — ถ้าลบปุ่มที่เปิดอยู่ ให้ปิด accordion ด้วย */
+  const removeButton = (index: number): void => {
+    const removed = config.buttons[index];
+    update({ ...config, buttons: config.buttons.filter((_entry, position) => position !== index) });
+    if (removed !== undefined && openButtonId === removed.id) setOpenButtonId(null);
   };
 
   const statusLine = (state: BuilderState): string | null => {
@@ -248,15 +295,7 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
           <button
             type="button"
             disabled={config.items.length >= MAX_NAV_ITEMS}
-            onClick={() =>
-              update({
-                ...config,
-                items: [
-                  ...config.items,
-                  { id: `item-${Date.now()}`, label: { th: "", en: "" }, href: "/", icon: "none" },
-                ],
-              })
-            }
+            onClick={addItem}
             className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.navbarAddItem}
@@ -264,84 +303,106 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
         </div>
 
         <ul className="flex flex-col gap-2">
-          {config.items.map((item, index) => (
-            <li key={item.id} className="border-line flex min-w-0 flex-col gap-1.5 rounded-lg border p-2">
-              <div className="flex items-center gap-1">
-                <NavIcon name={item.icon} className="text-fg-muted" />
-                <span className="text-fg-muted text-[11px]">#{index + 1}</span>
-                <div className="ml-auto flex gap-1">
-                  <button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} className="border-line text-fg rounded-lg border px-1.5 py-0.5 text-xs disabled:opacity-40">
-                    {strings.navbarMoveUp}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveItem(index, 1)}
-                    disabled={index === config.items.length - 1}
-                    className="border-line text-fg rounded-lg border px-1.5 py-0.5 text-xs disabled:opacity-40"
-                  >
-                    {strings.navbarMoveDown}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => update({ ...config, items: config.items.filter((_entry, position) => position !== index) })}
-                    className="border-line text-fg-muted rounded-lg border px-1.5 py-0.5 text-xs"
-                  >
-                    {strings.navbarRemove}
-                  </button>
-                </div>
-              </div>
+          {config.items.map((item, index) => {
+            const open = openItemId === item.id;
+            const summary = item.label.th.trim() === "" ? strings.navbarItemLabelTh : item.label.th;
 
-              {pageNameIds.includes(item.id) ? (
-                <p className="border-line bg-surface-raised text-fg-muted rounded-lg border p-2 text-[11px]">
-                  {strings.navbarItemLabelTh}: <span className="text-fg font-semibold">{item.label.th}</span>
-                  <br />
-                  {str(rawStrings["pageMenuNameFromPage"], "")}
-                </p>
-              ) : (
-                <label className="flex flex-col gap-1">
-                  <span className={LABEL_CLASS}>{strings.navbarItemLabelTh}</span>
-                  <input
-                    type="text"
-                    value={item.label.th}
-                    onChange={(event) => setItem(index, { label: { ...item.label, th: event.target.value } })}
-                    className={FIELD_CLASS}
-                  />
-                </label>
-              )}
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemLabelEn}</span>
-                <input
-                  type="text"
-                  value={item.label.en}
-                  onChange={(event) => setItem(index, { label: { ...item.label, en: event.target.value } })}
-                  className={FIELD_CLASS}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemHref}</span>
-                <input
-                  type="text"
-                  value={item.href}
-                  onChange={(event) => setItem(index, { href: event.target.value })}
-                  className={FIELD_CLASS}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemIcon}</span>
-                <select
-                  value={item.icon}
-                  onChange={(event) => setItem(index, { icon: event.target.value as NavbarItem["icon"] })}
-                  className={FIELD_CLASS}
-                >
-                  {NAV_ICON_KEYS.map((entry) => (
-                    <option key={entry.value} value={entry.value}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </li>
-          ))}
+            return (
+              <li key={item.id} className="border-line min-w-0 rounded-lg border">
+                {/* แถวสรุป — คลิกเพื่อเปิดฟอร์มของเมนูนี้ทีละรายการ (accordion) */}
+                <div className="flex items-center gap-1 p-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpenItemId((current) => toggleOpenId(current, item.id))}
+                    aria-expanded={open}
+                    className="focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-1.5 rounded-lg text-left focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <NavIcon name={item.icon} className="text-fg-muted shrink-0" />
+                    <span className="text-fg-muted shrink-0 text-[11px]">#{index + 1}</span>
+                    <span className="text-fg min-w-0 flex-1 truncate text-xs font-semibold">{summary}</span>
+                    <span aria-hidden="true" className="text-fg-muted shrink-0 text-[11px]">
+                      {open ? "▾" : "▸"}
+                    </span>
+                  </button>
+
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} className="border-line text-fg rounded-lg border px-1.5 py-0.5 text-xs disabled:opacity-40">
+                      {strings.navbarMoveUp}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveItem(index, 1)}
+                      disabled={index === config.items.length - 1}
+                      className="border-line text-fg rounded-lg border px-1.5 py-0.5 text-xs disabled:opacity-40"
+                    >
+                      {strings.navbarMoveDown}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="border-line text-fg-muted rounded-lg border px-1.5 py-0.5 text-xs"
+                    >
+                      {strings.navbarRemove}
+                    </button>
+                  </div>
+                </div>
+
+                {open ? (
+                  <div className="border-line flex flex-col gap-1.5 border-t p-2">
+                    {pageNameIds.includes(item.id) ? (
+                      <p className="border-line bg-surface-raised text-fg-muted rounded-lg border p-2 text-[11px]">
+                        {strings.navbarItemLabelTh}: <span className="text-fg font-semibold">{item.label.th}</span>
+                        <br />
+                        {str(rawStrings["pageMenuNameFromPage"], "")}
+                      </p>
+                    ) : (
+                      <label className="flex flex-col gap-1">
+                        <span className={LABEL_CLASS}>{strings.navbarItemLabelTh}</span>
+                        <input
+                          type="text"
+                          value={item.label.th}
+                          onChange={(event) => setItem(index, { label: { ...item.label, th: event.target.value } })}
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                    )}
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemLabelEn}</span>
+                      <input
+                        type="text"
+                        value={item.label.en}
+                        onChange={(event) => setItem(index, { label: { ...item.label, en: event.target.value } })}
+                        className={FIELD_CLASS}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemHref}</span>
+                      <input
+                        type="text"
+                        value={item.href}
+                        onChange={(event) => setItem(index, { href: event.target.value })}
+                        className={FIELD_CLASS}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemIcon}</span>
+                      <select
+                        value={item.icon}
+                        onChange={(event) => setItem(index, { icon: event.target.value as NavbarItem["icon"] })}
+                        className={FIELD_CLASS}
+                      >
+                        {NAV_ICON_KEYS.map((entry) => (
+                          <option key={entry.value} value={entry.value}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
 
@@ -354,22 +415,7 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
           <button
             type="button"
             disabled={config.buttons.length >= MAX_NAV_BUTTONS}
-            onClick={() =>
-              update({
-                ...config,
-                buttons: [
-                  ...config.buttons,
-                  {
-                    id: `button-${Date.now()}`,
-                    label: { th: "", en: "" },
-                    href: "/",
-                    icon: "none",
-                    tone: "brand",
-                    position: "right",
-                  },
-                ],
-              })
-            }
+            onClick={addButton}
             className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.navbarAddButton}
@@ -377,123 +423,145 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
         </div>
 
         <ul className="flex flex-col gap-2">
-          {config.buttons.map((button, index) => (
-            <li key={button.id} className="border-line flex min-w-0 flex-col gap-1.5 rounded-lg border p-2">
-              <div className="flex items-center gap-2">
-                <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold ${button.tone === "outline" ? "border-line border text-fg" : "bg-brand-red text-on-brand"}`}>
-                  <NavIcon name={button.icon} />
-                  {button.label.th === "" ? str(rawStrings["untitledLabel"], "") : button.label.th}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => update({ ...config, buttons: config.buttons.filter((_entry, position) => position !== index) })}
-                  className="border-line text-fg-muted ml-auto rounded-lg border px-1.5 py-0.5 text-xs"
-                >
-                  {strings.navbarRemove}
-                </button>
-              </div>
+          {config.buttons.map((button, index) => {
+            const open = openButtonId === button.id;
 
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemLabelTh}</span>
-                <input
-                  type="text"
-                  value={button.label.th}
-                  onChange={(event) =>
-                    update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry)) })
-                  }
-                  className={FIELD_CLASS}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemLabelEn}</span>
-                <input
-                  type="text"
-                  value={button.label.en}
-                  onChange={(event) =>
-                    update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, label: { ...entry.label, en: event.target.value } } : entry)) })
-                  }
-                  className={FIELD_CLASS}
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className={LABEL_CLASS}>{strings.navbarItemHref}</span>
-                <input
-                  type="text"
-                  value={button.href}
-                  onChange={(event) =>
-                    update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, href: event.target.value } : entry)) })
-                  }
-                  className={FIELD_CLASS}
-                />
-              </label>
+            return (
+              <li key={button.id} className="border-line min-w-0 rounded-lg border">
+                {/* แถวสรุป — คลิกเพื่อเปิดฟอร์มของปุ่มนี้ทีละรายการ (accordion) */}
+                <div className="flex items-center gap-2 p-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpenButtonId((current) => toggleOpenId(current, button.id))}
+                    aria-expanded={open}
+                    className="focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <span className={`flex min-w-0 max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold ${button.tone === "outline" ? "border-line border text-fg" : "bg-brand-red text-on-brand"}`}>
+                      <NavIcon name={button.icon} />
+                      <span className="truncate">
+                        {button.label.th === "" ? str(rawStrings["untitledLabel"], "") : button.label.th}
+                      </span>
+                    </span>
+                    <span aria-hidden="true" className="text-fg-muted ml-auto shrink-0 text-[11px]">
+                      {open ? "▾" : "▸"}
+                    </span>
+                  </button>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="flex flex-col gap-1">
-                  <span className={LABEL_CLASS}>{strings.navbarButtonTone}</span>
-                  <select
-                    value={button.tone}
-                    onChange={(event) =>
-                      update({
-                        ...config,
-                        buttons: config.buttons.map((entry, position) =>
-                          position === index ? { ...entry, tone: event.target.value as NavbarConfig["buttons"][number]["tone"] } : entry,
-                        ),
-                      })
-                    }
-                    className={FIELD_CLASS}
+                  <button
+                    type="button"
+                    onClick={() => removeButton(index)}
+                    className="border-line text-fg-muted shrink-0 rounded-lg border px-1.5 py-0.5 text-xs"
                   >
-                    {NAVBAR_BUTTON_TONES.map((entry) => (
-                      <option key={entry.value} value={entry.value}>
-                        {entry.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className={LABEL_CLASS}>{strings.navbarButtonPosition}</span>
-                  <select
-                    value={button.position}
-                    onChange={(event) =>
-                      update({
-                        ...config,
-                        buttons: config.buttons.map((entry, position) =>
-                          position === index ? { ...entry, position: event.target.value as NavbarConfig["buttons"][number]["position"] } : entry,
-                        ),
-                      })
-                    }
-                    className={FIELD_CLASS}
-                  >
-                    {NAVBAR_BUTTON_POSITIONS.map((entry) => (
-                      <option key={entry.value} value={entry.value}>
-                        {entry.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 sm:col-span-2">
-                  <span className={LABEL_CLASS}>{strings.navbarItemIcon}</span>
-                  <select
-                    value={button.icon}
-                    onChange={(event) =>
-                      update({
-                        ...config,
-                        buttons: config.buttons.map((entry, position) =>
-                          position === index ? { ...entry, icon: event.target.value as NavbarItem["icon"] } : entry,
-                        ),
-                      })
-                    }
-                    className={FIELD_CLASS}
-                  >
-                    {NAV_ICON_KEYS.map((entry) => (
-                      <option key={entry.value} value={entry.value}>
-                        {entry.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </li>
-          ))}
+                    {strings.navbarRemove}
+                  </button>
+                </div>
+
+                {open ? (
+                  <div className="border-line flex flex-col gap-1.5 border-t p-2">
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemLabelTh}</span>
+                      <input
+                        type="text"
+                        value={button.label.th}
+                        onChange={(event) =>
+                          update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, label: { ...entry.label, th: event.target.value } } : entry)) })
+                        }
+                        className={FIELD_CLASS}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemLabelEn}</span>
+                      <input
+                        type="text"
+                        value={button.label.en}
+                        onChange={(event) =>
+                          update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, label: { ...entry.label, en: event.target.value } } : entry)) })
+                        }
+                        className={FIELD_CLASS}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL_CLASS}>{strings.navbarItemHref}</span>
+                      <input
+                        type="text"
+                        value={button.href}
+                        onChange={(event) =>
+                          update({ ...config, buttons: config.buttons.map((entry, position) => (position === index ? { ...entry, href: event.target.value } : entry)) })
+                        }
+                        className={FIELD_CLASS}
+                      />
+                    </label>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="flex flex-col gap-1">
+                        <span className={LABEL_CLASS}>{strings.navbarButtonTone}</span>
+                        <select
+                          value={button.tone}
+                          onChange={(event) =>
+                            update({
+                              ...config,
+                              buttons: config.buttons.map((entry, position) =>
+                                position === index ? { ...entry, tone: event.target.value as NavbarConfig["buttons"][number]["tone"] } : entry,
+                              ),
+                            })
+                          }
+                          className={FIELD_CLASS}
+                        >
+                          {NAVBAR_BUTTON_TONES.map((entry) => (
+                            <option key={entry.value} value={entry.value}>
+                              {entry.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className={LABEL_CLASS}>{strings.navbarButtonPosition}</span>
+                        <select
+                          value={button.position}
+                          onChange={(event) =>
+                            update({
+                              ...config,
+                              buttons: config.buttons.map((entry, position) =>
+                                position === index ? { ...entry, position: event.target.value as NavbarConfig["buttons"][number]["position"] } : entry,
+                              ),
+                            })
+                          }
+                          className={FIELD_CLASS}
+                        >
+                          {NAVBAR_BUTTON_POSITIONS.map((entry) => (
+                            <option key={entry.value} value={entry.value}>
+                              {entry.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1 sm:col-span-2">
+                        <span className={LABEL_CLASS}>{strings.navbarItemIcon}</span>
+                        <select
+                          value={button.icon}
+                          onChange={(event) =>
+                            update({
+                              ...config,
+                              buttons: config.buttons.map((entry, position) =>
+                                position === index ? { ...entry, icon: event.target.value as NavbarItem["icon"] } : entry,
+                              ),
+                            })
+                          }
+                          className={FIELD_CLASS}
+                        >
+                          {NAV_ICON_KEYS.map((entry) => (
+                            <option key={entry.value} value={entry.value}>
+                              {entry.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
 
