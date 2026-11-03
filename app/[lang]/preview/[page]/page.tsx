@@ -3,6 +3,7 @@ import { fillTemplate } from "@/lib/i18n/template";
 import { notFound } from "next/navigation";
 
 import { PreviewFrame } from "@/features/blocks/ui/preview-frame";
+import { PreviewNavigationGuard } from "@/features/admin/ui/preview-navigation-guard";
 import { loadProductShowcaseData } from "@/lib/blocks/product-showcase-data";
 import { loadRecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
 import { loadNewsShowcaseData } from "@/lib/blocks/news-showcase-data";
@@ -109,6 +110,13 @@ export default async function PreviewPage({
 
   return (
     <div className="flex flex-col">
+      {/*
+        รอบที่ 325 (ฟีดแบ็กเจ้าของ): ห้ามให้ลิงก์/ฟอร์มในพรีวิวพา iframe เปลี่ยนหน้า
+        ⚠️ ต้องติดจาก **ในเอกสารนี้เอง** ด้วย ไม่พึ่งเฉพาะ onLoad ของหน้าต่างแม่
+           เพราะ iframe อาจโหลดเสร็จก่อน `/admin/builder/*` hydrate (เจอจริงกับ executives/certifications)
+        ⚠️ เปิดพรีวิวตรง ๆ ในแท็บใหม่ = ไม่ดัก (คอมโพเนนต์เช็ค `window.parent === window`)
+      */}
+      <PreviewNavigationGuard />
       {/*
         ซ่อนหัวเว็บ/ท้ายเว็บของ layout แล้วใช้หัวเว็บ "สด" ของพรีวิวแทน (รอบที่ 54)
         - สคริปต์ตั้ง `data-preview-chrome` บน <html> ก่อน paint ⇒ ไม่มีหัวเว็บซ้อนกันให้เห็น

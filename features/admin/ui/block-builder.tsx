@@ -21,6 +21,7 @@ import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
+import { installPreviewNavigationGuard } from "@/features/admin/ui/preview-navigation";
 import {
   DROP_IMAGE_MESSAGE,
   NAVBAR_MESSAGE,
@@ -688,6 +689,27 @@ export function BlockBuilder({
       window.location.origin,
     );
   }, [document, selectedId, selectTick]);
+
+  /**
+   * หลัง iframe โหลดเสร็จ: ติดตัวดักลิงก์/ฟอร์ม **(เฉพาะในพรีวิว)** แล้วส่งฉบับร่างเข้าไป
+   *
+   * ⚠️ รอบที่ 325 (ฟีดแบ็กเจ้าของ): ลิงก์ในพรีวิวเคยพา iframe เปลี่ยนหน้าเมื่อกดพลาด
+   *    ⇒ ติดตัวดักจากหน้าต่างแม่ทุกครั้งที่ `load` (เอกสารใหม่ = listener เก่าหายไปพร้อมเอกสาร)
+   *    หน้าเว็บสาธารณะไม่ถูกแตะ — ตัวดักมีอยู่เฉพาะใน iframe ของหน้าจอหลังบ้าน
+   */
+  const onFrameLoad = useCallback(() => {
+    installPreviewNavigationGuard(frameRef.current);
+    postToFrame();
+  }, [postToFrame]);
+
+  /*
+    ⚠️ `onLoad` อย่างเดียวไม่พอ: iframe อาจโหลดเสร็จ **ก่อน** React hydrate หน้าจอแม่
+    ⇒ เรียกติดตั้งอีกครั้งหลัง mount (และเมื่อสลับโหมด/ขนาด/เต็มจอที่ทำให้ iframe ถูกสร้างใหม่)
+    ตัวติดตั้งเป็น idempotent ด้วย WeakSet<Document> — เรียกซ้ำไม่เพิ่ม listener
+  */
+  useEffect(() => {
+    installPreviewNavigationGuard(frameRef.current);
+  }, [previewMode, frameKey, fullscreen]);
 
   /* หน่วง 250ms กันการส่งถี่เกินไปตอนพิมพ์รัว ๆ */
   useEffect(() => {
@@ -2626,7 +2648,7 @@ export function BlockBuilder({
                 key={`${previewMode}-${frameKey}`}
                 ref={frameRef}
                 src={previewSrc}
-                onLoad={postToFrame}
+                onLoad={onFrameLoad}
                 title={strings.previewTitle}
                 className="bg-bg h-full w-full rounded-lg border-0"
               />
@@ -2636,7 +2658,7 @@ export function BlockBuilder({
                   key={`${previewMode}-${frameKey}`}
                   ref={frameRef}
                   src={previewSrc}
-                  onLoad={postToFrame}
+                  onLoad={onFrameLoad}
                   title={strings.previewTitle}
                   style={{
                     width: `${previewSize.width}px`,

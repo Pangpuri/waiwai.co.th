@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { FOOTER_MESSAGE, MOURNING_LIVE_EVENT, MOURNING_MESSAGE, NAVBAR_MESSAGE } from "@/features/blocks/ui/preview-frame";
+import { installPreviewNavigationGuard } from "@/features/admin/ui/preview-navigation";
 import {
   DEFAULT_CHROME_MODE,
   DEFAULT_CHROME_PART,
@@ -172,6 +173,15 @@ export function ChromeWorkspace({
   useEffect(() => {
     postLiveValues();
   }, [postLiveValues, mode, reloadKey, part]);
+
+  /*
+    ⚠️ `onLoad` อย่างเดียวไม่พอ: iframe อาจโหลดเสร็จก่อน React hydrate หน้าจอแม่
+    ⇒ ติดตัวดักลิงก์/ฟอร์มอีกครั้งหลัง mount และเมื่อ iframe ถูกสร้างใหม่ (แท็บ/โหมด/กดโหลดใหม่/แสดงกลับ)
+    ตัวติดตั้ง idempotent ด้วย WeakSet<Document> — เรียกซ้ำไม่เพิ่ม listener
+  */
+  useEffect(() => {
+    installPreviewNavigationGuard(frameRef.current);
+  }, [mode, reloadKey, part, previewHidden]);
 
   /* ท้ายเว็บใช้พรีวิวคนละโหมด (โชว์ท้ายเว็บอย่างเดียว) — แถบเมนู/ป้ายประกาศใช้โหมด nav */
   const src =
@@ -351,6 +361,8 @@ export function ChromeWorkspace({
                 key={`${mode}-${reloadKey}`}
                 ref={frameRef}
                 onLoad={() => {
+                  /* รอบที่ 325: ลิงก์/ฟอร์มในพรีวิวห้ามพา iframe เปลี่ยนหน้า (เฉพาะในหน้าจอหลังบ้าน) */
+                  installPreviewNavigationGuard(frameRef.current);
                   postLiveValues();
                   /* เอกสารใหม่เพิ่งโหลด — ส่งซ้ำอีกครั้งหลัง hydration จะได้ไม่พลาด */
                   window.setTimeout(postLiveValues, 300);
