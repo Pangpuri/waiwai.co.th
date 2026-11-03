@@ -144,6 +144,20 @@ test("ci: ด่าน check:db ต้องไม่บังคับข้อ
   assert.ok(db.includes("firstCategoryIdOrSkip("), "วงจรที่ใช้หมวดสินค้าต้องใช้ตัวช่วยที่ข้ามได้");
   assert.ok(db.includes('skip("ข่าวจริงทั้งชุด'), "วงจรข่าวต้องข้ามอย่างเปิดเผยเมื่อฐานข้อมูลยังไม่มีข่าว");
 
+  /*
+    ★ รอบที่ 326 — CI แดงที่งาน database เพราะด่านนี้ assert "หมวดในโค้ดต้องยังอยู่"
+    ทั้งที่หมวดในโค้ดมาจาก `products:import` (CI ไม่มี) ⇒ ต้องเช็คก่อนว่ามีจริงแล้วค่อยพิสูจน์ประตูลบ
+    และต้องรายงานการข้ามด้วย `skip()` ไม่ใช่เงียบ
+  */
+  assert.ok(
+    db.includes("if ((await loadAdminCategory(builtInId)) === null)"),
+    "ต้องตรวจว่ามีหมวด built-in จริงก่อนพิสูจน์ประตูลบ (CI ไม่มีข้อมูลนำเข้า)",
+  );
+  assert.ok(
+    db.includes("ประตูลบหมวดในโค้ด (ต้องมีข้อมูลจาก products:import)"),
+    "ต้องรายงานการข้ามบล็อกหมวด built-in อย่างเปิดเผย",
+  );
+
   const skipFn = db.slice(db.indexOf("function skip("), db.indexOf("function skip(") + 200);
   assert.ok(skipFn.includes("⚠️"), "ป้ายของ skip ต้องเป็น ⚠️ (ไม่ใช่ ✓) — ไม่งั้นอ่านแล้วเข้าใจว่าผ่าน");
 });
