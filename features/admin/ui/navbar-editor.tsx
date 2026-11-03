@@ -5,6 +5,7 @@ import { useActionState, useEffect, useState } from "react";
 import { publishNavbarAction, saveNavbarDraftAction } from "@/app/admin/builder/navbar/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
+import { latestVersionOf } from "@/lib/blocks/version";
 import { toggleOpenId } from "@/lib/chrome/accordion";
 import {
   MAX_NAV_BUTTONS,
@@ -35,6 +36,7 @@ type Props = {
   /** id ของเมนูที่เป็น "หน้า" — ชื่อเมนูพวกนี้มาจากตาราง page (แก้ที่แท็บของหน้านั้น) */
   readonly pageNameIds?: readonly string[];
   readonly draftUpdatedAt: string | null;
+  readonly draftVersion: string | null;
   readonly publishedAt: string | null;
   readonly strings: {
     readonly [key: string]: string | { readonly [key: string]: string };
@@ -111,7 +113,14 @@ const FIELD_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 const LABEL_CLASS = "text-fg-muted text-xs";
 
-export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publishedAt, strings: rawStrings }: Props) {
+export function NavbarEditor({
+  initial,
+  pageNameIds = [],
+  draftUpdatedAt,
+  draftVersion,
+  publishedAt,
+  strings: rawStrings,
+}: Props) {
   const strings = asStrings(rawStrings);
   const [config, setConfig] = useState<NavbarConfig>(initial);
   /*
@@ -123,6 +132,8 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
   const [openButtonId, setOpenButtonId] = useState<string | null>(initial.buttons[0]?.id ?? null);
   const [draftState, draftAction, draftPending] = useActionState(saveNavbarDraftAction, INITIAL_BUILDER_STATE);
   const [publishState, publishAction, publishPending] = useActionState(publishNavbarAction, INITIAL_BUILDER_STATE);
+  const effectiveVersion = latestVersionOf([draftVersion, draftState.draftVersion, publishState.draftVersion]);
+  const conflict = draftState.status === "conflict" || publishState.status === "conflict";
 
   const issues = validateNavbarConfig(config);
   const errors = navbarErrorsOf(issues);
@@ -205,6 +216,7 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
 
   const statusLine = (state: BuilderState): string | null => {
     if (state.status === "idle") return null;
+    if (state.status === "conflict") return str(rawStrings["draftConflictTitle"], "");
     if (state.status === "published") return draftState.status === "published" ? null : str(rawStrings["publishedBadge"], "");
     return null;
   };
@@ -588,9 +600,10 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
       <div className="flex flex-wrap items-center gap-2">
         <form action={draftAction}>
           <input type="hidden" name="payload" value={payload} />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
           <button
             type="submit"
-            disabled={draftPending || errors.length > 0}
+            disabled={draftPending || errors.length > 0 || conflict}
             className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.navbarSaveDraft}
@@ -599,9 +612,10 @@ export function NavbarEditor({ initial, pageNameIds = [], draftUpdatedAt, publis
 
         <form action={publishAction}>
           <input type="hidden" name="payload" value={payload} />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
           <button
             type="submit"
-            disabled={publishPending || errors.length > 0}
+            disabled={publishPending || errors.length > 0 || conflict}
             className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-lg px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.navbarPublish}

@@ -11,6 +11,8 @@ import {
   moveBlockTo,
   moveBlockToLocation,
   removeBlock,
+  removeBlockWithUndo,
+  restoreRemovedBlock,
   removeColumn,
   replaceBlockWithPreset,
   setBlockText,
@@ -184,6 +186,36 @@ test("x1.1 edit: ลบบล็อกที่ซ้อนได้ (และ�
 
   const removedRow = removeBlock(built.document, "r1");
   assert.equal(countBlocks(removedRow.blocks), 0, "ลบแถว = ลูกลบตาม");
+});
+
+test("x1.1 edit: ลบบล็อกแล้วเลิกทำได้ — คืนตำแหน่งเดิมและ id เดิม", () => {
+  const built = withChild(docOf([rowBlock("r1")]), "r1");
+  const before = collectBlockIds(built.document.blocks);
+
+  const removal = removeBlockWithUndo(built.document, built.blockId);
+  assert.ok(removal !== null, "ต้องเก็บสำเนาไว้ทำ undo");
+  assert.equal(countBlocks(removal.document.blocks), 1, "ลบลูกแล้วเหลือแถว");
+
+  const restored = restoreRemovedBlock(removal.document, removal.removed);
+  assert.ok(restored !== null, "ภาชนะเดิมยังอยู่ = เลิกทำได้");
+  assert.deepEqual(collectBlockIds(restored.blocks), before, "ลำดับและ id ต้องกลับมาเหมือนเดิม");
+});
+
+test("x1.1 edit: เลิกทำลบระดับหน้าได้ และคืน null เมื่อตำแหน่งเดิมหาย", () => {
+  const document = docOf([createBlock("heading", "b1"), createBlock("divider", "b2")]);
+  const removal = removeBlockWithUndo(document, "b1");
+  assert.ok(removal !== null);
+  assert.deepEqual(removal.document.blocks.map((block) => block.id), ["b2"]);
+
+  const restored = restoreRemovedBlock(removal.document, removal.removed);
+  assert.ok(restored !== null);
+  assert.deepEqual(restored.blocks.map((block) => block.id), ["b1", "b2"]);
+
+  const built = withChild(docOf([rowBlock("r1")]), "r1");
+  const childRemoval = removeBlockWithUndo(built.document, built.blockId);
+  assert.ok(childRemoval !== null);
+  const rowGone = removeBlock(childRemoval.document, "r1");
+  assert.equal(restoreRemovedBlock(rowGone, childRemoval.removed), null, "แถวพ่อหายแล้ว = เลิกทำไม่ได้");
 });
 
 test("x1.1 edit: ทำซ้ำแถว = ได้ id ใหม่ทั้งก้อน (รวมบล็อกลูก)", () => {

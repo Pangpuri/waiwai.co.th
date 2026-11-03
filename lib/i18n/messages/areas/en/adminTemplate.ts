@@ -15,6 +15,7 @@ export const adminTemplate = {
   startFromTemplateReplace: "Use the built-in template (replaces the draft)",
   startFromTemplateOverwrite: "Tick to confirm replacing the current draft",
   startFromTemplateNeedsConfirm: "Not applied — you did not tick the confirmation. Your draft is unchanged",
+  startFromTemplateConflict: "The draft was changed elsewhere — nothing was overwritten. Reload and try again.",
   startFromTemplateHint:
     "Builds the content from this page's “template in code” — it is not a copy of the published page, so it may differ from the live site. Edit freely afterwards; your chosen layout is kept.",
   startFromTemplateSourceNote:

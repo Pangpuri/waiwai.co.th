@@ -276,12 +276,28 @@ test("x1.5 autosave: ตารางการตัดสินใจครบ�
   assert.equal(decideAutosave({ enabled: true, dirty: false, errorCount: 0, saving: false }), "not-needed");
   assert.equal(decideAutosave({ enabled: true, dirty: true, errorCount: 3, saving: false }), "blocked-errors");
   assert.equal(decideAutosave({ enabled: true, dirty: true, errorCount: 0, saving: true }), "in-flight");
+  assert.equal(
+    decideAutosave({ enabled: true, dirty: true, errorCount: 0, saving: false, conflicted: true }),
+    "blocked-conflict",
+  );
 });
 
 test("x1.5 autosave: มี error = ห้ามบันทึก (กันบันทึกทับงานที่ผู้ใช้ยังแก้ไม่เสร็จ)", () => {
   const decision = decideAutosave({ enabled: true, dirty: true, errorCount: 1, saving: false });
   assert.notEqual(decision, "schedule");
   assert.equal(decision, "blocked-errors");
+});
+
+test("รอบที่ 323 autosave: conflict ต้องหยุดก่อนทุกกรณี แม้ไม่มี diff/ยังไม่เซฟ", () => {
+  assert.equal(
+    decideAutosave({ enabled: true, dirty: false, errorCount: 0, saving: false, conflicted: true }),
+    "blocked-conflict",
+  );
+  assert.equal(
+    decideAutosave({ enabled: false, dirty: true, errorCount: 0, saving: false, conflicted: true }),
+    "disabled",
+    "ผู้ใช้ปิด autosave เอง = disabled มาก่อน",
+  );
 });
 
 test("x1.5 autosave: ปิดสวิตช์แล้วต้องไม่บันทึก แม้จะ dirty", () => {

@@ -43,4 +43,15 @@ export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
   sectionDead: "This section is no longer used — the site does not read these values (real source: {screen}) · nothing to edit here, the stored values are kept intact.",
   sectionCodeLayoutOnly:
     "Values here apply **only while the home page uses the code layout** — once the page runs on blocks (page builder), the marketplace block decides instead.",
+  /* ── Round 323: optimistic concurrency + undo delete + block empty publish ── */
+  draftConflictTitle: "This page was changed elsewhere",
+  draftConflictHint:
+    "What you see may be older than the latest draft — autosave is paused so it cannot overwrite another tab or person. Reload the latest data, or overwrite only if you mean to.",
+  draftConflictReload: "Reload latest",
+  draftConflictOverwrite: "Overwrite",
+  draftUndoDelete: "Block deleted",
+  draftUndoAction: "Undo",
+  draftUndoExpired: "Cannot undo — the original position has changed",
+  draftUndoDismiss: "Dismiss",
+  publishBlockedEmpty: "Cannot publish yet — this page has no blocks",
 };

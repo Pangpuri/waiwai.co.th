@@ -16,6 +16,7 @@ export const adminTemplate = {
   startFromTemplateReplace: "ใช้เทมเพลตตั้งต้น (ทับฉบับร่าง)",
   startFromTemplateOverwrite: "ติ๊กเพื่อยืนยันว่าจะทับฉบับร่างปัจจุบัน",
   startFromTemplateNeedsConfirm: "ยังไม่ได้ติ๊กยืนยัน — ไม่มีการเปลี่ยนแปลง (ฉบับร่างเดิมยังอยู่ครบ)",
+  startFromTemplateConflict: "ฉบับร่างถูกแก้จากที่อื่น — ไม่มีการทับ ให้โหลดหน้าใหม่แล้วลองอีกครั้ง",
   startFromTemplateHint:
     "สร้างเนื้อหาจาก “เทมเพลตที่เขียนไว้ในโค้ด” ของหน้านี้ — ไม่ใช่สำเนาของหน้าที่เผยแพร่อยู่ จึงอาจต่างจากหน้าเว็บปัจจุบัน · แก้ต่อได้อิสระ และเลย์เอาต์ที่เลือกไว้ยังอยู่",
   startFromTemplateSourceNote:

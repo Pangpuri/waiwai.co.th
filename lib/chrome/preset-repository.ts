@@ -1,6 +1,6 @@
 import { connectionExhaustedHint, getPool, isConnectionExhausted } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
-import { loadDocumentRow, saveJsonDraft } from "@/lib/blocks/repository";
+import { loadDocumentRow, saveJsonDraftIfCurrent } from "@/lib/blocks/repository";
 import {
   MAX_CHROME_PRESETS_PER_KIND,
   chromePresetPageKey,
@@ -234,7 +234,7 @@ export async function importChromePresets(input: {
 
 export type ApplyChromePresetResult =
   | { readonly ok: true; readonly kind: ChromePresetKind; readonly name: string }
-  | { readonly ok: false; readonly reason: "no-database" | "not-found" | "invalid" };
+  | { readonly ok: false; readonly reason: "no-database" | "not-found" | "invalid" | "conflict" };
 
 /**
  * "ใช้ชุดนี้" — เขียนชุดที่เลือกทับ **ฉบับร่างของส่วนนั้น**
@@ -247,6 +247,8 @@ export async function applyChromePreset(input: {
   readonly id: string;
   readonly actor: string;
   readonly messages: Messages;
+  /** version ของฉบับร่างที่หน้าจอเห็น — null = หน้าจอยังไม่เคยเห็นแถว */
+  readonly expectedVersion: string | null;
 }): Promise<ApplyChromePresetResult> {
   if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
 
@@ -268,12 +270,23 @@ export async function applyChromePreset(input: {
 
   const pageKey = chromePresetPageKey(input.kind);
 
+  const currentDraft = await loadDocumentRow(pageKey, "draft");
+  if ((currentDraft?.version ?? null) !== input.expectedVersion) {
+    return { ok: false, reason: "conflict" };
+  }
+
+  /*
+    ทุกส่วนในนี้เก็บเป็น JSON ธรรมดายกเว้น navbar ที่มีตัวจัดเรียงเมนูจากตาราง `page` (W1)
+    ⇒ ใช้ guarded save: ถ้ามีคนเขียนแทรกหลังหน้าจออ่าน version = ไม่ทับ
+  */
+  const saved = await saveJsonDraftIfCurrent(pageKey, preset.payload.config, input.actor, input.expectedVersion);
+  if (!saved.ok) return { ok: false, reason: "conflict" };
+
   /*
     เก็บ "ฉบับร่างก่อนใช้ชุด" ไว้ 1 ชุดต่อส่วน (รอบที่ 81)
-    ⇒ เผลอกดใช้ชุดแล้วยังย้อนกลับได้ทันทีด้วยปุ่มเดียว (ก่อนหน้านี้ไม่มีทางย้อนเลย)
-    ⚠️ ไม่มีฉบับร่างอยู่ = ไม่มีอะไรให้ย้อน ⇒ ไม่ต้องเขียนแถว (ปุ่มย้อนกลับจะบอกว่า "ไม่มีให้ย้อน")
+    ⇒ เผลอกดใช้ชุดแล้วยังย้อนกลับได้ทันทีด้วยปุ่มเดียว
+    ⚠️ เขียนหลัง guarded save สำเร็จเท่านั้น — ถ้า conflict ต้องไม่ทับประวัติย้อนกลับเดิม
   */
-  const currentDraft = await loadDocumentRow(pageKey, "draft");
   if (currentDraft !== null) {
     await getPool().query(
       `insert into chrome_draft_undo (page, payload, replaced_at, replaced_by, preset_name)
@@ -286,12 +299,6 @@ export async function applyChromePreset(input: {
       [pageKey, JSON.stringify(currentDraft.raw), input.actor, preset.name],
     );
   }
-
-  /*
-    ทุกส่วนในนี้เก็บเป็น JSON ธรรมดายกเว้น navbar ที่มีตัวจัดเรียงเมนูจากตาราง `page` (W1)
-    ⇒ ใช้ `saveJsonDraft` กับทุกส่วน: ค่าที่เก็บเป็นชุดดิบของส่วนนั้น (ไม่ใช่เอกสารบล็อก)
-  */
-  await saveJsonDraft(pageKey, preset.payload.config, input.actor);
 
   await recordAudit({
     action: "chrome-preset-apply",
@@ -357,7 +364,7 @@ export async function readChromeDraftUndo(kind: ChromePresetKind): Promise<Chrom
 
 export type UndoChromePresetResult =
   | { readonly ok: true; readonly kind: ChromePresetKind }
-  | { readonly ok: false; readonly reason: "no-database" | "not-found" | "invalid" };
+  | { readonly ok: false; readonly reason: "no-database" | "not-found" | "invalid" | "conflict" };
 
 /**
  * "ย้อนกลับ" — เขียนฉบับร่างก่อนใช้ชุดกลับคืน **แล้วลบข้อมูลย้อนกลับ** (ย้อนได้ครั้งเดียว)
@@ -369,6 +376,7 @@ export async function undoChromePreset(input: {
   readonly kind: ChromePresetKind;
   readonly actor: string;
   readonly messages: Messages;
+  readonly expectedVersion: string | null;
 }): Promise<UndoChromePresetResult> {
   if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
 
@@ -384,7 +392,8 @@ export async function undoChromePreset(input: {
   const payload = parseChromePresetPayload(input.kind, row.payload, input.messages);
   if (payload === null) return { ok: false, reason: "invalid" };
 
-  await saveJsonDraft(pageKey, payload.config, input.actor);
+  const saved = await saveJsonDraftIfCurrent(pageKey, payload.config, input.actor, input.expectedVersion);
+  if (!saved.ok) return { ok: false, reason: "conflict" };
 
   /* ย้อนกลับสำเร็จ ⇒ ลบข้อมูลย้อนกลับ (กันกดซ้ำสลับไปสลับมาโดยไม่รู้ตัว) */
   await getPool().query(`delete from chrome_draft_undo where page = $1`, [pageKey]);

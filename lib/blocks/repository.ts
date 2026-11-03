@@ -27,7 +27,22 @@ export type LoadedDocumentRow = {
   readonly updatedAt: string;
   readonly updatedBy: string | null;
   readonly publishedAt: string | null;
+  /**
+   * optimistic concurrency token (รอบที่ 323) — epoch ไมโครวินาทีของ `updated_at`
+   * เก็บเป็น `::text` เพื่อไม่ให้ JS Date ตัดความละเอียดเหลือมิลลิวินาที
+   */
+  readonly version: string;
 };
+
+export type DraftWriteConflict = {
+  readonly version: string | null;
+  readonly updatedAt: string | null;
+  readonly updatedBy: string | null;
+};
+
+export type DraftWriteResult =
+  | { readonly ok: true; readonly version: string }
+  | { readonly ok: false; readonly conflict: DraftWriteConflict };
 
 export type RevisionSummary = {
   readonly revision: number;
@@ -42,12 +57,15 @@ type RawDocumentRow = {
   updated_at: Date;
   updated_by: string | null;
   published_at: Date | null;
+  version: string;
 };
 
 /** อ่านเอกสารตามสถานะ — คืน null เมื่อยังไม่มีแถว */
 export async function loadDocumentRow(page: string, status: DocumentStatus): Promise<LoadedDocumentRow | null> {
   const result = await readQuery<RawDocumentRow>(
-    `select document, updated_at, updated_by, published_at from page_document where page = $1 and status = $2`,
+    `select document, updated_at, updated_by, published_at,
+            (extract(epoch from updated_at) * 1000000)::bigint::text as version
+       from page_document where page = $1 and status = $2`,
     [page, status],
   );
 
@@ -59,20 +77,96 @@ export async function loadDocumentRow(page: string, status: DocumentStatus): Pro
     updatedAt: row.updated_at.toISOString(),
     updatedBy: row.updated_by,
     publishedAt: row.published_at === null ? null : row.published_at.toISOString(),
+    version: row.version,
   };
 }
 
-/** บันทึกฉบับร่าง (ไม่มีประวัติ — ประวัติเกิดตอนเผยแพร่) */
-export async function saveDraft(page: string, document: BlockDocument, actor: string): Promise<void> {
-  await getPool().query(
+/**
+ * บันทึกฉบับร่าง (ไม่มีประวัติ — ประวัติเกิดตอนเผยแพร่)
+ * คืน version token ใหม่ เพื่อให้หน้าจอใช้เป็น baseline ของ autosave รอบถัดไป
+ */
+export async function saveDraft(page: string, document: BlockDocument, actor: string): Promise<string> {
+  const result = await getPool().query<{ version: string }>(
     `insert into page_document (page, status, document, updated_at, updated_by)
        values ($1, 'draft', $2::jsonb, now(), $3)
      on conflict (page, status) do update set
        document = excluded.document,
        updated_at = now(),
-       updated_by = excluded.updated_by`,
+       updated_by = excluded.updated_by
+     returning (extract(epoch from updated_at) * 1000000)::bigint::text as version`,
     [page, JSON.stringify(document), actor],
   );
+
+  const version = result.rows[0]?.version;
+  if (version === undefined) throw new Error("บันทึกฉบับร่างไม่คืน version");
+  return version;
+}
+
+/**
+ * บันทึกฉบับร่างแบบ optimistic concurrency (รอบที่ 323)
+ *
+ * - `expectedVersion = null` = หน้าจอยังไม่เคยเห็นแถวนี้ ⇒ อนุญาตเฉพาะการสร้างใหม่
+ * - `expectedVersion` = token ที่หน้าจออ่านมา ⇒ เขียนได้เฉพาะเมื่อ `updated_at` ยังตรงกัน
+ * - ไม่ตรง = **ไม่เขียนอะไรเลย** แล้วคืนข้อมูลของเจ้าของล่าสุดให้หน้าจอแสดง conflict
+ *
+ * ใช้ epoch ไมโครวินาทีเป็น token เพราะ `updated_at` ของ Postgres ละเอียดกว่า JS Date (มิลลิวินาที)
+ */
+async function writeDraftIfCurrent(
+  page: string,
+  document: unknown,
+  actor: string,
+  expectedVersion: string | null,
+): Promise<DraftWriteResult> {
+  if (expectedVersion === null) {
+    const inserted = await getPool().query<{ version: string }>(
+      `insert into page_document (page, status, document, updated_at, updated_by)
+         values ($1, 'draft', $2::jsonb, now(), $3)
+       on conflict (page, status) do nothing
+       returning (extract(epoch from updated_at) * 1000000)::bigint::text as version`,
+      [page, JSON.stringify(document), actor],
+    );
+
+    const version = inserted.rows[0]?.version;
+    if (version !== undefined) return { ok: true, version };
+    return { ok: false, conflict: await readDraftConflict(page) };
+  }
+
+  const updated = await getPool().query<{ version: string }>(
+    `update page_document
+        set document = $2::jsonb, updated_at = now(), updated_by = $3
+      where page = $1 and status = 'draft'
+        and (extract(epoch from updated_at) * 1000000)::bigint::text = $4
+      returning (extract(epoch from updated_at) * 1000000)::bigint::text as version`,
+    [page, JSON.stringify(document), actor, expectedVersion],
+  );
+
+  const version = updated.rows[0]?.version;
+  if (version !== undefined) return { ok: true, version };
+  return { ok: false, conflict: await readDraftConflict(page) };
+}
+
+/** เอกสารบล็อก: บันทึกฉบับร่างแบบตรวจ version */
+export async function saveDraftIfCurrent(
+  page: string,
+  document: BlockDocument,
+  actor: string,
+  expectedVersion: string | null,
+): Promise<DraftWriteResult> {
+  return writeDraftIfCurrent(page, document, actor, expectedVersion);
+}
+
+/** ข้อมูลของเจ้าของล่าสุดเมื่อเกิด conflict (อ่านไม่ได้บางส่วน = null ไม่ทำให้ action ล้ม) */
+async function readDraftConflict(page: string): Promise<DraftWriteConflict> {
+  try {
+    const current = await loadDocumentRow(page, "draft");
+    return {
+      version: current?.version ?? null,
+      updatedAt: current?.updatedAt ?? null,
+      updatedBy: current?.updatedBy ?? null,
+    };
+  } catch {
+    return { version: null, updatedAt: null, updatedBy: null };
+  }
 }
 
 /**
@@ -91,12 +185,32 @@ export async function saveJsonDraft(page: string, value: unknown, actor: string)
   );
 }
 
+/** JSON ใดก็ได้: บันทึกฉบับร่างแบบตรวจ version (ใช้กับ navbar/footer/notice/settings) */
+export async function saveJsonDraftIfCurrent(
+  page: string,
+  value: unknown,
+  actor: string,
+  expectedVersion: string | null,
+): Promise<DraftWriteResult> {
+  return writeDraftIfCurrent(page, value, actor, expectedVersion);
+}
+
 /**
  * เผยแพร่: คัดลอกฉบับร่างเป็นฉบับที่ใช้จริง + เก็บประวัติ
  * ต้องมีฉบับร่างอยู่ก่อน (ถ้าไม่มี → โยน error ให้หน้าจอบอกผู้ใช้ ไม่ใช่เผยแพร่หน้าเปล่า)
  */
-export async function publishDraft(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
-  const result = await publishDraftInTransaction(page, actor, note);
+export type PublishDraftOptions = {
+  /** true = เอกสารบล็อก (ห้าม 0 บล็อก) · false/ไม่ระบุ = JSON ทั่วไป (navbar/footer/notice/settings) */
+  readonly requireBlocks?: boolean;
+};
+
+export async function publishDraft(
+  page: string,
+  actor: string,
+  note: string | null,
+  options: PublishDraftOptions = {},
+): Promise<{ readonly revision: number }> {
+  const result = await publishDraftInTransaction(page, actor, note, options.requireBlocks === true);
 
   /*
     รอบที่ 249 (เคสจริงจากเจ้าของ: "ประวัติการเผยแพร่ค่อย ๆ ยืดมาเต็ม ควรมีลอจิกลบ"):
@@ -108,6 +222,88 @@ export async function publishDraft(page: string, actor: string, note: string | n
 
   /* ร่องรอยการเผยแพร่ (X2.2) — เขียนนอก transaction · ล้มเหลวก็ไม่ทำให้การเผยแพร่พัง */
   await recordAudit({ action: "publish", actorEmail: actor, target: page, detail: note });
+  return result;
+}
+
+export type PublishDraftResult =
+  | { readonly ok: true; readonly revision: number }
+  | { readonly ok: false; readonly conflict: DraftWriteConflict };
+
+/**
+ * เผยแพร่แบบ optimistic concurrency (รอบที่ 323)
+ *
+ * ตรวจ version ของฉบับร่างในทรานแซกชันเดียวกับการเขียนฉบับเผยแพร่ (`for update`)
+ * ⇒ ถ้ามีแท็บ/คนอื่นเขียนแทรกหลัง autosave แต่ก่อนกดเผยแพร่ จะไม่เผยแพร่ข้อมูลผิดรุ่น
+ */
+export async function publishDraftIfCurrent(
+  page: string,
+  actor: string,
+  note: string | null,
+  expectedVersion: string,
+): Promise<PublishDraftResult> {
+  return publishIfCurrent(page, actor, note, expectedVersion, true);
+}
+
+/** JSON ทั่วไป (navbar/footer/notice/settings): เผยแพร่แบบตรวจ version โดยไม่บังคับจำนวนบล็อก */
+export async function publishJsonDraftIfCurrent(
+  page: string,
+  actor: string,
+  note: string | null,
+  expectedVersion: string,
+): Promise<PublishDraftResult> {
+  return publishIfCurrent(page, actor, note, expectedVersion, false);
+}
+
+async function publishIfCurrent(
+  page: string,
+  actor: string,
+  note: string | null,
+  expectedVersion: string,
+  requireBlocks: boolean,
+): Promise<PublishDraftResult> {
+  const result = await withTransaction<PublishDraftResult>(async (client) => {
+    const draft = await client.query<{
+      document: unknown;
+      updated_at: Date;
+      updated_by: string | null;
+      version: string;
+    }>(
+      `select document, updated_at, updated_by,
+              (extract(epoch from updated_at) * 1000000)::bigint::text as version
+         from page_document
+        where page = $1 and status = 'draft'
+        for update`,
+      [page],
+    );
+
+    const draftRow = draft.rows[0];
+    if (draftRow === undefined) {
+      return {
+        ok: false as const,
+        conflict: { version: null, updatedAt: null, updatedBy: null } satisfies DraftWriteConflict,
+      };
+    }
+
+    if (draftRow.version !== expectedVersion) {
+      return {
+        ok: false as const,
+        conflict: {
+          version: draftRow.version,
+          updatedAt: draftRow.updated_at.toISOString(),
+          updatedBy: draftRow.updated_by,
+        } satisfies DraftWriteConflict,
+      };
+    }
+
+    const revision = await writePublishedRevision(client, page, draftRow.document, actor, note, requireBlocks);
+    await clearScheduleInTransaction(client, page);
+    return { ok: true as const, revision };
+  });
+
+  if (result.ok) {
+    await prunePageRevisions(page).catch(() => 0);
+    await recordAudit({ action: "publish", actorEmail: actor, target: page, detail: note });
+  }
   return result;
 }
 
@@ -132,7 +328,12 @@ export async function prunePageRevisions(page: string, keep: number = MAX_PAGE_R
   return result.rowCount ?? 0;
 }
 
-async function publishDraftInTransaction(page: string, actor: string, note: string | null): Promise<{ readonly revision: number }> {
+async function publishDraftInTransaction(
+  page: string,
+  actor: string,
+  note: string | null,
+  requireBlocks: boolean,
+): Promise<{ readonly revision: number }> {
   return withTransaction(async (client) => {
     const draft = await client.query<{ document: unknown }>(
       `select document from page_document where page = $1 and status = 'draft'`,
@@ -143,7 +344,7 @@ async function publishDraftInTransaction(page: string, actor: string, note: stri
       throw new Error("ไม่มีฉบับร่างให้เผยแพร่");
     }
 
-    const revision = await writePublishedRevision(client, page, draftRow.document, actor, note);
+    const revision = await writePublishedRevision(client, page, draftRow.document, actor, note, requireBlocks);
 
     /* เผยแพร่แล้ว = ล้างกำหนดเวลาเดิมทิ้ง (ไม่ค้างเป็นกำหนดเก่าให้ยิงซ้ำ) — X2.7 */
     await clearScheduleInTransaction(client, page);
@@ -168,7 +369,17 @@ async function writePublishedRevision(
   document: unknown,
   actor: string,
   note: string | null,
+  requireBlocks: boolean,
 ): Promise<number> {
+  /*
+    รอบที่ 323 — เอกสาร **บล็อก** ที่ไม่มีบล็อกเลยห้ามเผยแพร่ (กันหน้าเปล่าขึ้นเว็บ)
+    แต่ `page_document` ยังเก็บ JSON อื่น (navbar/footer/notice/settings) ที่ไม่มี `blocks`
+    ⇒ ด่านนี้ต้องเปิดเฉพาะเส้นทางบล็อก (requireBlocks) ไม่งั้นส่วนกลางจะเผยแพร่ไม่ได้
+  */
+  if (requireBlocks && countRawBlocks(document) === 0) {
+    throw new Error("empty-document");
+  }
+
   await client.query(
     `insert into page_document (page, status, document, updated_at, updated_by, published_at)
        values ($1, 'published', $2::jsonb, now(), $3, now())
@@ -243,21 +454,29 @@ export async function loadRevision(page: string, revision: number): Promise<unkn
  * กู้คืนรุ่นเก่า → เขียนทับ **ฉบับร่าง** (ไม่แตะฉบับที่เผยแพร่อยู่)
  * เจ้าของต้องกด "เผยแพร่" อีกครั้ง → ปลอดภัยกว่าการย้อนทับหน้าเว็บที่คนกำลังดูอยู่
  */
-export async function restoreRevisionToDraft(page: string, revision: number, actor: string): Promise<void> {
+export async function restoreRevisionToDraft(
+  page: string,
+  revision: number,
+  actor: string,
+  expectedVersion: string,
+): Promise<DraftWriteResult> {
   const document = await loadRevision(page, revision);
   if (document === null) {
     throw new Error(`ไม่พบประวัติรุ่นที่ ${revision}`);
   }
 
-  await getPool().query(
-    `insert into page_document (page, status, document, updated_at, updated_by)
-       values ($1, 'draft', $2::jsonb, now(), $3)
-     on conflict (page, status) do update set
-       document = excluded.document,
-       updated_at = now(),
-       updated_by = excluded.updated_by`,
-    [page, JSON.stringify(document), actor],
+  const updated = await getPool().query<{ version: string }>(
+    `update page_document
+        set document = $2::jsonb, updated_at = now(), updated_by = $3
+      where page = $1 and status = 'draft'
+        and (extract(epoch from updated_at) * 1000000)::bigint::text = $4
+      returning (extract(epoch from updated_at) * 1000000)::bigint::text as version`,
+    [page, JSON.stringify(document), actor, expectedVersion],
   );
+
+  const version = updated.rows[0]?.version;
+  if (version !== undefined) return { ok: true, version };
+  return { ok: false, conflict: await readDraftConflict(page) };
 }
 
 /* ── "ใช้เนื้อหานี้กับหน้าเว็บจริง" (เซสชั่น S1) ───────────────────────────────── */
@@ -400,7 +619,14 @@ export async function publishDuePage(
     const claim = rows[0];
     if (claim === undefined) return null;
 
-    const revision = await writePublishedRevision(client, page, claim.document, claim.scheduled_by ?? fallbackActor, note);
+    const revision = await writePublishedRevision(
+      client,
+      page,
+      claim.document,
+      claim.scheduled_by ?? fallbackActor,
+      note,
+      true,
+    );
     return { revision, by: claim.scheduled_by };
   });
 }
@@ -413,21 +639,36 @@ export async function replaceDocumentRaw(
   status: DocumentStatus,
   document: BlockDocument,
   actor: string,
-): Promise<void> {
-  await getPool().query(
-    `update page_document
-        set document = $1::jsonb, updated_at = now(), updated_by = $2
-      where page = $3 and status = $4`,
-    [JSON.stringify(document), actor, page, status],
-  );
+  expectedVersion?: string,
+): Promise<boolean> {
+  const result =
+    expectedVersion === undefined
+      ? await getPool().query(
+          `update page_document
+              set document = $1::jsonb, updated_at = now(), updated_by = $2
+            where page = $3 and status = $4`,
+          [JSON.stringify(document), actor, page, status],
+        )
+      : await getPool().query(
+          `update page_document
+              set document = $1::jsonb, updated_at = now(), updated_by = $2
+            where page = $3 and status = $4
+              and (extract(epoch from updated_at) * 1000000)::bigint::text = $5`,
+          [JSON.stringify(document), actor, page, status, expectedVersion],
+        );
+
+  return (result.rowCount ?? 0) > 0;
 }
 
-export type StoredMigrationResult = {
-  /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับร่าง */
-  readonly draft: number;
-  /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับเผยแพร่ */
-  readonly published: number;
-};
+export type StoredMigrationResult =
+  | {
+      readonly ok: true;
+      /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับร่าง */
+      readonly draft: number;
+      /** จำนวนบล็อกรุ่นเก่าที่ถูกย้ายในฉบับเผยแพร่ */
+      readonly published: number;
+    }
+  | { readonly ok: false; readonly reason: "conflict" };
 
 /**
  * ย้ายเอกสารที่เก็บไว้ (ฉบับร่าง + ฉบับเผยแพร่) ให้เป็นรุ่นรูปทรงปัจจุบัน
@@ -442,7 +683,11 @@ export type StoredMigrationResult = {
  * - เอกสารที่ย้ายแล้วยัง parse ไม่ผ่าน = **ไม่เขียนทับ** (คืน 0) เพื่อไม่ให้ข้อมูลเสียหายหนักกว่าเดิม
  * - ย้ายซ้ำ = ไม่ทำอะไร (นับเฉพาะบล็อกรุ่นเก่า)
  */
-export async function migrateStoredDocuments(page: string, actor: string): Promise<StoredMigrationResult> {
+export async function migrateStoredDocuments(
+  page: string,
+  actor: string,
+  expectedDraftVersion: string,
+): Promise<StoredMigrationResult> {
   const counts: { draft: number; published: number } = { draft: 0, published: 0 };
 
   for (const status of ["draft", "published"] as const) {
@@ -455,7 +700,13 @@ export async function migrateStoredDocuments(page: string, actor: string): Promi
     const parsed = parseBlockDocument(page, migrateDocumentValue(row.raw));
     if (!parsed.ok) continue;
 
-    await replaceDocumentRaw(page, status, parsed.document, actor);
+    /* ฉบับร่างคือที่ที่คนแก้อยู่ ⇒ ต้องตรวจ version ก่อนเขียน (รอบที่ 323) */
+    const written =
+      status === "draft"
+        ? await replaceDocumentRaw(page, status, parsed.document, actor, expectedDraftVersion)
+        : await replaceDocumentRaw(page, status, parsed.document, actor);
+    if (!written) return { ok: false, reason: "conflict" };
+
     counts[status] = summary.legacy;
   }
 
@@ -468,7 +719,7 @@ export async function migrateStoredDocuments(page: string, actor: string): Promi
     });
   }
 
-  return { draft: counts.draft, published: counts.published };
+  return { ok: true, draft: counts.draft, published: counts.published };
 }
 
 /** สรุปรุ่นของข้อมูลที่เก็บไว้ของหน้านี้ (ใช้เตือนในหน้าจอหลังบ้าน) */

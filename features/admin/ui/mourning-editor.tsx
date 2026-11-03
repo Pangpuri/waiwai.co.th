@@ -8,6 +8,7 @@ import { useFormStatus } from "react-dom";
 import { publishMourningAction, resetMourningToDefaultsAction, saveMourningDraftAction } from "@/app/admin/builder/mourning/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
+import { latestVersionOf } from "@/lib/blocks/version";
 import { fillTemplate } from "@/lib/i18n/template";
 import {
   MAX_MOURNING_IMAGES,
@@ -32,6 +33,7 @@ import type { Messages } from "@/lib/i18n/messages/th";
 type Props = {
   readonly initial: MourningConfig;
   readonly draftUpdatedAt: string | null;
+  readonly draftVersion: string | null;
   readonly publishedAt: string | null;
   readonly revisions: readonly {
     readonly revision: number;
@@ -50,10 +52,12 @@ function SubmitButton({
   label,
   pendingLabel,
   tone,
+  disabled = false,
 }: {
   readonly label: string;
   readonly pendingLabel: string;
   readonly tone: "brand" | "outline";
+  readonly disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const className =
@@ -62,7 +66,7 @@ function SubmitButton({
       : "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60";
 
   return (
-    <button type="submit" disabled={pending} className={className}>
+    <button type="submit" disabled={pending || disabled} className={className}>
       {pending ? pendingLabel : label}
     </button>
   );
@@ -131,7 +135,7 @@ function TextPair({
 function StatusPanel({ state, strings }: { readonly state: BuilderState; readonly strings: Messages["admin"] }) {
   if (state.status === "idle") return null;
 
-  const failed = state.status === "invalid" || state.status === "failed";
+  const failed = state.status === "invalid" || state.status === "failed" || state.status === "conflict";
   const message =
     state.status === "draft-saved"
       ? strings.savedDraft
@@ -139,7 +143,9 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
         ? fillTemplate(strings.publishedOk, { revision: state.revision ?? 1 })
         : state.status === "invalid"
           ? strings.errorTitle
-          : strings.dbMissingShort;
+          : state.status === "conflict"
+            ? strings.draftConflictTitle
+            : strings.dbMissingShort;
 
   const labels = strings.issueLabels as Readonly<Record<string, string>>;
 
@@ -169,7 +175,15 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
   );
 }
 
-export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions, strings, compact = false }: Props) {
+export function MourningEditor({
+  initial,
+  draftUpdatedAt,
+  draftVersion,
+  publishedAt,
+  revisions,
+  strings,
+  compact = false,
+}: Props) {
   const [config, setConfig] = useState<MourningConfig>(initial);
 
   /*
@@ -181,6 +195,8 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
   }, [config]);
   const [draftState, draftAction] = useActionState(saveMourningDraftAction, INITIAL_BUILDER_STATE);
   const [publishState, publishAction] = useActionState(publishMourningAction, INITIAL_BUILDER_STATE);
+  const effectiveVersion = latestVersionOf([draftVersion, draftState.draftVersion, publishState.draftVersion]);
+  const conflict = draftState.status === "conflict" || publishState.status === "conflict";
   const resetAction = resetMourningToDefaultsAction;
 
   /**
@@ -469,19 +485,28 @@ export function MourningEditor({ initial, draftUpdatedAt, publishedAt, revisions
       <div className="border-line bg-surface flex flex-wrap items-center gap-3 rounded-2xl border p-3">
         <form action={draftAction}>
           <input type="hidden" name="payload" value={payload} />
-          <SubmitButton label={strings.saveDraft} pendingLabel={strings.savingDraft} tone="outline" />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
+          <SubmitButton
+            label={strings.saveDraft}
+            pendingLabel={strings.savingDraft}
+            tone="outline"
+            disabled={conflict}
+          />
         </form>
 
         <form action={publishAction}>
           <input type="hidden" name="payload" value={payload} />
-          <SubmitButton label={strings.publish} pendingLabel={strings.publishing} tone="brand" />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
+          <SubmitButton label={strings.publish} pendingLabel={strings.publishing} tone="brand" disabled={conflict} />
         </form>
 
         {/* คืนค่าเริ่มต้นจากโค้ด/พจนานุกรม (เขียนเป็นฉบับร่างก่อน — ต้องกด "เผยแพร่" อีกครั้งจึงมีผลกับหน้าเว็บ) */}
         <form action={resetAction}>
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
           <button
             type="submit"
-            className="border-line text-fg-muted hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-3 py-2 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            disabled={conflict}
+            className="border-line text-fg-muted hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-3 py-2 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.mourningReset}
           </button>

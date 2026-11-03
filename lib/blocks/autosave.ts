@@ -17,7 +17,7 @@
 /** หน่วงหลังผู้ใช้หยุดแก้ ก่อนบันทึกอัตโนมัติ (มิลลิวินาที) */
 export const AUTOSAVE_DELAY_MS = 3000;
 
-export type AutosaveDecision = "schedule" | "not-needed" | "blocked-errors" | "disabled" | "in-flight";
+export type AutosaveDecision = "schedule" | "not-needed" | "blocked-errors" | "blocked-conflict" | "disabled" | "in-flight";
 
 export type AutosaveInput = {
   /** สวิตช์ในหน้าจอ (ผู้ใช้ปิดได้) */
@@ -28,10 +28,16 @@ export type AutosaveInput = {
   readonly errorCount: number;
   /** กำลังบันทึกอยู่หรือไม่ */
   readonly saving: boolean;
+  /**
+   * มี conflict จากอีกแท็บ/อีกคนค้างอยู่หรือไม่ (รอบที่ 323)
+   * ⇒ ห้าม autosave ซ้ำ เพราะจะเขียนทับงานของอีกฝ่ายโดยผู้ใช้ไม่ได้ตัดสินใจ
+   */
+  readonly conflicted?: boolean;
 };
 
 export function decideAutosave(input: AutosaveInput): AutosaveDecision {
   if (!input.enabled) return "disabled";
+  if (input.conflicted === true) return "blocked-conflict";
   if (!input.dirty) return "not-needed";
   if (input.errorCount > 0) return "blocked-errors";
   if (input.saving) return "in-flight";

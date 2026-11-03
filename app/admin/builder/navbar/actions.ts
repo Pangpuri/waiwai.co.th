@@ -5,7 +5,7 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
 
 import { type BuilderState } from "@/features/admin/builder-state";
 import { requireAdminUser } from "@/lib/auth/dal";
-import { publishDraft, saveJsonDraft } from "@/lib/blocks/repository";
+import { publishJsonDraftIfCurrent, saveJsonDraftIfCurrent, type DraftWriteConflict } from "@/lib/blocks/repository";
 import { NAVBAR_PAGE_KEY, navbarErrorsOf, parseNavbarConfig, validateNavbarConfig } from "@/lib/chrome/navbar";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 
@@ -34,6 +34,15 @@ type Prepared =
 
 function failure(problems: readonly string[]): BuilderState {
   return { status: "invalid", errors: [], warnings: [], problems, revision: null };
+}
+
+function expectedVersionOf(formData: FormData): string | null {
+  const value = formData.get("version");
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+function conflictState(conflict: DraftWriteConflict): BuilderState {
+  return { status: "conflict", errors: [], warnings: [], problems: [], revision: null, conflict };
 }
 
 async function prepare(formData: FormData): Promise<Prepared> {
@@ -76,15 +85,28 @@ export async function saveNavbarDraftAction(_previous: BuilderState, formData: F
   if (!prepared.ok) return prepared.state;
 
   try {
-    await saveJsonDraft(NAVBAR_PAGE_KEY, prepared.value, user.email);
+    const saved = await saveJsonDraftIfCurrent(
+      NAVBAR_PAGE_KEY,
+      prepared.value,
+      user.email,
+      expectedVersionOf(formData),
+    );
+    if (!saved.ok) return conflictState(saved.conflict);
+
+    revalidatePath(BUILDER_PATH);
+    /* ตัวแก้ถูกเรนเดอร์ในแท็บ "ส่วนกลางของเว็บ" ⇒ หน้าจอนั้นต้องเห็นสถานะฉบับร่างใหม่ด้วย */
+    revalidatePath(CHROME_PATH);
+    return {
+      status: "draft-saved",
+      errors: [],
+      warnings: [],
+      problems: [],
+      revision: null,
+      draftVersion: saved.version,
+    };
   } catch {
     return { status: "failed", errors: [], warnings: [], problems: ["บันทึกลงฐานข้อมูลไม่สำเร็จ"], revision: null };
   }
-
-  revalidatePath(BUILDER_PATH);
-  /* ตัวแก้ถูกเรนเดอร์ในแท็บ "ส่วนกลางของเว็บ" ⇒ หน้าจอนั้นต้องเห็นสถานะฉบับร่างใหม่ด้วย */
-  revalidatePath(CHROME_PATH);
-  return { status: "draft-saved", errors: [], warnings: [], problems: [], revision: null };
 }
 
 export async function publishNavbarAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
@@ -93,13 +115,29 @@ export async function publishNavbarAction(_previous: BuilderState, formData: For
   if (!prepared.ok) return prepared.state;
 
   try {
-    await saveJsonDraft(NAVBAR_PAGE_KEY, prepared.value, user.email);
-    const { revision } = await publishDraft(NAVBAR_PAGE_KEY, user.email, null);
+    const saved = await saveJsonDraftIfCurrent(
+      NAVBAR_PAGE_KEY,
+      prepared.value,
+      user.email,
+      expectedVersionOf(formData),
+    );
+    if (!saved.ok) return conflictState(saved.conflict);
+
+    const published = await publishJsonDraftIfCurrent(NAVBAR_PAGE_KEY, user.email, null, saved.version);
+    if (!published.ok) return conflictState(published.conflict);
+
     revalidatePath(BUILDER_PATH);
     revalidatePath(CHROME_PATH);
     /* แถบเมนูอยู่ทุกหน้า ⇒ ทำให้หน้าเว็บสาธารณะสดใหม่ทั้งเว็บ (ISR) — ห้ามลบ (รอบที่ 315) */
     await refreshPublicSite("chrome");
-    return { status: "published", errors: [], warnings: [], problems: [], revision };
+    return {
+      status: "published",
+      errors: [],
+      warnings: [],
+      problems: [],
+      revision: published.revision,
+      draftVersion: saved.version,
+    };
   } catch {
     return { status: "failed", errors: [], warnings: [], problems: ["เผยแพร่ไม่สำเร็จ"], revision: null };
   }

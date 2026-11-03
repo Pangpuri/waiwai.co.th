@@ -13,7 +13,7 @@ import type { ScheduleProblem as ScheduleValueProblem } from "@/lib/blocks/sched
  */
 
 /** รหัสเหตุผลที่ตั้งกำหนดไม่ได้ = เหตุผลจากตรรกะล้วน + กรณีที่รู้ได้เฉพาะฝั่งเซิร์ฟเวอร์ */
-export type ScheduleProblem = ScheduleValueProblem | "missing-page" | "content" | "server";
+export type ScheduleProblem = ScheduleValueProblem | "missing-page" | "content" | "empty" | "conflict" | "server";
 
 export type ScheduleState = {
   /** `idle` = ยังไม่เคยส่งฟอร์ม (หน้าจอใช้ค่าที่อ่านจากฐานข้อมูล) */
@@ -23,6 +23,8 @@ export type ScheduleState = {
   /** ใครตั้งไว้ (null = ไม่ได้ตั้ง) */
   readonly by: string | null;
   readonly problem: ScheduleProblem | null;
+  /** version ของฉบับร่างหลังบันทึกสำเร็จ (ใช้เป็น baseline ของ autosave รอบถัดไป) */
+  readonly draftVersion?: string | null;
 };
 
 export const INITIAL_SCHEDULE_STATE: ScheduleState = {

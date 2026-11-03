@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-import { logoutAction, publishScheduledNowAction, purgeRetentionNowAction } from "@/app/admin/actions";
+import {
+  clearScheduledPublishAction,
+  logoutAction,
+  publishScheduledNowAction,
+  purgeRetentionNowAction,
+} from "@/app/admin/actions";
 import { auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
 import { listRecentAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -348,6 +353,41 @@ export default async function AdminHomePage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {schedule.blocked.length === 0 ? null : (
+          <div className="border-brand-red bg-surface flex flex-col gap-2 rounded-xl border p-3" role="alert">
+            <p className="text-brand-red text-xs font-semibold">
+              {fillTemplate(strings.scheduleCardBlocked, { count: schedule.blocked.length })}
+            </p>
+            <p className="text-fg-muted text-[11px]">{strings.scheduleCardBlockedHint}</p>
+            <ul className="flex flex-col gap-1.5">
+              {schedule.blocked.map((row) => (
+                <li key={row.page} className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-fg-muted font-mono">
+                    {strings.scheduleCardRow.replace("{page}", row.page).replace("{time}", stamp(row.at))}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-1">
+                    <Link
+                      href={`/admin/builder/${row.page}`}
+                      className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      {strings.scheduleCardOpen}
+                    </Link>
+                    <form action={clearScheduledPublishAction}>
+                      <input type="hidden" name="page" value={row.page} />
+                      <button
+                        type="submit"
+                        className="border-brand-red text-brand-red hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                      >
+                        {strings.scheduleCardClear}
+                      </button>
+                    </form>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <form action={publishScheduledNowAction} className="flex flex-col gap-2">

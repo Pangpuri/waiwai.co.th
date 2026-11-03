@@ -17,6 +17,7 @@ export type ChromePresetActionCode =
   | "invalid"
   | "too-many"
   | "not-found"
+  | "conflict"
   | "no-database";
 
 export type ChromePresetActionState = {

@@ -19,12 +19,14 @@ import {
   loadDocumentRow,
   loadRevision,
   migrateStoredDocuments,
-  publishDraft,
+  publishDraftIfCurrent,
   restoreRevisionToDraft,
   saveDraft,
+  saveDraftIfCurrent,
   setPageLive,
   prunePageRevisions,
   setPublishSchedule,
+  type DraftWriteConflict,
 } from "@/lib/blocks/repository";
 import { documentErrorsOf, documentWarningsOf, validateDocument } from "@/lib/blocks/validate";
 import { decideRevertLayout } from "@/lib/blocks/layout-revert";
@@ -95,6 +97,22 @@ async function prepare(page: string, formData: FormData): Promise<Prepared> {
   return { ok: true, document: parsed.document, warnings };
 }
 
+/** version token ที่หน้าจอส่งมา — null = ยังไม่เคยมีฉบับร่าง */
+function expectedVersionOf(formData: FormData): string | null {
+  const value = formData.get("version");
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+/** เอกสารว่าง = ห้ามเผยแพร่ (ยังบันทึกฉบับร่างได้) */
+function isEmptyDocument(document: BlockDocument): boolean {
+  return document.blocks.length === 0;
+}
+
+/** สถานะ conflict กลาง — หน้าจอใช้ข้อความจากพจนานุกรม ไม่ใช่ข้อความจากเซิร์ฟเวอร์ */
+function conflictState(conflict: DraftWriteConflict): BuilderState {
+  return { status: "conflict", errors: [], warnings: [], problems: [], revision: null, conflict };
+}
+
 export async function saveDraftAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
   const user = await requireAdminUser("content");
   const page = String(formData.get("page") ?? "").trim();
@@ -106,13 +124,28 @@ export async function saveDraftAction(_previous: BuilderState, formData: FormDat
   if (!prepared.ok) return prepared.state;
 
   try {
-    await saveDraft(page, prepared.document, user.email);
+    /* "force" = ผู้ใช้เห็น conflict แล้วเลือกบันทึกทับเองเท่านั้น */
+    if (String(formData.get("force") ?? "") === "1") {
+      const version = await saveDraft(page, prepared.document, user.email);
+      revalidatePath(pathOf(page));
+      return { status: "draft-saved", errors: [], warnings: prepared.warnings, problems: [], revision: null, draftVersion: version };
+    }
+
+    const result = await saveDraftIfCurrent(page, prepared.document, user.email, expectedVersionOf(formData));
+    if (!result.ok) return conflictState(result.conflict);
+
+    revalidatePath(pathOf(page));
+    return {
+      status: "draft-saved",
+      errors: [],
+      warnings: prepared.warnings,
+      problems: [],
+      revision: null,
+      draftVersion: result.version,
+    };
   } catch {
     return { status: "failed", errors: [], warnings: prepared.warnings, problems: ["บันทึกลงฐานข้อมูลไม่สำเร็จ"], revision: null };
   }
-
-  revalidatePath(pathOf(page));
-  return { status: "draft-saved", errors: [], warnings: prepared.warnings, problems: [], revision: null };
 }
 
 export async function publishAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
@@ -125,9 +158,23 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
   const prepared = await prepare(page, formData);
   if (!prepared.ok) return prepared.state;
 
+  if (isEmptyDocument(prepared.document)) {
+    return {
+      status: "invalid",
+      errors: [],
+      warnings: prepared.warnings,
+      problems: ["หน้านี้ยังไม่มีบล็อก — เพิ่มบล็อกก่อนเผยแพร่"],
+      revision: null,
+    };
+  }
+
   try {
-    await saveDraft(page, prepared.document, user.email);
-    const { revision } = await publishDraft(page, user.email, null);
+    const saved = await saveDraftIfCurrent(page, prepared.document, user.email, expectedVersionOf(formData));
+    if (!saved.ok) return conflictState(saved.conflict);
+
+    const published = await publishDraftIfCurrent(page, user.email, null, saved.version);
+    if (!published.ok) return conflictState(published.conflict);
+    const revision = published.revision;
     revalidatePath(pathOf(page));
 
     /*
@@ -158,6 +205,8 @@ export async function publishAction(_previous: BuilderState, formData: FormData)
       live,
       rebuild: rebuild.kind,
       rebuildDetail: rebuild.kind === "failed" ? rebuild.detail : null,
+      draftVersion: saved.version,
+      conflict: null,
     };
   } catch {
     return {
@@ -204,21 +253,29 @@ export async function schedulePublishAction(_previous: ScheduleState, formData: 
     return { status: "failed", at: null, by: null, problem: "content" };
   }
 
+  if (isEmptyDocument(prepared.document)) {
+    return { status: "failed", at: null, by: null, problem: "empty" };
+  }
+
   const parsed = parseScheduleEpoch(formData.get("at"), new Date());
   if (!parsed.ok) {
     return { status: "failed", at: null, by: null, problem: parsed.problem };
   }
 
   const at = parsed.at.toISOString();
+  const saved = await saveDraftIfCurrent(page, prepared.document, user.email, expectedVersionOf(formData));
+  if (!saved.ok) {
+    return { status: "failed", at: null, by: null, problem: "conflict" };
+  }
+
   try {
-    await saveDraft(page, prepared.document, user.email);
     await setPublishSchedule(page, at, user.email);
   } catch {
     return { status: "failed", at: null, by: null, problem: "server" };
   }
 
   revalidatePath(pathOf(page));
-  return { status: "scheduled", at, by: user.email, problem: null };
+  return { status: "scheduled", at, by: user.email, problem: null, draftVersion: saved.version };
 }
 
 export async function restoreRevisionAction(_previous: BuilderState, formData: FormData): Promise<BuilderState> {
@@ -233,17 +290,23 @@ export async function restoreRevisionAction(_previous: BuilderState, formData: F
   /* อ่านรุ่นที่จะกู้คืน "ก่อน" เขียนทับ เพื่อส่งเอกสารกลับให้หน้าจอแสดงทันที (X1.5) */
   const raw = await loadRevision(page, revision);
 
+  const expectedVersion = expectedVersionOf(formData);
+  if (expectedVersion === null) {
+    return conflictState({ version: null, updatedAt: null, updatedBy: null });
+  }
+
   try {
-    await restoreRevisionToDraft(page, revision, user.email);
+    const restored = await restoreRevisionToDraft(page, revision, user.email, expectedVersion);
+    if (!restored.ok) return conflictState(restored.conflict);
+
+    const parsed = raw === null ? null : parseBlockDocument(page, raw);
+    const restoredDocument = parsed !== null && parsed.ok ? parsed.document : null;
+
+    revalidatePath(pathOf(page));
+    return { status: "restored", errors: [], warnings: [], problems: [], revision, restoredDocument, draftVersion: restored.version };
   } catch {
     return { status: "failed", errors: [], warnings: [], problems: ["กู้คืนไม่สำเร็จ"], revision: null };
   }
-
-  const parsed = raw === null ? null : parseBlockDocument(page, raw);
-  const restoredDocument = parsed !== null && parsed.ok ? parsed.document : null;
-
-  revalidatePath(pathOf(page));
-  return { status: "restored", errors: [], warnings: [], problems: [], revision, restoredDocument };
 }
 
 /**
@@ -398,6 +461,11 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
   });
   if (!decision.allowed) redirect(`${pathOf(page)}?template=confirm`);
 
+  /* รอบที่ 323: ฟอร์มนี้เขียนทับทั้งก้อน ⇒ ต้องตรวจ version ก่อน (กันแท็บอื่นเขียนแทรก) */
+  if (existingDraft !== null && expectedVersionOf(formData) !== existingDraft.version) {
+    redirect(`${pathOf(page)}?template=conflict`);
+  }
+
   /*
     ★ รอบที่ 253: เทมเพลตของหน้า **คณะผู้บริหาร** ต้องรู้พาธภาพจาก **คลังภาพ** (/media/<id>)
     ⇒ อ่าน id จากคลังด้วยลายนิ้วมือของไฟล์เดิม (`ABOUT_MEDIA.sha256`) แล้วส่งตัวช่วยเข้าเทมเพลต
@@ -445,7 +513,9 @@ export async function startFromTemplateAction(formData: FormData): Promise<void>
     /* อ่านฉบับร่างเดิมไม่ได้ = ไม่เป็นไร ใช้เลย์เอาต์ของเทมเพลต */
   }
 
-  await saveDraft(page, nextDocument, user.email);
+  const result = await saveDraftIfCurrent(page, nextDocument, user.email, existingDraft?.version ?? null);
+  if (!result.ok) redirect(`${pathOf(page)}?template=conflict`);
+
   revalidatePath(pathOf(page));
   redirect(pathOf(page));
 }
@@ -464,10 +534,26 @@ export async function migrateBlocksAction(_previous: BuilderState, formData: For
     return { status: "failed", errors: [], warnings: [], problems: ["ไม่รู้ว่าจะย้ายข้อมูลของหน้าไหน"], revision: null };
   }
 
+  const expectedVersion = expectedVersionOf(formData);
+  if (expectedVersion === null) {
+    return conflictState({ version: null, updatedAt: null, updatedBy: null });
+  }
+
   try {
-    const result = await migrateStoredDocuments(page, user.email);
+    const result = await migrateStoredDocuments(page, user.email, expectedVersion);
+    if (!result.ok) return conflictState({ version: null, updatedAt: null, updatedBy: null });
+
+    const after = await loadDocumentRow(page, "draft");
     revalidatePath(pathOf(page));
-    return { status: "migrated", errors: [], warnings: [], problems: [], revision: null, migrated: result };
+    return {
+      status: "migrated",
+      errors: [],
+      warnings: [],
+      problems: [],
+      revision: null,
+      migrated: { draft: result.draft, published: result.published },
+      draftVersion: after?.version ?? expectedVersion,
+    };
   } catch {
     return { status: "failed", errors: [], warnings: [], problems: ["ย้ายรุ่นข้อมูลไม่สำเร็จ"], revision: null };
   }

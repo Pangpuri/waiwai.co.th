@@ -144,7 +144,7 @@ async function publishPage(page: string, options: Options): Promise<PageOutcome>
     }
 
     /* ── 2) เผยแพร่ + เปิดใช้บนหน้าเว็บ (นโยบาย "กดเผยแพร่ = ขึ้นเว็บ") ───────────────── */
-    const { revision } = await publishDraft(page, options.actor, PUBLISH_CLI_NOTE);
+    const { revision } = await publishDraft(page, options.actor, PUBLISH_CLI_NOTE, { requireBlocks: true });
     if (publishGoesLive(page)) await setPageLive(page, true, options.actor);
 
     const live = await isPageLive(page).catch(() => false);

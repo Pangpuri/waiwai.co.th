@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 
 import { requireAdminUser } from "@/lib/auth/dal";
-import { loadDocumentRow, publishDraft } from "@/lib/blocks/repository";
+import { loadDocumentRow, publishJsonDraftIfCurrent } from "@/lib/blocks/repository";
 import { FOOTER_PAGE_KEY } from "@/lib/chrome/footer";
 import { NAVBAR_PAGE_KEY } from "@/lib/chrome/navbar";
 import { isDatabaseConfigured } from "@/lib/content/repository";
@@ -35,7 +35,8 @@ export async function publishChromeAction(): Promise<void> {
   for (const key of CHROME_KEYS) {
     const draft = await loadDocumentRow(key, "draft");
     if (draft === null) continue;
-    await publishDraft(key, user.email, null);
+    /* ถ้าฉบับร่างถูกแก้หลังอ่าน version = ข้ามส่วนนั้น (ไม่เผยแพร่ผิดรุ่น) */
+    await publishJsonDraftIfCurrent(key, user.email, null, draft.version);
   }
 
   revalidatePath(CHROME_PATH);

@@ -78,6 +78,7 @@ export default async function AdminBuilderPage({
   const { page } = await params;
   const query = await searchParams;
   const templateNotice = query.template === "confirm";
+  const templateConflict = query.template === "conflict";
   /* รอบที่ 246: ผลของการกด "กลับไปใช้ดีไซน์เดิม" (Server Action ปฏิเสธ/สำเร็จ แล้ว redirect กลับมาพร้อมรหัส) */
   const layoutNotice = query.layout ?? null;
   /* รอบที่ 249: ผลของการกด "ล้างประวัติ" (?history=pruned|nothing|needs-confirm) */
@@ -253,12 +254,18 @@ export default async function AdminBuilderPage({
           </p>
           <TemplateCoverageNote {...coverage} />
           {templateNotice ? (
-            <p className="text-brand-red text-sm" data-template-notice="">
+            <p className="text-brand-red text-sm" data-template-notice="confirm">
               {strings.startFromTemplateNeedsConfirm}
+            </p>
+          ) : null}
+          {templateConflict ? (
+            <p className="text-brand-red text-sm" data-template-notice="conflict">
+              {strings.startFromTemplateConflict}
             </p>
           ) : null}
           <form action={startFromTemplateAction} className="flex flex-col gap-3" data-template-form="">
             <input type="hidden" name="page" value={page} />
+            <input type="hidden" name="version" value={draftRow?.version ?? ""} />
             {draftRow === null ? null : (
               <label className="text-fg-muted flex items-center gap-2 text-xs">
                 <input
@@ -351,6 +358,7 @@ export default async function AdminBuilderPage({
             schedule={schedule}
             initialDraft={initialDraft}
             draftUpdatedAt={draftRow?.updatedAt ?? null}
+            draftVersion={draftRow?.version ?? null}
             publishedAt={publishedRow?.publishedAt ?? null}
             revisions={revisions}
             historyNotice={historyNotice}

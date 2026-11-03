@@ -60,6 +60,7 @@ export type ChromePresetStrings = {
   readonly chromePresetBadName: string;
   readonly chromePresetSavedFromDefault: string;
   readonly chromePresetInvalid: string;
+  readonly chromePresetConflict: string;
   readonly chromePresetNotFound: string;
   readonly chromePresetDbMissing: string;
   readonly chromePresetUndo: string;
@@ -133,6 +134,8 @@ function messageOf(
       return strings.chromePresetBadName;
     case "invalid":
       return strings.chromePresetInvalid;
+    case "conflict":
+      return strings.chromePresetConflict;
     case "too-many":
       return fillTemplate(strings.chromePresetTooMany, { max: maxPerKind });
     case "no-database":
@@ -165,11 +168,13 @@ function ChromePresetItem({
   row,
   strings,
   maxPerKind,
+  draftVersion,
 }: {
   readonly kind: string;
   readonly row: ChromePresetRow;
   readonly strings: ChromePresetStrings;
   readonly maxPerKind: number;
+  readonly draftVersion: string | null;
 }) {
   const [applyState, applyAction] = useActionState(applyChromePresetAction, INITIAL_CHROME_PRESET_STATE);
   const [deleteState, deleteAction] = useActionState(deleteChromePresetAction, INITIAL_CHROME_PRESET_STATE);
@@ -203,6 +208,7 @@ function ChromePresetItem({
         <form action={applyAction}>
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="id" value={row.id} />
+          <input type="hidden" name="version" value={draftVersion ?? ""} />
           <Submit label={strings.chromePresetApply} primary />
         </form>
         <form action={deleteAction}>
@@ -299,6 +305,7 @@ export function ChromePresetPanel({
   maxPerKind,
   dbMissing = false,
   undoLabel = null,
+  draftVersion = null,
 }: {
   readonly kind: string;
   readonly rows: readonly ChromePresetRow[];
@@ -307,6 +314,8 @@ export function ChromePresetPanel({
   readonly dbMissing?: boolean;
   /** ข้อความบอกว่าย้อนกลับได้ (แปลงแล้ว) — `null` = ไม่มีให้ย้อน */
   readonly undoLabel?: string | null;
+  /** version ของฉบับร่างส่วนนี้ — ใช้กันการเขียนทับตอนมีอีกแท็บแก้ */
+  readonly draftVersion?: string | null;
 }) {
   const [saveState, saveAction] = useActionState(saveChromePresetAction, INITIAL_CHROME_PRESET_STATE);
   const [undoState, undoAction] = useActionState(undoChromePresetAction, INITIAL_CHROME_PRESET_STATE);
@@ -349,6 +358,7 @@ export function ChromePresetPanel({
       {undoLabel === null || dbMissing ? null : (
         <form action={undoAction} className="border-line flex flex-col gap-1 rounded-lg border p-2">
           <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="version" value={draftVersion ?? ""} />
           <span className="text-fg-muted text-[11px]">{undoLabel}</span>
           <span className="flex flex-wrap items-center gap-2">
             <Submit label={strings.chromePresetUndo} />
@@ -366,7 +376,14 @@ export function ChromePresetPanel({
           <>
             <ul className="flex flex-col gap-1.5">
               {rows.map((row) => (
-                <ChromePresetItem key={row.id} kind={kind} row={row} strings={strings} maxPerKind={maxPerKind} />
+                <ChromePresetItem
+                  key={row.id}
+                  kind={kind}
+                  row={row}
+                  strings={strings}
+                  maxPerKind={maxPerKind}
+                  draftVersion={draftVersion}
+                />
               ))}
             </ul>
             <p className="text-fg-muted text-[11px]">{strings.chromePresetApplyHint}</p>

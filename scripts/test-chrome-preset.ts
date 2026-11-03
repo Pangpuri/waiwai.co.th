@@ -173,7 +173,11 @@ test("chrome-preset: บันทึกเป็นชื่อเดียว�
 test("chrome-preset: ใช้ชุดนี้เขียนทับเฉพาะฉบับร่าง ไม่แตะฉบับเผยแพร่", () => {
   const repo = sourceOf("lib/chrome/preset-repository.ts");
 
-  assert.ok(repo.includes("saveJsonDraft(pageKey"), "ต้องเขียนผ่าน saveJsonDraft ของแถว draft");
+  assert.ok(
+    repo.includes("saveJsonDraftIfCurrent(pageKey"),
+    "ต้องเขียนผ่าน guarded save ของแถว draft (รอบที่ 323)",
+  );
+  assert.ok(repo.includes("expectedVersion"), "ต้องเทียบ version ก่อนเขียนทับ");
   assert.ok(!repo.includes("publishDraft"), "ห้ามเผยแพร่ให้เอง — ผู้ใช้ต้องกดเอง");
   assert.ok(!/update page_document[^`]*published/.test(repo), "ห้ามเขียนทับแถว published");
   assert.ok(repo.includes('input.messages'), "ต้องตรวจ payload ด้วยพจนานุกรมของภาษาที่แสดง");

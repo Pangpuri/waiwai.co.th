@@ -12,13 +12,26 @@ export type BuilderIssue = {
   readonly detail: string | null;
 };
 
+export type BuilderConflict = {
+  readonly version: string | null;
+  readonly updatedAt: string | null;
+  readonly updatedBy: string | null;
+};
+
 export type BuilderState = {
-  readonly status: "idle" | "draft-saved" | "published" | "restored" | "migrated" | "compared" | "invalid" | "failed";
+  readonly status: "idle" | "draft-saved" | "published" | "restored" | "migrated" | "compared" | "invalid" | "failed" | "conflict";
   readonly errors: readonly BuilderIssue[];
   readonly warnings: readonly BuilderIssue[];
   readonly problems: readonly string[];
   /** เลขรุ่นที่เพิ่งเผยแพร่ (แสดงข้อความ "เผยแพร่แล้ว — รุ่นที่ N") */
   readonly revision: number | null;
+  /**
+   * optimistic concurrency token ล่าสุดที่เซิร์ฟเวอร์ยืนยัน (รอบที่ 323)
+   * หน้าจอใช้เป็น baseline ของ autosave และ publish รอบถัดไป
+   */
+  readonly draftVersion?: string | null;
+  /** ข้อมูลของอีกแท็บ/อีกคนที่เขียนแทรก — แสดงเมื่อ status = "conflict" */
+  readonly conflict?: BuilderConflict | null;
   /**
    * ผลการสั่ง "สร้างเว็บใหม่" หลังเผยแพร่ (เซสชั่น S1) — ไม่ใส่ = ยังไม่เกี่ยว
    * `isr` = หน้าเว็บถูกสั่งให้สร้างใหม่ทันที (X1.7) · `manual` = ไม่ได้ตั้ง env และโฮสต์ไม่มี ISR ⇒ หน้าจอต้องบอกผู้ใช้ตรง ๆ

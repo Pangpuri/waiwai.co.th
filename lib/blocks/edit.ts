@@ -547,6 +547,55 @@ export function removeBlock(document: BlockDocument, id: string): BlockDocument 
   return next as unknown as BlockDocument;
 }
 
+/** ข้อมูลที่เก็บไว้เพื่อ "เลิกทำการลบ" (รอบที่ 323) */
+export type RemovedBlock = {
+  readonly block: Block;
+  readonly location: BlockLocation;
+};
+
+export type BlockRemoval = {
+  readonly document: BlockDocument;
+  readonly removed: RemovedBlock;
+};
+
+/**
+ * ลบบล็อกพร้อมเก็บสำเนา + ตำแหน่งเดิมไว้ทำ undo
+ * — ใช้คู่กับ `restoreRemovedBlock()` ในหน้าจอตัวสร้าง
+ */
+export function removeBlockWithUndo(document: BlockDocument, id: string): BlockRemoval | null {
+  const location = findBlockLocation(document, id);
+  if (location === null) return null;
+
+  const next = clone(document);
+  const container = containerIn(next, location.rowId, location.columnId);
+  if (container === null) return null;
+
+  const [removed] = container.splice(location.index, 1);
+  if (removed === undefined) return null;
+
+  return {
+    document: next as unknown as BlockDocument,
+    removed: { block: removed as unknown as Block, location },
+  };
+}
+
+/**
+ * ใส่บล็อกที่เพิ่งลบกลับตำแหน่งเดิม
+ * - คืน `null` เมื่อภาชนะเดิมหายไป (เช่น แถวพ่อถูกลบต่อ) หรือ id ชนกับของที่มีอยู่
+ * - หน้าจอต้องรายงาน "เลิกทำไม่ได้" ไม่ใช่เงียบ
+ */
+export function restoreRemovedBlock(document: BlockDocument, removed: RemovedBlock): BlockDocument | null {
+  if (findBlockLocation(document, removed.block.id) !== null) return null;
+
+  const next = clone(document);
+  const container = containerIn(next, removed.location.rowId, removed.location.columnId);
+  if (container === null) return null;
+
+  const index = Math.max(0, Math.min(removed.location.index, container.length));
+  container.splice(index, 0, structuredClone(removed.block) as unknown as MutableBlock);
+  return next as unknown as BlockDocument;
+}
+
 /** เลื่อนบล็อกขึ้น/ลง (`delta` = -1 หรือ 1) **ภายในภาชนะของตัวเอง** */
 export function moveBlock(document: BlockDocument, id: string, delta: -1 | 1): BlockDocument {
   const location = findBlockLocation(document, id);

@@ -6,6 +6,7 @@ import { publishFooterAction, saveFooterDraftAction } from "@/app/admin/builder/
 import { INITIAL_BUILDER_STATE } from "@/features/admin/builder-state";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { NavIcon } from "@/features/shell/ui/nav-icon";
+import { latestVersionOf } from "@/lib/blocks/version";
 import {
   FOOTER_BACKGROUNDS,
   MAX_FOOTER_GROUPS,
@@ -65,6 +66,7 @@ type Strings = {
   readonly footerMoveUp: string;
   readonly footerMoveDown: string;
   readonly draftPrefix: string;
+  readonly draftConflictTitle: string;
 };
 
 const FIELD_CLASS =
@@ -76,17 +78,21 @@ const BUTTON_CLASS =
 export function FooterEditor({
   initial,
   draftUpdatedAt,
+  draftVersion,
   publishedAt,
   strings,
 }: {
   readonly initial: FooterConfig;
   readonly draftUpdatedAt: string | null;
+  readonly draftVersion: string | null;
   readonly publishedAt: string | null;
   readonly strings: Strings;
 }) {
   const [config, setConfig] = useState<FooterConfig>(initial);
   const [draftState, draftAction, draftPending] = useActionState(saveFooterDraftAction, INITIAL_BUILDER_STATE);
   const [publishState, publishAction, publishPending] = useActionState(publishFooterAction, INITIAL_BUILDER_STATE);
+  const effectiveVersion = latestVersionOf([draftVersion, draftState.draftVersion, publishState.draftVersion]);
+  const conflict = draftState.status === "conflict" || publishState.status === "conflict";
 
   const issues = validateFooterConfig(config);
   const errors = footerErrorsOf(issues);
@@ -606,21 +612,24 @@ export function FooterEditor({
       <div className="flex flex-wrap items-center gap-2">
         <form action={draftAction}>
           <input type="hidden" name="payload" value={payload} />
-          <button type="submit" disabled={draftPending || errors.length > 0} className={BUTTON_CLASS}>
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
+          <button type="submit" disabled={draftPending || errors.length > 0 || conflict} className={BUTTON_CLASS}>
             {strings.footerSaveDraft}
           </button>
         </form>
         <form action={publishAction}>
           <input type="hidden" name="payload" value={payload} />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
           <button
             type="submit"
-            disabled={publishPending || errors.length > 0}
+            disabled={publishPending || errors.length > 0 || conflict}
             className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-lg px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             {strings.footerPublish}
           </button>
         </form>
         {draftState.status === "published" ? null : null}
+        {conflict ? <span className="text-brand-red text-xs font-semibold">{strings.draftConflictTitle}</span> : null}
         {publishState.status === "published" ? <span className="text-fg-muted text-xs">✓</span> : null}
       </div>
     </div>

@@ -17,6 +17,8 @@ import { ADMIN_LOGIN_PATH } from "@/lib/auth/credentials";
 import { equalizeTiming } from "@/lib/auth/user-store";
 import { purgeNow, runScheduledPurge } from "@/lib/retention/purge";
 import { publishDueScheduled, runScheduledPublish } from "@/lib/blocks/publish-scheduler";
+import { setPublishSchedule } from "@/lib/blocks/repository";
+import { isBlockBuilderPage } from "@/lib/blocks/templates";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isValidEmail } from "@/lib/validate";
 
@@ -182,4 +184,34 @@ export async function publishScheduledNowAction(): Promise<void> {
 
   revalidatePath("/admin");
   if (published > 0) await refreshPublicSite("page");
+}
+
+/**
+ * ล้างกำหนดเวลาเผยแพร่จากหน้าภาพรวม (รอบที่ 324 · หนี้ D-323-2)
+ *
+ * ใช้กับการ์ด "งานที่ตั้งเวลาไว้" เมื่อพบว่าหน้าที่ตั้งไว้ยังไม่มีบล็อก
+ * ⇒ ถึงกำหนดก็จะถูกปฏิเสธ (empty-document) และค้างลองใหม่ทุกรอบ
+ * ⚠️ จำกัดเฉพาะหน้าของตัวสร้างบล็อก — ฟอร์มถูกแก้ให้ส่ง page อื่นไม่ได้
+ */
+export async function clearScheduledPublishAction(formData: FormData): Promise<void> {
+  const user = await requireAdminUser("content");
+  const page = readField(formData, "page");
+  if (page === "" || !isBlockBuilderPage(page)) return;
+
+  try {
+    await setPublishSchedule(page, null, user.email);
+  } catch {
+    revalidatePath("/admin");
+    return;
+  }
+
+  await recordAudit({
+    action: "schedule-clear",
+    actorEmail: user.email,
+    target: page,
+    detail: "cleared from admin overview (blocked empty draft)",
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/builder/${page}`);
 }

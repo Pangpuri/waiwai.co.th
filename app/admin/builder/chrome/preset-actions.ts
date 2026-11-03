@@ -45,6 +45,11 @@ function applyFailureReason(result: ApplyChromePresetResult): ChromePresetAction
   return result.ok ? null : result.reason;
 }
 
+function expectedVersionOf(formData: FormData): string | null {
+  const value = formData.get("version");
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
 /** บันทึกชุดปัจจุบัน (ฉบับร่าง = ของใหม่ · ฉบับเผยแพร่ = ของเก่า) เป็นพรีเซ็ต */
 export async function saveChromePresetAction(
   _previous: ChromePresetActionState,
@@ -87,7 +92,13 @@ export async function applyChromePresetAction(
   if (!isChromePresetKind(kind) || id === "") return { status: "failed", code: "invalid" };
 
   const messages = await getMessagesFor("th");
-  const result = await applyChromePreset({ kind, id, actor: user.email, messages });
+  const result = await applyChromePreset({
+    kind,
+    id,
+    actor: user.email,
+    messages,
+    expectedVersion: expectedVersionOf(formData),
+  });
 
   if (!result.ok) return { status: "failed", code: applyFailureReason(result) };
 
@@ -130,10 +141,17 @@ export async function undoChromePresetAction(
   if (!isChromePresetKind(kind)) return { status: "failed", code: "invalid" };
 
   const messages = await getMessagesFor("th");
-  const result = await undoChromePreset({ kind, actor: user.email, messages });
+  const result = await undoChromePreset({
+    kind,
+    actor: user.email,
+    messages,
+    expectedVersion: expectedVersionOf(formData),
+  });
 
   if (!result.ok) {
-    return { status: "failed", code: result.reason === "not-found" ? "undo-missing" : "invalid" };
+    const code =
+      result.reason === "not-found" ? "undo-missing" : result.reason === "conflict" ? "conflict" : "invalid";
+    return { status: "failed", code };
   }
 
   revalidateChrome();

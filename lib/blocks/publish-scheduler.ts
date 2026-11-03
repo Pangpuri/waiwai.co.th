@@ -1,6 +1,7 @@
 import { isDatabaseConfigured } from "@/db/pool";
 import { recordAudit } from "@/lib/audit/log";
-import { listDueSchedules, listPublishSchedules, publishDuePage, type DueSchedule } from "@/lib/blocks/repository";
+import { listDueSchedules, listPublishSchedules, loadDocumentRow, publishDuePage, type DueSchedule } from "@/lib/blocks/repository";
+import { countRawBlocks } from "@/lib/blocks/migrate";
 import { isDueAt } from "@/lib/blocks/schedule";
 
 /**
@@ -99,6 +100,13 @@ export async function runScheduledPublish(
   }
 }
 
+export type ScheduledBlockedPage = {
+  readonly page: string;
+  readonly at: string;
+  /** เหตุผลที่กำหนดนี้จะเผยแพร่ไม่ได้ — ตอนนี้มี `empty-document` */
+  readonly reason: "empty-document";
+};
+
 export type ScheduledPublishOverview = {
   /** กำหนดเวลาทั้งหมดที่ยังรออยู่ (ใหม่สุดก่อน) */
   readonly upcoming: readonly DueSchedule[];
@@ -106,6 +114,8 @@ export type ScheduledPublishOverview = {
   readonly dueCount: number;
   /** กำหนดถัดไป (null = ไม่มีเลย) */
   readonly nextAt: string | null;
+  /** หน้าที่ตั้งกำหนดไว้แต่ฉบับร่างไม่มีบล็อกเลย ⇒ ถึงเวลาก็เผยแพร่ไม่ได้ */
+  readonly blocked: readonly ScheduledBlockedPage[];
 };
 
 /** ข้อมูลสำหรับการ์ด "ตั้งเวลาเผยแพร่" บนหน้าภาพรวมหลังบ้าน — อ่านล้วน ไม่ทำให้หน้าจอพัง */
@@ -117,10 +127,28 @@ export async function scheduledPublishOverview(
   try {
     const now = options.now ?? new Date();
     const upcoming = await listPublishSchedules(20);
+
+    /*
+      รอบที่ 323 — หน้าเปล่าที่ตั้งกำหนดไว้จะถูก repository ปฏิเสธตอนถึงเวลา
+      ⇒ ต้องเตือนบน /admin ล่วงหน้า ไม่ปล่อยให้กำหนดค้างแล้วลองใหม่เงียบ ๆ
+    */
+    const blocked: ScheduledBlockedPage[] = [];
+    for (const row of upcoming) {
+      try {
+        const draft = await loadDocumentRow(row.page, "draft");
+        if (draft !== null && countRawBlocks(draft.raw) === 0) {
+          blocked.push({ page: row.page, at: row.at, reason: "empty-document" });
+        }
+      } catch {
+        /* อ่านไม่ได้ = ไม่ทำให้การ์ดทั้งใบหาย */
+      }
+    }
+
     return {
       upcoming,
       dueCount: upcoming.filter((row) => isDueAt(row.at, now)).length,
       nextAt: upcoming[0]?.at ?? null,
+      blocked,
     };
   } catch {
     return null;

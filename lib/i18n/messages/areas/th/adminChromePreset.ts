@@ -34,6 +34,7 @@ export const adminChromePreset = {
   chromePresetBadName: "ใส่ชื่อชุดก่อนบันทึก",
   chromePresetSavedFromDefault: "ยังไม่เคยบันทึกส่วนนี้มาก่อน — เก็บชุดค่าเริ่มต้นที่เว็บใช้อยู่ให้แล้ว",
   chromePresetInvalid: "ชุดนี้ใช้ไม่ได้ — ต้องแก้ค่าที่ผิดในส่วนนั้นก่อน",
+  chromePresetConflict: "ฉบับร่างถูกแก้จากที่อื่น — ยังไม่เขียนทับ ให้โหลดหน้าใหม่แล้วลองอีกครั้ง",
   chromePresetNotFound: "ไม่พบชุดนี้ (อาจถูกลบไปแล้ว)",
   chromePresetDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — ใช้พรีเซ็ตไม่ได้",
   chromePresetUndo: "ย้อนกลับไปฉบับร่างก่อนใช้ชุด",

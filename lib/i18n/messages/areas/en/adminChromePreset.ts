@@ -38,6 +38,7 @@ export const adminChromePreset: Pick<Messages["admin"], keyof typeof thAdminChro
   chromePresetBadName: "Give the set a name before saving",
   chromePresetSavedFromDefault: "This part was never saved before — captured the default set the live site uses",
   chromePresetInvalid: "This set cannot be used — fix the invalid values in that part first",
+  chromePresetConflict: "The draft was changed elsewhere — nothing was overwritten. Reload and try again.",
   chromePresetNotFound: "Set not found (it may have been deleted)",
   chromePresetDbMissing: "Database not configured — presets are unavailable",
   chromePresetUndo: "Revert to the draft from before",

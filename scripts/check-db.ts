@@ -180,10 +180,14 @@ import {
   listRevisions,
   loadDocumentRow,
   publishDraft,
+  publishDraftIfCurrent,
   publishDuePage,
+  publishJsonDraftIfCurrent,
   readPublishSchedule,
   saveDraft,
+  saveDraftIfCurrent,
   saveJsonDraft,
+  saveJsonDraftIfCurrent,
   setPageLive,
   setPublishSchedule,
 } from "@/lib/blocks/repository";
@@ -423,6 +427,15 @@ async function main(): Promise<void> {
   /* 42) ชื่อหน้า/เมนูของหน้า detail: ชื่อมาจากหมวด + ห้ามขึ้นเมนูหลัก (รอบที่ 286 · D-281-1/D-281-2) */
   await checkDetailPageNameAndMenu();
 
+  /* 43) optimistic concurrency + ห้ามเผยแพร่เอกสารว่าง (รอบที่ 323) */
+  await checkDraftConcurrency();
+
+  /* 44) กำหนดเวลาของหน้าเปล่า: ต้องเห็นบน /admin และล้างกำหนดได้ (D-323-2 · รอบที่ 324) */
+  await checkScheduledEmptyGuard();
+
+  /* 45) guarded save/publish ของเอกสาร JSON (navbar/footer/ป้าย/settings) — D-323-1 */
+  await checkJsonConcurrency();
+
   /*
     ── ด่านสุดท้าย: `check:db` ต้องไม่ทิ้งขยะของตัวเองไว้ในฐานข้อมูล (รอบที่ 286) ──────────────
     ตั้งแต่ประวัติที่อยู่ "อยู่ต่อแบบปลดระวาง" การลบด้วย `category_id` ไม่พออีกต่อไป ⇒ ต้องมีด่านนี้
@@ -437,6 +450,279 @@ async function main(): Promise<void> {
   await closePool();
 
   process.stdout.write(`\n${CHECKS.join("\n")}\n\n✓ check:db ผ่านทั้งหมด (${Date.now() - started} ms)\n`);
+}
+
+const CONCURRENCY_TEST_PAGE = "check-db-concurrency";
+const CONCURRENCY_TEST_ACTOR = "check-db-concurrency@example.invalid";
+
+/**
+ * รอบที่ 323 — optimistic concurrency + ห้ามเผยแพร่เอกสารว่าง
+ *
+ * พิสูจน์ของจริงบน DB:
+ * 1. token เก่าเขียนไม่ได้ และไม่ทับเอกสารล่าสุด
+ * 2. publish ด้วย token เก่า = conflict (ไม่เผยแพร่ผิดรุ่น)
+ * 3. เอกสารว่าง publish ไม่ได้ทั้งเส้นทางปกติและเส้นทาง guarded
+ * 4. token ปัจจุบัน publish ได้จริง + เก็บประวัติ/audit
+ */
+async function checkDraftConcurrency(): Promise<void> {
+  const pool = getPool();
+
+  const cleanup = async (): Promise<void> => {
+    await pool.query("delete from page_document where page = $1", [CONCURRENCY_TEST_PAGE]);
+    await pool.query("delete from page_document_revision where page = $1", [CONCURRENCY_TEST_PAGE]);
+    await pool.query("delete from audit_log where target = $1", [CONCURRENCY_TEST_PAGE]);
+  };
+
+  await cleanup();
+
+  const templatePage = TEMPLATED_PAGE_IDS[0];
+  assert.ok(templatePage !== undefined, "ต้องมีหน้าตัวอย่างที่มีเทมเพลตอย่างน้อย 1 หน้า");
+  const template = buildBlockTemplate(templatePage);
+  assert.ok(template !== null, `${templatePage}: ต้องสร้างเทมเพลตได้`);
+
+  const document = { ...template, page: CONCURRENCY_TEST_PAGE };
+  const emptyDocument = { ...document, blocks: [] };
+  assert.equal(countRawBlocks(emptyDocument), 0, "เอกสารทดสอบว่างต้องมี 0 บล็อก");
+
+  try {
+    const baseVersion = await saveDraft(CONCURRENCY_TEST_PAGE, document, CONCURRENCY_TEST_ACTOR);
+
+    const saved = await saveDraftIfCurrent(
+      CONCURRENCY_TEST_PAGE,
+      emptyDocument,
+      CONCURRENCY_TEST_ACTOR,
+      baseVersion,
+    );
+    assert.ok(saved.ok, "บันทึกด้วย version ปัจจุบันต้องผ่าน");
+    assert.notEqual(saved.version, baseVersion, "เขียนแล้ว version ต้องเปลี่ยน");
+
+    const stale = await saveDraftIfCurrent(
+      CONCURRENCY_TEST_PAGE,
+      document,
+      CONCURRENCY_TEST_ACTOR,
+      baseVersion,
+    );
+    assert.equal(stale.ok, false, "version เก่าต้องเขียนไม่ได้");
+    if (stale.ok) throw new Error("unreachable");
+    assert.equal(stale.conflict.version, saved.version, "conflict ต้องคืน version ล่าสุด");
+
+    const current = await loadDocumentRow(CONCURRENCY_TEST_PAGE, "draft");
+    assert.ok(current !== null, "ต้องอ่านฉบับร่างกลับได้");
+    assert.equal(countRawBlocks(current.raw), 0, "การเขียนด้วย token เก่าต้องไม่ทับเอกสารล่าสุด");
+
+    const stalePublish = await publishDraftIfCurrent(
+      CONCURRENCY_TEST_PAGE,
+      CONCURRENCY_TEST_ACTOR,
+      null,
+      baseVersion,
+    );
+    assert.equal(stalePublish.ok, false, "publish ด้วย version เก่าต้องไม่ผ่าน");
+    if (stalePublish.ok) throw new Error("unreachable");
+    assert.equal(stalePublish.conflict.version, saved.version);
+
+    let emptyPublishBlocked = false;
+    try {
+      await publishDraft(CONCURRENCY_TEST_PAGE, CONCURRENCY_TEST_ACTOR, null, { requireBlocks: true });
+    } catch (error) {
+      emptyPublishBlocked = error instanceof Error && error.message === "empty-document";
+    }
+    assert.equal(emptyPublishBlocked, true, "publishDraft ต้องปฏิเสธเอกสารว่าง");
+    assert.equal(
+      await countWhere("page_document where page = $1 and status = 'published'", [CONCURRENCY_TEST_PAGE]),
+      0,
+      "เผยแพร่เอกสารว่างต้องไม่เกิดแถว published",
+    );
+
+    let guardedPublishBlocked = false;
+    try {
+      await publishDraftIfCurrent(CONCURRENCY_TEST_PAGE, CONCURRENCY_TEST_ACTOR, null, saved.version);
+    } catch (error) {
+      guardedPublishBlocked = error instanceof Error && error.message === "empty-document";
+    }
+    assert.equal(guardedPublishBlocked, true, "publishDraftIfCurrent ต้องปฏิเสธเอกสารว่าง");
+
+    const restored = await saveDraftIfCurrent(
+      CONCURRENCY_TEST_PAGE,
+      document,
+      CONCURRENCY_TEST_ACTOR,
+      saved.version,
+    );
+    assert.ok(restored.ok, "บันทึกเอกสารที่มีบล็อกด้วย version ล่าสุดต้องผ่าน");
+
+    const published = await publishDraftIfCurrent(
+      CONCURRENCY_TEST_PAGE,
+      CONCURRENCY_TEST_ACTOR,
+      "check:db",
+      restored.version,
+    );
+    assert.ok(published.ok, "publish ด้วย version ล่าสุดต้องผ่าน");
+    assert.ok(published.revision >= 1, "ต้องได้เลขรุ่น");
+    assert.equal(
+      await countWhere("page_document_revision where page = $1", [CONCURRENCY_TEST_PAGE]),
+      1,
+      "ต้องมีประวัติการเผยแพร่ 1 รุ่น",
+    );
+    assert.equal(
+      await countWhere("audit_log where target = $1 and action = 'publish'", [CONCURRENCY_TEST_PAGE]),
+      1,
+      "ต้องมี audit publish 1 ครั้ง",
+    );
+
+    done("optimistic concurrency + กันเผยแพร่เอกสารว่าง (รอบที่ 323)", "stale token · conflict · empty publish");
+  } finally {
+    await cleanup();
+    assert.equal(
+      await countWhere("page_document where page = $1", [CONCURRENCY_TEST_PAGE]),
+      0,
+      "ต้องไม่เหลือแถวทดสอบ",
+    );
+  }
+}
+
+const SCHEDULE_EMPTY_PAGE = "check-db-schedule-empty";
+const SCHEDULE_EMPTY_ACTOR = "check-db-schedule-empty@example.invalid";
+
+/**
+ * D-323-2 (รอบที่ 324) — หน้าเปล่าที่ตั้งกำหนดเวลาไว้
+ * 1. หน้าภาพรวมต้องเห็นเป็น `blocked` ล่วงหน้า
+ * 2. ถึงกำหนดแล้วต้องไม่เผยแพร่ และกำหนดต้องยังอยู่ (ให้คนแก้/ล้าง)
+ * 3. ล้างกำหนดได้จริง
+ */
+async function checkScheduledEmptyGuard(): Promise<void> {
+  const pool = getPool();
+
+  const cleanup = async (): Promise<void> => {
+    await pool.query("delete from page_document where page = $1", [SCHEDULE_EMPTY_PAGE]);
+    await pool.query("delete from page_document_revision where page = $1", [SCHEDULE_EMPTY_PAGE]);
+    await pool.query("delete from audit_log where target = $1", [SCHEDULE_EMPTY_PAGE]);
+  };
+
+  await cleanup();
+
+  const templatePage = TEMPLATED_PAGE_IDS[0];
+  assert.ok(templatePage !== undefined, "ต้องมีหน้าตัวอย่างที่มีเทมเพลตอย่างน้อย 1 หน้า");
+  const template = buildBlockTemplate(templatePage);
+  assert.ok(template !== null, `${templatePage}: ต้องสร้างเทมเพลตได้`);
+
+  const emptyDocument = { ...template, page: SCHEDULE_EMPTY_PAGE, blocks: [] };
+  assert.equal(countRawBlocks(emptyDocument), 0, "เอกสารทดสอบต้องว่างจริง");
+
+  try {
+    await saveDraft(SCHEDULE_EMPTY_PAGE, emptyDocument, SCHEDULE_EMPTY_ACTOR);
+
+    const now = new Date();
+    const due = new Date(now.getTime() - 60 * 1000).toISOString();
+    await setPublishSchedule(SCHEDULE_EMPTY_PAGE, due, SCHEDULE_EMPTY_ACTOR);
+
+    const overview = await scheduledPublishOverview({ now });
+    assert.ok(overview !== null, "หน้าภาพรวมต้องอ่านกำหนดเวลาได้");
+    assert.ok(
+      overview.blocked.some((row) => row.page === SCHEDULE_EMPTY_PAGE && row.reason === "empty-document"),
+      "หน้าเปล่าที่ตั้งกำหนดไว้ต้องถูกทำเครื่องหมาย blocked",
+    );
+
+    let blocked = false;
+    try {
+      await publishDuePage(SCHEDULE_EMPTY_PAGE, due, SCHEDULE_EMPTY_ACTOR, "check:db");
+    } catch (error) {
+      blocked = error instanceof Error && error.message === "empty-document";
+    }
+    assert.equal(blocked, true, "ถึงกำหนดแล้วต้องไม่เผยแพร่เอกสารว่าง");
+    assert.equal(
+      await countWhere("page_document where page = $1 and status = 'published'", [SCHEDULE_EMPTY_PAGE]),
+      0,
+      "ต้องไม่เกิดฉบับเผยแพร่",
+    );
+    assert.notEqual(await readPublishSchedule(SCHEDULE_EMPTY_PAGE), null, "เผยแพร่ไม่สำเร็จ = กำหนดต้องยังอยู่");
+
+    await setPublishSchedule(SCHEDULE_EMPTY_PAGE, null, SCHEDULE_EMPTY_ACTOR);
+    assert.equal(await readPublishSchedule(SCHEDULE_EMPTY_PAGE), null, "ล้างกำหนดจากหน้าภาพรวมได้");
+
+    done("กำหนดเวลาของหน้าเปล่า: เตือนบน /admin + ล้างกำหนดได้ (D-323-2)", "empty-document · schedule remains");
+  } finally {
+    await cleanup();
+    assert.equal(
+      await countWhere("page_document where page = $1", [SCHEDULE_EMPTY_PAGE]),
+      0,
+      "ต้องไม่เหลือแถวทดสอบ",
+    );
+  }
+}
+
+const JSON_CONCURRENCY_PAGE = "check-db-json-concurrency";
+const JSON_CONCURRENCY_ACTOR = "check-db-json-concurrency@example.invalid";
+
+/**
+ * D-323-1 (รอบที่ 324) — เอกสาร JSON (navbar/footer/ป้าย/settings) ที่ใช้ `page_document` เดียวกัน
+ * ต้องมี guarded save/publish และ **ไม่ติดด่านเอกสารว่าง** เพราะ JSON ว่างไม่ใช่หน้าเปล่า
+ */
+async function checkJsonConcurrency(): Promise<void> {
+  const pool = getPool();
+
+  const cleanup = async (): Promise<void> => {
+    await pool.query("delete from page_document where page = $1", [JSON_CONCURRENCY_PAGE]);
+    await pool.query("delete from page_document_revision where page = $1", [JSON_CONCURRENCY_PAGE]);
+    await pool.query("delete from audit_log where target = $1", [JSON_CONCURRENCY_PAGE]);
+  };
+
+  await cleanup();
+
+  try {
+    await saveJsonDraft(JSON_CONCURRENCY_PAGE, { value: 1 }, JSON_CONCURRENCY_ACTOR);
+    const initial = await loadDocumentRow(JSON_CONCURRENCY_PAGE, "draft");
+    assert.ok(initial !== null, "ต้องมีฉบับร่าง JSON เริ่มต้น");
+
+    const staleSave = await saveJsonDraftIfCurrent(JSON_CONCURRENCY_PAGE, { value: 2 }, JSON_CONCURRENCY_ACTOR, null);
+    assert.equal(staleSave.ok, false, "token ว่างต้องไม่เขียนทับแถวที่มีอยู่");
+
+    const afterStale = await loadDocumentRow(JSON_CONCURRENCY_PAGE, "draft");
+    assert.deepEqual(afterStale?.raw, { value: 1 }, "conflict ต้องไม่เปลี่ยนเนื้อหา");
+
+    const saved = await saveJsonDraftIfCurrent(
+      JSON_CONCURRENCY_PAGE,
+      { value: 2 },
+      JSON_CONCURRENCY_ACTOR,
+      initial.version,
+    );
+    assert.equal(saved.ok, true, "token ตรงต้องบันทึกได้");
+
+    const stalePublish = await publishJsonDraftIfCurrent(
+      JSON_CONCURRENCY_PAGE,
+      JSON_CONCURRENCY_ACTOR,
+      null,
+      initial.version,
+    );
+    assert.equal(stalePublish.ok, false, "publish ด้วย token เก่าต้องถูกปฏิเสธ");
+    assert.equal(
+      await countWhere("page_document where page = $1 and status = 'published'", [JSON_CONCURRENCY_PAGE]),
+      0,
+      "publish ที่ conflict ต้องไม่เกิดฉบับเผยแพร่",
+    );
+
+    const goodVersion = saved.ok ? saved.version : null;
+    assert.ok(goodVersion !== null, "guarded save ต้องคืน version ใหม่");
+    const published = await publishJsonDraftIfCurrent(
+      JSON_CONCURRENCY_PAGE,
+      JSON_CONCURRENCY_ACTOR,
+      null,
+      goodVersion,
+    );
+    assert.equal(published.ok, true, "JSON ต้องเผยแพร่ได้แม้ไม่มีบล็อก");
+    assert.deepEqual(
+      (await loadDocumentRow(JSON_CONCURRENCY_PAGE, "published"))?.raw,
+      { value: 2 },
+      "ฉบับเผยแพร่ต้องเป็นค่าล่าสุด",
+    );
+
+    done("guarded save/publish ของเอกสาร JSON (D-323-1)", "stale token · conflict · publish ได้โดยไม่ติดด่านบล็อก");
+  } finally {
+    await cleanup();
+    assert.equal(
+      await countWhere("page_document where page = $1", [JSON_CONCURRENCY_PAGE]),
+      0,
+      "ต้องไม่เหลือแถวทดสอบ",
+    );
+  }
 }
 
 /** อีเมล/ป้ายที่ใช้ตามหารอยทดสอบของข้อ 8 — ต้องไม่ชนกับข้อมูลจริงของผู้ใช้ */
@@ -1194,7 +1480,9 @@ async function checkChromePresets(): Promise<void> {
     if (!saved.ok) return;
 
     /* จำฉบับร่าง ณ ตอนนี้ไว้เทียบตอนย้อนกลับ (คือ "ของใหม่" ที่จะถูกทับเมื่อใช้ชุด) */
-    const draftBeforeApply = (await loadDocumentRow(navbarKey, "draft"))?.raw ?? null;
+    const draftRowBeforeApply = await loadDocumentRow(navbarKey, "draft");
+    const draftBeforeApply = draftRowBeforeApply?.raw ?? null;
+    const navbarVersionBeforeApply = draftRowBeforeApply?.version ?? null;
 
     const listed = await listChromePresets(th);
     const mine = listed.filter((preset) => preset.name === CHROME_PRESET_TEST_NAME);
@@ -1222,6 +1510,7 @@ async function checkChromePresets(): Promise<void> {
       id: saved.id,
       actor: CHROME_PRESET_TEST_ACTOR,
       messages: th,
+      expectedVersion: navbarVersionBeforeApply,
     });
     assert.equal(applied.ok, true, "ใช้ชุดต้องสำเร็จ");
 
@@ -1277,11 +1566,13 @@ async function checkChromePresets(): Promise<void> {
     }
 
     /* ── 4) ชนิดต้องตรง: ใช้ชุด navbar กับ footer ไม่ได้ ── */
+    const footerVersionCurrent = (await loadDocumentRow(footerKey, "draft"))?.version ?? null;
     const wrongKind = await applyChromePreset({
       kind: "footer",
       id: saved.id,
       actor: CHROME_PRESET_TEST_ACTOR,
       messages: th,
+      expectedVersion: footerVersionCurrent,
     });
     assert.equal(wrongKind.ok, false, "ชุดของส่วนอื่นต้องใช้ไม่ได้");
     assert.deepEqual(
@@ -1331,7 +1622,13 @@ async function checkChromePresets(): Promise<void> {
       const beforeUndo = await readChromeDraftUndo("navbar");
       assert.ok(beforeUndo !== null, "หลังใช้ชุดต้องมีข้อมูลให้ย้อนกลับ");
 
-      const undone = await undoChromePreset({ kind: "navbar", actor: CHROME_PRESET_TEST_ACTOR, messages: th });
+      const navbarVersionBeforeUndo = (await loadDocumentRow(navbarKey, "draft"))?.version ?? null;
+      const undone = await undoChromePreset({
+        kind: "navbar",
+        actor: CHROME_PRESET_TEST_ACTOR,
+        messages: th,
+        expectedVersion: navbarVersionBeforeUndo,
+      });
       assert.equal(undone.ok, true, "ย้อนกลับต้องสำเร็จ");
 
       const draftAfterUndo = await loadDocumentRow(navbarKey, "draft");
@@ -1344,7 +1641,12 @@ async function checkChromePresets(): Promise<void> {
       assert.deepEqual(draftAfterUndo?.raw ?? null, expectedDraft, "ฉบับร่างหลังย้อนกลับต้องเป็นชุดก่อนใช้ชุด");
       assert.equal(await readChromeDraftUndo("navbar"), null, "ย้อนกลับสำเร็จแล้วต้องลบข้อมูลย้อนกลับ (ใช้ได้ครั้งเดียว)");
 
-      const again = await undoChromePreset({ kind: "navbar", actor: CHROME_PRESET_TEST_ACTOR, messages: th });
+      const again = await undoChromePreset({
+        kind: "navbar",
+        actor: CHROME_PRESET_TEST_ACTOR,
+        messages: th,
+        expectedVersion: draftAfterUndo?.version ?? null,
+      });
       assert.equal(again.ok, false, "ย้อนกลับซ้ำต้องบอกว่าไม่มีให้ย้อน ไม่ใช่พัง");
       done("ย้อนกลับฉบับร่างก่อนใช้ชุดได้", "และย้อนซ้ำอย่างปลอดภัย");
     }
@@ -1473,7 +1775,7 @@ async function checkPageTemplates(): Promise<void> {
     try {
       /* ── 1) บันทึกฉบับร่างจากเทมเพลต → เผยแพร่ ── */
       await saveDraft(page, parsed.document, TEMPLATE_TEST_ACTOR);
-      const { revision } = await publishDraft(page, TEMPLATE_TEST_ACTOR, "check:db");
+      const { revision } = await publishDraft(page, TEMPLATE_TEST_ACTOR, "check:db", { requireBlocks: true });
       assert.ok(revision >= 1, `${page}: เผยแพร่ต้องได้เลขรุ่น`);
 
       /* ── 2) สวิตช์: ค่าเริ่มต้นต้องเป็น "ปิด" และหน้าเว็บยังใช้เลย์เอาต์เดิม ── */
@@ -1961,7 +2263,16 @@ async function checkScheduledPublish(): Promise<void> {
   const now = new Date();
   const past = new Date(now.getTime() - 60 * 1000);
   const future = new Date(now.getTime() + 60 * 60 * 1000);
-  const document = { page: SCHEDULE_TEST_PAGE, blocks: [] };
+  /*
+    รอบที่ 323 — ห้ามเผยแพร่เอกสารที่ไม่มีบล็อก
+    เดิมด่านนี้ใช้ `blocks: []` แล้ว publish ผ่าน ⇒ จะล้มทันทีหลังเพิ่มด่าน "empty-document"
+    ⇒ ใช้เทมเพลตจริงของหน้าที่มีอยู่ แล้วเปลี่ยนชื่อหน้าเป็นหน้าทดสอบ
+  */
+  const templatePage = TEMPLATED_PAGE_IDS[0];
+  assert.ok(templatePage !== undefined, "ต้องมีหน้าตัวอย่างที่มีเทมเพลตอย่างน้อย 1 หน้า");
+  const template = buildBlockTemplate(templatePage);
+  assert.ok(template !== null, `${templatePage}: ต้องสร้างเทมเพลตได้`);
+  const document = { ...template, page: SCHEDULE_TEST_PAGE };
 
   try {
     await saveDraft(SCHEDULE_TEST_PAGE, document, SCHEDULE_TEST_ACTOR);
@@ -2044,7 +2355,7 @@ async function checkScheduledPublish(): Promise<void> {
 
     /* ── กดเผยแพร่เอง = ล้างกำหนดเวลาเดิมด้วย ── */
     await setPublishSchedule(SCHEDULE_TEST_PAGE, future.toISOString(), SCHEDULE_TEST_ACTOR);
-    await publishDraft(SCHEDULE_TEST_PAGE, SCHEDULE_TEST_ACTOR, "check:db");
+    await publishDraft(SCHEDULE_TEST_PAGE, SCHEDULE_TEST_ACTOR, "check:db", { requireBlocks: true });
     assert.equal(await readPublishSchedule(SCHEDULE_TEST_PAGE), null, "กดเผยแพร่เองต้องล้างกำหนดเวลาเดิม");
 
     done("ตั้งเวลาเผยแพร่: ครบกำหนด → เผยแพร่ครั้งเดียว → ล้างกำหนด", "idempotent · claim แย่งกัน · audit");
@@ -4926,7 +5237,7 @@ async function checkProductDetailBuilderPage(): Promise<void> {
     await saveDraft(pageId, document, BUILDER_CHECK_ACTOR);
     assert.equal(await countWhere("page_document where page = $1", [pageId]), 1, "บันทึกฉบับร่างได้จริง");
     /* เผยแพร่ = เก็บ "ประวัติการเผยแพร่" (ตัวเดียวกับที่ตัว builder ใช้กู้คืน) */
-    await publishDraft(pageId, BUILDER_CHECK_ACTOR, null);
+    await publishDraft(pageId, BUILDER_CHECK_ACTOR, null, { requireBlocks: true });
     assert.ok((await listRevisions(pageId)).length >= 1, "เผยแพร่ต้องเก็บประวัติของหน้า");
 
     assert.equal(

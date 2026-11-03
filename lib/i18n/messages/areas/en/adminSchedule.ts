@@ -29,6 +29,8 @@ export const adminSchedule: Pick<Messages["admin"], keyof typeof thAdminSchedule
   scheduleProblemTooFar: "You can schedule at most 1 year ahead",
   scheduleProblemPage: "The target page is missing",
   scheduleProblemContent: "Cannot schedule yet — fix the content errors first",
+  scheduleProblemEmpty: "Cannot schedule yet — this page has no blocks",
+  scheduleProblemConflict: "This page was changed elsewhere — reload the latest data before scheduling",
   scheduleProblemServer: "Could not save the schedule — please try again",
 
   /* ── Card on the admin overview ────────────────────────────────────────── */
@@ -39,9 +41,14 @@ export const adminSchedule: Pick<Messages["admin"], keyof typeof thAdminSchedule
   scheduleCardDue: "{count} page(s) are due",
   scheduleCardNext: "Next: {time} (UTC)",
   scheduleCardRow: "{page} · {time} (UTC)",
+  scheduleCardBlocked: "{count} scheduled page(s) cannot be published — the draft has no blocks",
+  scheduleCardBlockedHint: "They will not go live until blocks are added — add blocks or clear the schedule from this list.",
+  scheduleCardOpen: "Open editor",
+  scheduleCardClear: "Clear schedule",
   schedulePublishNow: "Publish due pages now",
   schedulePublishNowHint: "Use this when a scheduled page is due but has not gone live yet (e.g. no cron job is set up).",
 
   /* ── Audit log trail ──────────────────────────────────────────────────── */
   auditPublishScheduled: "Published on schedule",
+  auditScheduleClear: "Publish schedule cleared",
 };

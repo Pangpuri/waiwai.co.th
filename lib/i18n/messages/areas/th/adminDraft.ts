@@ -39,4 +39,15 @@ export const adminDraft = {
   sectionDead: "ส่วนนี้เลิกใช้แล้ว — หน้าเว็บไม่อ่านค่าจากที่นี่ (ข้อมูลจริงมาจาก: {screen}) · ไม่ต้องแก้ ระบบเก็บค่าเดิมไว้ครบ",
   sectionCodeLayoutOnly:
     "ค่าที่กรอกที่นี่มีผล **เมื่อหน้าแรกยังใช้เลย์เอาต์โค้ด** — ถ้าหน้าแรกเปิดใช้บล็อก (ตัวสร้างหน้าเว็บ) บล็อก \"ที่ซื้อสินค้า\" จะเป็นตัวตัดสินแทน",
+  /* ── รอบที่ 323: optimistic concurrency + undo delete + block empty publish ── */
+  draftConflictTitle: "หน้านี้ถูกแก้จากที่อื่น",
+  draftConflictHint:
+    "ข้อมูลบนจออาจเก่ากว่าฉบับล่าสุด — ระบบหยุดบันทึกอัตโนมัติเพื่อไม่ให้ทับงานของอีกแท็บ/อีกคน · เลือกโหลดข้อมูลล่าสุด หรือบันทึกทับถ้าตั้งใจ",
+  draftConflictReload: "โหลดข้อมูลล่าสุด",
+  draftConflictOverwrite: "บันทึกทับ",
+  draftUndoDelete: "ลบบล็อกแล้ว",
+  draftUndoAction: "เลิกทำ",
+  draftUndoExpired: "เลิกทำไม่ได้ — ตำแหน่งเดิมถูกแก้ไปแล้ว",
+  draftUndoDismiss: "ปิด",
+  publishBlockedEmpty: "ยังเผยแพร่ไม่ได้ — หน้านี้ยังไม่มีบล็อก",
 };

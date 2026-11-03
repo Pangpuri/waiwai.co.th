@@ -467,3 +467,48 @@ test("block builder: การลบบล็อกต้องใช้ functio
     "ห้ามกลับไปใช้เอกสารจาก closure (กดลบสองครั้งใน tick เดียวจะทับกัน)",
   );
 });
+
+/* รอบที่ 323 — optimistic concurrency: version ต้องถูกส่งจากฟอร์มทุกทาง และเขียนแบบ guarded */
+test("block builder: save/publish/schedule/restore ต้องส่ง version และใช้ guarded writes", () => {
+  const builder = codeOf("features/admin/ui/block-builder.tsx");
+  const actions = codeOf("app/admin/builder/actions.ts");
+  const repository = codeOf("lib/blocks/repository.ts");
+  const page = codeOf("app/admin/builder/[page]/page.tsx");
+
+  assert.ok(builder.includes('body.append("version", effectiveVersion ?? "")'), "autosave ต้องแนบ version");
+  assert.ok(
+    (builder.match(/name="version"/g) ?? []).length >= 4,
+    "ฟอร์ม publish/schedule/restore/template ต้องมี hidden version",
+  );
+  assert.ok(builder.includes("isUnresolvedConflict"), "ต้องเทียบ version หลังบันทึกทับก่อนซ่อน conflict");
+  assert.ok(builder.includes("blocked-conflict"), "autosave ต้องหยุดเมื่อมี conflict");
+
+  assert.ok(actions.includes("saveDraftIfCurrent"), "action ต้องเขียนฉบับร่างแบบ guarded");
+  assert.ok(actions.includes("publishDraftIfCurrent"), "action ต้องเผยแพร่แบบ guarded");
+  assert.ok(actions.includes('String(formData.get("force") ?? "") === "1"'), "บันทึกทับต้องเป็นเจตนาชัดเจน");
+  assert.ok(page.includes("draftVersion={draftRow?.version ?? null}"), "หน้าต้องส่ง version เข้าตัวสร้าง");
+  assert.ok(
+    page.includes('<input type="hidden" name="version" value={draftRow?.version ?? ""} />'),
+    "ฟอร์มเริ่มจากเทมเพลตต้องแนบ version",
+  );
+  assert.ok(actions.includes("?template=conflict"), "เทมเพลตที่ชน version ต้องพากลับพร้อมรหัส conflict");
+
+  assert.ok(repository.includes("export async function saveDraftIfCurrent"), "ต้องมี guarded save");
+  assert.ok(repository.includes("export async function publishDraftIfCurrent"), "ต้องมี guarded publish");
+  assert.ok(repository.includes("for update"), "guarded publish ต้องล็อกแถวใน transaction");
+  assert.ok(
+    repository.includes("(extract(epoch from updated_at) * 1000000)::bigint::text"),
+    "token ต้องเป็น epoch ไมโครวินาที ไม่ใช่วันที่ที่ JS ตัดความละเอียด",
+  );
+});
+
+test("block builder: ลบแล้วเลิกทำได้ และเอกสารว่างกดเผยแพร่ไม่ได้", () => {
+  const builder = codeOf("features/admin/ui/block-builder.tsx");
+
+  assert.ok(builder.includes("removeBlockWithUndo"), "ต้องเก็บสำเนาบล็อกก่อนลบ");
+  assert.ok(builder.includes("restoreRemovedBlock"), "ต้องมีทางคืนบล็อก");
+  assert.ok(builder.includes("DELETE_UNDO_MS"), "ปุ่มเลิกทำต้องมีเวลาหมดอายุ");
+  assert.ok(builder.includes("disabled={emptyDocument || activeConflict !== null}"), "เอกสารว่างต้องกดเผยแพร่ไม่ได้");
+  assert.ok(builder.includes('data-publish-blocked="empty"'), "ต้องมีคำเตือนเอกสารว่าง");
+  assert.ok(builder.includes("activeConflict === null ? null :"), "ต้องมีแบนเนอร์ conflict");
+});

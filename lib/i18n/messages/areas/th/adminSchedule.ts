@@ -26,6 +26,8 @@ export const adminSchedule = {
   scheduleProblemTooFar: "ตั้งล่วงหน้าได้ไม่เกิน 1 ปี",
   scheduleProblemPage: "ไม่รู้ว่าจะตั้งกำหนดให้หน้าไหน",
   scheduleProblemContent: "ยังตั้งกำหนดไม่ได้ — ต้องแก้ข้อผิดพลาดของเนื้อหาก่อน",
+  scheduleProblemEmpty: "ยังตั้งกำหนดไม่ได้ — หน้านี้ยังไม่มีบล็อก",
+  scheduleProblemConflict: "หน้านี้ถูกแก้จากที่อื่น — โหลดข้อมูลล่าสุดก่อนตั้งกำหนด",
   scheduleProblemServer: "บันทึกกำหนดเวลาไม่สำเร็จ — ลองอีกครั้ง",
 
   /* ── การ์ดบนหน้าภาพรวมหลังบ้าน ───────────────────────────────────────── */
@@ -36,9 +38,14 @@ export const adminSchedule = {
   scheduleCardDue: "ครบกำหนดแล้ว {count} หน้า",
   scheduleCardNext: "กำหนดถัดไป {time} (UTC)",
   scheduleCardRow: "{page} · {time} (UTC)",
+  scheduleCardBlocked: "กำหนดที่จะเผยแพร่ไม่ได้ {count} หน้า — ฉบับร่างยังไม่มีบล็อก",
+  scheduleCardBlockedHint: "ถึงกำหนดแล้วจะไม่เผยแพร่จนกว่าจะมีบล็อก — เพิ่มบล็อกหรือล้างกำหนดได้จากรายการนี้",
+  scheduleCardOpen: "เปิดหน้าแก้",
+  scheduleCardClear: "ล้างกำหนด",
   schedulePublishNow: "เผยแพร่ที่ครบกำหนดเดี๋ยวนี้",
   schedulePublishNowHint: "ใช้เมื่อมีงานครบกำหนดแล้วแต่ยังไม่ถูกเผยแพร่ (เช่น ยังไม่ได้ตั้ง cron บนเซิร์ฟเวอร์)",
 
   /* ── ร่องรอยใน audit log ─────────────────────────────────────────────── */
   auditPublishScheduled: "เผยแพร่ตามกำหนดเวลา",
+  auditScheduleClear: "ล้างกำหนดเวลาเผยแพร่",
 };

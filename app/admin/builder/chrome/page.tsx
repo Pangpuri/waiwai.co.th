@@ -63,6 +63,7 @@ export default async function ChromePage({
   */
   const query = await searchParams;
   const initialTab = chromeTabOf(query);
+  const conflictNotice = query.conflict === "1";
 
   if (!isDatabaseConfigured()) {
     return (
@@ -188,6 +189,7 @@ export default async function ChromePage({
     chromePresetBadName: strings.chromePresetBadName,
     chromePresetSavedFromDefault: strings.chromePresetSavedFromDefault,
     chromePresetInvalid: strings.chromePresetInvalid,
+    chromePresetConflict: strings.chromePresetConflict,
     chromePresetNotFound: strings.chromePresetNotFound,
     chromePresetDbMissing: strings.chromePresetDbMissing,
     chromePresetUndo: strings.chromePresetUndo,
@@ -228,6 +230,11 @@ export default async function ChromePage({
         <header className="flex flex-col gap-1">
           <h1 className="text-fg text-lg font-semibold">{strings.chromeTitle}</h1>
           <p className="text-fg-muted text-xs">{strings.chromeIntro}</p>
+          {conflictNotice ? (
+            <p className="text-brand-red text-sm font-semibold" data-chrome-conflict="">
+              {strings.draftConflictTitle}
+            </p>
+          ) : null}
         </header>
 
       {/*
@@ -270,6 +277,7 @@ export default async function ChromePage({
             initial={navbarConfig}
             pageNameIds={pages.map((entry) => entry.id)}
             draftUpdatedAt={navbarDraftRow?.updatedAt ?? null}
+            draftVersion={navbarDraftRow?.version ?? null}
             publishedAt={navbarPublishedRow?.publishedAt ?? null}
             strings={strings}
           />
@@ -279,6 +287,7 @@ export default async function ChromePage({
             key={footerDraftRow?.updatedAt ?? "fresh-footer"}
             initial={footerConfig}
             draftUpdatedAt={footerDraftRow?.updatedAt ?? null}
+            draftVersion={footerDraftRow?.version ?? null}
             publishedAt={footerPublishedRow?.publishedAt ?? null}
             strings={strings}
           />
@@ -290,6 +299,7 @@ export default async function ChromePage({
             compact
             initial={noticeConfig}
             draftUpdatedAt={noticeDraftRow?.updatedAt ?? null}
+            draftVersion={noticeDraftRow?.version ?? null}
             publishedAt={noticePublishedRow?.publishedAt ?? null}
             revisions={noticeRevisions}
             strings={strings}
@@ -347,6 +357,7 @@ export default async function ChromePage({
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
               undoLabel={undoNavbar}
+              draftVersion={navbarDraftRow?.version ?? null}
             />
           </section>
 
@@ -358,6 +369,7 @@ export default async function ChromePage({
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
               undoLabel={undoFooter}
+              draftVersion={footerDraftRow?.version ?? null}
             />
           </section>
 
@@ -369,6 +381,7 @@ export default async function ChromePage({
               strings={presetStrings}
               maxPerKind={MAX_CHROME_PRESETS_PER_KIND}
               undoLabel={undoNotice}
+              draftVersion={noticeDraftRow?.version ?? null}
             />
           </section>
         </div>

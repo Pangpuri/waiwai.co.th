@@ -15,7 +15,7 @@ import {
 } from "@/app/admin/builder/actions";
 import { deletePresetAction, savePresetAction } from "@/app/admin/builder/preset-actions";
 import { uploadImageAction } from "@/app/admin/media/actions";
-import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
+import { INITIAL_BUILDER_STATE, type BuilderConflict, type BuilderState } from "@/features/admin/builder-state";
 import { INITIAL_SCHEDULE_STATE, type ScheduleProblem } from "@/features/admin/schedule-state";
 import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
@@ -71,6 +71,9 @@ import {
   moveCardTo,
   moveRecipeItem,
   removeBlock,
+  removeBlockWithUndo,
+  restoreRemovedBlock,
+  type RemovedBlock,
   removeCard,
   removeColumn,
   removeGalleryItem,
@@ -105,6 +108,7 @@ import {
   setTableColumnText,
   setTableFirstColumnHeader,
 } from "@/lib/blocks/edit";
+import { isUnresolvedConflict, latestVersionOf } from "@/lib/blocks/version";
 import { LAYOUT_CHOICES, STYLE_CHOICES } from "@/lib/blocks/style";
 import type { BlockPreset } from "@/lib/blocks/presets";
 import type { StoredVersionSummary } from "@/lib/blocks/migrate";
@@ -201,6 +205,8 @@ type Props = {
   readonly presets?: readonly BlockPreset[];
   readonly initialDraft: BlockDocument;
   readonly draftUpdatedAt: string | null;
+  /** optimistic concurrency token ของฉบับร่างที่โหลดมา (รอบที่ 323) */
+  readonly draftVersion: string | null;
   readonly publishedAt: string | null;
   readonly revisions: readonly Revision[];
   /** ผลของการกด "ล้างประวัติ" ที่ Server Action ส่งกลับมา (?history=…) — รอบที่ 249 */
@@ -233,6 +239,8 @@ type Props = {
 const DRAG_CARD_MIME = "application/x-waiwai-card";
 /** ลากการ์ดเมนู (บล็อก `recipeCards`) สลับลำดับ — คนละชนิดกับการ์ดปกติ จึงไม่หลุดไปหากัน */
 const DRAG_RECIPE_MIME = "application/x-waiwai-recipe";
+/** ระยะเวลาที่ปุ่ม "เลิกทำ" การลบบล็อกยังอยู่ (รอบที่ 323) */
+const DELETE_UNDO_MS = 8000;
 
 const PREVIEW_SIZES = [
   { key: "wide", width: 1920, height: 1080, labelKey: "widthWide" },
@@ -271,6 +279,10 @@ function scheduleProblemLabel(strings: Messages["admin"], problem: ScheduleProbl
       return strings.scheduleProblemPage;
     case "content":
       return strings.scheduleProblemContent;
+    case "empty":
+      return strings.scheduleProblemEmpty;
+    case "conflict":
+      return strings.scheduleProblemConflict;
     case "server":
     case null:
       return strings.scheduleProblemServer;
@@ -281,10 +293,12 @@ function SubmitButton({
   label,
   pendingLabel,
   tone,
+  disabled = false,
 }: {
   readonly label: string;
   readonly pendingLabel: string;
   readonly tone: "brand" | "outline";
+  readonly disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const className =
@@ -293,7 +307,7 @@ function SubmitButton({
       : "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60";
 
   return (
-    <button type="submit" disabled={pending} className={className}>
+    <button type="submit" disabled={pending || disabled} className={className}>
       {pending ? pendingLabel : label}
     </button>
   );
@@ -434,7 +448,7 @@ function SelectField({
 function StatusPanel({ state, strings }: { readonly state: BuilderState; readonly strings: Messages["admin"] }) {
   if (state.status === "idle") return null;
 
-  const failed = state.status === "invalid" || state.status === "failed";
+  const failed = state.status === "invalid" || state.status === "failed" || state.status === "conflict";
   const migratedDraft = state.migrated?.draft ?? 0;
   const migratedPublished = state.migrated?.published ?? 0;
   const message =
@@ -450,7 +464,9 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
               : fillTemplate(strings.migratedOk, { draft: migratedDraft, published: migratedPublished })
             : state.status === "invalid"
               ? strings.errorTitle
-              : strings.dbMissingShort;
+              : state.status === "conflict"
+                ? strings.draftConflictTitle
+                : strings.dbMissingShort;
 
   /* ผลการทำให้หน้าเว็บสดใหม่หลังเผยแพร่ (S1 เดิม + X1.7) — บอกตรง ๆ ว่าเกิดอะไรขึ้นหลังกดเผยแพร่ */
   const rebuildMessage =
@@ -521,6 +537,7 @@ export function BlockBuilder({
   presets = [],
   initialDraft,
   draftUpdatedAt,
+  draftVersion,
   publishedAt,
   revisions,
   historyNotice = null,
@@ -541,6 +558,9 @@ export function BlockBuilder({
   const [selectTick, setSelectTick] = useState(0);
   /** การ์ดที่กำลังแก้ (ลำดับในบล็อก) — null = ดูภาพรวมของบล็อก */
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
+  /** บล็อกที่เพิ่งลบ + เวลาหมดอายุของปุ่ม "เลิกทำ" (รอบที่ 323) */
+  const [undoRemoval, setUndoRemoval] = useState<{ readonly removal: RemovedBlock; readonly expiresAt: number } | null>(null);
+  const [undoProblem, setUndoProblem] = useState(false);
   /** ช่องที่เพิ่งถูกคลิกจากพรีวิว → โฟกัสให้ทันที (ผู้ใช้ไม่ต้องหาเอง) */
   const [focusTarget, setFocusTarget] = useState<{ readonly id: string; readonly key: number } | null>(null);
   const [previewWidth, setPreviewWidth] = useState<PreviewSizeKey>("desktop");
@@ -572,8 +592,13 @@ export function BlockBuilder({
     ⇒ "ยังไม่บันทึก" = diff ระหว่างสองตัวนี้ (ไม่ใช่ธงที่ตั้งมือ ซึ่งเพี้ยนได้ง่าย)
   */
   const [savedDocument, setSavedDocument] = useState<BlockDocument>(initialDraft);
+  const [savedVersion, setSavedVersion] = useState<string | null>(draftVersion);
+  const [conflict, setConflict] = useState<BuilderConflict | null>(null);
   const [autosaveEnabled, setAutosaveEnabled] = useState(true);
-  const [autosave, setAutosave] = useState<{ readonly status: "idle" | "saving" | "saved" | "failed"; readonly at: string | null }>({
+  const [autosave, setAutosave] = useState<{
+    readonly status: "idle" | "saving" | "saved" | "failed" | "conflict";
+    readonly at: string | null;
+  }>({
     status: "idle",
     at: null,
   });
@@ -599,6 +624,35 @@ export function BlockBuilder({
   const [scheduleState, scheduleAction] = useActionState(schedulePublishAction, INITIAL_SCHEDULE_STATE);
   /** ค่าในช่อง `datetime-local` (เวลาท้องถิ่นของผู้ใช้) — ว่าง = ยังไม่เลือก */
   const [scheduleInput, setScheduleInput] = useState("");
+
+  /*
+    version ล่าสุดที่เซิร์ฟเวอร์ยืนยันแล้ว (รอบที่ 323) — เลือกค่ามากสุดจากทุก action
+    ⇒ autosave หลังตั้งกำหนดเวลา/กู้คืน/เผยแพร่ ไม่ใช้ token เก่าจนเกิด conflict ปลอม
+  */
+  const effectiveVersion = latestVersionOf([
+    savedVersion,
+    scheduleState.draftVersion,
+    publishState.draftVersion,
+    restoreState.draftVersion,
+    migrateState.draftVersion,
+  ]);
+  /*
+    conflict ที่แสดง = conflict จาก autosave ก่อน · ถ้าไม่มีจึงดูผลของ publish
+    ⚠️ หลังกด "บันทึกทับ" สำเร็จ `useActionState` ยังจำสถานะ conflict เดิม
+    ⇒ ต้องเทียบ version: ถ้าในเครื่องใหม่กว่าฝั่งที่ชนแล้ว = ถือว่าจบ ไม่ต้องค้างแบนเนอร์
+  */
+  const publishConflict =
+    publishState.status === "conflict"
+      ? (publishState.conflict ?? { version: null, updatedAt: null, updatedBy: null })
+      : null;
+  const activeConflict = conflict ?? (isUnresolvedConflict(publishConflict, effectiveVersion) ? publishConflict : null);
+  /*
+    conflict ของ publish มีแบนเนอร์เฉพาะด้านบนแล้ว
+    ⇒ ไม่ต้องให้ StatusPanel พูดซ้ำ (และต้องหายหลังกดบันทึกทับ แม้ action state เดิมยังเป็น conflict)
+  */
+  const publishStateForDisplay: BuilderState =
+    publishState.status === "conflict" ? { ...publishState, status: "idle" as const } : publishState;
+  const emptyDocument = document.blocks.length === 0;
 
   /*
     กำหนดเวลาที่จะแสดง = ผลของ action ล่าสุด (ถ้ามี) · ไม่งั้นใช้ค่าที่อ่านจากฐานข้อมูล
@@ -803,36 +857,58 @@ export function BlockBuilder({
     dirty,
     errorCount: errors.length,
     saving: autosave.status === "saving",
+    conflicted: activeConflict !== null,
   });
 
   /**
-   * บันทึกฉบับร่างอัตโนมัติ — เรียก **Server Action ตัวเดียวกับปุ่มบันทึก** (ไม่มีทางพิเศษที่สอง)
+   * บันทึกฉบับร่าง — เรียก **Server Action ตัวเดียวกับปุ่มบันทึก** (ไม่มีทางพิเศษที่สอง)
    * ⇒ สิ่งที่บันทึกอัตโนมัติผ่านการตรวจสิทธิ์/parse/validate ชุดเดียวกันทุกประการ
+   *
+   * ส่ง version token ไปด้วยทุกครั้ง (รอบที่ 323) · `force = true` ใช้เฉพาะเมื่อผู้ใช้
+   * เห็น conflict แล้วกด "บันทึกทับ" เองเท่านั้น
    */
-  const runAutosave = useCallback(async () => {
-    if (savingRef.current) return;
-    savingRef.current = true;
-    setAutosave({ status: "saving", at: null });
+  const persistDocument = useCallback(
+    async (force: boolean) => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      setAutosave({ status: "saving", at: null });
 
-    const snapshot = document;
-    const body = new FormData();
-    body.append("page", page);
-    body.append("payload", JSON.stringify(snapshot));
+      const snapshot = document;
+      const body = new FormData();
+      body.append("page", page);
+      body.append("payload", JSON.stringify(snapshot));
+      body.append("version", effectiveVersion ?? "");
+      if (force) body.append("force", "1");
 
-    try {
-      const result = await saveDraftAction(INITIAL_BUILDER_STATE, body);
-      if (result.status === "draft-saved") {
-        setSavedDocument(snapshot);
-        setAutosave({ status: "saved", at: new Date().toISOString() });
-      } else {
+      try {
+        const result = await saveDraftAction(INITIAL_BUILDER_STATE, body);
+        if (result.status === "draft-saved") {
+          setSavedDocument(snapshot);
+          setSavedVersion(result.draftVersion ?? effectiveVersion ?? null);
+          setConflict(null);
+          setAutosave({ status: "saved", at: new Date().toISOString() });
+        } else if (result.status === "conflict") {
+          setConflict(result.conflict ?? { version: null, updatedAt: null, updatedBy: null });
+          setAutosave({ status: "conflict", at: null });
+        } else {
+          setAutosave({ status: "failed", at: null });
+        }
+      } catch {
         setAutosave({ status: "failed", at: null });
+      } finally {
+        savingRef.current = false;
       }
-    } catch {
-      setAutosave({ status: "failed", at: null });
-    } finally {
-      savingRef.current = false;
-    }
-  }, [document, page]);
+    },
+    [document, page, effectiveVersion],
+  );
+
+  const runAutosave = useCallback(async () => {
+    await persistDocument(false);
+  }, [persistDocument]);
+
+  const forceSave = useCallback(async () => {
+    await persistDocument(true);
+  }, [persistDocument]);
 
   useEffect(() => {
     if (autosaveDecision !== "schedule") return undefined;
@@ -841,6 +917,13 @@ export function BlockBuilder({
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [autosaveDecision, runAutosave]);
+
+  /** ปุ่ม "เลิกทำ" หมดอายุเอง — ไม่ค้างตลอดหน้าจอ */
+  useEffect(() => {
+    if (undoRemoval === null) return undefined;
+    const timer = window.setTimeout(() => setUndoRemoval(null), Math.max(0, undoRemoval.expiresAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [undoRemoval]);
 
   /**
    * ซิงก์ "ฉบับที่บันทึกแล้ว" กับสิ่งที่เซิร์ฟเวอร์ทำจริง
@@ -856,6 +939,10 @@ export function BlockBuilder({
         setSavedDocument(submitted);
         pendingSaveRef.current = null;
       }
+      if (publishState.draftVersion !== undefined && publishState.draftVersion !== null) {
+        setSavedVersion(publishState.draftVersion);
+      }
+      setConflict(null);
       return;
     }
 
@@ -865,9 +952,19 @@ export function BlockBuilder({
 
     setDocument(restored);
     setSavedDocument(restored);
+    if (restoreState.draftVersion !== undefined && restoreState.draftVersion !== null) {
+      setSavedVersion(restoreState.draftVersion);
+    }
+    setConflict(null);
     setSelectedId(restored.blocks[0]?.id ?? "");
     setSelectedCard(null);
-  }, [publishState.status, restoreState.status, restoreState.restoredDocument]);
+  }, [
+    publishState.status,
+    publishState.draftVersion,
+    restoreState.status,
+    restoreState.restoredDocument,
+    restoreState.draftVersion,
+  ]);
 
   /** เตือนก่อนออกจากหน้าเมื่อมีงานที่ยังไม่บันทึก (ปิดแท็บ + คลิกลิงก์ในเว็บ) */
   useEffect(() => {
@@ -975,6 +1072,21 @@ export function BlockBuilder({
 
   function update(next: BlockDocument) {
     setDocument(next);
+  }
+
+  /** คืนบล็อกที่เพิ่งลบ — ถ้าตำแหน่งเดิมหายไป ให้บอกผู้ใช้ ไม่เงียบ */
+  function undoDelete(): void {
+    if (undoRemoval === null) return;
+    const restored = restoreRemovedBlock(document, undoRemoval.removal);
+    if (restored === null) {
+      setUndoProblem(true);
+      return;
+    }
+    setDocument(restored);
+    setUndoRemoval(null);
+    setUndoProblem(false);
+    setSelectedId(undoRemoval.removal.block.id);
+    setSelectedCard(null);
   }
 
   function renderInspector(block: Block) {
@@ -2058,7 +2170,7 @@ export function BlockBuilder({
         </div>
       </div>
 
-      <StatusPanel state={publishState} strings={strings} />
+      <StatusPanel state={publishStateForDisplay} strings={strings} />
 
       {/* คำเตือน "ส่วนที่เทมเพลตยังไม่ครอบคลุม" (S2 รอบที่ 83) — ต้องเห็นก่อนกดเผยแพร่ */}
       {coverage === undefined ? null : <TemplateCoverageNote {...coverage} />}
@@ -2095,6 +2207,7 @@ export function BlockBuilder({
               <input type="hidden" name="intent" value="set" />
               <input type="hidden" name="page" value={page} />
               <input type="hidden" name="payload" value={payload} />
+              <input type="hidden" name="version" value={effectiveVersion ?? ""} />
               {/*
                 epoch ms ของเวลาที่ผู้ใช้เลือก — คำนวณฝั่งเบราว์เซอร์เท่านั้น
                 (ค่าเริ่มต้นเป็นสตริงว่าง ⇒ เรนเดอร์ฝั่งเซิร์ฟเวอร์กับไฮเดรตได้ผลตรงกัน ไม่มี mismatch)
@@ -2116,8 +2229,18 @@ export function BlockBuilder({
                   className="border-line bg-surface text-fg focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs focus-visible:ring-2 focus-visible:outline-none"
                 />
               </div>
-              <SubmitButton label={strings.scheduleSet} pendingLabel={strings.scheduling} tone="outline" />
+              <SubmitButton
+                label={strings.scheduleSet}
+                pendingLabel={strings.scheduling}
+                tone="outline"
+                disabled={emptyDocument || activeConflict !== null}
+              />
             </form>
+            {emptyDocument ? (
+              <p className="text-brand-red text-xs font-semibold" role="alert" data-schedule-blocked="empty">
+                {strings.publishBlockedEmpty}
+              </p>
+            ) : null}
 
             {currentSchedule === null ? null : (
               <form action={scheduleAction}>
@@ -2165,6 +2288,7 @@ export function BlockBuilder({
           </div>
           <form action={migrateAction} className="flex items-center gap-2">
             <input type="hidden" name="page" value={page} />
+            <input type="hidden" name="version" value={effectiveVersion ?? ""} />
             <button
               type="submit"
               disabled={legacyStoredBlocks === 0}
@@ -2334,6 +2458,30 @@ export function BlockBuilder({
             </div>
           </div>
 
+          {/* ลบแล้วยัง "เลิกทำ" ได้ใน 8 วินาที — ก่อน autosave รอบถัดไปกลายเป็นของถาวร (รอบที่ 323) */}
+          {undoRemoval === null ? null : (
+            <div
+              className="border-line bg-surface-raised flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed p-2"
+              role="status"
+            >
+              <p className={`text-xs font-semibold ${undoProblem ? "text-brand-red" : "text-fg"}`}>
+                {undoProblem ? strings.draftUndoExpired : strings.draftUndoDelete}
+              </p>
+              <TinyButton
+                label={undoProblem ? strings.draftUndoDismiss : strings.draftUndoAction}
+                onClick={() => {
+                  if (undoProblem) {
+                    setUndoRemoval(null);
+                    setUndoProblem(false);
+                    return;
+                  }
+                  undoDelete();
+                }}
+                active={!undoProblem}
+              />
+            </div>
+          )}
+
           {/* เลเยอร์แบบซ้อนได้ (X1.1) — คอมโพเนนต์แยก เพื่อไม่ให้ไฟล์นี้ยาวเกินจำเป็น */}
           <BlockLayerList
             document={document}
@@ -2364,8 +2512,14 @@ export function BlockBuilder({
                 เดิม `update(removeBlock(document, blockId))` ใช้ `document` จาก closure
                 ⇒ ถ้ากดลบบล็อกสองอันใน tick เดียว (สคริปต์/อีเวนต์เร็ว) ตัวที่สองเห็นเอกสารชุดเก่า
                   แล้วเขียนทับ ⇒ การลบครั้งแรกหายเงียบ ๆ
+                รอบที่ 323: เก็บสำเนา + ตำแหน่งเดิมไว้ทำ "เลิกทำ" ก่อนลบจริง
               */
+              const removal = removeBlockWithUndo(document, blockId);
               setDocument((current) => removeBlock(current, blockId));
+              if (removal !== null) {
+                setUndoRemoval({ removal: removal.removed, expiresAt: Date.now() + DELETE_UNDO_MS });
+                setUndoProblem(false);
+              }
               if (blockId === selectedId) setSelectedId("");
             }}
             onMoveTo={(blockId, target: BlockLocation) => update(moveBlockToLocation(document, blockId, target))}
@@ -2521,6 +2675,32 @@ export function BlockBuilder({
         </section>
       </div>
 
+      {/* conflict จากอีกแท็บ/อีกคน — หยุด autosave และให้ผู้ใช้เลือกโหลดใหม่/บันทึกทับ (รอบที่ 323) */}
+      {activeConflict === null ? null : (
+        <div className="border-brand-red bg-surface flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3" role="alert">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-brand-red text-sm font-semibold">{strings.draftConflictTitle}</p>
+            <p className="text-fg-muted text-xs">{strings.draftConflictHint}</p>
+            {activeConflict.updatedBy === null ? null : (
+              <p className="text-fg-muted text-[11px]">
+                {activeConflict.updatedBy}
+                {activeConflict.updatedAt === null ? "" : ` · ${shortTimeOf(activeConflict.updatedAt) ?? ""}`}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {strings.draftConflictReload}
+            </button>
+            <TinyButton label={strings.draftConflictOverwrite} onClick={() => void forceSave()} active />
+          </div>
+        </div>
+      )}
+
       {/*
         ── ปุ่มเดียว: "เผยแพร่" (มติเจ้าของ 2026-10-09 · รอบที่ 240) ─────────────────────────
         ถอด "บันทึกฉบับร่าง" ออก — งานที่ยังไม่กดเผยแพร่ถูกเก็บให้เองด้วย **บันทึกอัตโนมัติ** (3 วิ)
@@ -2537,13 +2717,24 @@ export function BlockBuilder({
         >
           <input type="hidden" name="page" value={page} />
           <input type="hidden" name="payload" value={payload} />
-          <SubmitButton label={strings.publish} pendingLabel={strings.publishing} tone="brand" />
+          <input type="hidden" name="version" value={effectiveVersion ?? ""} />
+          <SubmitButton
+            label={strings.publish}
+            pendingLabel={strings.publishing}
+            tone="brand"
+            disabled={emptyDocument || activeConflict !== null}
+          />
         </form>
 
         {/* บอกล่วงหน้าว่ากดแล้วจะเกิดอะไร (หน้าแรก = ขึ้นเว็บ · หน้าอื่น = เก็บไว้) — จอต้องไม่โกหก */}
         <p className="text-fg-muted text-xs" data-publish-hint={publishLive ? "live" : "saved-only"}>
           {publishLive ? strings.publishHintLive : strings.publishHintSavedOnly}
         </p>
+        {emptyDocument ? (
+          <p className="text-brand-red text-xs font-semibold" role="alert" data-publish-blocked="empty">
+            {strings.publishBlockedEmpty}
+          </p>
+        ) : null}
 
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <p className={`text-xs font-semibold ${dirty ? "text-fg" : "text-fg-muted"}`}>
@@ -2570,7 +2761,7 @@ export function BlockBuilder({
               {autosave.status === "saved" ? fillTemplate(strings.draftAutosaveSaved, { time: shortTimeOf(autosave.at) ?? "" }) : null}
               {autosave.status === "failed" ? strings.draftAutosaveFailed : null}
               {autosave.status === "idle" && autosaveDecision === "blocked-errors" ? strings.draftAutosaveBlocked : null}
-              {autosave.status === "idle" && autosaveDecision !== "blocked-errors"
+              {autosave.status === "idle" && autosaveDecision !== "blocked-errors" && autosaveDecision !== "blocked-conflict"
                 ? fillTemplate(strings.draftAutosaveHint, { seconds: Math.round(AUTOSAVE_DELAY_MS / 1000) })
                 : null}
             </span>
@@ -2650,6 +2841,7 @@ export function BlockBuilder({
                   <form action={restoreAction}>
                     <input type="hidden" name="page" value={page} />
                     <input type="hidden" name="revision" value={entry.revision} />
+                    <input type="hidden" name="version" value={effectiveVersion ?? ""} />
                     <button
                       type="submit"
                       className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
@@ -2717,6 +2909,7 @@ export function BlockBuilder({
                     <form action={restoreAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="page" value={page} />
                       <input type="hidden" name="revision" value={compareState.compare.revision} />
+                      <input type="hidden" name="version" value={effectiveVersion ?? ""} />
                       <button
                         type="submit"
                         className="bg-brand-red text-on-brand focus-visible:ring-ring rounded-lg px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
