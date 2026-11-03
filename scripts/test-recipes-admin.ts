@@ -333,10 +333,30 @@ test("admin sidebar: มีไอคอนทุกเมนู · พับแ�
   assert.ok(ui.includes("aria-expanded"), "ปุ่มเปิด/ปิดต้องบอกสถานะให้ assistive tech");
   assert.ok(ui.includes("title={item.label}"), "พับเก็บแล้วต้อง hover ดูชื่อเมนูได้");
   /* ⚠️ บทเรียนรอบ 157: ของเดิมพับแล้ว unmount เมนูทั้งก้อน ⇒ กระพริบ/กระโดด */
-  /* ของเดิมพับแล้วไม่ render เมนูทั้งก้อน ⇒ กระพริบ/กระโดด · ตอนนี้ต้อง "ซ่อนด้วย CSS" เท่านั้น */
+  assert.ok(ui.includes("<nav"), "เมนูต้อง render ตลอดเวลา (ห้าม unmount ตอนพับ)");
   assert.ok(
-    ui.includes("<nav className={open ?"),
-    "เมนูต้อง render ตลอดเวลา แล้วสลับคลาสตามสถานะ (ห้าม unmount ตอนพับ)",
+    ui.includes('mobileOpen ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr] lg:visible"'),
+    "มือถือต้องหุบรายการเมนูด้วย CSS (เหลือแถบหัว) ไม่ใช่เหลือไอคอนเต็มหน้า",
   );
+  assert.ok(ui.includes("transition-[grid-template-rows,visibility]"), "เปิด/ปิดเมนูมือถือต้อง animate ความสูง");
+  assert.ok(ui.includes("lg:block") && ui.includes("lg:visible"), "เดสก์ท็อปต้องยังเห็นเมนูเสมอ แม้มือถือหุบอยู่");
   assert.ok(layout.includes("AdminSidebar"), "layout ต้องใช้ Sidebar");
+});
+
+/* ── รอบที่ 320: เมนูมือถือต้องหุบได้จริง (แถบหัว + รายการที่กาง/หุบ) ─────────── */
+
+test("admin sidebar mobile: ค่าเริ่มต้นหุบ · มีปุ่มเฉพาะมือถือ · กดเมนูแล้วหุบ · ปิดด้วย Escape", () => {
+  const ui = readFileSync("features/admin/ui/admin-sidebar.tsx", "utf8");
+
+  assert.ok(ui.includes("const [mobileOpen, setMobileOpen] = useState(false)"), "มือถือต้องเริ่มที่สถานะหุบ");
+  assert.ok(ui.includes("aria-controls=\"admin-sidebar-nav\""), "ปุ่มมือถือต้องชี้ไปที่รายการเมนู");
+  assert.ok(ui.includes("id=\"admin-sidebar-nav\""), "รายการเมนูต้องมี id ให้ aria-controls อ้างถึง");
+  assert.ok(ui.includes("lg:hidden"), "ปุ่มกาง/หุบมือถือต้องไม่โผล่บนเดสก์ท็อป");
+  assert.ok(ui.includes("hidden rounded-lg border") && ui.includes("lg:inline-flex"), "ปุ่มย่อรางต้องเห็นเฉพาะเดสก์ท็อป");
+  assert.ok(ui.includes("onClick={() => setMobileOpen(false)}"), "กดลิงก์เมนูแล้วต้องหุบเมนูมือถือ");
+  assert.ok(ui.includes('event.key === "Escape"') && ui.includes("setMobileOpen(false)"), "ต้องปิดเมนูมือถือด้วย Escape");
+  assert.ok(ui.includes("lg:justify-center lg:gap-0"), "รางไอคอนเดสก์ท็อปต้องยังพับเป็นไอคอนล้วน");
+  /* รอบที่ 321: ไอคอนต้อง morph ด้วย rotate/scale/opacity (Tailwind v4 ใช้ property แยก ไม่ใช่ transform) */
+  assert.ok(ui.includes("transition-[rotate,scale,opacity]"), "ไอคอน hamburger/X ต้อง animate แบบนุ่ม");
+  assert.ok(ui.includes("rotate-90 scale-75 opacity-0") && ui.includes("-rotate-90 scale-75 opacity-0"), "ไอคอนต้องไขว้กันสองทาง");
 });

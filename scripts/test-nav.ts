@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -132,4 +133,20 @@ test("buildFooterColumns: ครบทุกคอลัมน์และเต
       assert.ok(link.href.startsWith("/en"), `${link.labelKey} ต้องขึ้นต้นด้วย /en`);
     }
   }
+});
+
+/* ── รอบที่ 321: เมนูมือถือหน้าบ้านเปิด/ปิดลื่นไหล ─────────────────────────── */
+
+test("mobile nav: panel อยู่ใน DOM ตลอด · fade/slide ด้วย transition · ไอคอน morph", () => {
+  const code = readFileSync("features/shell/ui/mobile-nav.tsx", "utf8");
+
+  /* ⚠️ ต้องไม่กลับไป {open ? <panel/> : null} — unmount แล้วเปิด/ปิดจะกระพริบ */
+  assert.ok(code.includes('id="mobile-nav-panel"'), "ต้องมี panel ให้ aria-controls อ้างถึง");
+  assert.ok(code.includes('data-state={open ? "open" : "closed"}'), "panel ต้องอยู่ใน DOM ตลอด");
+  assert.ok(code.includes("inert={!open}") && code.includes("aria-hidden={!open}"), "ตอนปิดต้องไม่รับโฟกัส/ไม่ประกาศให้ screen reader");
+  assert.ok(code.includes("transition-[opacity,translate]") && code.includes("duration-200"), "ต้อง animate opacity + translate");
+  assert.ok(code.includes("opacity-100") && code.includes("-translate-y-2"), "ต้องมีสถานะเปิด/ปิดที่ชัดเจน");
+  /* Tailwind v4 ตั้ง rotate/scale เป็น property แยก — transition-transform เดิมไม่ครอบคลุม */
+  assert.ok(code.includes("transition-[rotate,scale,opacity]"), "ไอคอนต้อง morph ด้วย rotate/scale/opacity");
+  assert.ok(code.includes("toggleRef.current?.focus()"), "ปิดด้วย Escape แล้วต้องคืนโฟกัสที่ปุ่ม");
 });
