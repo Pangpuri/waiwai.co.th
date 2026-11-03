@@ -2359,7 +2359,13 @@ export function BlockBuilder({
             onMove={(blockId, delta) => update(moveBlock(document, blockId, delta))}
             onDuplicate={(blockId) => update(duplicateBlock(document, blockId))}
             onRemove={(blockId) => {
-              update(removeBlock(document, blockId));
+              /*
+                ⚠️ ต้องใช้ functional update (รอบที่ 322)
+                เดิม `update(removeBlock(document, blockId))` ใช้ `document` จาก closure
+                ⇒ ถ้ากดลบบล็อกสองอันใน tick เดียว (สคริปต์/อีเวนต์เร็ว) ตัวที่สองเห็นเอกสารชุดเก่า
+                  แล้วเขียนทับ ⇒ การลบครั้งแรกหายเงียบ ๆ
+              */
+              setDocument((current) => removeBlock(current, blockId));
               if (blockId === selectedId) setSelectedId("");
             }}
             onMoveTo={(blockId, target: BlockLocation) => update(moveBlockToLocation(document, blockId, target))}

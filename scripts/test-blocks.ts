@@ -4,6 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { codeOf } from "./source-scan.ts";
+
 import { addCard, insertPresetBlock, moveBlockTo, moveCardTo, replaceBlockWithPreset, setBlockVisibility, setCardText } from "@/lib/blocks/edit";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { normalizePresetName } from "@/lib/blocks/presets";
@@ -445,4 +447,23 @@ test("parseBlockDocument: อ่าน visibility จากข้อมูลท
   assert.equal(fallback.ok, true);
   if (fallback.ok) assert.equal(fallback.document.blocks[0]?.visibility, undefined, "ค่าผิดรูป = แสดงทุกขนาด");
   assert.ok(id !== "");
+});
+
+/*
+  รอบที่ 322 — บั๊กจริงจากการยิงลบบล็อกผ่านหลังบ้าน:
+  กดลบสองบล็อกใน tick เดียว ตัวที่สองอ่าน `document` จาก closure ชุดเก่าแล้วเขียนทับ
+  ⇒ ลำดับที่หนึ่งหายเงียบ ๆ · ต้องใช้ functional update ให้ React ต่อคิวจาก state ล่าสุด
+*/
+test("block builder: การลบบล็อกต้องใช้ functional state update (ลบหลายบล็อกติดกันไม่หาย)", () => {
+  /* ใช้ตัวตัดคอมเมนต์กลาง (`codeOf`) — กันเทสต์หลอกตัวเองเพราะตัวอย่างโค้ดเก่าในคำอธิบาย */
+  const code = codeOf("features/admin/ui/block-builder.tsx");
+
+  assert.ok(
+    code.includes("setDocument((current) => removeBlock(current, blockId))"),
+    "onRemove ต้องอัปเดตจาก state ล่าสุด ไม่ใช่ document จาก closure",
+  );
+  assert.ok(
+    !code.includes("update(removeBlock(document, blockId))"),
+    "ห้ามกลับไปใช้เอกสารจาก closure (กดลบสองครั้งใน tick เดียวจะทับกัน)",
+  );
 });
