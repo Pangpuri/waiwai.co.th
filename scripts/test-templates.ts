@@ -15,7 +15,7 @@ import { countRawBlocks } from "@/lib/blocks/migrate";
 import { documentErrorsOf, validateDocument } from "@/lib/blocks/validate";
 import { MAX_BLOCKS_TOTAL } from "@/lib/blocks/types";
 import { PAGE_PATHS, PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
-import { stripComments } from "@/scripts/source-scan";
+import { stripComments } from "./source-scan.ts";
 
 /**
  * เทสต์ S2 — ตัวสร้างหน้าเว็บรองรับหลายหน้า (รอบที่ 82)
@@ -516,17 +516,18 @@ test("★ templates: ปุ่มเทมเพลตต้องบอกค�
 /** ★ รอบที่ 226 (เคลียร์หนี้ "แก้ได้สองที่") + รอบที่ 252 (ปิดหนี้ให้จบ) — หน้าจอเนื้อหาหน้าแรกต้องไม่หลอกตา */
 test("★ content: ทุกส่วนของหน้าแรกถูกตัดสิน (เจ้าของที่นี่ · ย้ายที่ · เลิกใช้แล้ว) และหน้าจอแสดงตรงตามนั้น", () => {
   /*
-    ★ รอบที่ 252 — ของจริงที่ตรวจจากซอร์ส:
-    · `whereToBuy` = EAV **ถูกอ่านจริง** แต่เฉพาะสาขา **เลย์เอาต์โค้ด** (`whereToBuyViewOf`) ⇒ หน้าจอนี้เป็นเจ้าของในกรณีนั้น
+    ★ รอบ 329 — ของจริงที่ตรวจจากซอร์ส:
+    · `whereToBuy` = ย้ายไปบล็อก "ที่ซื้อสินค้า" ใน `/admin/builder/home` ⇒ EAV หน้าจอนี้ **เลิกใช้แล้ว**
     · `products`/`recipes`/`news`/`newsletter` = มาจากฐานข้อมูล + บล็อก ⇒ EAV **เลิกใช้แล้ว**
     · `seo` = มาจากตั้งค่าส่วนกลาง ⇒ EAV **เลิกใช้แล้ว**
     · `hero` = ย้ายไปหน้าจอสไลด์ (รอบ 251)
   */
-  assert.deepEqual([...HOME_SECTIONS_OWNED_HERE], ["whereToBuy"], "ที่ซื้อสินค้าเป็นของหน้าจอนี้ (ใช้เมื่อเลย์เอาต์โค้ด)");
-  assert.equal(ownerOfSection("whereToBuy")?.codeLayoutOnly, true, "ต้องระบุว่ามีผลเฉพาะเลย์เอาต์โค้ด");
+  assert.deepEqual([...HOME_SECTIONS_OWNED_HERE], [], "หน้าจอเนื้อหาเดิมไม่เป็นเจ้าของค่าจริงแล้ว");
+  assert.equal(ownerOfSection("whereToBuy")?.dead, true, "ที่ซื้อสินค้าย้ายไปบล็อกในตัวสร้างหน้าเว็บ");
+  assert.equal(ownerOfSection("whereToBuy")?.screen, "/admin/builder/home", "ต้องชี้ไปที่บล็อกที่ซื้อสินค้า");
   assert.equal(ownerOfSection("hero")?.hideForm, true, "hero ย้ายไปหน้าจอสไลด์ (รอบ 251)");
 
-  const dead = ["products", "recipes", "news", "newsletter", "seo"];
+  const dead = ["whereToBuy", "products", "recipes", "news", "newsletter", "seo"];
   for (const key of dead) {
     assert.equal(ownerOfSection(key)?.dead, true, `${key}: ต้องถูกทำเครื่องหมายว่าเลิกใช้แล้ว`);
     assert.ok((ownerOfSection(key)?.screen ?? "").startsWith("/"), `${key}: ต้องชี้หน้าจอจริง (แหล่งใหม่)`);
@@ -538,23 +539,16 @@ test("★ content: ทุกส่วนของหน้าแรกถูก�
     assert.ok(decided, `ส่วน ${section.key}: ยังไม่ตัดสินใจว่าใครเป็นเจ้าของค่าจริง`);
   }
 
-  /* หน้าจอต้องซ่อนฟอร์มของส่วนที่เลิกใช้แล้ว/ย้ายที่ และแสดงป้ายจริง (ไม่ใช่แค่มีตรรกะ) */
-  const editor = readFileSync("features/admin/ui/home-editor.tsx", "utf8");
-  assert.ok(editor.includes("data-section-managed="), "ต้องมีป้าย 'แก้ที่อื่น' ในหน้าจอ");
-  assert.ok(editor.includes("data-dead-section={section.key}"), "ต้องมีป้าย 'เลิกใช้แล้ว' + ซ่อนฟอร์ม");
-  assert.ok(editor.includes("owner?.dead !== true"), "ส่วนที่เลิกใช้แล้วต้องไม่ถูกเรนเดอร์เป็นฟอร์ม");
-  assert.ok(editor.includes("data-section-code-layout="), "ต้องบอกว่าที่ซื้อสินค้ามีผลเฉพาะเลย์เอาต์โค้ด");
-  assert.ok(editor.includes("ownerOfSection(section.key)"), "ต้องใช้ทะเบียนกลาง");
-  assert.ok(editor.includes("strings.sectionManagedElsewhere"), "ข้อความต้องมาจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
-  assert.ok(editor.includes("strings.sectionDead"), "ข้อความ 'เลิกใช้แล้ว' ต้องมาจากพจนานุกรม");
-  assert.ok(editor.includes("strings.sectionCodeLayoutOnly"), "ข้อความ 'เฉพาะเลย์เอาต์โค้ด' ต้องมาจากพจนานุกรม");
+  /* รอบ 330: ถอดหน้าจอฟิลด์เดิม — เหลือ redirect + ไม่มีเมนู/การ์ด */
+  const page = stripComments(readFileSync("app/admin/content/home/page.tsx", "utf8"));
+  assert.ok(page.includes('requireAdminUser("content")'), "redirect ต้องตรวจสิทธิ์ก่อน");
+  assert.ok(page.includes('redirect("/admin/builder/home")'), "URL เดิมต้องพาไปตัวสร้าง");
+  assert.equal(page.includes("HomeEditor"), false, "ต้องไม่มีฟอร์มฟิลด์เดิม");
 
-  /* ⚠️ ค่าที่ซ่อนไว้ต้องยังถูกส่งกลับตอนบันทึก (ห้ามลบข้อมูลของผู้ใช้) */
-  assert.ok(editor.includes("toContent(draft)"), "ส่ง draft ทั้งก้อน ⇒ ค่าของส่วนที่ซ่อนอยู่ไม่หาย");
-
-  /* หน้าจอต้องบอกขอบเขตของตัวเอง (ข้อความเดิมเปลี่ยนจาก 'แก้ได้ทุกส่วน' → ขอบเขตจริง) */
-  const page = readFileSync("app/admin/content/home/page.tsx", "utf8");
-  assert.ok(page.includes("data-content-intro="), "ต้องมีคำอธิบายขอบเขตหน้าจอ");
+  const layout = readFileSync("app/admin/layout.tsx", "utf8");
+  assert.equal(layout.includes('href: "/admin/content/home"'), false, "ไม่มีเมนูเดิม");
+  const overview = readFileSync("app/admin/page.tsx", "utf8");
+  assert.equal(overview.includes('href="/admin/content/home"'), false, "ไม่มีลิงก์ในการ์ดภาพรวม");
 });
 
 /** ★ รอบที่ 230 (บั๊กจริงที่เจ้าของเจอ) — คลิกบล็อกในรายการแล้วต้องเลื่อนพรีวิวไปหา (คลิกซ้ำก็ต้องได้) */

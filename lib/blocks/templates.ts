@@ -18,7 +18,7 @@ import type { BlockDocument } from "@/lib/blocks/types";
  * กติกา
  * - เทมเพลตทุกตัว **ต้องผ่าน parser + validator** (มีเทสต์บังคับ — `scripts/test-templates.ts`)
  * - `page` ในเอกสารต้องตรงกับ id ของหน้าที่ขอ (กันเทมเพลตสลับหน้า)
- * - หน้าที่ไม่มีเทมเพลต = ยังใช้เลย์เอาต์ที่ออกแบบไว้ + หน้าจอเนื้อหาแบบฟิลด์เดิม (ไม่ใช่ข้อผิดพลาด)
+ * - หน้าที่ไม่มีเทมเพลต = ยังใช้เลย์เอาต์ที่ออกแบบไว้ + เนื้อหาจากตัวนำเข้า/จอเฉพาะของส่วนนั้น (ไม่ใช่ข้อผิดพลาด)
  */
 
 /** หน้าเมนูหลักที่มีเทมเพลต (รอบที่ 266: 8 หน้า — ตัด careers ออก) */
@@ -245,8 +245,8 @@ export function blockCoverageGaps(page: string): readonly BlockCoveragePartId[] 
  *    แต่ตารางนี้พร้อมใช้ทันทีที่มีช่องว่างใหม่ และเทสต์กันการใส่ค่าที่กดแล้วเงียบ
  */
 export const BLOCK_COVERAGE_PART_TARGETS: Readonly<Record<BlockCoveragePartId, string>> = {
-  /* เจ้าของคือหน้าจอเนื้อหาหน้าแรก (ไม่ใช่บล็อก) — ดูเหตุผลใน `COVERAGE`/`BLOCK_COVERAGE_PART_IDS` */
-  whereToBuy: "/admin/content/home",
+  /* "ที่ซื้อสินค้า" = ชนิดบล็อก ⇒ ปลายทางคือแผงเพิ่มบล็อก (หน้าจอฟิลด์เดิมถูกถอดรอบ 330) */
+  whereToBuy: "#builder-add-type",
   /* ส่วนที่เกิดจาก "ชนิดบล็อก" ⇒ ปลายทางคือแผงเพิ่มบล็อกในตัวสร้าง (เลือกชนิดที่ขาดจากรายการ) */
   gallery: "#builder-add-type",
   lightbox: "#builder-add-type",

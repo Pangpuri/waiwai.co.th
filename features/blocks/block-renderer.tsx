@@ -732,7 +732,7 @@ function BlockView({
           · **การ์ดกรอบเหลืองแบรนด์** (`bg-brand-yellow` + `text-accent-on-yellow`) ตามดีไซน์เดิม
             ⇒ ถ้าไม่มี จะเหลือแค่ปุ่มลอยบนพื้นจาง ๆ (เจ้าของทักว่า "กรอบสีเหลืองหายไป")
         */
-        const market = marketplaceLinksView(language);
+        const market = marketplaceLinksView(block, language);
         if (market.isEmpty) return null;
         return (
           <div className={container}>
@@ -741,6 +741,9 @@ function BlockView({
               className="bg-brand-yellow text-accent-on-yellow scroll-mt-40 rounded-3xl px-6 py-12 sm:px-10 lg:px-14 lg:py-16"
             >
               <div className={`flex flex-col gap-2 ${align}`}>
+                {market.eyebrow === "" ? null : (
+                  <p className="text-accent-on-yellow/80 text-xs font-bold tracking-[0.18em] uppercase">{market.eyebrow}</p>
+                )}
                 {block.heading[language].trim() === "" ? null : (
                   <h2 className={`font-bold ${headingSizeClass(block.style)}`}>{block.heading[language]}</h2>
                 )}

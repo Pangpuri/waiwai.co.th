@@ -153,7 +153,8 @@ export const PROBE_TARGETS: readonly ProbeTarget[] = [
   { url: "/admin/hero?tab=campaigns", admin: true, expect: [200], group: "admin" },
   { url: "/admin/hero?tab=nope", admin: true, expect: [200], group: "admin" },
   { url: "/admin/hero?tab=trash", admin: true, expect: [200], group: "admin" },
-  { url: "/admin/content/home", admin: true, expect: [200], group: "admin" },
+  /* รอบ 330: หน้าจอฟิลด์เดิมถูกถอด — URL เดิมเหลือ redirect ไปตัวสร้าง */
+  { url: "/admin/content/home", admin: true, expect: [307], group: "admin" },
   { url: "/admin/builder/home", admin: true, expect: [200], must: ["เทมเพลตนี้ครอบคลุมทุกส่วนของหน้านี้", 'id="builder-add-type"'], group: "admin" },
   { url: "/admin/builder/about", admin: true, expect: [200], group: "admin" },
   { url: "/admin/builder/contact", admin: true, expect: [200], group: "admin" },

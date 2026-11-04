@@ -18,6 +18,7 @@ import {
   MAX_COLUMNS,
   GALLERY_IMAGE_SHAPES,
   MAX_GALLERY_ITEMS,
+  MAX_MARKETPLACE_LINKS,
   MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
@@ -43,6 +44,7 @@ import {
   type BlockStyle,
   type BlockTableRow,
   type HeroSlideItem,
+  type MarketplaceLinkItem,
   type PageLayout,
   type RecipeCardItem,
   type RosterMember,
@@ -463,6 +465,48 @@ function readRecipeItems(entry: Record<string, unknown>, path: string, problems:
   return items;
 }
 
+/** อ่านรายการช่องทางจำหน่ายของบล็อก "ที่ซื้อสินค้า" — ไม่ระบุ = ใช้ค่าเริ่มต้นจาก SITE */
+function readMarketplaceItems(
+  entry: Record<string, unknown>,
+  path: string,
+  problems: string[],
+): readonly MarketplaceLinkItem[] {
+  const value = entry["items"];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${path}.items: ต้องเป็นรายการ`);
+    return [];
+  }
+  if (value.length > MAX_MARKETPLACE_LINKS) {
+    problems.push(`${path}.items: เกินที่อนุญาต (${value.length} > ${MAX_MARKETPLACE_LINKS}) — ตัดส่วนเกินทิ้ง`);
+  }
+
+  const seen = new Set<string>();
+  const items: MarketplaceLinkItem[] = [];
+  value.slice(0, MAX_MARKETPLACE_LINKS).forEach((raw, index) => {
+    const itemPath = `${path}.items[${index}]`;
+    if (!isRecord(raw)) {
+      problems.push(`${itemPath}: ต้องเป็นออบเจ็กต์`);
+      return;
+    }
+
+    let id = readString(raw, "id", `${itemPath}.id`, problems);
+    if (id === "" || seen.has(id)) {
+      if (id !== "") problems.push(`${itemPath}.id: ซ้ำกับช่องทางก่อนหน้า — สร้างรหัสใหม่ให้`);
+      id = nextPrefixedId("shop", seen);
+    }
+    seen.add(id);
+
+    items.push({
+      id,
+      label: toText(raw["label"], `${itemPath}.label`, problems),
+      href: readString(raw, "href", `${itemPath}.href`, problems),
+    });
+  });
+
+  return items;
+}
+
 /** จำนวนคอลัมน์ของเมนูอาหาร (1 | 2 | 3) — การ์ดเมนูมีส่วนผสม/วิธีทำ จึงไม่ควรเกิน 3 คอลัมน์ */
 function readRecipeColumns(container: Record<string, unknown>, path: string, problems: string[]): 1 | 2 | 3 {
   const value = readIntChoice(container, "columns", [1, 2, 3], 2, path, problems);
@@ -784,8 +828,11 @@ function readBlock(entry: unknown, path: string, problems: string[], context: Pa
       return {
         ...base,
         type: "marketplaceLinks",
+        eyebrow: readText(entry, "eyebrow", `${path}.eyebrow`, problems),
         heading: readText(entry, "heading", `${path}.heading`, problems),
         body: readText(entry, "body", `${path}.body`, problems),
+        retailNote: readText(entry, "retailNote", `${path}.retailNote`, problems),
+        items: readMarketplaceItems(entry, path, problems),
       };
     case "row":
       return { ...base, type: "row", columns: readRowColumns(entry, path, problems, context) };

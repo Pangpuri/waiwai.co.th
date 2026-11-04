@@ -20,7 +20,7 @@ export const adminTemplate = {
     "Builds the content from this page's “template in code” — it is not a copy of the published page, so it may differ from the live site. Edit freely afterwards; your chosen layout is kept.",
   startFromTemplateSourceNote:
     "To go back to content that was published before, use “Publish history” below — this button creates a fresh set from the template; it does not restore the old one.",
-  templateMissingBody: "This page has no block template yet — keep editing it with the field-based content screen for now.",
+  templateMissingBody: "This page has no block template yet — its content comes from an importer or the screen dedicated to that section.",
   /* Round 260: pages built by an importer have no "start from template" button on purpose */
   importedContentTitle: "This page is built by an importer (no starting template)",
   importedContentBody:

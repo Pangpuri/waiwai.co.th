@@ -99,5 +99,4 @@ export const adminHero = {
   textsFields: "ช่องที่ต้องแก้: {fields}",
   textsLabelTh: "ไทย",
   textsLabelEn: "อังกฤษ (เว้นว่างได้)",
-  textsMoveHint: "ย้ายไปแก้ที่หน้าจอ \"สไลด์ แคมเปญ ข้อความหัวเว็บไซต์\" แล้ว",
 };

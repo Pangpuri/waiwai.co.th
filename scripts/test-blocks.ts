@@ -6,15 +6,31 @@ import { fileURLToPath } from "node:url";
 
 import { codeOf } from "./source-scan.ts";
 
-import { addCard, insertPresetBlock, moveBlockTo, moveCardTo, replaceBlockWithPreset, setBlockVisibility, setCardText } from "@/lib/blocks/edit";
+import {
+  addCard,
+  addMarketplaceLink,
+  canAddMarketplaceLink,
+  insertPresetBlock,
+  moveBlockTo,
+  moveCardTo,
+  removeMarketplaceLink,
+  replaceBlockWithPreset,
+  seedMarketplaceItems,
+  setBlockVisibility,
+  setCardText,
+  setMarketplaceLinkHref,
+  setMarketplaceLinkLabel,
+} from "@/lib/blocks/edit";
 import { parseBlockDocument } from "@/lib/blocks/parse";
 import { normalizePresetName } from "@/lib/blocks/presets";
+import { SITE } from "@/lib/site";
 import { STYLE_CHOICES, alignClass, containerClass, headingClass, heroHeightClass, shellClass } from "@/lib/blocks/style";
 import {
   BLOCK_CATALOG,
   BLOCK_TYPES,
   DEFAULT_BLOCK_STYLE,
   MAX_BLOCKS_PER_PAGE,
+  MAX_MARKETPLACE_LINKS,
   createBlock,
   hiddenSizesOf,
   isSafeHref,
@@ -297,6 +313,98 @@ test("parse: จำนวนบล็อกเกินเพดานถูก�
   assert.equal(outcome.ok, false);
   assert.ok(!outcome.ok);
   assert.ok(outcome.problems.some((problem) => problem.includes("เกินที่อนุญาต")));
+});
+
+
+/* ── บล็อก "ที่ซื้อสินค้า": รายการลิงก์ที่แก้ได้ (รอบ 329) ───────────────────── */
+
+test("blocks: marketplaceLinks — เอกสารเก่าไม่มี items ได้ค่าเริ่มต้น และแก้/เพิ่ม/ลบรายการได้", () => {
+  /* ข้อมูลเก่า (ก่อนรอบ 329) ไม่มี eyebrow/retailNote/items ⇒ ต้อง parse ผ่าน */
+  const legacy = parseBlockDocument("home", {
+    blocks: [
+      {
+        id: "m1",
+        type: "marketplaceLinks",
+        heading: { th: "หาซื้อได้ที่ไหน", en: "" },
+        body: { th: "", en: "" },
+      },
+    ],
+  });
+  assert.equal(legacy.ok, true);
+  if (legacy.ok) {
+    const block = legacy.document.blocks[0];
+    assert.equal(block?.type, "marketplaceLinks");
+    if (block?.type === "marketplaceLinks") {
+      assert.deepEqual(block.items, [], "ไม่มี items = ใช้ค่าเริ่มต้นจาก SITE");
+      assert.deepEqual(block.eyebrow, { th: "", en: "" });
+      assert.deepEqual(block.retailNote, { th: "", en: "" });
+    }
+  }
+
+  let doc = docOf([createBlock("marketplaceLinks", "m1")]);
+  assert.equal(canAddMarketplaceLink(doc, "m1"), true);
+  doc = addMarketplaceLink(doc, "m1");
+  doc = setMarketplaceLinkLabel(doc, "m1", 0, "th", "ร้านทดสอบ");
+  doc = setMarketplaceLinkLabel(doc, "m1", 0, "en", "Test shop");
+  doc = setMarketplaceLinkHref(doc, "m1", 0, "https://example.test/shop");
+
+  const parsed = parseBlockDocument("home", JSON.parse(JSON.stringify(doc)));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    const block = parsed.document.blocks[0];
+    if (block?.type === "marketplaceLinks") {
+      assert.deepEqual(block.items, [
+        { id: "shop-1", label: { th: "ร้านทดสอบ", en: "Test shop" }, href: "https://example.test/shop" },
+      ]);
+    }
+  }
+
+  doc = removeMarketplaceLink(doc, "m1", 0);
+  const empty = doc.blocks[0];
+  assert.ok(empty?.type === "marketplaceLinks" && empty.items.length === 0);
+
+  for (let index = 0; index < MAX_MARKETPLACE_LINKS; index += 1) doc = addMarketplaceLink(doc, "m1");
+  assert.equal(canAddMarketplaceLink(doc, "m1"), false, "เพิ่มได้ไม่เกินเพดาน");
+});
+
+test("blocks: marketplaceLinks — รายการที่ไม่มีชื่อ/ลิงก์อันตรายถูกจับตอนเผยแพร่", () => {
+  const base = createBlock("marketplaceLinks", "m1");
+  assert.equal(base.type, "marketplaceLinks");
+  if (base.type !== "marketplaceLinks") return;
+
+  const badDocument: BlockDocument = {
+    page: "home",
+    blocks: [
+      {
+        ...base,
+        items: [{ id: "shop-1", label: { th: "", en: "" }, href: "javascript:alert(1)" }],
+      },
+    ],
+  };
+  const errors = documentErrorsOf(validateDocument(badDocument));
+  assert.ok(errors.some((issue) => issue.code === "empty-th" && issue.path.includes("items[0].label")));
+  assert.ok(errors.some((issue) => issue.code === "bad-href" && issue.path.includes("items[0].href")));
+});
+
+test("blocks: marketplaceLinks — เติมรายการเริ่มต้นแล้วแก้ลิงก์ได้ และไม่ทับรายการที่แก้แล้ว", () => {
+  let doc = docOf([createBlock("marketplaceLinks", "m1")]);
+  doc = seedMarketplaceItems(doc, "m1");
+
+  const seeded = doc.blocks[0];
+  assert.ok(seeded?.type === "marketplaceLinks");
+  if (seeded?.type === "marketplaceLinks") {
+    assert.equal(seeded.items.length, SITE.marketplaces.length);
+    assert.equal(seeded.items[0]?.href, SITE.marketplaces[0]?.href);
+    assert.equal(seeded.items[0]?.label.th, "Shopee");
+    assert.equal(seeded.items[0]?.label.en, "Shopee");
+  }
+
+  doc = setMarketplaceLinkHref(doc, "m1", 0, "https://shopee.co.th/new-shop");
+  const edited = doc.blocks[0];
+  assert.ok(edited?.type === "marketplaceLinks" && edited.items[0]?.href === "https://shopee.co.th/new-shop");
+
+  const again = seedMarketplaceItems(doc, "m1");
+  assert.equal(again, doc, "มีรายการอยู่แล้ว = ไม่แตะ/ไม่สร้าง state ใหม่");
 });
 
 

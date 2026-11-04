@@ -52,7 +52,7 @@ type HeroCardProps = {
   readonly href: string;
   readonly labels: HeroCardLabels;
   /**
-   * ภาพการ์ด (รอบที่ 200) — หลังบ้านตั้งได้ที่ `/admin/content/home` → "การ์ดประกาศมุมขวาล่าง"
+   * ภาพการ์ด (รอบที่ 200) — หลังบ้านตั้งได้ที่ `/admin/hero` → "การ์ดประกาศมุมขวาล่าง"
    * ไม่ส่งมา = ใช้ค่าคงที่ในโค้ด (`HERO_CARD_IMAGE`) เหมือนเดิมเป๊ะ
    */
   readonly image?: { readonly src: string; readonly alt: string };

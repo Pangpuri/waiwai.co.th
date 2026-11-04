@@ -97,15 +97,19 @@ export function buildHomeTemplate(): BlockDocument {
     },
     {
       /*
-        บล็อกไดนามิก "ที่ซื้อสินค้า" (รอบที่ 229) — ปุ่มร้านจริงจาก `SITE.marketplaces` + หมายเหตุร้านค้า
-        ⇒ เจ้าของส่วนนี้ย้ายมาเป็นตัวสร้างหน้าเว็บ (หน้าจอเนื้อหาจะขึ้นป้ายบอกว่าค่าจริงมาจากที่นี่)
+        บล็อกไดนามิก "ที่ซื้อสินค้า" (รอบที่ 229 · รอบ 329) — ข้อความและปุ่มร้านแก้ได้ในบล็อก
+        · `items` ว่าง = ใช้ลิงก์เริ่มต้นจาก `SITE.marketplaces` + ป้ายจากพจนานุกรม (พฤติกรรมเดิม)
+        · เจ้าของแก้ข้อความ/ปุ่มได้ที่แผงบล็อกนี้ที่เดียว (หน้าจอเนื้อหาเดิมเลิกแสดงฟอร์มส่วนนี้)
       */
       id: "block-5",
       version: BLOCK_SCHEMA_VERSION,
       type: "marketplaceLinks",
       style: style({ background: "subtle" }),
+      eyebrow: { th: th.whereToBuy.eyebrow, en: en.whereToBuy.eyebrow },
       heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },
       body: { th: th.whereToBuy.body, en: en.whereToBuy.body },
+      retailNote: { th: th.whereToBuy.retailNote, en: en.whereToBuy.retailNote },
+      items: [],
     },
   ];
 

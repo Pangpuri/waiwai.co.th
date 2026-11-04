@@ -147,7 +147,7 @@ test("home-hero: ตัวสร้างต้องแสดงแถว hero 
   const builder = codeOf("features/admin/ui/block-builder.tsx");
   assert.ok(builder.includes('data-hero-row=""'), "มีแถว hero ในตัวสร้าง");
   assert.ok(builder.includes('href="/admin/hero"'), "ลิงก์ไปหน้าจอสไลด์");
-  assert.ok(builder.includes('href="/admin/content/home"'), "ลิงก์ไปหน้าจอข้อความ");
+  assert.ok(builder.includes('href="/admin/hero#hero-texts"'), "ลิงก์ไปฟอร์มข้อความในหน้าจอสไลด์");
   assert.ok(builder.includes("strings.builderHeroRowTitle"), "ข้อความจากพจนานุกรม (ห้ามพิมพ์ไทยใน .tsx)");
   assert.ok(builder.includes("strings.builderHeroRowHint"), "ต้องอธิบายว่าทำไมไม่ใช่บล็อก");
   /* แถวนี้ต้องไม่ลาก/ไม่เลือกได้ (ไม่ใช่บล็อกจริง) */

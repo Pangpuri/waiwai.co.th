@@ -81,7 +81,7 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   },
   nextStepTitle: "What comes next",
   nextStepBody:
-    "Sign-in works. The home page editor arrives in the next phase (it needs the database connection first).",
+    "Start with “Edit home page” (the block builder) — the home page's text and buttons are edited in one place.",
   openSite: "Open the public site",
   securityNote:
     "Never share this password. If you think it has leaked, generate a new one with the setup script immediately.",
@@ -89,27 +89,6 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   setupBody: "Run this command locally to create an admin account, then paste the values into .env.local.",
   setupCommand: "npm run admin:create -- --email=you@waiwai.co.th",
 
-  contentTitle: "Edit the home page",
-  /* Round 252: state the real scope — only sections owned here are editable */
-  contentIntro:
-    "This screen only really edits the \"Where to buy\" section (it applies while the home page uses the code layout) — every other section has its own owner; see the labels below · stored values are kept, nothing is deleted",
-  backToOverview: "Back to overview",
-  save: "Save",
-  saving: "Saving…",
-  savedOk: "Saved · {written} rows written · {deleted} rows deleted",
-  savedWithWarnings: "Saved ({count} warnings — they do not block saving)",
-  errorTitle: "Fix these before saving",
-  warningTitle: "Warnings (saving is allowed)",
-  warningCount: "{count} warnings",
-  itemsHeading: "Items",
-  addItem: "Add item",
-  removeItem: "Remove this item",
-  itemNumber: "Item {n}",
-  maxItemsHint: "Up to {n} items",
-  fieldTh: "Thai",
-  fieldEnOptional: "English (optional)",
-  imageHint: "Drag an image into the box — that is all it takes.",
-  imagePathLabel: "File path",
   /* Hero slides & campaigns (round 184) */
   blockImageLabel: "Image for this block",
   /* "Big image" block (round 259) — full width, never cropped */
@@ -132,12 +111,12 @@ export const admin: Omit<Messages["admin"], MovedKeys> = {
   imageAltThLabel: "Alt text (Thai)",
   imageAltEnLabel: "Alt text (English)",
   imageWatermarkLabel: "This image carries a watermark",
-  emptyTitle: "No content in the database yet",
-  emptyBody: "Use the button below to import the starting copy (from the original dictionaries), then you can edit it.",
-  importSeed: "Import starting copy",
-  importing: "Importing…",
-  dbMissingTitle: "Database is not configured",
-  dbMissingBody: "The admin area needs DATABASE_URL, then db/schema.sql and npm run db:seed (see AGENTS.md).",
+  imagePathLabel: "File path",
+  /* Shared with other screens (page builder / image form) — not from the retired field screen */
+  save: "Save",
+  errorTitle: "Fix these before saving",
+  warningTitle: "Warnings (saving is allowed)",
+  warningCount: "{count} warnings",
   builderTitle: "Build the page",
   builderIntro: "Add, remove and reorder blocks freely. Pick looks from the brand presets. Preview 1:1 before publishing.",
   builderBack: "Back to overview",

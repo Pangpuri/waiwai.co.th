@@ -281,6 +281,27 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
       });
       return;
 
+    case "marketplaceLinks":
+      /*
+        บล็อก "ที่ซื้อสินค้า" — ข้อความและปุ่มลิงก์แก้ได้ในบล็อก (รอบ 329)
+        · heading/body/eyebrow/retailNote ไม่บังคับ (ว่าง = ไม่แสดง/ใช้ค่าเริ่มต้น)
+        · รายการที่เพิ่มแล้วต้องมีชื่อไทย + ลิงก์ที่ปลอดภัยก่อนเผยแพร่
+        · รายการที่ไม่มีลิงก์ = คำเตือน (ตัวเรนเดอร์ข้ามปุ่มนั้น)
+      */
+      checkText(block.eyebrow, `${path}.eyebrow`, { required: false, englishRequired: false }, issues);
+      checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
+      checkText(block.body, `${path}.body`, { required: false, englishRequired: false }, issues);
+      checkText(block.retailNote, `${path}.retailNote`, { required: false, englishRequired: false }, issues);
+      block.items.forEach((item, index) => {
+        const itemPath = `${path}.items[${index}]`;
+        checkText(item.label, `${itemPath}.label`, { required: true, englishRequired: false }, issues);
+        checkHref(item.href, `${itemPath}.href`, issues);
+        if (item.href.trim() === "") {
+          issues.push(issue("warning", "marketplace-link-without-href", `${itemPath}.href`, "ปุ่มนี้ยังไม่มีลิงก์ — จะไม่แสดงบนหน้าเว็บ"));
+        }
+      });
+      return;
+
     case "row": {
       /* แถว: ตรวจโครงคอลัมน์ (ตัวบล็อกลูกถูกเดินตรวจด้านล่างผ่าน walkBlocks) */
       if (block.columns.length === 0) {

@@ -8,6 +8,7 @@ import {
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
   MAX_HERO_SLIDES,
+  MAX_MARKETPLACE_LINKS,
   MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
@@ -37,6 +38,7 @@ import {
   type HeroSlideItem,
   type PageLayout,
 } from "@/lib/blocks/types";
+import { defaultMarketplaceItems } from "@/lib/blocks/marketplace-links";
 import { clampRecipeShowcaseOptions, type RecipeShowcaseOptions } from "@/lib/blocks/recipe-showcase";
 import { clampNewsShowcaseOptions, type NewsShowcaseOptions } from "@/lib/blocks/news-showcase";
 import { clampShowcaseOptions, type ProductShowcaseOptions } from "@/lib/blocks/product-showcase";
@@ -1051,6 +1053,75 @@ export function setRosterMemberImage(
     const base = member.image ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
     const merged = { ...base, ...patch };
     member.image = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/* ── บล็อก "ที่ซื้อสินค้า" — ปุ่มลิงก์ที่แก้ได้ในบล็อก (รอบ 329) ───────────── */
+
+export function canAddMarketplaceLink(document: BlockDocument, id: string): boolean {
+  const location = findBlockLocation(document, id);
+  if (location === null) return false;
+  const block = blockAt(document, location);
+  return block !== null && block.type === "marketplaceLinks" && block.items.length < MAX_MARKETPLACE_LINKS;
+}
+
+/** เพิ่มช่องทางว่าง (ยังไม่มีชื่อ/ลิงก์ — validator จะบังคับชื่อไทยก่อนเผยแพร่) */
+export function addMarketplaceLink(document: BlockDocument, id: string): BlockDocument {
+  if (!canAddMarketplaceLink(document, id)) return document;
+  return withBlock(document, id, (block) => {
+    if (block.type !== "marketplaceLinks") return;
+    const used = new Set(block.items.map((item) => item.id));
+    block.items.push({ id: nextPrefixedId("shop", used), label: emptyText(), href: "" });
+  });
+}
+
+/**
+ * เติมรายการเริ่มต้น (Shopee · Lazada · LINE Shop) ให้บล็อกที่ยังว่าง
+ * ⇒ เจ้าของแก้ลิงก์ทีละปุ่มได้โดยไม่ต้องคีย์ชื่อร้านใหม่ · มีรายการอยู่แล้ว = ไม่แตะ
+ */
+export function seedMarketplaceItems(document: BlockDocument, id: string): BlockDocument {
+  const location = findBlockLocation(document, id);
+  const block = location === null ? null : blockAt(document, location);
+  if (block === null || block.type !== "marketplaceLinks" || block.items.length > 0) return document;
+
+  return withBlock(document, id, (target) => {
+    if (target.type !== "marketplaceLinks") return;
+    target.items = defaultMarketplaceItems().map((item) => ({ ...item, label: { ...item.label } }));
+  });
+}
+
+export function removeMarketplaceLink(document: BlockDocument, id: string, index: number): BlockDocument {
+  const location = findBlockLocation(document, id);
+  const block = location === null ? null : blockAt(document, location);
+  if (block === null || block.type !== "marketplaceLinks" || index < 0 || index >= block.items.length) return document;
+
+  return withBlock(document, id, (target) => {
+    if (target.type !== "marketplaceLinks") return;
+    target.items.splice(index, 1);
+  });
+}
+
+export function setMarketplaceLinkLabel(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  language: BlockLanguage,
+  value: string,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "marketplaceLinks") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item.label[language] = value;
+  });
+}
+
+export function setMarketplaceLinkHref(document: BlockDocument, id: string, index: number, value: string): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "marketplaceLinks") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item.href = value;
   });
 }
 

@@ -47,12 +47,14 @@ import {
   addColumn,
   addGalleryItem,
   addHeroSlide,
+  addMarketplaceLink,
   addRecipeItem,
   addRosterMember,
   addTableColumn,
   addTableRow,
   canAddCard,
   canAddGalleryItem,
+  canAddMarketplaceLink,
   moveHeroSlide,
   removeHeroSlide,
   setHeroSlideFocus,
@@ -78,11 +80,13 @@ import {
   removeCard,
   removeColumn,
   removeGalleryItem,
+  removeMarketplaceLink,
   removeRecipeItem,
   removeRosterMember,
   removeTableColumn,
   removeTableRow,
   replaceBlockWithPreset,
+  seedMarketplaceItems,
   setBlockChoice,
   setBlockImage,
   setBlockString,
@@ -95,6 +99,8 @@ import {
   setColumnWidth,
   setGalleryItemCaption,
   setGalleryItemImage,
+  setMarketplaceLinkHref,
+  setMarketplaceLinkLabel,
   setProductShowcaseOptions,
   setRecipeShowcaseOptions,
   setNewsShowcaseOptions,
@@ -120,6 +126,7 @@ import {
   MAX_CARDS,
   MAX_COLUMNS,
   MAX_GALLERY_ITEMS,
+  MAX_MARKETPLACE_LINKS,
   MAX_RECIPE_ITEMS,
   MAX_ROSTER_MEMBERS,
   MAX_TABLE_COLUMNS,
@@ -1475,11 +1482,89 @@ export function BlockBuilder({
             </>
           );
         case "marketplaceLinks":
-          /* บล็อก "ที่ซื้อสินค้า" (รอบที่ 229) — ปุ่มร้านมาจากค่าคงที่ของโปรเจกต์ ⇒ แก้แค่หัวข้อ/คำโปรย */
+          /*
+            บล็อก "ที่ซื้อสินค้า" (รอบ 229 · รอบ 329) — ข้อความและ **ปุ่มลิงก์ร้าน** แก้ได้ในบล็อกนี้
+            · `items` ว่าง = ใช้ลิงก์เริ่มต้นจาก SITE (Shopee/Lazada/LINE Shop) + ข้อความจากพจนานุกรม
+            · เพิ่ม/ลบ/แก้ชื่อ–ลิงก์ได้ที่นี่ (เป็นแหล่งเดียวของส่วนนี้)
+          */
           return (
             <>
-              <TextPair idBase={`${base}-heading`} label="heading" value={block.heading} onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))} />
-              <TextPair idBase={`${base}-body`} label={`body (${strings.optionalHint})`} value={block.body} onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))} />
+              <TextPair
+                idBase={`${base}-eyebrow`}
+                label={`${strings.blockMarketplaceEyebrow} (${strings.optionalHint})`}
+                value={block.eyebrow}
+                onChange={(language, next) => update(setBlockText(document, block.id, "eyebrow", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-heading`}
+                label="heading"
+                value={block.heading}
+                onChange={(language, next) => update(setBlockText(document, block.id, "heading", language, next))}
+              />
+              <TextPair
+                idBase={`${base}-body`}
+                label={`body (${strings.optionalHint})`}
+                value={block.body}
+                onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
+              />
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-fg-muted text-xs font-semibold">
+                    {fillTemplate(strings.blockMarketplaceLinks, { n: block.items.length, max: MAX_MARKETPLACE_LINKS })}
+                  </p>
+                  <TinyButton
+                    label={strings.blockAddMarketplaceLink}
+                    disabled={!canAddMarketplaceLink(document, block.id)}
+                    onClick={() => update(addMarketplaceLink(document, block.id))}
+                  />
+                </div>
+
+                {block.items.length === 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-fg-muted text-xs">{strings.blockMarketplaceFallbackHint}</p>
+                    <TinyButton
+                      label={strings.blockUseDefaultMarketplaceLinks}
+                      onClick={() => update(seedMarketplaceItems(document, block.id))}
+                    />
+                  </div>
+                ) : null}
+
+                {block.items.map((item, index) => (
+                  <div key={item.id} className="border-line flex flex-col gap-1.5 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-fg-muted text-xs font-semibold">
+                        {fillTemplate(strings.blockMarketplaceLinkNumber, { n: index + 1 })}
+                      </p>
+                      <TinyButton
+                        label={strings.blockRemoveMarketplaceLink}
+                        onClick={() => update(removeMarketplaceLink(document, block.id, index))}
+                      />
+                    </div>
+                    <TextPair
+                      idBase={`${base}-market-${index}-label`}
+                      label={strings.blockMarketplaceLinkLabel}
+                      value={item.label}
+                      onChange={(language, next) =>
+                        update(setMarketplaceLinkLabel(document, block.id, index, language, next))
+                      }
+                    />
+                    <SingleField
+                      idBase={`${base}-market-${index}-href`}
+                      label={strings.blockMarketplaceLinkHref}
+                      value={item.href}
+                      onChange={(next) => update(setMarketplaceLinkHref(document, block.id, index, next))}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <TextPair
+                idBase={`${base}-retail-note`}
+                label={`${strings.blockMarketplaceRetailNote} (${strings.optionalHint})`}
+                value={block.retailNote}
+                onChange={(language, next) => update(setBlockText(document, block.id, "retailNote", language, next))}
+              />
               <p className="text-fg-muted text-xs">{strings.blockMarketplaceHint}</p>
             </>
           );
@@ -2471,7 +2556,7 @@ export function BlockBuilder({
                 {strings.builderHeroEditSlides}
               </Link>
               <Link
-                href="/admin/content/home"
+                href="/admin/hero#hero-texts"
                 className="border-line-strong text-fg hover:bg-bg-subtle focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
                 data-hero-link="texts"
               >

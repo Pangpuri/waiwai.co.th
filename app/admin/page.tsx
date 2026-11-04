@@ -160,12 +160,6 @@ export default async function AdminHomePage() {
             {strings.mourningTitle}
           </Link>
           <Link
-            href="/admin/content/home"
-            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-          >
-            {strings.contentTitle}
-          </Link>
-          <Link
             href="/th"
             className="text-link focus-visible:ring-ring w-fit text-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
           >

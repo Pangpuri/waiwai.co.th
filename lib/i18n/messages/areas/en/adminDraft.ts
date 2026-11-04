@@ -8,7 +8,6 @@ import type { Messages } from "@/lib/i18n/messages/th";
 import type { adminDraft as thAdminDraft } from "@/lib/i18n/messages/areas/th/adminDraft";
 
 export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
-  sectionManagedElsewhere: "The live site shows this from another system (owner: {screen}) — values typed here are not shown yet. Do not edit in two places",
   draftAutosaveOn: "Autosave: on",
   draftAutosaveOff: "Autosave: off",
   draftAutosaveHint: "Saved automatically {seconds} seconds after you stop editing — no need to save manually.",
@@ -39,10 +38,6 @@ export const adminDraft: Pick<Messages["admin"], keyof typeof thAdminDraft> = {
   /* Page-level change (X1.8): the layout is not tied to any block, so it has its own label */
   draftDiffLayout: "Page layout",
   draftRestoredApplied: "Restored — what is on screen was replaced by the restored revision (not live yet)",
-  /* ── Round 252: retired sections / code-layout-only sections ── */
-  sectionDead: "This section is no longer used — the site does not read these values (real source: {screen}) · nothing to edit here, the stored values are kept intact.",
-  sectionCodeLayoutOnly:
-    "Values here apply **only while the home page uses the code layout** — once the page runs on blocks (page builder), the marketplace block decides instead.",
   /* ── Round 323: optimistic concurrency + undo delete + block empty publish ── */
   draftConflictTitle: "This page was changed elsewhere",
   draftConflictHint:

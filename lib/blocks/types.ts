@@ -465,11 +465,23 @@ export type NewsShowcaseBlock = BlockBase & {
   readonly ctaHref: string;
 };
 
-/** บล็อก "ที่ซื้อสินค้า" (ไดนามิกจากค่าคงที่ของโปรเจกต์) — รอบที่ 229 */
+/** บล็อก "ที่ซื้อสินค้า" (ไดนามิก) — รอบที่ 229 · รอบ 329 เพิ่มรายการลิงก์ที่แก้ได้ในบล็อก */
+export type MarketplaceLinkItem = {
+  readonly id: string;
+  readonly label: LocalizedValue;
+  readonly href: string;
+};
+
 export type MarketplaceLinksBlock = BlockBase & {
   readonly type: "marketplaceLinks";
+  /** ข้อความเล็กเหนือหัวข้อ (ย้ายมาจากหน้าจอเนื้อหาหน้าแรกเดิม) — ว่างได้ */
+  readonly eyebrow: LocalizedValue;
   readonly heading: LocalizedValue;
   readonly body: LocalizedValue;
+  /** หมายเหตุร้านค้าปลีก — ว่าง = ค่าเริ่มต้นจากพจนานุกรม */
+  readonly retailNote: LocalizedValue;
+  /** รายการช่องทางที่แก้ได้ — ว่าง = ค่าเริ่มต้นจาก `SITE.marketplaces` */
+  readonly items: readonly MarketplaceLinkItem[];
 };
 
 export type RecipeCardsBlock = BlockBase & {
@@ -582,7 +594,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox) · เลือกสัดส่วนช่องภาพได้ (ภาพถ่าย/เอกสาร)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
-  { type: "marketplaceLinks", label: "ที่ซื้อสินค้า", hint: "ปุ่มช่องทางจำหน่ายจริง (Shopee · Lazada · LINE Shop) + หมายเหตุร้านค้า" },
+  { type: "marketplaceLinks", label: "ที่ซื้อสินค้า", hint: "ข้อความ + ปุ่มช่องทางจำหน่ายที่แก้ได้ในบล็อก (เว้นว่าง = ใช้ลิงก์เริ่มต้น Shopee · Lazada · LINE Shop)" },
   { type: "newsShowcase", label: "ข่าวล่าสุด", hint: "ดึงข่าว/กิจกรรมล่าสุดจากฐานข้อมูล (ภาพ/วันที่/คำโปรย) — เลือกจำนวนได้" },
   { type: "recipeShowcase", label: "เมนูล่าสุด", hint: "ดึงเมนูล่าสุดจากฐานข้อมูล (ภาพ/ชื่อ/วันที่) — เลือกจำนวนได้" },
   {
@@ -627,6 +639,8 @@ export const MAX_JOB_ITEMS = 60;
 export const MAX_ROSTER_MEMBERS = 24;
 /** จำนวนเมนูสูงสุดในบล็อก "เมนูอาหาร" (เทศกาลหนึ่งไม่ควรมีเกินนี้) */
 export const MAX_RECIPE_ITEMS = 24;
+/** จำนวนช่องทางจำหน่ายสูงสุดในบล็อก "ที่ซื้อสินค้า" (เดิม EAV ใช้เพดาน 12) */
+export const MAX_MARKETPLACE_LINKS = 12;
 
 export function emptyText(): LocalizedValue {
   return { th: "", en: "" };
@@ -698,7 +712,15 @@ export function createBlock(type: BlockType, id: string): Block {
       /* เริ่มด้วย 2 คอลัมน์ + รายการว่าง (ผู้ใช้กด "เพิ่มเมนู" หรือเริ่มจากเทมเพลต) */
       return { ...base, type: "recipeCards", heading: emptyText(), body: emptyText(), columns: 2, items: [] };
     case "marketplaceLinks":
-      return { ...base, type: "marketplaceLinks", heading: emptyText(), body: emptyText() };
+      return {
+        ...base,
+        type: "marketplaceLinks",
+        eyebrow: emptyText(),
+        heading: emptyText(),
+        body: emptyText(),
+        retailNote: emptyText(),
+        items: [],
+      };
     case "newsShowcase":
       return { ...base, type: "newsShowcase", heading: emptyText(), body: emptyText(), columns: 3, limit: 3, showDates: true, showExcerpts: true, ctaLabel: emptyText(), ctaHref: "" };
     case "recipeShowcase":

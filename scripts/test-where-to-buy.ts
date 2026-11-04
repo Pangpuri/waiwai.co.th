@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildHeaderCta } from "@/features/shell/nav";
-import { WHERE_TO_BUY_ANCHOR } from "@/lib/blocks/marketplace-links";
+import { WHERE_TO_BUY_ANCHOR, defaultMarketplaceItems, marketplaceLinksView } from "@/lib/blocks/marketplace-links";
+import { createBlock, type MarketplaceLinksBlock } from "@/lib/blocks/types";
+import { SITE } from "@/lib/site";
+import { th } from "@/lib/i18n/messages/th";
 
 import { codeOf } from "./source-scan.ts";
 
@@ -77,11 +80,59 @@ test("where-to-buy: บล็อกต้องมีกรอบเหลือ
   assert.ok(block.includes("scroll-mt-40"), "ต้องมี scroll-mt กันหัวเว็บทับ (เหมือนดีไซน์เดิม)");
 });
 
+test("where-to-buy: รายการในบล็อกเป็นแหล่งแรก · ว่าง/ไม่ครบ = ถอยไปค่าเริ่มต้นจาก SITE", () => {
+  const base = createBlock("marketplaceLinks", "m1");
+  assert.equal(base.type, "marketplaceLinks");
+  if (base.type !== "marketplaceLinks") return;
+
+  /* ไม่มีรายการในบล็อก = ใช้ SITE + ป้ายจากพจนานุกรม (พฤติกรรมเดิม) */
+  const fallback = marketplaceLinksView(base, "th");
+  assert.equal(fallback.items.length, SITE.marketplaces.length);
+  assert.equal(fallback.items[0]?.href, SITE.marketplaces[0]?.href);
+  assert.equal(fallback.items[0]?.label, th.whereToBuy.marketplaces.shopee);
+  assert.equal(fallback.retailNote, th.whereToBuy.retailNote);
+  assert.equal(fallback.eyebrow, "");
+
+  /* ชุดเริ่มต้นที่ใช้เติมลงบล็อก = ชุดเดียวกับ fallback (ชื่อ/ลิงก์มาจากแหล่งเดียว) */
+  const defaults = defaultMarketplaceItems();
+  assert.equal(defaults.length, SITE.marketplaces.length);
+  assert.equal(defaults[0]?.href, SITE.marketplaces[0]?.href);
+  assert.equal(defaults[0]?.label.th, th.whereToBuy.marketplaces.shopee);
+  assert.equal(defaults[0]?.label.en, "Shopee");
+
+  /* มีรายการในบล็อก = ใช้รายการนั้น (ชื่อ/ลิงก์/eyebrow/retailNote) */
+  const custom: MarketplaceLinksBlock = {
+    ...base,
+    eyebrow: { th: "ช่องทางอย่างเป็นทางการ", en: "" },
+    retailNote: { th: "", en: "" },
+    items: [{ id: "shop-1", label: { th: "ร้านทดสอบ", en: "Test shop" }, href: "https://example.test/shop" }],
+  };
+  const view = marketplaceLinksView(custom, "th");
+  assert.deepEqual(view.items, [{ id: "shop-1", label: "ร้านทดสอบ", href: "https://example.test/shop" }]);
+  assert.equal(view.eyebrow, "ช่องทางอย่างเป็นทางการ");
+  assert.equal(view.retailNote, th.whereToBuy.retailNote, "retailNote ว่าง = ค่าเริ่มต้น");
+  assert.equal(view.isEmpty, false);
+
+  /* รายการที่ไม่มีลิงก์ถูกข้าม → ถอยไปค่าเริ่มต้น (ไม่เรนเดอร์ปุ่มที่พาไปที่ว่าง) */
+  const incomplete = marketplaceLinksView(
+    { ...custom, items: [{ id: "shop-2", label: { th: "ยังไม่มีลิงก์", en: "" }, href: "" }] },
+    "th",
+  );
+  assert.equal(incomplete.items[0]?.id, SITE.marketplaces[0]?.id);
+});
+
 test("where-to-buy: ชื่อร้าน/ลิงก์มาจากแหล่งความจริงเดียว + ไม่มีข้อมูล = ไม่เรนเดอร์", () => {
   const marketplace = codeOf("lib/blocks/marketplace-links.ts");
-  /* ลิงก์ร้านต้องมาจาก SITE (ไม่คีย์ซ้ำในคอมโพเนนต์) */
-  assert.ok(marketplace.includes("SITE"), "ต้องอ่านลิงก์ร้านจาก SITE");
+  /* ลิงก์ร้านต้องมาจาก SITE (fallback) + รายการที่แก้ในบล็อก (แหล่งแรก) */
+  assert.ok(marketplace.includes("SITE"), "ต้องอ่านลิงก์ร้านเริ่มต้นจาก SITE");
+  assert.ok(marketplace.includes("block.items"), "ต้องอ่านรายการที่แก้ในบล็อก");
   const renderer = codeOf("features/blocks/block-renderer.tsx");
-  assert.ok(renderer.includes("marketplaceLinksView(language)"), "ตัวเรนเดอร์ต้องใช้วิวจากชั้นข้อมูล");
+  assert.ok(renderer.includes("marketplaceLinksView(block, language)"), "ตัวเรนเดอร์ต้องใช้วิวจากชั้นข้อมูล");
   assert.ok(renderer.includes("if (market.isEmpty) return null"), "ไม่มีข้อมูลร้าน = ไม่เรนเดอร์บล็อก");
+
+  /* แผงแก้ต้องมีปุ่มเพิ่ม/ลบ + ช่องชื่อ/ลิงก์ (ย้ายมาจากหน้าจอเนื้อหาเดิม) */
+  const builder = codeOf("features/admin/ui/block-builder.tsx");
+  for (const needle of ["addMarketplaceLink", "removeMarketplaceLink", "setMarketplaceLinkLabel", "setMarketplaceLinkHref", "seedMarketplaceItems", "blockMarketplaceLinks", "blockUseDefaultMarketplaceLinks"]) {
+    assert.ok(builder.includes(needle), `แผงบล็อกต้องมี: ${needle}`);
+  }
 });

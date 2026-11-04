@@ -99,5 +99,4 @@ export const adminHero = {
   textsFields: "Fields to fix: {fields}",
   textsLabelTh: "Thai",
   textsLabelEn: "English (optional)",
-  textsMoveHint: "Moved to the \"Slides, campaigns & site header text\" screen",
 };

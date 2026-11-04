@@ -88,7 +88,11 @@ export function HeroTextsForm({ current, strings, problemFields = [] }: HeroText
   const bad = (name: string): boolean => problemFields.includes(name);
 
   return (
-    <section className="border-line bg-surface flex flex-col gap-4 rounded-2xl border p-4" data-hero-texts="">
+    <section
+      id="hero-texts"
+      className="border-line bg-surface scroll-mt-24 flex flex-col gap-4 rounded-2xl border p-4"
+      data-hero-texts=""
+    >
       <div className="flex flex-col gap-1">
         <h2 className="text-fg text-base font-semibold">{strings.textsTitle}</h2>
         <p className="text-fg-muted text-xs">{strings.textsHint}</p>
