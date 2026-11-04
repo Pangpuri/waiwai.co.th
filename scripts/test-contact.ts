@@ -274,9 +274,9 @@ test("a11y: หน้าที่เรนเดอร์จากบล็อ�
   );
 
   /* หน้าแรกมี <h1> ตัวจริงจาก Hero อยู่แล้ว ⇒ ห้ามใส่ h1 ซ้ำ (sr-only) เป็นอันขาด */
-  const home = readFileSync(path.join(PROJECT_ROOT, "app/[lang]/page.tsx"), "utf8");
-  const start = home.indexOf("<BlockDocumentView");
-  const call = home.slice(start, home.indexOf("/>", start));
-  assert.ok(start > 0 && call.length > 0, "ต้องพบการเรียก BlockDocumentView ในหน้าแรก");
+  const homeBlock = readFileSync(path.join(PROJECT_ROOT, "features/home/ui/home-block-page.tsx"), "utf8");
+  const start = homeBlock.indexOf("<BlockDocumentView");
+  const call = homeBlock.slice(start, homeBlock.indexOf("/>", start));
+  assert.ok(start > 0 && call.length > 0, "ต้องพบการเรียก BlockDocumentView ใน HomeBlockPage");
   assert.ok(!call.includes("heading="), "หน้าแรกต้องไม่ส่ง heading (Hero เรนเดอร์ h1 อยู่แล้ว — ไม่งั้นได้ 2 h1)");
 });

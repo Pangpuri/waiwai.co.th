@@ -141,9 +141,13 @@ test("★ home card: หน้าเว็บอ่านค่าจากห�
   assert.ok(hero.includes("href={localePath(locale, card.href)}"), "ลิงก์การ์ดมาจากค่าที่ตั้งไว้");
   assert.ok(!hero.includes("title: m.card.title"), "ห้ามอ่านหัวข้อจากพจนานุกรมตรง ๆ อีก (นี่คือต้นเหตุ hardcode)");
 
+  const loader = readFileSync("features/home/home-hero-view.ts", "utf8");
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
+  const blockPage = readFileSync("features/home/ui/home-block-page.tsx", "utf8");
   assert.ok(
-    page.includes("const cardContent = heroCardContentOf(homeContent, messages, lang)") && page.includes("heroCard={heroCard}"),
+    loader.includes("heroCardContentOf(homeContent, messages, locale)") &&
+      page.includes("heroCard={homeHero.heroCard}") &&
+      blockPage.includes("heroCard={view.heroCard}"),
     "หน้าแรกต้องส่งเนื้อหาการ์ดจากที่เก็บจริงเข้า Hero",
   );
 
@@ -307,8 +311,8 @@ test("★ pr card frame: ต่อสายจริง — จอเลือ�
   assert.ok(card.includes("aspectRatio: `${ratio}`"), "กล่องการ์ดบนเว็บต้องยืดหดตามสัดส่วน");
   assert.ok(card.includes('className="object-contain"'), "ภาพการ์ดต้องเห็นเต็มใบ (ไม่ตัดขอบ)");
 
-  const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("cardRatioOf(heroSetting.prCardFrame") && page.includes("loadMediaSizes"), "หน้าแรกต้องคิดสัดส่วนจากกรอบ + ขนาดภาพจริง");
+  const loader = readFileSync("features/home/home-hero-view.ts", "utf8");
+  assert.ok(loader.includes("cardRatioOf(heroSetting.prCardFrame") && loader.includes("loadMediaSizes"), "loader hero ต้องคิดสัดส่วนจากกรอบ + ขนาดภาพจริง");
 
   for (const locale of ["th", "en"]) {
     const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
@@ -374,7 +378,7 @@ test("★ home section: 'ที่ซื้อสินค้า' อ่าน�
   assert.ok(ui.includes("view.marketplaces.map"), "ต้องเรนเดอร์จากวิวที่ส่งเข้ามา");
   assert.ok(ui.includes("view.retailNote") && ui.includes("view.eyebrow"), "ข้อความต้องมาจากวิว");
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("whereToBuyViewOf(homeContent, messages, lang, SITE.marketplaces)"), "หน้าแรกต้องประกอบวิวจากที่เก็บจริง");
+  assert.ok(page.includes("whereToBuyViewOf(homeHero.homeContent, messages, lang, SITE.marketplaces)"), "หน้าแรกต้องประกอบวิวจากที่เก็บจริง");
   assert.ok(page.includes("<WhereToBuy messages={messages} view={whereToBuyView} />"), "ต้องส่งวิวเข้าเซกชัน");
   /* ค่าเริ่มต้นใน DB (seed) ต้องดึงลิงก์จริงจาก SITE — ไม่พิมพ์ซ้ำ */
   const seed = readFileSync("lib/content/home-seed.ts", "utf8");

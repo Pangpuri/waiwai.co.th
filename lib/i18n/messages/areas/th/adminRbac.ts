@@ -14,7 +14,7 @@ export const adminRbac = {
   rbacRolePublisherName: "ผู้เผยแพร่",
   rbacRolePublisherHint: "ทำได้ทุกอย่างของบรรณาธิการ + กล่องข้อความลูกค้า + SEO + ถังขยะ",
   rbacRoleAdminName: "ผู้ดูแลระบบ",
-  rbacRoleAdminHint: "ทุกอย่าง รวมถึงบัญชีผู้ใช้ · ตั้งค่าส่วนกลาง · ระยะเก็บข้อมูล (PDPA) · โหมดปิดปรับปรุง",
+  rbacRoleAdminHint: "ทุกอย่าง รวมถึงบัญชีผู้ใช้ · ข้อมูลองค์กร & SEO · ระยะเก็บข้อมูล (PDPA) · โหมดปิดปรับปรุง",
   rbacRoleUnknown: "บทบาทไม่ถูกต้อง",
   rbacCreateTitle: "เพิ่มบัญชีใหม่",
   rbacCreateHint: "ระบบจะสร้างรหัสผ่านให้ — คัดลอกเก็บไว้แล้วส่งให้เจ้าของบัญชี (แสดงครั้งเดียว)",

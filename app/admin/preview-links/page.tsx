@@ -12,12 +12,13 @@ import { PREVIEWABLE_PAGE_IDS, isPreviewablePage } from "@/lib/pages/paths";
 import { defaultPages } from "@/lib/pages/model";
 import { listPages } from "@/lib/pages/repository";
 import {
+  PREVIEW_LINK_KEEP_DAYS,
   PREVIEW_LINK_MAX_ACTIVE,
   PREVIEW_LINK_TTL_HOURS,
   hoursLeftInPreviewLink,
   previewLinkStatus,
 } from "@/lib/preview-link/plan";
-import { listPreviewLinks } from "@/lib/preview-link/repository";
+import { countClosedPreviewLinks, listPreviewLinks } from "@/lib/preview-link/repository";
 
 /**
  * ลิงก์พรีวิวชั่วคราว (X2.6 · รอบที่ 79) — ให้ผู้จัดการดูฉบับร่าง **โดยไม่ต้องมีบัญชี**
@@ -27,7 +28,7 @@ import { listPreviewLinks } from "@/lib/preview-link/repository";
  * - หน้านี้ให้ผู้ดูแลสร้าง **ลิงก์อายุสั้น** ส่งเป็นการรายครั้ง แล้วยกเลิกได้ทุกเมื่อ
  *
  * ⚠️ ต้องล็อกอินเสมอ (`requireAdminUser("<permission>")`) — หน้านี้เป็นเครื่องมือของเจ้าหน้าที่
- * ⚠️ ตัวเลขทั้งหมด (อายุ/เพดาน) ดึงจาก `lib/preview-link/plan.ts` (ห้ามพิมพ์ในหน้านี้)
+ * ⚠️ ตัวเลขทั้งหมด (อายุ/เพดาน/กำหนดลบอัตโนมัติ) ดึงจาก `lib/preview-link/plan.ts` (ห้ามพิมพ์ในหน้านี้)
  */
 
 const STAMP_LENGTH = 16;
@@ -92,6 +93,9 @@ export default async function AdminPreviewLinksPage() {
     };
   });
 
+  /* ลิงก์ที่ปิดแล้วทั้งหมด (ไม่จำกัด 100 แถวของตาราง) — ใช้บอกจำนวนและเปิดปุ่มลบทั้งหมด */
+  const closedCount = configured ? await countClosedPreviewLinks(now) : 0;
+
   const managerStrings: PreviewLinkStrings = {
     previewLinkCreate: strings.previewLinkCreate,
     previewLinkCreateAction: strings.previewLinkCreateAction,
@@ -122,6 +126,15 @@ export default async function AdminPreviewLinksPage() {
     previewLinkTooMany: strings.previewLinkTooMany,
     previewLinkDbMissing: strings.previewLinkDbMissing,
     previewLinkRevokeWarning: strings.previewLinkRevokeWarning,
+    previewLinkDelete: strings.previewLinkDelete,
+    previewLinkDeleted: strings.previewLinkDeleted,
+    previewLinkDeleteAll: strings.previewLinkDeleteAll,
+    previewLinkDeleteAllCount: strings.previewLinkDeleteAllCount,
+    previewLinkConfirmDeleteAll: strings.previewLinkConfirmDeleteAll,
+    previewLinkConfirmRequired: strings.previewLinkConfirmRequired,
+    previewLinkDeletedMany: strings.previewLinkDeletedMany,
+    previewLinkDeleteNotClosed: strings.previewLinkDeleteNotClosed,
+    previewLinkDeleteWarning: strings.previewLinkDeleteWarning,
   };
 
   return (
@@ -132,6 +145,10 @@ export default async function AdminPreviewLinksPage() {
         {/* อายุลิงก์จากค่ากลาง (ชั่วโมง) — เอกสารกับของจริงหลุดจากกันไม่ได้ */}
         <p className="text-fg-muted text-xs">
           {fillTemplate(strings.previewLinkTtlNote, { hours: PREVIEW_LINK_TTL_HOURS })}
+        </p>
+        {/* กำหนดลบอัตโนมัติจากค่ากลาง (วัน) — ผู้ใช้เลือกได้ว่าจะรอหรือกดลบเอง */}
+        <p className="text-fg-muted text-xs">
+          {fillTemplate(strings.previewLinkAutoDeleteNote, { days: PREVIEW_LINK_KEEP_DAYS })}
         </p>
         <p className="text-fg-muted text-xs">{strings.previewLinkNoStoreWarning}</p>
       </header>
@@ -153,7 +170,12 @@ export default async function AdminPreviewLinksPage() {
             />
           </section>
 
-          <PreviewLinkTable rows={rows} strings={managerStrings} maxActive={PREVIEW_LINK_MAX_ACTIVE} />
+          <PreviewLinkTable
+            rows={rows}
+            strings={managerStrings}
+            maxActive={PREVIEW_LINK_MAX_ACTIVE}
+            closedCount={closedCount}
+          />
         </>
       ) : null}
 

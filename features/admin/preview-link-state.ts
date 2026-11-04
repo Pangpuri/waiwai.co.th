@@ -5,7 +5,17 @@
  * `code` เป็น "รหัส" ไม่ใช่ข้อความ ⇒ หน้าจอแปลจากพจนานุกรม
  */
 
-export type PreviewLinkActionCode = "created" | "revoked" | "too-many" | "no-database" | "invalid" | "missing";
+export type PreviewLinkActionCode =
+  | "created"
+  | "revoked"
+  | "deleted"
+  | "deleted-many"
+  | "too-many"
+  | "no-database"
+  | "invalid"
+  | "missing"
+  | "not-closed"
+  | "confirm-required";
 
 export type PreviewLinkActionState = {
   readonly status: "idle" | "ok" | "failed";
@@ -15,6 +25,8 @@ export type PreviewLinkActionState = {
    * ⇒ เก็บเฉพาะในหน่วยความจำของหน้าจอ ไม่เขียนลงที่อื่น
    */
   readonly path: string | null;
+  /** จำนวนแถวที่ลบจริง (ใช้กับ `deleted-many`) — null = ไม่เกี่ยวกับการลบ */
+  readonly deleted: number | null;
 };
 
-export const INITIAL_PREVIEW_LINK_STATE: PreviewLinkActionState = { status: "idle", code: null, path: null };
+export const INITIAL_PREVIEW_LINK_STATE: PreviewLinkActionState = { status: "idle", code: null, path: null, deleted: null };

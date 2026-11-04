@@ -39,6 +39,8 @@ export const PREVIEW_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export const PREVIEW_LINK_AUDIT_ACTIONS = {
   create: "preview-link-create",
   revoke: "preview-link-revoke",
+  /** ลบด้วยมือ (รายรายการ/ทั้งที่ปิดแล้ว) — แยกจาก purge อัตโนมัติเพื่อให้ตรวจย้อนหลังได้ว่าใครสั่ง */
+  delete: "preview-link-delete",
   purge: "preview-link-purge",
 } as const;
 

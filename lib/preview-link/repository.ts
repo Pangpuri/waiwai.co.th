@@ -22,7 +22,7 @@ import {
  *    ⇒ ต่อให้ฐานข้อมูลรั่ว ก็เอาไปเปิดลิงก์ไม่ได้ · และหน้าจอหลังบ้านก็แสดงลิงก์เดิมซ้ำไม่ได้ (ต้องสร้างใหม่)
  * 2. **ตรวจรูปทรงโทเคนก่อนคิวรี** (`isPreviewTokenShape`) — ค่าขยะจาก URL ไม่แตะฐานข้อมูล
  * 3. ตรวจ **หมดอายุ + ยกเลิก** ที่เซิร์ฟเวอร์ทุกครั้งที่เปิดลิงก์ (ไม่เชื่ออะไรจากฝั่งเบราว์เซอร์)
- * 4. ทุกการสร้าง/ยกเลิกลง audit log · การเปิดลิงก์นับ `use_count`/`last_used_at` (ล้มเหลวได้ ไม่ทำให้หน้าพัง)
+ * 4. ทุกการสร้าง/ยกเลิก/ลบด้วยมือลง audit log · การเปิดลิงก์นับ `use_count`/`last_used_at` (ล้มเหลวได้ ไม่ทำให้หน้าพัง)
  * 5. **ไม่มี DB = คืนค่าว่าง/`null`** — หน้าจอหลังบ้านและหน้าเว็บต้องไม่พังเพราะเรื่องนี้
  */
 
@@ -102,6 +102,18 @@ export async function countActivePreviewLinks(page: string, now: Date = new Date
     `select count(*)::int as n from preview_link
       where page = $1 and revoked_at is null and expires_at > $2`,
     [page, now.toISOString()],
+  );
+  return rows[0]?.n ?? 0;
+}
+
+/** จำนวนลิงก์ที่ปิดแล้วทั้งหมด (หมดอายุ/ยกเลิก) — ใช้เป็นตัวเลขบนปุ่มลบทั้งหมด */
+export async function countClosedPreviewLinks(now: Date = new Date()): Promise<number> {
+  if (!isDatabaseConfigured()) return 0;
+
+  const { rows } = await getPool().query<{ n: number }>(
+    `select count(*)::int as n from preview_link
+      where revoked_at is not null or expires_at <= $1`,
+    [now.toISOString()],
   );
   return rows[0]?.n ?? 0;
 }
@@ -197,6 +209,66 @@ export async function revokePreviewLink(id: string, actorEmail: string | null, n
     });
   }
   return revoked;
+}
+
+/**
+ * ลบ **ลิงก์ที่ปิดแล้ว** ทีละรายการด้วยมือ (หมดอายุหรือถูกยกเลิก)
+ *
+ * ⚠️ เงื่อนไข SQL บังคับที่ฐานข้อมูล — ลิงก์ที่ยังใช้ได้จะไม่ถูกลบ แม้ผู้เรียกจะส่ง id มา
+ * ⚠️ ไม่มีโทเคน/hash ใน audit (เก็บแค่ id)
+ */
+export async function deleteClosedPreviewLink(
+  id: string,
+  actorEmail: string | null,
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (!isDatabaseConfigured() || id === "") return false;
+
+  const result = await getPool().query(
+    `delete from preview_link
+      where id = $1 and (revoked_at is not null or expires_at <= $2)`,
+    [id, now.toISOString()],
+  );
+
+  const deleted = (result.rowCount ?? 0) > 0;
+  if (deleted) {
+    await recordAudit({
+      action: PREVIEW_LINK_AUDIT_ACTIONS.delete,
+      actorEmail,
+      target: `${PREVIEW_LINK_AUDIT_TARGET}:${id}`,
+      detail: "manual",
+    });
+  }
+  return deleted;
+}
+
+/**
+ * ลบ **ลิงก์ที่ปิดแล้วทั้งหมด** ด้วยมือ (ไม่รอครบ `PREVIEW_LINK_KEEP_DAYS`)
+ *
+ * ผู้ใช้เลือกได้ระหว่างปล่อยให้ตัวลบอัตโนมัติทำงาน หรือกดลบทันทีจากหน้าจอ
+ * ⚠️ ลิงก์ที่ยังใช้ได้ไม่ถูกแตะ (เงื่อนไขเดียวกับ `deleteClosedPreviewLink`)
+ */
+export async function deleteClosedPreviewLinks(
+  actorEmail: string | null,
+  now: Date = new Date(),
+): Promise<number> {
+  if (!isDatabaseConfigured()) return 0;
+
+  const result = await getPool().query(
+    `delete from preview_link where revoked_at is not null or expires_at <= $1`,
+    [now.toISOString()],
+  );
+
+  const deleted = result.rowCount ?? 0;
+  if (deleted > 0) {
+    await recordAudit({
+      action: PREVIEW_LINK_AUDIT_ACTIONS.delete,
+      actorEmail,
+      target: PREVIEW_LINK_AUDIT_TARGET,
+      detail: `manual deleted=${deleted}`,
+    });
+  }
+  return deleted;
 }
 
 export type PreviewLinkPurgeReport = {

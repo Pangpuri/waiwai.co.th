@@ -165,9 +165,12 @@ test("hero module: ต่อสายหน้าแรก — สไลด์�
   );
   assert.ok(hero.includes("HERO_SLIDES.map"), "เทมเพลตเดิมต้องยังอยู่ (ไม่ลบของเดิม)");
 
+  const loader = readFileSync("features/home/home-hero-view.ts", "utf8");
+  assert.ok(loader.includes("listHeroPageSlides()"), "loader hero ต้องอ่านสไลด์จากชั้นข้อมูลของโมดูล");
+  assert.ok(loader.includes("managedHeroSlideViews("), "loader hero ต้องแปลงวิวผ่านตัวช่วยกลาง");
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("listHeroPageSlides()"), "หน้าแรกต้องอ่านสไลด์จากชั้นข้อมูลของโมดูล");
-  assert.ok(page.includes("managedHeroSlideViews("), "ต้องแปลงวิวผ่านตัวช่วยกลาง (ไม่ประกอบเองในหน้า)");
+  assert.ok(page.includes("loadHomeHeroView("), "หน้าแรกต้องใช้ loader hero ตัวกลาง");
+  assert.ok(page.includes("homeHero.slides"), "หน้าแรกต้องส่งสไลด์เข้า hero");
   assert.ok(page.includes("revalidate = 300"), "หน้าแรกยังต้องเป็น ISR 300 วิเหมือนเดิม");
 });
 
@@ -227,8 +230,10 @@ test("hero module (เอฟเฟค): อ่านค่าตั้งค่�
   assert.ok(/prefers-reduced-motion: reduce\)[\s\S]{0,200}\[data-hero-slide\] \{\s*transition: none/.test(css), "โหมดลดการเคลื่อนไหวต้องตัดภาพทันที");
   const slider = readFileSync("features/home/ui/hero-slider.tsx", "utf8");
   assert.ok(slider.includes("data-effect={effect}") && slider.includes("intervalMs"), "ตัวเลื่อนต้องรับเอฟเฟค/ความเร็วจากข้อมูล");
+  const loader = readFileSync("features/home/home-hero-view.ts", "utf8");
+  assert.ok(loader.includes("loadHeroSetting()"), "loader hero ต้องอ่านค่าตั้งค่าจากชั้นข้อมูล");
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("loadHeroSetting()") && page.includes("heroSetting="), "หน้าแรกต้องอ่านค่าตั้งค่าและส่งเข้า hero");
+  assert.ok(page.includes("heroSetting={homeHero.heroSetting}"), "หน้าแรกต้องส่งค่าตั้งค่าเข้า hero");
   const admin = readFileSync("app/admin/hero/page.tsx", "utf8");
   assert.ok(admin.includes("saveHeroSettingAction") && admin.includes("HERO_EFFECTS.map"), "จอหลังบ้านต้องมีฟอร์มเลือกเอฟเฟค");
   const actions = readFileSync("app/admin/hero/actions.ts", "utf8");

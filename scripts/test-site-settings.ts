@@ -52,14 +52,13 @@ test("validateSiteSettings: พาธไฟล์ต้องไม่ใช่ 
   assert.ok(siteSettingsErrorsOf(validateSiteSettings({ ...base, favicon: "media/f.ico" })).some((i) => i.code === "bad-path"));
   assert.deepEqual(siteSettingsErrorsOf(validateSiteSettings({ ...base, favicon: "/media/f.ico", defaultOgImage: "/media/og.png" })), []);
 
-  assert.ok(siteSettingsErrorsOf(validateSiteSettings({ ...base, organization: { ...base.organization, mapUrl: "javascript:alert(1)" } })).some((i) => i.code === "bad-href"));
   assert.ok(siteSettingsErrorsOf(validateSiteSettings({ ...base, socials: ["ไม่ใช่ลิงก์"] })).some((i) => i.code === "bad-href"));
 
   assert.ok(siteSettingsErrorsOf(validateSiteSettings({ ...base, name: { th: "", en: "" } })).some((i) => i.code === "empty-th"));
   assert.ok(siteSettingsErrorsOf(validateSiteSettings({ ...base, organization: { ...base.organization, email: "ไม่ใช่อีเมล" } })).some((i) => i.code === "bad-email"));
 });
 
-test("parseSiteSettings: รับค่าจากฟอร์ม + ตัดลิงก์ว่าง/เกินเพดาน + ไม่พังกับค่าที่ไม่รู้จัก", () => {
+test("parseSiteSettings: รับค่าจากฟอร์ม + ตัดลิงก์ว่าง/เกินเพดาน + ไม่พังกับค่าที่ไม่รู้จัก (รวมของเก่า hours/mapUrl)", () => {
   const raw = {
     name: { th: "ไวไวใหม่", en: "" },
     defaultOgImage: "/media/og.png",
@@ -72,7 +71,13 @@ test("parseSiteSettings: รับค่าจากฟอร์ม + ตัด�
   assert.equal(parsed.ok, true);
   if (parsed.ok) {
     assert.deepEqual(parsed.value.socials, ["https://facebook.com/x", "https://line.me/y"], "ตัดช่องว่างและไม่เก็บลิงก์ว่าง");
-    assert.equal(parsed.value.organization.hours.th, "8-17");
+    assert.equal(parsed.value.organization.phone, "02");
+    /*
+      รอบ 326: ฟิลด์เก่า `hours`/`mapUrl` ยังอยู่ในเอกสารที่เคยเผยแพร่ได้
+      ⇒ ต้อง parse ผ่านและ **ไม่พาเข้าค่าที่ใช้จริง** (ไม่มีโค้ดฝั่งเว็บอ่านสองค่านี้)
+    */
+    assert.equal("hours" in parsed.value.organization, false, "hours ที่เลิกใช้แล้วต้องไม่ถูกส่งต่อ");
+    assert.equal("mapUrl" in parsed.value.organization, false, "mapUrl ที่เลิกใช้แล้วต้องไม่ถูกส่งต่อ");
   }
 
   assert.equal(parseSiteSettings(null, th).ok, false);

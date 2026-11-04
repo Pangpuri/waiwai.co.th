@@ -170,15 +170,44 @@ test("preview-link: ตัวสร้างต้องล็อกอิน �
 
   const required = actions.match(/await requireAdminUser\("[a-z]+"\)/g) ?? [];
   const exported = actions.match(/export async function/g) ?? [];
-  assert.equal(exported.length, 2, "ต้องมี 2 action (สร้าง · ยกเลิก)");
+  assert.equal(exported.length, 4, "ต้องมี 4 action (สร้าง · ยกเลิก · ลบรายตัว · ลบทั้งหมด)");
   assert.equal(required.length, exported.length, "ทุก action ต้องตรวจสิทธิ์ก่อนทำงาน");
   assert.ok(actions.includes("isPreviewablePage(page)"), "ต้องตรวจว่าหน้านั้นพรีวิวได้");
   assert.ok(actions.includes("isLocale(locale)"), "ต้องตรวจภาษาก่อนสร้างพาธ");
+  assert.ok(actions.includes("deletePreviewLinkAction"), "ต้องมี action ลบรายตัว");
+  assert.ok(actions.includes("deleteClosedPreviewLinksAction"), "ต้องมี action ลบทั้งหมดที่ปิดแล้ว");
+  assert.ok(actions.includes('formData.get("confirm")'), "การลบทั้งหมดต้องมีด่านยืนยันฝั่งเซิร์ฟเวอร์");
 
   const page = sourceOf("app/admin/preview-links/page.tsx");
   assert.ok(page.includes('requireAdminUser("preview")'), "หน้าจอต้องมีสิทธิ์ลิงก์พรีวิว (X1.10)");
   assert.ok(page.includes("PREVIEW_LINK_TTL_HOURS"), "หน้าจอต้องบอกอายุจากค่ากลาง (ไม่พิมพ์เลขเอง)");
   assert.ok(page.includes("PREVIEW_LINK_MAX_ACTIVE"), "หน้าจอต้องใช้เพดานจากค่ากลาง");
+  assert.ok(page.includes("PREVIEW_LINK_KEEP_DAYS"), "หน้าจอต้องบอกกำหนดลบอัตโนมัติจากค่ากลาง");
+  assert.ok(page.includes("previewLinkAutoDeleteNote"), "หน้าจอต้องมีข้อความแจ้งกำหนดลบอัตโนมัติ");
+  assert.ok(page.includes("countClosedPreviewLinks"), "จำนวนบนปุ่มลบทั้งหมดต้องมาจากฐานข้อมูล ไม่ใช่แค่ 100 แถวที่แสดง");
+});
+
+test("preview-link: หน้าแรกต้องเห็น hero + บล็อกไดนามิกเหมือนเว็บจริง และมีเปลือกเดียว", () => {
+  const route = sourceOf("app/[lang]/preview/t/[token]/page.tsx");
+  assert.ok(route.includes("HomeBlockPage"), "หน้าแรกในลิงก์พรีวิวต้องใช้ HomeBlockPage (ไม่ใช่ BlockDocumentView เปล่า ๆ)");
+  assert.ok(route.includes("loadHomeHeroView"), "ต้องโหลด hero ชุดเดียวกับหน้าเว็บจริง");
+  for (const loader of ["loadProductShowcaseData", "loadRecipeShowcaseData", "loadNewsShowcaseData"]) {
+    assert.ok(route.includes(loader), `ต้องส่งข้อมูลให้บล็อกไดนามิก: ${loader}`);
+  }
+  assert.ok(route.includes("ProductListSection"), "หน้า detail ต้องมีรายการสินค้าต่อท้ายเหมือนเว็บจริง");
+  assert.ok(!route.includes("SiteHeaderLive"), "ห้าม render header ซ้ำ — ใช้เปลือกของ layout");
+  assert.ok(!route.includes("SiteFooterLive"), "ห้าม render footer ซ้ำ (เคสจริง: footer 2 อัน)");
+  assert.ok(!route.includes("InlineScript"), "ไม่ต้องซ่อน header ของ layout แล้ว — ใช้เปลือกจริง");
+
+  const blockPage = sourceOf("features/home/ui/home-block-page.tsx");
+  assert.ok(blockPage.includes("<Hero"), "HomeBlockPage ต้องเรนเดอร์ Hero ก่อนบล็อก");
+  assert.ok(blockPage.includes("productData={await loadProductShowcaseData"), "ต้องส่งข้อมูลสินค้าให้บล็อก");
+  assert.ok(blockPage.includes("recipeData={await loadRecipeShowcaseData"), "ต้องส่งข้อมูลเมนูให้บล็อก");
+  assert.ok(blockPage.includes("newsData={await loadNewsShowcaseData"), "ต้องส่งข้อมูลข่าวให้บล็อก");
+
+  const home = sourceOf("app/[lang]/page.tsx");
+  assert.ok(home.includes("HomeBlockPage"), "หน้าแรกจริงต้องใช้ HomeBlockPage ตัวเดียวกัน");
+  assert.ok(home.includes("loadHomeHeroView"), "หน้าแรกจริงต้องใช้ loader hero ตัวเดียวกัน");
 });
 
 test("preview-link: รายการหน้าที่พรีวิวได้เป็นแหล่งเดียว และพรีวิวในหลังบ้านใช้ร่วมกัน", () => {
@@ -198,6 +227,17 @@ test("preview-link: เก็บกวาดโดยตัวลบกลาง
   const repo = sourceOf("lib/preview-link/repository.ts");
   assert.ok(repo.includes("previewLinkCleanupCutoff"), "ต้องใช้อายุเก็บจากค่ากลาง");
   assert.ok(repo.includes("revoked_at is not null or expires_at <= $1"), "ต้องเก็บกวาดเฉพาะลิงก์ที่ปิดแล้ว");
+  assert.ok(repo.includes("deleteClosedPreviewLink"), "ต้องมีการลบรายตัวที่ปิดแล้ว");
+  assert.ok(repo.includes("deleteClosedPreviewLinks"), "ต้องมีการลบทั้งหมดที่ปิดแล้ว");
+  assert.ok(repo.includes("countClosedPreviewLinks"), "ต้องนับลิงก์ที่ปิดแล้วทั้งหมดสำหรับปุ่มลบ");
+  assert.ok(
+    repo.includes("where id = $1 and (revoked_at is not null or expires_at <= $2)"),
+    "ลบรายตัวต้องบังคับที่ฐานข้อมูลว่าปิดแล้วเท่านั้น",
+  );
+  assert.ok(
+    repo.includes("delete from preview_link where revoked_at is not null or expires_at <= $1"),
+    "ลบทั้งหมดต้องไม่แตะลิงก์ที่ยังใช้งานได้",
+  );
 
   const actions = Object.values(PREVIEW_LINK_AUDIT_ACTIONS);
   assert.equal(new Set(actions).size, actions.length, "ชื่อ action ต้องไม่ซ้ำ");
@@ -228,6 +268,8 @@ test("preview-link: พจนานุกรมสองภาษาห้าม
     const admin = sourceOf(`lib/i18n/messages/areas/${locale}/adminPreviewLink.ts`);
     assert.ok(!admin.includes(String(PREVIEW_LINK_TTL_HOURS)), `${locale}: ห้ามพิมพ์ชั่วโมงอายุในพจนานุกรม`);
     assert.ok(!admin.includes(String(PREVIEW_LINK_MAX_ACTIVE)), `${locale}: ห้ามพิมพ์เพดานในพจนานุกรม`);
+    assert.ok(!admin.includes(String(PREVIEW_LINK_KEEP_DAYS)), `${locale}: ห้ามพิมพ์จำนวนวันเก็บกวาดในพจนานุกรม`);
     assert.ok(admin.includes("{hours}"), `${locale}: ต้องใช้ตัวเติม {hours}`);
+    assert.ok(admin.includes("{days}"), `${locale}: ต้องใช้ตัวเติม {days} สำหรับกำหนดลบอัตโนมัติ`);
   }
 });

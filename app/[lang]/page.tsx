@@ -1,23 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { BlockDocumentView } from "@/features/blocks/block-renderer";
-import { loadProductShowcaseData } from "@/lib/blocks/product-showcase-data";
-import { loadRecipeShowcaseData } from "@/lib/blocks/recipe-showcase-data";
-import { loadNewsShowcaseData } from "@/lib/blocks/news-showcase-data";
-import { Hero } from "@/features/home/ui/hero";
-import { heroCardContentOf, type HeroCardContent } from "@/lib/content/home-card";
-import { heroTextsOf } from "@/lib/content/home-hero";
+import { HomeBlockPage } from "@/features/home/ui/home-block-page";
+import { loadHomeHeroView } from "@/features/home/home-hero-view";
 import { whereToBuyViewOf } from "@/lib/content/home-section";
 import { SITE } from "@/lib/site";
-import { cardRatioOf } from "@/lib/hero/pr-card-frame";
-import { loadMediaSizes } from "@/lib/media/repository";
-import { loadHomeContentSafely } from "@/lib/content/repository";
-import { managedHeroSlideViews } from "@/features/home/slides";
 import { NewsList } from "@/features/home/ui/news-list";
 import { Newsletter } from "@/features/home/ui/newsletter";
 import { ProductsShowcase } from "@/features/home/ui/products-showcase";
 import { Recipes } from "@/features/home/ui/recipes";
+import { Hero } from "@/features/home/ui/hero";
 import { WhereToBuy } from "@/features/home/ui/where-to-buy";
 import {
   homeCategoryCards,
@@ -26,7 +18,6 @@ import {
   homeRecipeItems,
 } from "@/features/home/view-models";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
-import { listHeroPageSlides, loadHeroSetting } from "@/lib/hero/repository";
 import { buildAlternates, isLocale } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { countNews, listNews } from "@/lib/news/repository";
@@ -78,29 +69,12 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   const messages = await getMessages(lang);
 
   /*
-    การ์ด PR ที่ขยับ (รอบที่ 208) — รวม 3 อย่าง:
-    1) ข้อความ/ภาพ = ค่าที่ตั้งในหลังบ้าน (ทับพจนานุกรม)
-    2) กรอบที่เลือก = ตาราง `hero_setting.pr_card_frame` ('auto' = ยืดหดตามภาพ)
-    3) สัดส่วนจริง = ขนาดภาพในตาราง `media` (มีเฉพาะภาพที่อยู่ในคลัง ⇒ ไฟล์ในโปรเจกต์ถอยไป 4:5)
+    ข้อมูล hero (การ์ด PR · ข้อความ · สไลด์) — **แหล่งเดียว** กับลิงก์พรีวิวชั่วคราว
+    (`features/home/home-hero-view.ts`): ค่าหลังบ้านทับพจนานุกรม + กรอบการ์ด + ขนาดภาพจริง
   */
-  const homeContent = await loadHomeContentSafely();
-  const heroSetting = await loadHeroSetting();
-  const cardContent = heroCardContentOf(homeContent, messages, lang);
-  /*
-    ข้อความ hero (รอบที่ 250) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม
-    ⚠️ ต้องส่งทั้ง "โหมดบล็อก" และ "เลย์เอาต์โค้ด" (สองสาขาด้านล่าง) ไม่งั้นโหมดหนึ่งจะยังใช้พจนานุกรม
-  */
-  const heroTexts = heroTextsOf(homeContent, messages, lang);
-  const cardMediaId = cardContent.image.src.startsWith("/media/") ? cardContent.image.src.slice("/media/".length) : "";
-  const cardSizes = cardMediaId === "" ? null : await loadMediaSizes([cardMediaId]);
+  const homeHero = await loadHomeHeroView(lang, messages);
   /* "ที่ซื้อสินค้า" (รอบที่ 209) — ค่าที่ตั้งในหลังบ้านทับพจนานุกรม · ว่าง = ช่องทางเริ่มต้นจากโค้ด */
-  const whereToBuyView = whereToBuyViewOf(homeContent, messages, lang, SITE.marketplaces);
-
-  const heroCard: HeroCardContent = {
-    ...cardContent,
-    frame: heroSetting.prCardFrame,
-    imageRatio: cardRatioOf(heroSetting.prCardFrame, cardSizes?.get(cardMediaId)),
-  };
+  const whereToBuyView = whereToBuyViewOf(homeHero.homeContent, messages, lang, SITE.marketplaces);
 
   /*
     ── เนื้อหาหน้าแรกมาจากไหน (เซสชั่น S1) ──────────────────────────────────────
@@ -111,35 +85,13 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
   */
   const liveDocument = await loadLiveBlockDocument("home");
   if (liveDocument !== null) {
-    /* ส่งชื่อหน้าไปให้ตัวเรนเดอร์ออก <h1> (a11y · รอบที่ 149) — หน้าแรกจากบล็อกไม่มี h1 เลย */
     /*
       ⚠️ รอบที่ 217 — hero ของหน้าแรก **ไม่ใช่บล็อก** (แหล่งเดียวคือ `/admin/hero`)
       ⇒ โหมดบล็อกต้องเรนเดอร์ hero จริงก่อน แล้วต่อด้วยบล็อกที่เหลือ (กัน "แก้ได้สองที่")
+      ⚠️ รอบที่ 328: ใช้ `HomeBlockPage` ตัวเดียวกับลิงก์พรีวิวชั่วคราว
+      (เดิมลิงก์พรีวิวไม่มี hero + ไม่ส่งข้อมูลบล็อกไดนามิก ⇒ พรีวิวดูเหมือนหน้าเปล่า)
     */
-    return (
-      <>
-        <Hero
-          locale={lang}
-          messages={messages}
-          dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
-          heroSetting={await loadHeroSetting()}
-          heroCard={heroCard}
-          texts={heroTexts}
-        />
-        {/*
-          บล็อกไดนามิก (รอบที่ 213): โหลดข้อมูลจริงครั้งเดียว (ไม่มีบล็อกชนิดนั้น = ไม่ยิง query)
-          ⚠️ รอบที่ 267: **ไม่ส่ง `heading`** — เพราะ `Hero` ด้านบนเรนเดอร์ `<h1>` ตัวจริงอยู่แล้ว
-          (เคยได้ 2 h1 ต่อหน้า = ผิดกติกา a11y "1 h1 ต่อหน้า" — ตรวจพบตอนพิสูจน์หน้า /contact)
-        */}
-        <BlockDocumentView
-          document={liveDocument}
-          language={lang}
-          productData={await loadProductShowcaseData(liveDocument)}
-        recipeData={await loadRecipeShowcaseData(liveDocument)}
-        newsData={await loadNewsShowcaseData(liveDocument)}
-        />
-      </>
-    );
+    return <HomeBlockPage locale={lang} messages={messages} document={liveDocument} view={homeHero} />;
   }
 
   /*
@@ -168,11 +120,11 @@ export default async function HomePage({ params }: PageProps<"/[lang]">) {
       <Hero
         locale={lang}
         messages={messages}
-        texts={heroTexts}
-        dbSlides={managedHeroSlideViews(await listHeroPageSlides(), lang)}
-        heroSetting={heroSetting}
+        texts={homeHero.heroTexts}
+        dbSlides={homeHero.slides}
+        heroSetting={homeHero.heroSetting}
         /* การ์ดประกาศที่ขยับ: ค่าจากหลังบ้าน (ถ้ามี) ทับพจนานุกรม — รอบที่ 200 */
-        heroCard={heroCard}
+        heroCard={homeHero.heroCard}
       />
       <ProductsShowcase
         locale={lang}

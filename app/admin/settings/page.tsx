@@ -4,10 +4,11 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadSiteSettingsForEditing } from "@/lib/site-settings/loader";
 
 /**
- * ตั้งค่าเว็บ (X1.3 + X1.4) — ชื่อเว็บ · ไอคอน · รูปแชร์ · ข้อมูลองค์กร · โซเชียล
+ * ข้อมูลองค์กร & SEO (X1.3 + X1.4) — ชื่อเว็บ · ไอคอน · รูปแชร์ · ข้อมูลนิติบุคคล · โซเชียล
  *
  * ⚠️ ต้องล็อกอินก่อนเสมอ (ข้อมูลระดับองค์กร + ค่าที่มีผลทั้งเว็บ)
  * ⚠️ ค่าที่ใช้จริงบนหน้าเว็บคือ **ฉบับเผยแพร่** (loader อ่านเฉพาะ published) — ไม่ตั้งค่า = ของเดิม
+ * ⚠️ รอบ 326: ถอดช่อง "เวลาทำการ" / "ลิงก์แผนที่" ที่ไม่มีโค้ดฝั่งเว็บอ่านค่าออกแล้ว
  */
 export default async function AdminSettingsPage() {
   await requireAdminUser("settings");

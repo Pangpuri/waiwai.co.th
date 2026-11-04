@@ -3,7 +3,12 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { createPreviewLinkAction, revokePreviewLinkAction } from "@/app/admin/preview-links/actions";
+import {
+  createPreviewLinkAction,
+  deleteClosedPreviewLinksAction,
+  deletePreviewLinkAction,
+  revokePreviewLinkAction,
+} from "@/app/admin/preview-links/actions";
 import {
   INITIAL_PREVIEW_LINK_STATE,
   type PreviewLinkActionState,
@@ -54,6 +59,15 @@ export type PreviewLinkStrings = {
   readonly previewLinkTooMany: string;
   readonly previewLinkDbMissing: string;
   readonly previewLinkRevokeWarning: string;
+  readonly previewLinkDelete: string;
+  readonly previewLinkDeleted: string;
+  readonly previewLinkDeleteAll: string;
+  readonly previewLinkDeleteAllCount: string;
+  readonly previewLinkConfirmDeleteAll: string;
+  readonly previewLinkConfirmRequired: string;
+  readonly previewLinkDeletedMany: string;
+  readonly previewLinkDeleteNotClosed: string;
+  readonly previewLinkDeleteWarning: string;
 };
 
 export type PreviewLinkRow = {
@@ -89,6 +103,14 @@ function messageOf(
       return strings.previewLinkCreated;
     case "revoked":
       return strings.previewLinkRevoked;
+    case "deleted":
+      return strings.previewLinkDeleted;
+    case "deleted-many":
+      return fillTemplate(strings.previewLinkDeletedMany, { count: state.deleted ?? 0 });
+    case "not-closed":
+      return strings.previewLinkDeleteNotClosed;
+    case "confirm-required":
+      return strings.previewLinkConfirmRequired;
     case "too-many":
       return fillTemplate(strings.previewLinkTooMany, { max: maxActive });
     case "no-database":
@@ -122,6 +144,56 @@ function StatusLine({
         </span>
       )}
     </div>
+  );
+}
+
+/** ปุ่มลบลิงก์ที่ปิดแล้วทีละรายการ (เฉพาะในแถวที่หมดอายุ/ถูกยกเลิก) */
+function PreviewLinkDeleteForm({
+  id,
+  strings,
+  maxActive,
+}: {
+  readonly id: string;
+  readonly strings: PreviewLinkStrings;
+  readonly maxActive: number;
+}) {
+  const [state, action] = useActionState(deletePreviewLinkAction, INITIAL_PREVIEW_LINK_STATE);
+
+  return (
+    <form action={action} className="flex flex-col gap-1">
+      <input type="hidden" name="id" value={id} />
+      <Submit label={strings.previewLinkDelete} danger />
+      <span className="text-brand-red text-[11px]">{strings.previewLinkDeleteWarning}</span>
+      <StatusLine state={state} strings={strings} maxActive={maxActive} />
+    </form>
+  );
+}
+
+/** ลบลิงก์ที่ปิดแล้วทั้งหมด — ต้องติ๊กยืนยัน (ด่านจริงอยู่ที่ Server Action) */
+function PreviewLinkBulkDeleteForm({
+  closedCount,
+  strings,
+  maxActive,
+}: {
+  readonly closedCount: number;
+  readonly strings: PreviewLinkStrings;
+  readonly maxActive: number;
+}) {
+  const [state, action] = useActionState(deleteClosedPreviewLinksAction, INITIAL_PREVIEW_LINK_STATE);
+
+  return (
+    <form action={action} className="border-line flex flex-wrap items-center gap-2 rounded-xl border p-2">
+      <span className="text-fg-muted text-[11px]">
+        {fillTemplate(strings.previewLinkDeleteAllCount, { count: closedCount })}
+      </span>
+      <label className="text-fg-muted flex items-center gap-1.5 text-[11px]">
+        <input type="checkbox" name="confirm" value="yes" className="accent-brand-red" />
+        {strings.previewLinkConfirmDeleteAll}
+      </label>
+      <Submit label={strings.previewLinkDeleteAll} danger />
+      <span className="text-brand-red basis-full text-[11px]">{strings.previewLinkDeleteWarning}</span>
+      <StatusLine state={state} strings={strings} maxActive={maxActive} />
+    </form>
   );
 }
 
@@ -187,7 +259,7 @@ function PreviewLinkRowItem({ row, strings, maxActive }: { readonly row: Preview
             <StatusLine state={state} strings={strings} maxActive={maxActive} />
           </form>
         ) : (
-          <span className="text-fg-muted text-[11px]">{row.statusLabel}</span>
+          <PreviewLinkDeleteForm id={row.id} strings={strings} maxActive={maxActive} />
         )}
       </td>
     </tr>
@@ -198,10 +270,13 @@ export function PreviewLinkTable({
   rows,
   strings,
   maxActive,
+  closedCount,
 }: {
   readonly rows: readonly PreviewLinkRow[];
   readonly strings: PreviewLinkStrings;
   readonly maxActive: number;
+  /** จำนวนลิงก์ที่ปิดแล้ว (หมดอายุ/ยกเลิก) — ใช้แสดงปุ่มลบทั้งหมด */
+  readonly closedCount: number;
 }) {
   if (rows.length === 0) {
     return <p className="border-line bg-surface text-fg-muted rounded-2xl border p-5 text-sm">{strings.previewLinkEmpty}</p>;
@@ -210,6 +285,9 @@ export function PreviewLinkTable({
   return (
     <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-4">
       <h2 className="text-fg text-sm font-semibold">{strings.previewLinkListTitle}</h2>
+      {closedCount === 0 ? null : (
+        <PreviewLinkBulkDeleteForm closedCount={closedCount} strings={strings} maxActive={maxActive} />
+      )}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>

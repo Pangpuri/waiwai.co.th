@@ -9,7 +9,7 @@ import { MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
- * ฟอร์ม "ตั้งค่าเว็บ" + การ์ดพรีวิว SEO (X1.3 + X1.4)
+ * ฟอร์ม "ข้อมูลองค์กร & SEO" + การ์ดพรีวิว SEO (X1.3 + X1.4)
  *
  * - ปุ่มบันทึกฉบับร่าง/เผยแพร่เหมือนส่วนอื่น
  * - **การ์ดพรีวิว**: จำลองผลลัพธ์บน Google และตอนแชร์ — คำนวณจากค่าที่กรอกในฟอร์มทันที (ไม่ยิงออกเน็ต)
@@ -69,8 +69,6 @@ export function SettingsForm({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <p className="text-fg-muted text-xs">{strings.settingsHint}</p>
-
       <form action={saveAction} className="flex flex-col gap-3">
         <div className="grid gap-2 md:grid-cols-2">
           <label className="flex flex-col gap-1">
@@ -119,22 +117,6 @@ export function SettingsForm({
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLASS}>{strings.settingsAddressEn}</span>
             <textarea name="addressEn" defaultValue={initial.organization.address.en} rows={2} className={FIELD_CLASS} />
-          </label>
-
-          <div className="grid gap-2 md:grid-cols-2">
-            <label className="flex flex-col gap-1">
-              <span className={LABEL_CLASS}>{strings.settingsHoursTh}</span>
-              <input type="text" name="hoursTh" defaultValue={initial.organization.hours.th} maxLength={200} className={FIELD_CLASS} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={LABEL_CLASS}>{strings.settingsHoursEn}</span>
-              <input type="text" name="hoursEn" defaultValue={initial.organization.hours.en} maxLength={200} className={FIELD_CLASS} />
-            </label>
-          </div>
-
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.settingsMapUrl}</span>
-            <input type="text" name="mapUrl" defaultValue={initial.organization.mapUrl} placeholder="https://maps.google.com/…" className={FIELD_CLASS} />
           </label>
 
           <label className="flex flex-col gap-1">

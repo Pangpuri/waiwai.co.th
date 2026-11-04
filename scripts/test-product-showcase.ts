@@ -197,9 +197,9 @@ test("★ product showcase: ตัวเรนเดอร์ + การส่�
   assert.ok(!renderer.includes("listProductCategoryCards"), "ห้ามตัวเรนเดอร์เรียกตัวอ่านฐานข้อมูล");
   assert.ok(!renderer.includes("@/lib/products/repository"), "ห้าม import ชั้นฐานข้อมูลในตัวเรนเดอร์");
 
-  /* ผู้เรียก (เซิร์ฟเวอร์) เป็นคนโหลด: หน้าเว็บจริง + พรีวิว */
-  const home = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(home.includes("productData={await loadProductShowcaseData(liveDocument)}"), "หน้าเว็บจริงต้องโหลดข้อมูลให้");
+  /* ผู้เรียก (เซิร์ฟเวอร์) เป็นคนโหลด: HomeBlockPage + พรีวิวหลังบ้าน */
+  const blockPage = readFileSync("features/home/ui/home-block-page.tsx", "utf8");
+  assert.ok(blockPage.includes("productData={await loadProductShowcaseData(document)}"), "HomeBlockPage ต้องโหลดข้อมูลให้");
   const preview = readFileSync("app/[lang]/preview/[page]/page.tsx", "utf8");
   assert.ok(preview.includes("productData={await loadProductShowcaseData(document)}"), "พรีวิวต้องโหลดข้อมูลให้");
   const frame = readFileSync("features/blocks/ui/preview-frame.tsx", "utf8");
@@ -315,8 +315,8 @@ test("★ recipe showcase: ลงทะเบียนครบ + ตัวเ�
   for (const needle of ["setRecipeShowcaseOptions", "blockRecipeLimit", "blockRecipeDates", "blockRecipeHint"]) {
     assert.ok(panel.includes(needle), `แผงต้องมี: ${needle}`);
   }
-  const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("loadRecipeShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดเมนูให้");
+  const blockPage = readFileSync("features/home/ui/home-block-page.tsx", "utf8");
+  assert.ok(blockPage.includes("recipeData={await loadRecipeShowcaseData(document)}"), "HomeBlockPage ต้องโหลดเมนูให้");
   const template = buildHomeTemplate();
   assert.deepEqual(template.blocks.map((b) => b.type), ["productShowcase", "recipeShowcase", "newsShowcase", "form", "marketplaceLinks"]);
   const block = template.blocks[1];
@@ -338,8 +338,8 @@ test("★ news showcase: บล็อกข่าวล่าสุดครบ�
   for (const needle of ["setNewsShowcaseOptions", "blockNewsLimit", "blockNewsDates", "blockNewsExcerpts", "blockNewsHint"]) {
     assert.ok(panel.includes(needle), `แผงต้องมี: ${needle}`);
   }
-  const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  assert.ok(page.includes("loadNewsShowcaseData(liveDocument)"), "หน้าเว็บจริงต้องโหลดข่าวให้");
+  const blockPage = readFileSync("features/home/ui/home-block-page.tsx", "utf8");
+  assert.ok(blockPage.includes("newsData={await loadNewsShowcaseData(document)}"), "HomeBlockPage ต้องโหลดข่าวให้");
   const template = buildHomeTemplate();
   const block = template.blocks.find((row) => row.type === "newsShowcase");
   assert.equal(block?.type, "newsShowcase");

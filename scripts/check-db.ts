@@ -168,6 +168,7 @@ import { th } from "@/lib/i18n/messages/th";
 import {
   countActivePreviewLinks,
   createPreviewLink,
+  deleteClosedPreviewLink,
   hashPreviewToken,
   listPreviewLinks,
   purgeExpiredPreviewLinks,
@@ -1415,6 +1416,36 @@ async function checkPreviewLinks(): Promise<void> {
     );
     assert.equal(await countWhere("preview_link where id = $1", [id]), 1, "ลิงก์ที่เพิ่งยกเลิกต้องยังอยู่");
     done("เก็บกวาดเฉพาะลิงก์ที่พ้นอายุเก็บ", `ลบ ${purgedLinks.deleted} แถว`);
+
+    /* ── 6) ลบด้วยมือ: ลบได้เฉพาะลิงก์ที่ปิดแล้ว (ลิงก์ที่ยังใช้ได้ต้องไม่ถูกแตะ) ── */
+    assert.equal(
+      await deleteClosedPreviewLink(id, PREVIEW_LINK_TEST_ACTOR),
+      true,
+      "ลบลิงก์ที่ยกเลิกแล้วต้องสำเร็จ",
+    );
+    assert.equal(await countWhere("preview_link where id = $1", [id]), 0, "ลิงก์ที่ลบแล้วต้องหายไป");
+    assert.equal(
+      await deleteClosedPreviewLink(id, PREVIEW_LINK_TEST_ACTOR),
+      false,
+      "ลบซ้ำต้องบอกว่าไม่พบ ไม่ใช่พัง",
+    );
+
+    await pool.query(
+      `insert into preview_link (id, token_hash, page, expires_at, created_by)
+        values ($1, $2, 'home', now() + interval '1 hour', $3)`,
+      ["check-db-preview-active", hashPreviewToken("a".repeat(43)), PREVIEW_LINK_TEST_ACTOR],
+    );
+    assert.equal(
+      await deleteClosedPreviewLink("check-db-preview-active", PREVIEW_LINK_TEST_ACTOR),
+      false,
+      "ลิงก์ที่ยังใช้ได้ต้องลบด้วยมือไม่ได้",
+    );
+    assert.equal(
+      await countWhere("preview_link where id = $1", ["check-db-preview-active"]),
+      1,
+      "ลิงก์ที่ยังใช้ได้ต้องยังอยู่",
+    );
+    done("ลบด้วยมือเฉพาะลิงก์ที่ปิดแล้ว", "ลบได้ · ลิงก์ที่ยังใช้ได้ไม่ถูกแตะ");
   } finally {
     /* คืนสภาพ: ลบเฉพาะลิงก์/ร่องรอยของด่านนี้ (ไม่แตะลิงก์จริงของผู้ใช้) */
     await pool.query("delete from preview_link where created_by = $1", [PREVIEW_LINK_TEST_ACTOR]);

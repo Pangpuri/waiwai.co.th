@@ -121,9 +121,12 @@ test("home-hero: hero ต้องใช้ค่าที่ส่งมา แ
   assert.equal(hero.includes("{m.eyebrow}"), false, "ห้ามอ่าน eyebrow จากพจนานุกรมตรง ๆ อีก");
   assert.equal(hero.includes("{m.title}"), false, "ห้ามอ่าน title จากพจนานุกรมตรง ๆ อีก");
   assert.equal(hero.includes("{m.body}"), false, "ห้ามอ่าน body จากพจนานุกรมตรง ๆ อีก");
+  const loader = codeOf("features/home/home-hero-view.ts");
+  assert.ok(loader.includes("heroTextsOf(homeContent, messages, locale)"), "loader hero ต้องรวมค่าจาก EAV");
   const page = codeOf("app/[lang]/page.tsx");
-  assert.ok(page.includes("heroTextsOf(homeContent, messages, lang)"), "หน้าจอต้องรวมค่าจาก EAV");
-  assert.equal((page.match(/texts=\{heroTexts\}/g) ?? []).length, 2, "ต้องส่งทั้งสองสาขา (โหมดบล็อก + เลย์เอาต์โค้ด)");
+  assert.equal((page.match(/texts=\{homeHero\.heroTexts\}/g) ?? []).length, 1, "เลย์เอาต์โค้ดต้องส่งข้อความเข้า hero");
+  const blockPage = codeOf("features/home/ui/home-block-page.tsx");
+  assert.ok(blockPage.includes("texts={view.heroTexts}"), "โหมดบล็อกต้องส่งข้อความเข้า hero");
 });
 
 /* ── 3) หลังบ้านต้องมีช่องให้แก้ + ตัวสร้างต้องเห็นส่วนนี้ ─────────────────── */

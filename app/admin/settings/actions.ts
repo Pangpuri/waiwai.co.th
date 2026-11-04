@@ -11,7 +11,7 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { SITE_SETTINGS_PAGE_KEY, parseSiteSettings, siteSettingsErrorsOf, validateSiteSettings } from "@/lib/site-settings/model";
 
 /**
- * Server Actions ของ "ตั้งค่าเว็บ" (X1.3)
+ * Server Actions ของ "ข้อมูลองค์กร & SEO" (X1.3)
  *
  * ลำดับเดียวกับส่วนอื่น: ตรวจสิทธิ์ → parse (ไม่เชื่อเบราว์เซอร์) → validate → บันทึก/เผยแพร่
  * ⚠️ ค่าที่บันทึกเป็น "พาธในเว็บ" (favicon/OG) ตามมติ D9 — ตรวจแล้วใน validateSiteSettings
@@ -39,8 +39,6 @@ function toRaw(fields: Readonly<Record<string, string>>): unknown {
       address: { th: fields["addressTh"] ?? "", en: fields["addressEn"] ?? "" },
       phone: fields["phone"] ?? "",
       email: fields["email"] ?? "",
-      hours: { th: fields["hoursTh"] ?? "", en: fields["hoursEn"] ?? "" },
-      mapUrl: fields["mapUrl"] ?? "",
     },
     socials,
   };

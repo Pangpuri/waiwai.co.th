@@ -335,7 +335,10 @@ test("templates: ทุกหน้าที่มีเทมเพลตต้
         : source.includes(`loadLiveBlockDocument("${page}")`),
       `${page}: ต้องโหลดเอกสารที่เผยแพร่`,
     );
-    assert.ok(source.includes("<BlockDocumentView"), `${page}: ต้องใช้ตัวเรนเดอร์ตัวเดียวกับหน้าแรก`);
+    assert.ok(
+      source.includes("<BlockDocumentView") || (page === "home" && source.includes("<HomeBlockPage")),
+      `${page}: ต้องใช้ตัวเรนเดอร์ตัวเดียวกับหน้าแรก`,
+    );
     assert.ok(source.includes("return ("), `${page}: ต้องมีเลย์เอาต์เดิมเป็นทางถอย`);
 
     /*
@@ -408,10 +411,10 @@ test("★ templates: หน้าแรกไม่มีบล็อก hero �
 
   /* โหมด "ใช้กับหน้าเว็บจริง": hero จริงต้องถูกเรนเดอร์ (ไม่ปล่อยให้หาย) */
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
-  const start = page.indexOf("if (liveDocument !== null) {");
-  const blockPath = page.slice(start, page.indexOf("<BlockDocumentView", start));
-  assert.ok(blockPath.includes("<Hero"), "โหมดบล็อกต้องเรนเดอร์ hero จริง");
-  assert.ok(blockPath.includes("heroCard={heroCard}"), "hero ต้องใช้การ์ด PR จากที่เก็บจริง");
+  assert.ok(page.includes("<HomeBlockPage"), "โหมดบล็อกต้องใช้ HomeBlockPage");
+  const blockPage = readFileSync("features/home/ui/home-block-page.tsx", "utf8");
+  assert.ok(blockPage.includes("<Hero"), "โหมดบล็อกต้องเรนเดอร์ hero จริง");
+  assert.ok(blockPage.includes("heroCard={view.heroCard}"), "hero ต้องใช้การ์ด PR จากที่เก็บจริง");
 });
 
 /** ★ รอบที่ 218 — แถบบอกโหมดพรีวิว (เจ้าของขอ "ก": กันเข้าใจผิดว่าพรีวิวไม่ตรงหน้าเว็บ) */

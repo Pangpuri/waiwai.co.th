@@ -24,7 +24,7 @@ export const privacyPage = {
   controllerEmailLabel: "อีเมล",
   controllerDpoLabel: "ผู้ติดต่อเรื่องข้อมูลส่วนบุคคล",
   controllerDpoValue: "เจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล",
-  controllerMissing: "ยังไม่ได้กรอกในตั้งค่าเว็บไซต์ — ผู้ดูแลเว็บเพิ่มได้ที่หน้าตั้งค่าส่วนกลาง",
+  controllerMissing: "ยังไม่ได้กรอกใน “ข้อมูลองค์กร & SEO” — ผู้ดูแลเว็บเพิ่มได้ที่เมนูนั้นในหลังบ้าน",
 
   definitionsTitle: "คำนิยาม",
   definitionsIntro: "คำสำคัญในนโยบายนี้มีความหมายดังนี้",

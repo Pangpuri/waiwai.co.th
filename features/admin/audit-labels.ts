@@ -90,6 +90,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "trash-purge": strings.auditTrashPurge,
     "preview-link-create": strings.auditPreviewLinkCreate,
     "preview-link-revoke": strings.auditPreviewLinkRevoke,
+    "preview-link-delete": strings.auditPreviewLinkDelete,
     "preview-link-purge": strings.auditPreviewLinkPurge,
     "chrome-preset-save": strings.auditChromePresetSave,
     "chrome-preset-apply": strings.auditChromePresetApply,

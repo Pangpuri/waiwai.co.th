@@ -10,13 +10,14 @@ import { SITE } from "@/lib/site";
  *
  * ⚠️ กฎเหล็ก: **ไม่ตั้งค่า = พฤติกรรมเดิมเป๊ะ** (ค่าเริ่มต้นมาจาก `SITE` + พจนานุกรม)
  * ⚠️ พาธไฟล์ (favicon/OG) เก็บเป็นพาธในเว็บ ตามมติ D9 — ไม่เก็บ URL เต็ม
+ * ⚠️ รอบ 326: ถอด `organization.hours` / `organization.mapUrl` ออก เพราะ **ไม่มีโค้ดฝั่งเว็บอ่านค่าเลย**
+ *    ข้อมูลเก่าใน `page_document` ที่ยังมีสองคีย์นี้จะถูกเพิกเฉย (parse ไม่พัง) — ไม่ต้อง migration
  */
 
 export const SITE_SETTINGS_PAGE_KEY = "site-settings";
 
 export const MAX_SITE_NAME_LENGTH = 60;
 export const MAX_URL_LENGTH = 300;
-export const MAX_HOURS_LENGTH = 200;
 export const MAX_SOCIALS = 8;
 
 export type SiteSettings = {
@@ -30,9 +31,6 @@ export type SiteSettings = {
     readonly address: LocalizedValue;
     readonly phone: string;
     readonly email: string;
-    readonly hours: LocalizedValue;
-    /** ลิงก์เปิดแผนที่ (ไม่ฝังสคริปต์ของบุคคลที่สาม) */
-    readonly mapUrl: string;
   };
   /** ลิงก์โซเชียลอย่างเป็นทางการ (ใช้กับ JSON-LD sameAs) */
   readonly socials: readonly string[];
@@ -47,8 +45,6 @@ export const EMPTY_SITE_SETTINGS: SiteSettings = {
     address: { th: "", en: "" },
     phone: "",
     email: "",
-    hours: { th: "", en: "" },
-    mapUrl: "",
   },
   socials: [],
 };
@@ -64,8 +60,6 @@ export function defaultSiteSettings(messages: Messages): SiteSettings {
       address: { th: SITE.contact.address, en: SITE.contact.addressEn },
       phone: SITE.contact.phone,
       email: SITE.contact.email,
-      hours: { th: "", en: "" },
-      mapUrl: "",
     },
     socials: SITE.social.map((item) => item.href),
   };
@@ -120,8 +114,6 @@ export function parseSiteSettings(raw: unknown, messages: Messages): SiteSetting
         address: toLocalized(rawOrg["address"], fallback.organization.address, 300),
         phone: toText(rawOrg["phone"], fallback.organization.phone, 40),
         email: toText(rawOrg["email"], fallback.organization.email, 80),
-        hours: toLocalized(rawOrg["hours"], fallback.organization.hours, MAX_HOURS_LENGTH),
-        mapUrl: toText(rawOrg["mapUrl"], fallback.organization.mapUrl, MAX_URL_LENGTH),
       },
       socials,
     },
@@ -167,9 +159,6 @@ export function validateSiteSettings(value: SiteSettings): readonly SiteSettings
     const issue = pathIssue("bad-path", path, raw);
     if (issue !== null) issues.push(issue);
   }
-
-  const mapIssue = externalIssue("organization.mapUrl", value.organization.mapUrl);
-  if (mapIssue !== null) issues.push(mapIssue);
 
   if (value.organization.email !== "" && !value.organization.email.includes("@")) {
     issues.push({ severity: "error", code: "bad-email", path: "organization.email", detail: null });

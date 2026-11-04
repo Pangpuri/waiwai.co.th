@@ -14,7 +14,7 @@ export const adminRbac = {
   rbacRolePublisherName: "Publisher",
   rbacRolePublisherHint: "Everything an editor can do + customer inbox + SEO + trash",
   rbacRoleAdminName: "Administrator",
-  rbacRoleAdminHint: "Everything, including accounts · site settings · retention (PDPA) · maintenance mode",
+  rbacRoleAdminHint: "Everything, including accounts · organisation & SEO · retention (PDPA) · maintenance mode",
   rbacRoleUnknown: "Unknown role",
   rbacCreateTitle: "Add an account",
   rbacCreateHint: "The system generates the password — copy it and hand it over (shown once).",

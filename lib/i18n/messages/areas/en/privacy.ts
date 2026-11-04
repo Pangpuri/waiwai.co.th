@@ -24,7 +24,7 @@ export const privacyPage = {
   controllerEmailLabel: "Email",
   controllerDpoLabel: "Personal data contact",
   controllerDpoValue: "Data Protection Officer",
-  controllerMissing: "Not filled in under site settings yet — an administrator can add it on the settings screen.",
+  controllerMissing: "Not filled in under “Organisation & SEO” yet — an administrator can add it there in the back office.",
 
   definitionsTitle: "Definitions",
   definitionsIntro: "Key terms in this policy have the following meanings",
