@@ -90,9 +90,10 @@ test("validate: seed มีคำเตือน placeholder และภาพ�
 
 /* ── TH บังคับ ──────────────────────────────────────────────────────── */
 
-test("validate: ฟิลด์ระดับ section ที่เว้นว่าง = error", () => {
+test("validate: ฟิลด์ระดับ section ที่ยังบังคับและเว้นว่าง = error", () => {
   const content = clone();
-  section(content, "hero").fields.title = text("   ");
+  /* รอบ 331: hero.title เปลี่ยนเป็นไม่บังคับแล้ว — ใช้ products.title (ยังบังคับ) ตรวจแทน */
+  section(content, "products").fields.title = text("   ");
   assert.ok(errorCodes(content).includes("empty-th"));
 });
 
@@ -101,6 +102,16 @@ test("validate: ฟิลด์ที่ตั้ง required=false เว้น
   section(content, "hero").fields.note = text("");
   section(content, "newsletter").fields.note = text("");
   assert.ok(!errorCodes(content).includes("empty-th"), "note ที่เจตนาเว้นว่างต้องไม่เป็น error");
+});
+
+test("validate: ข้อความหัวเว็บไซต์ 4 ช่องเว้นว่างได้ (ว่าง = ซ่อน · รอบ 331)", () => {
+  const content = clone();
+  for (const key of ["eyebrow", "title", "titleAccent", "body"]) {
+    section(content, "hero").fields[key] = text("");
+  }
+  const codes = errorCodes(content);
+  assert.ok(!codes.includes("empty-th"), "TH ว่างต้องไม่เป็น error (เจ้าของสั่งซ่อนได้)");
+  assert.ok(!codes.includes("missing-en"), "EN ว่างต้องไม่เป็น error (ช่องนี้ไม่บังคับแปลแล้ว)");
 });
 
 /* ── EN ตามมติ D3 ───────────────────────────────────────────────────── */

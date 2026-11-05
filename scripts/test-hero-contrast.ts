@@ -192,10 +192,13 @@ test("hero: ข้อความต้องไม่ทับบนภาพ�
     "ข้อความ hero อยู่บนพื้นแล้ว จึงต้องไม่ใช้เงา/ออร่าของข้อความบนภาพ",
   );
 
-  // 2) หัวข้อต้องใช้คู่สีที่ผ่านทั้งสองโหมด (แดงแบรนด์ + แดงเข้ม)
-  const heading = /<h1 className="([^"]+)"/.exec(hero);
-  assert.ok(heading?.[1], "ไม่พบ <h1 className=…> ใน hero.tsx");
-  assert.ok(heading[1].includes("text-brand-red"), "คำหลักต้องเป็นแดงแบรนด์");
+  // 2) หัวข้อที่มองเห็นต้องใช้คู่สีที่ผ่านทั้งสองโหมด (แดงแบรนด์ + แดงเข้ม)
+  //    รอบที่ 331: มี h1 "sr-only" สำหรับกรณีเจ้าของซ่อนหัวข้อ — ตรวจเฉพาะ h1 ที่มองเห็น
+  const heading = /<h1 className="([^"]*text-brand-red[^"]*)"/.exec(hero);
+  assert.ok(heading !== null, "ไม่พบ <h1> ที่มองเห็น (แดงแบรนด์) ใน hero.tsx");
+  const headingClass = heading[1] ?? "";
+  assert.ok(headingClass.includes("text-brand-red"), "คำหลักต้องเป็นแดงแบรนด์");
+  assert.equal(headingClass.includes("sr-only"), false, "h1 ที่มีสีแบรนด์ต้องเป็นตัวที่มองเห็น");
 
   /* รอบที่ 250: ข้อความหัวข้ออ่านจาก `texts.*` (ค่าหลังบ้านทับพจนานุกรม) ไม่ใช่ `m.*` ตรง ๆ */
   const accent = /<span className="([^"]*)">\{texts\.titleAccent\}/.exec(hero);
@@ -207,9 +210,10 @@ test("hero: ข้อความต้องไม่ทับบนภาพ�
 
   // 3) แถบภาพต้องไม่มีข้อความอยู่ข้างในแล้ว (ข้อความอยู่ในบล็อกถัดไป)
   const band = /<div className="relative min-h-\[[^\]]+\][^"]*"/.exec(hero);
-  assert.ok(band?.[0], "ไม่พบแถบภาพสไลด์ใน hero.tsx");
+  assert.ok(band !== null, "ไม่พบแถบภาพสไลด์ใน hero.tsx");
+  assert.ok(heading.index > band.index, "หัวข้อที่มองเห็นต้องอยู่หลังแถบภาพ");
   assert.ok(
-    !/\{m\.title\}/.test(hero.slice(0, hero.indexOf("<h1"))),
-    "ข้อความหัวข้อต้องอยู่หลังแถบภาพ ไม่ใช่ข้างใน",
+    !/\{m\.title\}/.test(hero.slice(band.index, heading.index)),
+    "ข้อความหัวข้อต้องไม่ถูกอ่านจากพจนานุกรมตรง ๆ ในแถบภาพ",
   );
 });

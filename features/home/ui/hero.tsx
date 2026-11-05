@@ -60,6 +60,13 @@ export function Hero({
   const m = messages.hero;
   /* ข้อความ: ค่าที่ส่งมา (จากหลังบ้าน) หรือค่าเริ่มต้นจากพจนานุกรม (รอบที่ 250) */
   const texts = heroTexts ?? heroTextsDefaults(messages);
+  /*
+    รอบที่ 331 (คำสั่งเจ้าของ 2026-11-05): ช่องที่เว้นว่าง = **ไม่แสดง** (ไม่ถอยค่าเริ่มต้น)
+    · hasHeading = มีหัวข้อจริง (title หรือ titleAccent) ⇒ ถ้าไม่มี เหลือ h1 แบบ sr-only
+    · hasTextBlock = false ⇒ ไม่เรนเดอร์ชั้นข้อความทั้งก้อน (ไม่เหลือ py-12 ว่างใต้ภาพ)
+  */
+  const hasHeading = texts.title !== "" || texts.titleAccent !== "";
+  const hasTextBlock = texts.eyebrow !== "" || hasHeading || texts.body !== "" || texts.ctaLabel !== "";
   /* เนื้อหาการ์ด: ค่าที่ส่งมา (จากหลังบ้าน) หรือค่าเริ่มต้นจากพจนานุกรม */
   const card = heroCard ?? heroCardDefaults(messages);
 
@@ -73,6 +80,12 @@ export function Hero({
 
   return (
     <section className="relative isolate bg-bg">
+      {/*
+        a11y: ทุกหน้าต้องมี h1 หนึ่งตัว — ถ้าเจ้าของซ่อนหัวข้อ (title + titleAccent ว่าง)
+        ให้เหลือ h1 แบบอ่านออกเสียงเท่านั้น (sr-only · ไม่แสดงบนจอ) · อยู่บนสุดของ section
+      */}
+      {hasHeading ? null : <h1 className="sr-only">{messages.meta.siteName}</h1>}
+
       {/*
         ── ชั้นที่ 1: แถบภาพสไลด์ ────────────────────────────────────────────────
         ความสูง: จอเล็ก 24rem (384px) · lg 36rem (576px) — ปรับได้ที่ min-h-* สองจุดนี้
@@ -124,51 +137,66 @@ export function Hero({
         ── ชั้นที่ 2: ข้อความ ─────────────────────────────────────────────────────
         อยู่บนพื้นหน้าเว็บ → ใช้ token ของพื้น (fg · fg-muted · accent) ไม่ใช่สีบนภาพ
         สีหัวข้อ: คำหลัก = แดงแบรนด์ · คำรอง = แดงเข้ม (--accent ซึ่งสลับสีให้เองในโหมดมืด)
+        รอบที่ 331: **ช่องไหนว่าง = ไม่เรนเดอร์ช่องนั้น** · ว่างครบทุกช่อง = ไม่มีชั้นนี้เลย
+        (ไม่เหลือพื้นที่ py-12 ว่างใต้ภาพ) · `first:mt-0` กันระยะ mt ค้างเมื่อช่องก่อนหน้าถูกซ่อน
       */}
-      <div className="container-site py-12 lg:py-16">
-        <div className="max-w-3xl">
-          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-bg-subtle px-3.5 py-1.5 text-xs font-bold tracking-[0.16em] text-fg-muted uppercase">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {texts.eyebrow}
-          </p>
-
-          {/*
-            คอนทราสต์ที่วัดจริง (ดู scripts/test-hero-contrast.ts):
-              คำหลัก แดงแบรนด์  → พื้นสว่าง 4.80:1 · พื้นมืด 3.92:1 (ผ่านเกณฑ์ตัวอักษรใหญ่ 3:1)
-              คำรอง  แดงเข้ม    → พื้นสว่าง 5.88:1 · พื้นมืด 6.79:1
-            ⚠️ ห้ามใช้สีเหลืองแบรนด์กับข้อความบนพื้นสว่าง — ให้เพียง ~1.4:1 (อ่านไม่ออก)
-          */}
-          <h1 className="mt-6 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
-            {texts.title} <span className="text-accent">{texts.titleAccent}</span>
-          </h1>
-
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            {texts.body}
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link
-              href={localePath(locale, texts.ctaHref)}
-              className="inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3.5 text-sm font-bold text-on-brand shadow-sm transition-transform hover:-translate-y-0.5"
-            >
-              {texts.ctaLabel}
-              <span aria-hidden="true">→</span>
-            </Link>
+      {hasTextBlock ? (
+        <div className="container-site py-12 lg:py-16">
+          <div className="max-w-3xl">
+            {texts.eyebrow === "" ? null : (
+              <p className="inline-flex items-center gap-2 rounded-full border border-line bg-bg-subtle px-3.5 py-1.5 text-xs font-bold tracking-[0.16em] text-fg-muted uppercase">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
+                {texts.eyebrow}
+              </p>
+            )}
 
             {/*
-              ⚠️ รอบที่ 112: **ถอดปุ่ม "ค้นหาร้านใกล้บ้าน" ออก** ตามคำสั่งเจ้าของ
-              เหตุผล (คำเจ้าของ): สินค้าขายตามร้านค้าทั่วไปอยู่แล้ว · ถ้าคงปุ่มนี้ไว้จะมีภาระต้องปักพิกัด
-              ทุกร้านและดูแลต่อเนื่อง — เกินขอบเขตของเว็บองค์กรนี้
-              ⇒ ปุ่มหลักของ hero เหลือ "ดูผลิตภัณฑ์ทั้งหมด" (ช่องทางซื้อออนไลน์ยังอยู่ในส่วน "ที่ซื้อสินค้า" ด้านล่าง)
+              คอนทราสต์ที่วัดจริง (ดู scripts/test-hero-contrast.ts):
+                คำหลัก แดงแบรนด์  → พื้นสว่าง 4.80:1 · พื้นมืด 3.92:1 (ผ่านเกณฑ์ตัวอักษรใหญ่ 3:1)
+                คำรอง  แดงเข้ม    → พื้นสว่าง 5.88:1 · พื้นมืด 6.79:1
+              ⚠️ ห้ามใช้สีเหลืองแบรนด์กับข้อความบนพื้นสว่าง — ให้เพียง ~1.4:1 (อ่านไม่ออก)
+              ⚠️ ท่อนเน้นสีต้องไม่ติดช่องว่างนำหน้าเมื่อ title ว่าง (ประกอบข้อความแบบมีเงื่อนไข)
+            */}
+            {hasHeading ? (
+              <h1 className="mt-6 first:mt-0 font-display text-4xl leading-[1.08] font-extrabold tracking-tight text-brand-red sm:text-5xl lg:text-[3.75rem]">
+                {texts.title}
+                {texts.title !== "" && texts.titleAccent !== "" ? " " : null}
+                {texts.titleAccent === "" ? null : <span className="text-accent">{texts.titleAccent}</span>}
+              </h1>
+            ) : null}
+
+            {texts.body === "" ? null : (
+              <p className="mt-6 first:mt-0 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
+                {texts.body}
+              </p>
+            )}
+
+            {texts.ctaLabel === "" ? null : (
+              <div className="mt-8 first:mt-0 flex flex-wrap items-center gap-3">
+                <Link
+                  href={localePath(locale, texts.ctaHref)}
+                  className="inline-flex items-center gap-2 rounded-full bg-brand-red px-6 py-3.5 text-sm font-bold text-on-brand shadow-sm transition-transform hover:-translate-y-0.5"
+                >
+                  {texts.ctaLabel}
+                  <span aria-hidden="true">→</span>
+                </Link>
+
+                {/*
+                  ⚠️ รอบที่ 112: **ถอดปุ่ม "ค้นหาร้านใกล้บ้าน" ออก** ตามคำสั่งเจ้าของ
+                  เหตุผล (คำเจ้าของ): สินค้าขายตามร้านค้าทั่วไปอยู่แล้ว · ถ้าคงปุ่มนี้ไว้จะมีภาระต้องปักพิกัด
+                  ทุกร้านและดูแลต่อเนื่อง — เกินขอบเขตของเว็บองค์กรนี้
+                  ⇒ ปุ่มหลักของ hero เหลือ "ดูผลิตภัณฑ์ทั้งหมด" (ช่องทางซื้อออนไลน์ยังอยู่ในส่วน "ที่ซื้อสินค้า" ด้านล่าง)
+                */}
+              </div>
+            )}
+
+            {/*
+              รอบที่ 273 (มติเจ้าของ: "เราเตรียมออนจริงแล้ว"): **ถอดบรรทัดหมายเหตุ "ภาพ/ข้อความตัวอย่าง" ออก**
+              เดิมช่องนี้มาจากค่าหลังบ้าน (`note`) — ตอนนี้ไม่เรนเดอร์เลย ⇒ ไม่มีข้อความตัวอย่างขึ้นเว็บแม้ช่องจะมีค่า
             */}
           </div>
-
-          {/*
-            รอบที่ 273 (มติเจ้าของ: "เราเตรียมออนจริงแล้ว"): **ถอดบรรทัดหมายเหตุ "ภาพ/ข้อความตัวอย่าง" ออก**
-            เดิมช่องนี้มาจากค่าหลังบ้าน (`note`) — ตอนนี้ไม่เรนเดอร์เลย ⇒ ไม่มีข้อความตัวอย่างขึ้นเว็บแม้ช่องจะมีค่า
-          */}
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

@@ -23,6 +23,7 @@ import { isDatabaseConfigured, loadPageContent, savePageContent } from "@/lib/co
  *   ⇒ ตัวช่วยเดิมจัดการ orphan/คีย์ซ้ำให้ครบ (บทเรียนคีย์ `item_key` 2026-10-02)
  * - **fail-closed**: เจอแถวที่โครงไม่รู้จัก (`unknownKeys`) = ไม่บันทึก (กันข้อมูลส่วนอื่นหาย)
  * - ตรวจค่าด้วย `parseHeroTextsInput()` (ตรรกะล้วน) → `?error=invalid` + `&fields=` บอกช่องที่ต้องแก้
+ *   (รอบที่ 331: ช่องข้อความเว้นว่างได้ = ซ่อน · เหลือตรวจเฉพาะรูปแบบปลายทางปุ่ม)
  * - บันทึกแล้วสั่ง `refreshPublicSite()` (ISR) ⇒ หน้าเว็บใหม่ทันที + audit `hero-save` (`hero-texts-save`)
  */
 export async function saveHeroTextsAction(formData: FormData): Promise<void> {
@@ -30,7 +31,7 @@ export async function saveHeroTextsAction(formData: FormData): Promise<void> {
   if (!isDatabaseConfigured()) redirect("/admin/hero?error=save-failed");
 
   const parsed = parseHeroTextsInput(formData);
-  /* ฟอร์มฝั่งจอมี `required` อยู่แล้ว — ตรงนี้เป็นด่านกันจริงที่ฝั่งเซิร์ฟเวอร์ */
+  /* รอบที่ 331: ข้อความว่างผ่านได้ (ว่าง = ซ่อน) — ด่านฝั่งเซิร์ฟเวอร์ยังตรวจรูปแบบปลายทาง */
   if (!parsed.ok) {
     const fields = parsed.problems.join(",");
     redirect(`/admin/hero?error=invalid&fields=${encodeURIComponent(fields)}`);

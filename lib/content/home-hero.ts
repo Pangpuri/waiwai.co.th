@@ -13,8 +13,13 @@ import type { Messages } from "@/lib/i18n/messages/th";
  *   – จอเดิม (`/admin/content/home` → section "แถบเปิดหน้าแรก (Hero)") เคยมีช่องให้แก้แต่ **ไม่มีผลกับหน้าเว็บ**
  *   – รอบ 330 ถอดจอนั้นแล้ว · ค่าจริงแก้ที่ `/admin/hero` (ฟอร์มข้อความ hero) และ **มีผลกับหน้าเว็บ**
  *
- * ⇒ ไฟล์นี้เป็น **กติกาการเลือกค่าจุดเดียว**: *ค่าที่ตั้งในหลังบ้านทับพจนานุกรม* และช่องที่ว่าง = ใช้ค่าเดิม
- * ⚠️ ห้ามให้ช่องไหนกลายเป็นสตริงว่างบนหน้าเว็บ — ว่าง = ถอยไปใช้ค่าเริ่มต้นเสมอ (หน้าเว็บห้ามพังเพราะข้อมูล)
+ * ⇒ ไฟล์นี้เป็น **กติกาการเลือกค่าจุดเดียว**: *ค่าที่ตั้งในหลังบ้านทับพจนานุกรม*
+ *
+ * ## รอบที่ 331 (คำสั่งเจ้าของ 2026-11-05): เว้นว่างได้ = ซ่อน
+ * เดิมช่องข้อความหลักบังคับกรอก และ "ว่าง" ถอยไปใช้ค่าเริ่มต้น ⇒ เจ้าของ **ซ่อนข้อความไม่ได้**
+ * ใหม่: **แถวที่ยังไม่มีใน DB** = ค่าเริ่มต้นจากพจนานุกรม · **แถวที่มีอยู่แต่ช่องว่าง** = ซ่อน (`""`)
+ *   – หน้าเว็บต้องไม่พังเพราะข้อมูล: ช่องที่ซ่อนต้องไม่ทิ้งแท็กเปล่า/ช่องว่างในผัง
+ *   – หน้าไทยไม่แสดงข้อความอังกฤษ (บทเรียนรอบ 200) · หน้า EN ที่ยังไม่มี EN ยังถอยไทยได้
  */
 
 export type HeroTexts = {
@@ -49,8 +54,8 @@ export function heroTextsDefaults(messages: Messages): HeroTexts {
 }
 
 /**
- * เลือกค่าตามภาษา: **EN ใช้เฉพาะเมื่อขอ EN และมีจริง** — ไม่งั้นถอยไทย · ว่างเปล่า = ใช้ค่าเดิม
- * (บทเรียนรอบ 200: เคยลืมเช็คภาษา ⇒ หน้าไทยแสดงข้อความอังกฤษ)
+ * ค่าที่ **ห้ามว่างบนหน้าเว็บ** (เช่น ปลายทางปุ่ม) — ว่าง = ถอยค่าเริ่มต้นเสมอ
+ * (บทเรียนรอบ 200: เคยลืมเช็คภาษา ⇒ หน้าไทยแสดงข้อความอังกฤษ · EN ใช้เมื่อมีจริงเท่านั้น)
  */
 function pick(value: { readonly th: string; readonly en: string } | undefined, fallback: string, language: "th" | "en"): string {
   if (value === undefined) return fallback;
@@ -59,9 +64,27 @@ function pick(value: { readonly th: string; readonly en: string } | undefined, f
 }
 
 /**
+ * ข้อความที่ **เว้นว่างได้ = ซ่อน** (รอบที่ 331)
+ *
+ * - **ไม่มีแถวใน DB** = ใช้ค่าเริ่มต้นจากพจนานุกรม (ผู้ใช้ยังไม่เคยแตะช่องนี้)
+ * - **มีแถวแต่ช่องว่าง** = คืน `""` (ผู้ใช้สั่งซ่อน) — **ห้าม** ถอยไปค่าเริ่มต้น ไม่งั้นซ่อนไม่ได้
+ * - ขอ EN และ EN ว่าง = ถอยไทย (มติ D22) · ขอ TH และไทยว่าง = ซ่อน (ห้ามหน้าไทยแสดงอังกฤษ)
+ */
+function optionalText(
+  value: { readonly th: string; readonly en: string } | undefined,
+  fallback: string,
+  language: "th" | "en",
+): string {
+  if (value === undefined) return fallback;
+  const preferred = language === "en" ? value.en : value.th;
+  if (preferred.trim() !== "") return preferred.trim();
+  if (language === "en") return value.th.trim();
+  return "";
+}
+
+/**
  * หมายเหตุ (ป้าย "ภาพตัวอย่าง…"): **ผู้ใช้สั่งซ่อนได้**
- * ⚠️ ต่างจากช่องอื่นโดยเจตนา — ช่องอื่น "ว่าง = ใช้ค่าเริ่มต้น" แต่ช่องนี้พอถูกล้างแล้วต้องหายไปจริง
- *   (ไม่งั้นผู้ใช้จะซ่อนป้ายไม่ได้เลย) · ยังไม่เคยตั้ง (ไม่มีแถว) = ใช้ค่าเริ่มต้นของพจนานุกรม
+ * (ปัจจุบันไม่เรนเดอร์บนหน้าเว็บ — รอบที่ 273 · เก็บกติกาไว้ให้ค่าที่ค้างใน DB ไม่ทำให้หน้าพัง)
  */
 function noteText(value: { readonly th: string; readonly en: string } | undefined, fallback: string, language: "th" | "en"): string {
   if (value === undefined) return fallback;
@@ -75,6 +98,7 @@ function noteText(value: { readonly th: string; readonly en: string } | undefine
 /**
  * รวมข้อความ hero: **หลังบ้าน (EAV) ทับพจนานุกรม**
  * `content` = `null`/ยังไม่มีแถว = ค่าเริ่มต้น (หน้าเว็บไม่มีทางพังเพราะฐานข้อมูล)
+ * รอบ 331: ช่องข้อความหลักที่ถูกล้าง = `""` (ซ่อน) · ปลายทางปุ่มยังถอยค่าเริ่มต้นเสมอ
  */
 export function heroTextsOf(content: PageContent | null, messages: Messages, language: "th" | "en"): HeroTexts {
   const fallback = heroTextsDefaults(messages);
@@ -82,13 +106,13 @@ export function heroTextsOf(content: PageContent | null, messages: Messages, lan
   if (fields === undefined) return fallback;
 
   return {
-    eyebrow: pick(fields["eyebrow"], fallback.eyebrow, language),
-    title: pick(fields["title"], fallback.title, language),
-    titleAccent: pick(fields["titleAccent"], fallback.titleAccent, language),
-    body: pick(fields["body"], fallback.body, language),
+    eyebrow: optionalText(fields["eyebrow"], fallback.eyebrow, language),
+    title: optionalText(fields["title"], fallback.title, language),
+    titleAccent: optionalText(fields["titleAccent"], fallback.titleAccent, language),
+    body: optionalText(fields["body"], fallback.body, language),
     /* หมายเหตุ: ว่างได้ — แต่ถ้าไม่เคยตั้ง (ไม่มีแถว) ใช้ค่าเริ่มต้นของพจนานุกรม */
     note: noteText(fields["note"], fallback.note, language),
-    ctaLabel: pick(fields["ctaLabel"], fallback.ctaLabel, language),
+    ctaLabel: optionalText(fields["ctaLabel"], fallback.ctaLabel, language),
     /* ปลายทางไม่ผูกภาษา (พาธกลาง) — อ่านจากช่องไทยตามกติกาเดิม (เหมือนการ์ดประกาศ) */
     ctaHref: pick(fields["ctaHref"], fallback.ctaHref, "th"),
   };
@@ -100,14 +124,11 @@ export function heroTextsOf(content: PageContent | null, messages: Messages, lan
    ⚠️ เก็บที่เดิม (EAV `content_field` section `hero`) — ไม่ย้ายที่เก็บ ⇒ หน้าเว็บอ่านค่าเดิม
 */
 
-/** ช่องที่ทำให้บันทึกไม่ผ่าน (ใช้บอกผู้ใช้) */
-export const HERO_TEXT_FIELD_CODES = [
-  "eyebrowTh",
-  "titleTh",
-  "titleAccentTh",
-  "bodyTh",
-  "ctaHref",
-] as const;
+/**
+ * ช่องที่ทำให้บันทึกไม่ผ่าน (ใช้บอกผู้ใช้)
+ * รอบที่ 331: ช่องข้อความเว้นว่างได้ทั้งหมด ⇒ เหลือเฉพาะ **ปลายทางปุ่ม** ที่ต้องตรวจรูปแบบ
+ */
+export const HERO_TEXT_FIELD_CODES = ["ctaHref"] as const;
 export type HeroTextFieldCode = (typeof HERO_TEXT_FIELD_CODES)[number];
 
 export type HeroTextsInput = {
@@ -143,11 +164,11 @@ function text(raw: unknown, max: number): string {
 /**
  * อ่านค่าจากฟอร์ม + ตรวจ (ตรรกะล้วน · ไม่แตะ DB)
  *
- * กติกา
- * - **ไทยบังคับ** ในช่องที่เป็นแกนของส่วน (ข้อความเล็ก/หัวข้อ/ท่อนเน้น/คำโปรย) — เหมือนสเปกเนื้อหา
- * - **อังกฤษไม่บังคับ** (มติ D22: EN = ความรับผิดชอบการตลาด) · ว่าง = หน้า EN ถอยไปใช้ไทย (`heroTextsOf`)
- * - หมายเหตุ/ป้ายปุ่ม/ปลายทาง **ว่างได้** — ว่าง = ถอยค่าเริ่มต้นของโค้ด (หมายเหตุ: ว่าง = ซ่อนป้าย)
- * - ปลายทางกรอกมา = ต้องเป็นพาธในเว็บหรือ http(s) เท่านั้น (ห้าม URL แปลกปลอม)
+ * กติกา (รอบที่ 331)
+ * - **ทุกช่องข้อความเว้นว่างได้** — ว่าง = ไม่แสดงส่วนนั้นบนเว็บ (คำสั่งเจ้าของ 2026-11-05)
+ *   · ไม่มีแถวใน DB = ค่าเริ่มต้นจากพจนานุกรม (กติกาอยู่ที่ `heroTextsOf`)
+ * - **อังกฤษไม่บังคับ** (มติ D22: EN = ความรับผิดชอบการตลาด) · ว่าง = หน้า EN ถอยไปใช้ไทย
+ * - ปลายทางกรอกมา = ต้องเป็นพาธในเว็บหรือ http(s) เท่านั้น (ห้าม URL แปลกปลอม) · ว่าง = ค่าเริ่มต้น
  */
 export function parseHeroTextsInput(form: { get(key: string): unknown }): HeroTextsParseResult {
   const value: HeroTextsInput = {
@@ -167,10 +188,7 @@ export function parseHeroTextsInput(form: { get(key: string): unknown }): HeroTe
   };
 
   const problems: HeroTextFieldCode[] = [];
-  if (value.eyebrowTh === "") problems.push("eyebrowTh");
-  if (value.titleTh === "") problems.push("titleTh");
-  if (value.titleAccentTh === "") problems.push("titleAccentTh");
-  if (value.bodyTh === "") problems.push("bodyTh");
+  /* รอบที่ 331: ช่องข้อความว่างได้ (ว่าง = ซ่อน) — ตรวจเฉพาะรูปแบบปลายทาง */
   if (value.ctaHref !== "" && !isInSitePath(value.ctaHref) && !/^https?:\/\//.test(value.ctaHref)) {
     problems.push("ctaHref");
   }
@@ -180,27 +198,63 @@ export function parseHeroTextsInput(form: { get(key: string): unknown }): HeroTe
 }
 
 /**
- * ค่าตั้งต้นของฟอร์ม = ค่าที่ **บันทึกไว้จริง** (ว่าง = ว่าง) ไม่ใช่ค่าที่ merge กับพจนานุกรมแล้ว
- * เพื่อให้ผู้ใช้เห็นว่าช่องไหน "ยังไม่ได้ตั้ง" (แต่ตัวอย่างบนเว็บยังใช้ค่าเริ่มต้น)
+ * ค่าตั้งต้นของฟอร์ม
+ *
+ * - ไม่ส่ง `fallback` = **ค่าดิบที่บันทึกไว้จริง** (ว่าง = ว่าง) — ใช้เมื่อต้องการเห็นแถวใน DB ตามจริง
+ * - ส่ง `fallback` (ปกติคือ `heroTextsDefaults(messages)`) = **แถวที่ยังไม่มีใน DB ใช้ค่าเริ่มต้น**
+ *   ⚠️ แถวที่มีอยู่แล้วแต่ถูกล้าง ต้องคงเป็นว่าง (ผู้ใช้สั่งซ่อน) — ห้ามเติมค่าเริ่มต้นทับ
+ *   ⇒ ฟอร์มจะโชว์ "สิ่งที่เว็บกำลังแสดง" และการล้างช่อง = ซ่อนจริง (รอบที่ 331)
+ *   · ช่อง EN ยังคงค่าดิบเสมอ (ว่าง = หน้า EN ถอยไทย) — ไม่เติมค่าเริ่มต้นอังกฤษให้เอง
  */
-export function heroTextsDraftOf(content: PageContent | null): HeroTextsInput {
+export function heroTextsDraftOf(content: PageContent | null, fallback?: HeroTexts): HeroTextsInput {
   const fields = content?.sections["hero"]?.fields;
-  const raw = (field: string, language: "th" | "en"): string => fields?.[field]?.[language] ?? "";
+  const raw = (field: string, language: "th" | "en", fallbackValue = ""): string => {
+    const row = fields?.[field];
+    return row === undefined ? fallbackValue : (row[language] ?? "");
+  };
 
   return {
-    eyebrowTh: raw("eyebrow", "th"),
+    eyebrowTh: raw("eyebrow", "th", fallback?.eyebrow ?? ""),
     eyebrowEn: raw("eyebrow", "en"),
-    titleTh: raw("title", "th"),
+    titleTh: raw("title", "th", fallback?.title ?? ""),
     titleEn: raw("title", "en"),
-    titleAccentTh: raw("titleAccent", "th"),
+    titleAccentTh: raw("titleAccent", "th", fallback?.titleAccent ?? ""),
     titleAccentEn: raw("titleAccent", "en"),
-    bodyTh: raw("body", "th"),
+    bodyTh: raw("body", "th", fallback?.body ?? ""),
     bodyEn: raw("body", "en"),
-    noteTh: raw("note", "th"),
+    noteTh: raw("note", "th", fallback?.note ?? ""),
     noteEn: raw("note", "en"),
-    ctaLabelTh: raw("ctaLabel", "th"),
+    ctaLabelTh: raw("ctaLabel", "th", fallback?.ctaLabel ?? ""),
     ctaLabelEn: raw("ctaLabel", "en"),
-    ctaHref: raw("ctaHref", "th"),
+    ctaHref: raw("ctaHref", "th", fallback?.ctaHref ?? ""),
+  };
+}
+
+/**
+ * ค่าเริ่มต้นสำหรับปุ่ม **“คืนค่าเริ่มต้น”** ในฟอร์ม (รอบที่ 331)
+ *
+ * เติมทั้ง TH และ EN จากพจนานุกรมของแต่ละภาษา ⇒ ผู้ใช้เห็น “รูปแบบเริ่มต้นจริง” ก่อนปรับ
+ * ⚠️ ฟังก์ชันนี้ **ไม่แตะ DB** — เป็นเพียงค่าที่จะถูกใส่ในฟอร์ม · ยังไม่บันทึกจนกว่าจะกด “บันทึกข้อความ”
+ * (ต่างจาก `heroTextsDraftOf` ที่ช่อง EN ปล่อยว่างเพื่อให้หน้า EN ถอยไทย)
+ */
+export function heroTextsDefaultsInput(messagesTh: Messages, messagesEn: Messages): HeroTextsInput {
+  const th = heroTextsDefaults(messagesTh);
+  const en = heroTextsDefaults(messagesEn);
+
+  return {
+    eyebrowTh: th.eyebrow,
+    eyebrowEn: en.eyebrow,
+    titleTh: th.title,
+    titleEn: en.title,
+    titleAccentTh: th.titleAccent,
+    titleAccentEn: en.titleAccent,
+    bodyTh: th.body,
+    bodyEn: en.body,
+    noteTh: th.note,
+    noteEn: en.note,
+    ctaLabelTh: th.ctaLabel,
+    ctaLabelEn: en.ctaLabel,
+    ctaHref: th.ctaHref,
   };
 }
 

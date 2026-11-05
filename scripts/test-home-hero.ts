@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { heroTextsDefaults, heroTextsOf } from "@/lib/content/home-hero";
+import { heroTextsDefaults, heroTextsDraftOf, heroTextsOf } from "@/lib/content/home-hero";
+import { HOME_PAGE_SPEC } from "@/lib/content/model";
 import type { PageContent } from "@/lib/content/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -21,11 +22,13 @@ import { codeOf } from "./source-scan.ts";
  *   (คลาสเดียวกับบั๊กการ์ดประกาศ รอบที่ 200) + ปุ่มหลักฮาร์ดโค้ด ⇒ "ช่องที่โกหก"
  *
  * ## สัญญาที่ล็อก
- * 1. ค่าที่ตั้งในหลังบ้าน **ทับ** พจนานุกรม · ไม่มีค่า/ว่าง = ถอยไปใช้ค่าเริ่มต้น (หน้าเว็บห้ามพัง ห้ามว่าง)
- * 2. EN ว่าง ⇒ ถอยไทย (ห้ามหน้าไทยแสดงข้อความอังกฤษ)
- * 3. หมายเหตุ (ป้าย "ภาพตัวอย่าง…") **ล้างแล้วต้องหายจริง** (ต่างจากช่องอื่นโดยเจตนา)
- * 4. ปุ่มหลัก (ป้าย + ปลายทาง) แก้ได้จากหลังบ้าน · ปลายทางเป็นพาธกลาง
+ * 1. ค่าที่ตั้งในหลังบ้าน **ทับ** พจนานุกรม · **ไม่มีแถว** = ค่าเริ่มต้น · **มีแถวแต่เว้นว่าง = ซ่อน**
+ *    (รอบที่ 331 · คำสั่งเจ้าของ 2026-11-05: ต้องซ่อนข้อความหัวเว็บได้)
+ * 2. EN ว่าง ⇒ ถอยไทย · ไทยว่าง ⇒ ซ่อน (ห้ามหน้าไทยแสดงข้อความอังกฤษ)
+ * 3. หมายเหตุ (ป้าย "ภาพตัวอย่าง…") **ล้างแล้วต้องหายจริง** (แต่ไม่เรนเดอร์อยู่แล้วตั้งแต่รอบ 273)
+ * 4. ปุ่มหลัก (ป้าย + ปลายทาง) แก้ได้จากหลังบ้าน · ป้ายว่าง = ซ่อนปุ่ม · ปลายทางว่าง = พาธกลางค่าเริ่มต้น
  * 5. ตัวสร้างต้องแสดงแถว hero พร้อมลิงก์ไปแก้ทั้งสองทาง (กัน "หายไป 1 บล็อก" ในสายตาผู้ใช้)
+ * 6. ฟอร์มหลังบ้าน prefill ค่าเริ่มต้นเฉพาะแถวที่ยังไม่มี — แถวที่ถูกล้างต้องคงว่าง
  */
 
 /* ใช้พจนานุกรมตรง ๆ (ไม่ผ่านตัวช่วยที่พึ่ง next/navigation — เทสต์รันด้วย `node --test`) */
@@ -75,13 +78,32 @@ test("home-hero: ค่าจากหลังบ้านทับพจนา
   assert.equal(texts.ctaHref, "/products");
 });
 
-test("home-hero: ช่องว่าง = ถอยค่าเดิม · EN ว่าง = ถอยไทย (ห้ามหน้าอังกฤษว่าง/ไทยโชว์อังกฤษ)", () => {
+test("home-hero: แถวที่เว้นว่าง = ซ่อน · EN ว่าง = ถอยไทย · ไทยว่าง = ซ่อน", () => {
   const fallback = heroTextsDefaults(messages);
 
-  /* ช่องว่างล้วน ⇒ ค่าเดิม (หน้าเว็บห้ามว่าง) */
-  const blank = heroTextsOf(contentWithHero({ eyebrow: { th: "  ", en: "" }, title: { th: "", en: "" } }), messages, "th");
-  assert.equal(blank.eyebrow, fallback.eyebrow);
-  assert.equal(blank.title, fallback.title);
+  /* ไม่มีแถว = ค่าเริ่มต้น (ผู้ใช้ยังไม่เคยตั้ง) */
+  const missing = heroTextsOf(contentWithHero({}), messages, "th");
+  assert.equal(missing.eyebrow, fallback.eyebrow);
+  assert.equal(missing.title, fallback.title);
+
+  /* มีแถวแต่ช่องว่าง = ผู้ใช้สั่งซ่อน (ไม่ถอยค่าเริ่มต้น) */
+  const blank = heroTextsOf(
+    contentWithHero({
+      eyebrow: { th: "  ", en: "" },
+      title: { th: "", en: "" },
+      titleAccent: { th: "", en: "" },
+      body: { th: "", en: "" },
+      ctaLabel: { th: "", en: "" },
+    }),
+    messages,
+    "th",
+  );
+  assert.equal(blank.eyebrow, "", "ข้อความเล็กเว้นว่าง = ซ่อน");
+  assert.equal(blank.title, "", "หัวข้อเว้นว่าง = ซ่อน");
+  assert.equal(blank.titleAccent, "", "ท่อนเน้นเว้นว่าง = ซ่อน");
+  assert.equal(blank.body, "", "คำโปรยเว้นว่าง = ซ่อน");
+  assert.equal(blank.ctaLabel, "", "ป้ายปุ่มเว้นว่าง = ซ่อนปุ่ม");
+  assert.equal(blank.ctaHref, fallback.ctaHref, "ปลายทางที่เว้นว่าง = ค่าเริ่มต้น (ลิงก์ต้องไม่พัง)");
 
   /* ขอ EN แต่ EN ว่าง ⇒ ใช้ไทย (ไม่ใช่ค่าว่าง) */
   const partial = heroTextsOf(contentWithHero({ body: { th: "ข้อความไทย", en: "" } }), messages, "en");
@@ -92,7 +114,29 @@ test("home-hero: ช่องว่าง = ถอยค่าเดิม · EN
   assert.equal(both.body, "English");
   /* ขอ TH ⇒ ไทยเสมอ แม้ EN มีค่า */
   assert.equal(heroTextsOf(contentWithHero({ body: { th: "ไทย", en: "English" } }), messages, "th").body, "ไทย");
+  /* ขอ TH แต่ไทยว่าง + EN มี ⇒ ซ่อน (ห้ามหน้าไทยแสดงอังกฤษ) */
+  assert.equal(heroTextsOf(contentWithHero({ body: { th: "", en: "English" } }), messages, "th").body, "");
   assert.equal(messagesEn.hero.title.trim() === "" ? true : both.body !== messagesEn.hero.title, true);
+});
+
+test("home-hero: ฟอร์ม prefill ค่าเริ่มต้นเฉพาะแถวที่ยังไม่มี — แถวที่ถูกล้างต้องคงว่าง", () => {
+  const fallback = heroTextsDefaults(messages);
+  const draft = heroTextsDraftOf(
+    contentWithHero({
+      title: { th: "", en: "" },
+      body: { th: "ไทย", en: "English" },
+    }),
+    fallback,
+  );
+  assert.equal(draft.titleTh, "", "แถวที่มีอยู่แต่ถูกล้าง = ว่าง (ผู้ใช้สั่งซ่อน)");
+  assert.equal(draft.titleEn, "");
+  assert.equal(draft.eyebrowTh, fallback.eyebrow, "แถวที่ยังไม่มี = ค่าเริ่มต้น เพื่อให้ฟอร์มตรงกับเว็บ");
+  assert.equal(draft.bodyTh, "ไทย");
+  assert.equal(draft.bodyEn, "English");
+  assert.equal(draft.ctaHref, fallback.ctaHref, "ปลายทางที่ยังไม่มี = ค่าเริ่มต้น");
+
+  /* ไม่ส่ง fallback = ค่าดิบ (ว่าง = ว่าง) */
+  assert.equal(heroTextsDraftOf(contentWithHero({})).titleTh, "");
 });
 
 test("home-hero: หมายเหตุล้างแล้วต้องหายจริง (แต่ไม่เคยตั้ง = ค่าเริ่มต้น)", () => {
@@ -127,6 +171,14 @@ test("home-hero: hero ต้องใช้ค่าที่ส่งมา แ
   assert.equal((page.match(/texts=\{homeHero\.heroTexts\}/g) ?? []).length, 1, "เลย์เอาต์โค้ดต้องส่งข้อความเข้า hero");
   const blockPage = codeOf("features/home/ui/home-block-page.tsx");
   assert.ok(blockPage.includes("texts={view.heroTexts}"), "โหมดบล็อกต้องส่งข้อความเข้า hero");
+  /* รอบที่ 331: ช่องว่างต้องไม่ถูกเรนเดอร์ + ไม่เหลือบล็อกว่าง + ยังมี h1 ให้ a11y */
+  assert.ok(hero.includes('texts.eyebrow === "" ? null : ('), "ข้อความเล็กว่าง = ไม่เรนเดอร์");
+  assert.ok(hero.includes("hasHeading ? ("), "หัวข้อว่าง = ไม่เรนเดอร์ h1 ที่มองเห็น");
+  assert.ok(hero.includes("hasTextBlock ? ("), "ว่างครบทุกช่อง = ไม่มีชั้นข้อความ");
+  assert.ok(hero.includes('texts.body === "" ? null : ('), "คำโปรยว่าง = ไม่เรนเดอร์");
+  assert.ok(hero.includes('texts.ctaLabel === "" ? null : ('), "ป้ายปุ่มว่าง = ไม่เรนเดอร์ปุ่ม");
+  assert.ok(hero.includes("messages.meta.siteName"), "ซ่อนหัวข้อแล้วต้องเหลือ h1 สำหรับ screen reader");
+  assert.ok(hero.includes("first:mt-0"), "ระยะห่างต้องไม่ค้างเมื่อช่องก่อนหน้าถูกซ่อน");
 });
 
 /* ── 3) หลังบ้านต้องมีช่องให้แก้ + ตัวสร้างต้องเห็นส่วนนี้ ─────────────────── */
@@ -137,6 +189,12 @@ test("home-hero: โมเดลเนื้อหามีช่องปุ่
   assert.ok(model.includes('sectionUrl("ctaHref"'), "ต้องมีช่องปลายทางปุ่ม (ไม่ผูกภาษา)");
   const heroSpec = model.slice(model.indexOf("const HERO: SectionSpec"), model.indexOf("items: [", model.indexOf("const HERO: SectionSpec")));
   assert.ok(heroSpec.includes("required: false"), "ช่องใหม่ต้องไม่บังคับ (ข้อมูลเดิมต้องไม่กลายเป็นไม่ผ่าน)");
+
+  /* รอบที่ 331: 4 ช่องข้อความหลักต้องไม่บังคับกรอก (ว่าง = ซ่อน) */
+  const heroFields = HOME_PAGE_SPEC.sections.find((section) => section.key === "hero")?.fields ?? [];
+  for (const key of ["eyebrow", "title", "titleAccent", "body", "ctaLabel"]) {
+    assert.equal(heroFields.find((field) => field.key === key)?.required, false, `${key} ต้องเว้นว่างได้`);
+  }
 
   const seed = codeOf("lib/content/home-seed.ts");
   assert.ok(seed.includes("ctaLabel: text(th.actions.viewProducts, en.actions.viewProducts)"), "seed ต้องมีป้ายปุ่ม");

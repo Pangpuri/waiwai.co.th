@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { heroTextsDraftOf, heroTextsFieldsOf, heroTextFieldCodesOf, parseHeroTextsInput } from "@/lib/content/home-hero";
+import {
+  heroTextsDefaults,
+  heroTextsDefaultsInput,
+  heroTextsDraftOf,
+  heroTextsFieldsOf,
+  heroTextFieldCodesOf,
+  parseHeroTextsInput,
+} from "@/lib/content/home-hero";
 import { ownerOfSection } from "@/lib/content/home-section-owners";
 import { HOME_PAGE_SPEC } from "@/lib/content/model";
+import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 
 import { codeOf, rawOf } from "./source-scan.ts";
@@ -41,7 +49,7 @@ const base = {
   ctaHref: "/products",
 };
 
-test("hero texts: อ่านค่าฟอร์ม + ตัดความยาว + บังคับไทย · อังกฤษเว้นว่างได้", () => {
+test("hero texts: อ่านค่าฟอร์ม + ตัดความยาว · ทุกช่องเว้นว่างได้ (รอบ 331)", () => {
   const parsed = parseHeroTextsInput(form(base));
   assert.equal(parsed.ok, true);
   if (!parsed.ok) return;
@@ -55,12 +63,17 @@ test("hero texts: อ่านค่าฟอร์ม + ตัดความ�
   if (long.ok) assert.equal(long.value.eyebrowTh.length, 40, "ความยาวต้องถูกตัดตามสเปก");
 });
 
-test("hero texts: ไทยบังคับในช่องแกน · ปลายทางต้องเป็นพาธหรือ http(s)", () => {
-  for (const missing of ["eyebrowTh", "titleTh", "titleAccentTh", "bodyTh"] as const) {
-    const parsed = parseHeroTextsInput(form({ ...base, [missing]: "" }));
-    assert.equal(parsed.ok, false, `${missing} ว่างต้องไม่ผ่าน`);
-    if (!parsed.ok) assert.deepEqual(parsed.problems, [missing]);
+test("hero texts: 4 ช่องข้อความเว้นว่างได้ · ปลายทางต้องเป็นพาธหรือ http(s)", () => {
+  /* รอบที่ 331 (คำสั่งเจ้าของ): ว่างได้ทุกช่อง — ว่าง = ซ่อนบนเว็บ (ไม่ใช่ error) */
+  for (const blank of ["eyebrowTh", "titleTh", "titleAccentTh", "bodyTh", "ctaLabelTh"] as const) {
+    const parsed = parseHeroTextsInput(form({ ...base, [blank]: "" }));
+    assert.equal(parsed.ok, true, `${blank} ว่างต้องผ่าน`);
   }
+  assert.equal(
+    parseHeroTextsInput(form({ eyebrowTh: "", titleTh: "", titleAccentTh: "", bodyTh: "", ctaLabelTh: "" })).ok,
+    true,
+    "เว้นว่างครบทุกช่อง = ซ่อนทั้งบล็อก (ต้องบันทึกได้)",
+  );
 
   /* ปลายทาง: ว่างได้ (ถอยค่าเริ่มต้น) · /path ได้ · https ได้ · ค่าประหลาดไม่ผ่าน */
   assert.equal(parseHeroTextsInput(form({ ...base, ctaHref: "" })).ok, true, "ว่าง = ใช้ค่าเริ่มต้นในโค้ด");
@@ -70,28 +83,99 @@ test("hero texts: ไทยบังคับในช่องแกน · ป�
   assert.equal(parseHeroTextsInput(form({ ...base, ctaHref: "/products all" })).ok, false, "พาธต้องไม่มีช่องว่าง");
 });
 
-test("hero texts: prefill มาจากค่าที่บันทึกจริง + แปลงเป็นฟิลด์ EAV ครบ", () => {
+test("hero texts: prefill แสดงสิ่งที่เว็บใช้จริง · แถวที่ถูกล้างคงว่าง + แปลงเป็นฟิลด์ EAV ครบ", () => {
   const content = {
     page: "home",
     sections: { hero: { fields: { title: { th: "ไทย", en: "EN" }, ctaHref: { th: "/products", en: "" } }, items: {} } },
   };
-  const draft = heroTextsDraftOf(content);
-  assert.equal(draft.titleTh, "ไทย");
-  assert.equal(draft.titleEn, "EN");
-  assert.equal(draft.eyebrowTh, "", "ช่องที่ไม่ตั้ง = ว่าง (ให้ผู้ใช้เห็นว่ายังไม่ได้ตั้ง)");
-  assert.equal(draft.ctaHref, "/products");
 
-  const fields = heroTextsFieldsOf(draft);
+  /* ค่าดิบ (ไม่ส่ง fallback) */
+  const raw = heroTextsDraftOf(content);
+  assert.equal(raw.titleTh, "ไทย");
+  assert.equal(raw.titleEn, "EN");
+  assert.equal(raw.eyebrowTh, "", "แถวที่ไม่มี = ว่างในค่าดิบ");
+  assert.equal(raw.ctaHref, "/products");
+
+  /* ค่าที่ฟอร์มใช้จริง: แถวที่ไม่มี = ค่าเริ่มต้น · แถวที่มีแต่ว่าง = ว่าง (ซ่อน) */
+  const fallback = { eyebrow: "ค่าเริ่มต้น", title: "ค่าเริ่มต้น", titleAccent: "ค่าเริ่มต้น", body: "ค่าเริ่มต้น", note: "", ctaLabel: "ปุ่ม", ctaHref: "/products" };
+  const formValues = heroTextsDraftOf(content, fallback);
+  assert.equal(formValues.titleTh, "ไทย", "แถวที่มีค่าแล้วใช้ค่าจริง");
+  assert.equal(formValues.eyebrowTh, "ค่าเริ่มต้น", "แถวที่ไม่มี = ค่าเริ่มต้น (ฟอร์มตรงกับเว็บ)");
+  assert.equal(formValues.ctaLabelTh, "ปุ่ม");
+  assert.equal(formValues.ctaHref, "/products");
+
+  const cleared = heroTextsDraftOf(
+    { page: "home", sections: { hero: { fields: { title: { th: "", en: "" } }, items: {} } } },
+    fallback,
+  );
+  assert.equal(cleared.titleTh, "", "แถวที่มีอยู่แต่ถูกล้าง = ว่าง (ห้ามเติมค่าเริ่มต้นทับ)");
+
+  const fields = heroTextsFieldsOf(raw);
   assert.deepEqual(Object.keys(fields).sort(), ["body", "ctaHref", "ctaLabel", "eyebrow", "note", "title", "titleAccent"]);
   assert.deepEqual(fields.ctaHref, { th: "/products", en: "" }, "ปลายทางไม่ผูกภาษา");
 
-  /* ไม่มีข้อมูล = ว่างทั้งหมด (ไม่ทำให้หน้าจอพัง) */
+  /* ไม่มีข้อมูล = ค่าเริ่มต้น (ฟอร์มไม่พัง) */
   assert.equal(heroTextsDraftOf(null).titleTh, "");
+  assert.equal(heroTextsDraftOf(null, fallback).titleTh, "ค่าเริ่มต้น");
 });
 
-test("hero texts: ตัวกรอง 'ช่องที่ต้องแก้' เชื่อค่าจาก URL ไม่ได้", () => {
-  assert.deepEqual(heroTextFieldCodesOf("titleTh,bodyTh"), ["titleTh", "bodyTh"]);
-  assert.deepEqual(heroTextFieldCodesOf("titleTh,<script>,bodyTh"), ["titleTh", "bodyTh"], "รหัสแปลกปลอมถูกทิ้ง");
+test("hero texts: ปุ่มคืนค่าเริ่มต้นเติมค่า TH/EN จริง · ยังไม่บันทึกเอง", () => {
+  const thDefaults = heroTextsDefaults(th);
+  const enDefaults = heroTextsDefaults(en);
+  const input = heroTextsDefaultsInput(th, en);
+
+  assert.equal(input.eyebrowTh, thDefaults.eyebrow);
+  assert.equal(input.eyebrowEn, enDefaults.eyebrow);
+  assert.equal(input.titleTh, thDefaults.title);
+  assert.equal(input.titleEn, enDefaults.title);
+  assert.equal(input.titleAccentTh, thDefaults.titleAccent);
+  assert.equal(input.titleAccentEn, enDefaults.titleAccent);
+  assert.equal(input.bodyTh, thDefaults.body);
+  assert.equal(input.bodyEn, enDefaults.body);
+  assert.equal(input.noteTh, thDefaults.note);
+  assert.equal(input.noteEn, enDefaults.note);
+  assert.equal(input.ctaLabelTh, th.actions.viewProducts);
+  assert.equal(input.ctaLabelEn, en.actions.viewProducts);
+  assert.equal(input.ctaHref, "/products");
+
+  /* ข้อความหลัก + ป้ายปุ่มต้องมีค่าให้เห็นจริง (note ไม่บังคับ — TH ว่างได้) */
+  for (const key of [
+    "eyebrowTh",
+    "eyebrowEn",
+    "titleTh",
+    "titleEn",
+    "titleAccentTh",
+    "titleAccentEn",
+    "bodyTh",
+    "bodyEn",
+    "ctaLabelTh",
+    "ctaLabelEn",
+    "ctaHref",
+  ] as const) {
+    assert.notEqual(input[key], "", `${key} ต้องมีค่าเริ่มต้นให้ผู้ใช้เห็น`);
+  }
+
+  const page = codeOf("app/admin/hero/page.tsx");
+  assert.ok(page.includes('searchParamText(query.defaults) === "1"'), "อ่าน ?defaults=1 ผ่านตัวช่วยกลาง");
+  assert.ok(
+    page.includes('heroTextsDefaultsInput(messages, await getMessagesFor("en"))'),
+    "ค่าเริ่มต้น TH/EN มาจากพจนานุกรมของแต่ละภาษา",
+  );
+  assert.ok(page.includes("showingDefaults={showDefaults}"), "ส่งโหมดค่าเริ่มต้นให้ฟอร์ม");
+
+  const form = codeOf("features/admin/ui/hero-texts-form.tsx");
+  assert.ok(form.includes('"/admin/hero?defaults=1#hero-texts"'), "มีลิงก์ไปโหมดค่าเริ่มต้น");
+  assert.ok(form.includes('showingDefaults ? "/admin/hero#hero-texts"'), "มีลิงก์กลับไปค่าที่บันทึกไว้");
+  assert.ok(form.includes("key={showingDefaults ?"), "remount ฟอร์มเมื่อสลับโหมด (defaultValue จะได้มีผล)");
+  assert.ok(form.includes("strings.textsRestoreDefaults"), "ป้ายปุ่มจากพจนานุกรม");
+  assert.ok(form.includes("strings.textsDefaultsNotice"), "ต้องบอกผู้ใช้ว่ายังไม่บันทึก");
+  assert.ok(form.includes("action={saveHeroTextsAction}"), "การบันทึกยังเป็น action เดิม");
+});
+
+test("hero texts: ตัวกรอง 'ช่องที่ต้องแก้' เหลือเฉพาะปลายทาง + เชื่อค่าจาก URL ไม่ได้", () => {
+  /* รอบ 331: ข้อความว่างผ่านได้แล้ว ⇒ มีเพียง ctaHref ที่เป็น error ได้ */
+  assert.deepEqual(heroTextFieldCodesOf("ctaHref"), ["ctaHref"]);
+  assert.deepEqual(heroTextFieldCodesOf("titleTh,<script>,ctaHref"), ["ctaHref"], "รหัสแปลกปลอม/รหัสเก่าถูกทิ้ง");
   assert.deepEqual(heroTextFieldCodesOf(undefined), []);
   assert.deepEqual(heroTextFieldCodesOf(""), []);
 });
@@ -114,7 +198,7 @@ test("hero texts: action อยู่หน้าจอสไลด์ · ตร
 test("hero texts: หน้าจอสไลด์แสดงฟอร์ม · หน้าจอเนื้อหาไม่แสดง (แต่ค่าไม่หาย)", () => {
   const heroPage = codeOf("app/admin/hero/page.tsx");
   assert.ok(heroPage.includes("<HeroTextsForm"), "หน้าจอสไลด์ต้องมีฟอร์มข้อความ");
-  assert.ok(heroPage.includes("heroTextsDraftOf(homeContent)"), "prefill จากค่าจริง");
+  assert.ok(heroPage.includes("heroTextsDraftOf(homeContent, heroTextsDefaults(messages))"), "prefill จากค่าจริง + ค่าเริ่มต้นเฉพาะแถวที่ยังไม่มี");
   assert.ok(heroPage.includes("heroTextFieldCodesOf(problemFieldsRaw)"), "แสดงช่องที่ต้องแก้จาก ?fields=");
 
   const owner = ownerOfSection("hero");
@@ -133,6 +217,9 @@ test("hero texts: หน้าจอสไลด์แสดงฟอร์ม �
   assert.ok(heroForm.includes("data-texts-field={pair.name}"), "ช่อง Th/En มาจากชื่อฐานเดียวกัน");
   assert.ok(heroForm.includes('data-texts-field="ctaHref"'), "ต้องมีช่องปลายทางปุ่ม");
   assert.ok(heroForm.includes("maxLength={40}") && heroForm.includes("maxLength={300}"), "มีเพดานความยาวตามสเปก");
+  /* รอบ 331: ต้องไม่มี `required` / ดาวบังคับกรอกเหลืออยู่ในฟอร์ม */
+  assert.equal(heroForm.includes("required"), false, "ฟอร์มต้องไม่บังคับกรอกช่องใดอีก");
+  assert.equal(heroForm.includes("*</span>"), false, "ต้องไม่เหลือดาวบังคับกรอก");
 });
 
 test("hero texts: กลุ่ม slides (ข้อมูลตาย) ต้องไม่อยู่ในสเปก/seed และไม่มีใครอ่าน", () => {

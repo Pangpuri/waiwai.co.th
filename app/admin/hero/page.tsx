@@ -8,7 +8,7 @@ import { ImageLibraryProvider, type ImageLibraryItem } from "@/features/admin/ui
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { heroCardContentOf, heroCardDraftOf } from "@/lib/content/home-card";
-import { heroTextsDraftOf, heroTextFieldCodesOf } from "@/lib/content/home-hero";
+import { heroTextsDefaults, heroTextsDefaultsInput, heroTextsDraftOf, heroTextFieldCodesOf } from "@/lib/content/home-hero";
 import { loadHomeContentSafely } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import {
@@ -60,6 +60,14 @@ export default async function AdminHeroPage({
   const feedback = feedbackOf({ saved: searchParamText(query.saved), error: searchParamText(query.error) });
   /* รอบที่ 251: ช่องที่ต้องแก้ ส่งมากับ ?fields= (Server Action ตรวจไม่ผ่าน) */
   const problemFieldsRaw = searchParamText(query.fields, 300);
+  /*
+    รอบที่ 331: ?defaults=1 = เติม **ค่าเริ่มต้นจริง TH/EN** ลงฟอร์มให้ผู้ใช้เห็นรูปแบบเดิมก่อนปรับ
+    ⚠️ เป็นเพียงค่าที่แสดงในฟอร์ม — ยังไม่บันทึกจนกว่าจะกด "บันทึกข้อความ"
+  */
+  const showDefaults = searchParamText(query.defaults) === "1";
+  const textsCurrent = showDefaults
+    ? heroTextsDefaultsInput(messages, await getMessagesFor("en"))
+    : heroTextsDraftOf(homeContent, heroTextsDefaults(messages));
   const savedMessages: Readonly<Record<HeroSavedCode, string>> = {
     "slide-added": s.feedbackSlideAdded,
     "slide-removed": s.feedbackSlideRemoved,
@@ -132,7 +140,12 @@ export default async function AdminHeroPage({
         ⇒ หน้าจอ "เนื้อหาหน้าแรก" ไม่แสดงส่วน hero แล้ว (กันแก้ได้สองที่) — ค่าเก็บที่เดิม (EAV)
         ⚠️ ฟอร์มเป็น Server Action ล้วน (ไม่ต้องมี JS) · ค่าที่ส่งกลับมาบอกผลด้วยรหัสใน URL
       */}
-      <HeroTextsForm current={heroTextsDraftOf(homeContent)} strings={s} problemFields={heroTextFieldCodesOf(problemFieldsRaw)} />
+      <HeroTextsForm
+        current={textsCurrent}
+        strings={s}
+        problemFields={heroTextFieldCodesOf(problemFieldsRaw)}
+        showingDefaults={showDefaults}
+      />
 
 
       <form action={saveHeroSettingAction} className="border-line bg-surface flex flex-wrap items-end gap-3 rounded-xl border p-3">
