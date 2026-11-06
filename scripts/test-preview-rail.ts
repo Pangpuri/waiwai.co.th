@@ -60,14 +60,22 @@ test("preview rail: PreviewFrame ต้องกัน re-render ซ้ำเม
   );
 });
 
-test("preview rail: ตัวสร้างหน้าเว็บยืดช่องพรีวิวเต็มคอลัมน์ + iframe สูงพอดีช่อง", () => {
+test("preview rail: ตัวสร้างหน้าเว็บใช้ split view (พรีวิวเต็มความสูง + ตั้งค่าเลื่อนในตัวเอง)", () => {
   /*
     รอบที่ 302 (เจ้าของ): "ส่วนล่างไม่ได้ยืดลงมา" — จอตัวสร้างหน้าเว็บ
-    ⇒ กล่องพรีวิวต้องกินทุกแถวของคอลัมน์ตั้งค่า และช่อง iframe ต้องสูงพอดีช่อง (ไม่ใช่สูงคงที่ตามอุปกรณ์)
+    รอบที่ 334 (เจ้าของ): "แต่ละบล็อกจะยาวขึ้น … ต้องเลื่อนไปเลื่อนมา … อยากให้ส่วนที่ตั้งค่า scroll ได้"
+    ⇒ จอใหญ่ใช้กริดสูงพอดีวิวพอร์ต · พรีวิวเต็มความสูง · เลเยอร์พับได้ · ตั้งค่าเลื่อนในตัวเอง
   */
   const builder = codeOf("features/admin/ui/block-builder.tsx");
 
-  assert.ok(builder.includes("md:row-span-5"), "กล่องพรีวิวต้องกินทุกแถวของคอลัมน์ตั้งค่า (ปัจจุบัน 5 แถว)");
+  assert.ok(builder.includes("lg:h-[calc(100dvh-8rem)]"), "กล่องกริดต้องสูงพอดีวิวพอร์ตบนจอใหญ่");
+  assert.ok(builder.includes("lg:grid-rows-[auto_minmax(0,1fr)]"), "แถวเลเยอร์ = auto · แถวตั้งค่า = กินที่เหลือ");
+  assert.ok(builder.includes("md:row-span-2"), "พรีวิวต้องอยู่ข้างเลเยอร์ + ตั้งค่า (สองแถว)");
+  assert.ok(builder.includes("lg:h-full"), "พรีวิวต้องเต็มความสูงกริด");
+  assert.ok(builder.includes("data-inspector-scroll"), "แผงตั้งค่าต้องมี marker สำหรับเลื่อนในตัวเอง");
+  assert.ok(builder.includes("lg:overflow-y-auto"), "แผงตั้งค่าต้องเลื่อนในตัวเอง ไม่ดันหน้าเว็บให้ยาว");
+  assert.ok(builder.includes("aria-expanded={layersOpen}"), "ปุ่มเลเยอร์ต้องบอกสถานะเปิด/พับ");
+  assert.ok(builder.includes("layersCollapsed"), "เลเยอร์ที่พับต้องมีข้อความบอกวิธีเปิด");
   assert.ok(builder.includes("admin-preview-pane"), "ช่องพรีวิวต้องใช้คลาสกลาง (overflow + scrollbar-gutter)");
   assert.ok(builder.includes("md:min-h-0 md:flex-1"), "ช่องพรีวิวต้องยืดเต็มที่เหลือบนจอใหญ่");
   assert.ok(builder.includes("const renderedHeight ="), "ต้องคำนวณความสูง iframe จากความสูงช่องพรีวิว");

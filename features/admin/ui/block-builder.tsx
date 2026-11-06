@@ -566,6 +566,11 @@ export function BlockBuilder({
     (เดิม deps = [document, selectedId] ⇒ ค่าไม่เปลี่ยน = ไม่ส่งอะไร ⇒ ผู้ใช้รู้สึกว่า "คลิกไม่ติด")
   */
   const [selectTick, setSelectTick] = useState(0);
+  /**
+   * เลเยอร์พับเก็บได้ (รอบที่ 334) — ลดความยาวของแผงขวาเมื่อมีหลายบล็อก
+   * ค่าเริ่มต้น = พับ (ผู้ใช้กดเปิดเมื่อต้องการเลือก/ย้าย/เพิ่มบล็อก)
+   */
+  const [layersOpen, setLayersOpen] = useState(false);
   /** การ์ดที่กำลังแก้ (ลำดับในบล็อก) — null = ดูภาพรวมของบล็อก */
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   /** บล็อกที่เพิ่งลบ + เวลาหมดอายุของปุ่ม "เลิกทำ" (รอบที่ 323) */
@@ -2446,13 +2451,83 @@ export function BlockBuilder({
         ⇒ พรีวิวอยู่ซ้าย (กว้างที่สุด) · **แผงปรับแต่งอยู่ขวา** เลื่อนตามได้
         ⇒ และ "หน้า home ปรับแต่งล้น ต้องสกอลข้าง" ⇒ ทุกช่องใส่ `min-w-0` + ให้ข้อความตัดบรรทัด
            (สาเหตุเดิม: ชื่อบล็อกยาวในคอลัมน์แคบ ดันให้เกิดแถบเลื่อนแนวนอนทั้งหน้า)
-      */}
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* เลเยอร์ */}
-        <section className="border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-2 md:row-start-2">
-          <h2 className="text-fg text-sm font-semibold">{strings.layers}</h2>
 
-          {/* เลย์เอาต์ของหน้า (X1.8) — ตั้งระดับหน้า ไม่ใช่ระดับบล็อก ⇒ อยู่เหนือรายการบล็อก */}
+        รอบที่ 334 (คำเจ้าของ): ลดการเลื่อนหน้าเว็บระหว่างแก้บล็อก
+        - จอใหญ่ = **split view**: กริดสูงพอดีวิวพอร์ต · พรีวิวอยู่ครึ่งซ้ายเต็มความสูง
+        - แผงขวาแบ่งเป็น "เลเยอร์" (พับได้ · สูงจำกัด) + "ตั้งค่าบล็อกที่เลือก" (เลื่อนในตัวเอง)
+        ⇒ พรีวิวไม่หลุดจอ และไม่ต้องเลื่อนหน้าเว็บขึ้นลงเพื่อดูตัวอย่าง
+      */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] md:items-start xl:grid-cols-[minmax(0,1fr)_360px] lg:h-[calc(100dvh-8rem)] lg:min-h-[560px] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch">
+        {/* เลเยอร์ */}
+        <section
+          className="border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-2 md:row-start-1"
+          data-layers-panel={layersOpen ? "open" : "closed"}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h2 className="text-fg text-sm font-semibold">{strings.layers}</h2>
+              <p className="text-fg-muted text-[11px]">{fillTemplate(strings.blocksCount, { n: document.blocks.length })}</p>
+            </div>
+            <button
+              type="button"
+              aria-expanded={layersOpen}
+              aria-controls="builder-layers-body"
+              onClick={() => setLayersOpen((current) => !current)}
+              className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span aria-hidden="true">{layersOpen ? "▾ " : "▸ "}</span>
+              {layersOpen ? strings.layersHide : strings.layersShow}
+            </button>
+          </div>
+
+          {layersOpen ? (
+            <div
+              id="builder-layers-body"
+              className="flex min-h-0 flex-col gap-2 lg:max-h-[35dvh] lg:overflow-y-auto lg:overscroll-contain"
+            >
+          {/* เลเยอร์แบบซ้อนได้ (X1.1) — คอมโพเนนต์แยก เพื่อไม่ให้ไฟล์นี้ยาวเกินจำเป็น */}
+          <BlockLayerList
+            document={document}
+            selectedId={selectedId}
+            strings={strings}
+            onSelect={(blockId) => {
+              setSelectedId(blockId);
+              setSelectedCard(null);
+              /*
+                รอบที่ 230/232: เลือกซ้ำบล็อกเดิมก็ต้องเลื่อนไปหาใหม่ + ส่ง **ทันที** ไม่รอ debounce 250ms
+                (ตัวจับเวลาถูกยกเลิกได้ถ้ามีการอัปเดตอื่นแทรก ⇒ เจ้าของเจออาการ "คลิกในรายการแล้วไม่วิ่งตาม")
+              */
+              const nextTick = selectTick + 1;
+              setSelectTick(nextTick);
+              const previewWindow = frameRef.current?.contentWindow;
+              if (previewWindow !== null && previewWindow !== undefined) {
+                previewWindow.postMessage(
+                  { type: PREVIEW_MESSAGE, document, selectedId: blockId, selectTick: nextTick },
+                  window.location.origin,
+                );
+              }
+            }}
+            onMove={(blockId, delta) => update(moveBlock(document, blockId, delta))}
+            onDuplicate={(blockId) => update(duplicateBlock(document, blockId))}
+            onRemove={(blockId) => {
+              /*
+                ⚠️ ต้องใช้ functional update (รอบที่ 322)
+                เดิม `update(removeBlock(document, blockId))` ใช้ `document` จาก closure
+                ⇒ ถ้ากดลบบล็อกสองอันใน tick เดียว (สคริปต์/อีเวนต์เร็ว) ตัวที่สองเห็นเอกสารชุดเก่า
+                  แล้วเขียนทับ ⇒ การลบครั้งแรกหายเงียบ ๆ
+                รอบที่ 323: เก็บสำเนา + ตำแหน่งเดิมไว้ทำ "เลิกทำ" ก่อนลบจริง
+              */
+              const removal = removeBlockWithUndo(document, blockId);
+              setDocument((current) => removeBlock(current, blockId));
+              if (removal !== null) {
+                setUndoRemoval({ removal: removal.removed, expiresAt: Date.now() + DELETE_UNDO_MS });
+                setUndoProblem(false);
+              }
+              if (blockId === selectedId) setSelectedId("");
+            }}
+            onMoveTo={(blockId, target: BlockLocation) => update(moveBlockToLocation(document, blockId, target))}
+          />
+          {/* เลย์เอาต์ของหน้า (X1.8) — ตั้งระดับหน้า ไม่ใช่ระดับบล็อก ⇒ อยู่ใต้รายการบล็อก (ให้เลือกบล็อกได้ก่อน) */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="builder-layout" className="text-fg-muted text-xs">
               {strings.layoutLabel}
@@ -2623,48 +2698,10 @@ export function BlockBuilder({
             </div>
           )}
 
-          {/* เลเยอร์แบบซ้อนได้ (X1.1) — คอมโพเนนต์แยก เพื่อไม่ให้ไฟล์นี้ยาวเกินจำเป็น */}
-          <BlockLayerList
-            document={document}
-            selectedId={selectedId}
-            strings={strings}
-            onSelect={(blockId) => {
-              setSelectedId(blockId);
-              setSelectedCard(null);
-              /*
-                รอบที่ 230/232: เลือกซ้ำบล็อกเดิมก็ต้องเลื่อนไปหาใหม่ + ส่ง **ทันที** ไม่รอ debounce 250ms
-                (ตัวจับเวลาถูกยกเลิกได้ถ้ามีการอัปเดตอื่นแทรก ⇒ เจ้าของเจออาการ "คลิกในรายการแล้วไม่วิ่งตาม")
-              */
-              const nextTick = selectTick + 1;
-              setSelectTick(nextTick);
-              const previewWindow = frameRef.current?.contentWindow;
-              if (previewWindow !== null && previewWindow !== undefined) {
-                previewWindow.postMessage(
-                  { type: PREVIEW_MESSAGE, document, selectedId: blockId, selectTick: nextTick },
-                  window.location.origin,
-                );
-              }
-            }}
-            onMove={(blockId, delta) => update(moveBlock(document, blockId, delta))}
-            onDuplicate={(blockId) => update(duplicateBlock(document, blockId))}
-            onRemove={(blockId) => {
-              /*
-                ⚠️ ต้องใช้ functional update (รอบที่ 322)
-                เดิม `update(removeBlock(document, blockId))` ใช้ `document` จาก closure
-                ⇒ ถ้ากดลบบล็อกสองอันใน tick เดียว (สคริปต์/อีเวนต์เร็ว) ตัวที่สองเห็นเอกสารชุดเก่า
-                  แล้วเขียนทับ ⇒ การลบครั้งแรกหายเงียบ ๆ
-                รอบที่ 323: เก็บสำเนา + ตำแหน่งเดิมไว้ทำ "เลิกทำ" ก่อนลบจริง
-              */
-              const removal = removeBlockWithUndo(document, blockId);
-              setDocument((current) => removeBlock(current, blockId));
-              if (removal !== null) {
-                setUndoRemoval({ removal: removal.removed, expiresAt: Date.now() + DELETE_UNDO_MS });
-                setUndoProblem(false);
-              }
-              if (blockId === selectedId) setSelectedId("");
-            }}
-            onMoveTo={(blockId, target: BlockLocation) => update(moveBlockToLocation(document, blockId, target))}
-          />
+            </div>
+          ) : (
+            <p className="text-fg-muted text-xs">{strings.layersCollapsed}</p>
+          )}
         </section>
 
         {/* พรีวิวเหมือนหน้าเว็บจริง (โหลดในเปลือกเว็บจริงผ่าน iframe) */}
@@ -2678,11 +2715,11 @@ export function BlockBuilder({
             fullscreen
               ? "bg-bg fixed inset-0 z-50 flex h-dvh flex-col gap-2 overflow-hidden p-2 sm:p-3"
               /*
-                `md:row-span-5` = กินความสูง **ทุกแถวของคอลัมน์ตั้งค่า** (เลเยอร์ · ตรวจสอบ · ประวัติ · คำเตือน)
-                ⇒ กล่องพรีวิวยืดลงไปเท่ากล่องตั้งค่าจริง ไม่จบก่อนแล้วเหลือที่ว่าง
-                ⚠️ ถ้าเพิ่มการ์ดฝั่งขวาใหม่ ต้องขยับเลขนี้ตาม (มีเทสต์ล็อกไว้ที่ `scripts/test-preview-rail.ts`)
+                `md:row-span-2` = อยู่ข้างเลเยอร์ + ตั้งค่า (สองแถวของคอลัมน์ขวา)
+                `lg:h-full` = ใน split view พรีวิวสูงเต็มกริด (พอดีวิวพอร์ต) ⇒ ไม่หลุดจอขณะแก้
+                ⚠️ โครงนี้มีเทสต์ล็อกที่ `scripts/test-preview-rail.ts` — แก้แล้วต้องอัปเดตเทสต์ด้วย
               */
-              : "border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-span-5 md:row-start-1"
+              : "border-line bg-surface flex min-w-0 flex-col gap-2 rounded-2xl border p-3 md:col-start-1 md:row-span-2 md:row-start-1 md:self-start lg:h-full lg:min-h-0 lg:self-stretch"
           }
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2800,7 +2837,8 @@ export function BlockBuilder({
         */}
         <section
           ref={noticePanelRef}
-          className="border-line bg-surface flex min-w-0 flex-col gap-3 rounded-2xl border p-3 md:col-start-2 md:row-start-3"
+          className="border-line bg-surface flex min-w-0 flex-col gap-3 rounded-2xl border p-3 md:col-start-2 md:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable]"
+          data-inspector-scroll=""
         >
           <h2 className="text-fg text-sm font-semibold">{strings.inspector}</h2>
           {selected === null ? (
