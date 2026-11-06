@@ -354,7 +354,13 @@ test("blocks: marketplaceLinks — เอกสารเก่าไม่มี
     const block = parsed.document.blocks[0];
     if (block?.type === "marketplaceLinks") {
       assert.deepEqual(block.items, [
-        { id: "shop-1", label: { th: "ร้านทดสอบ", en: "Test shop" }, href: "https://example.test/shop" },
+        {
+          id: "shop-1",
+          label: { th: "ร้านทดสอบ", en: "Test shop" },
+          href: "https://example.test/shop",
+          logo: null,
+          brand: null,
+        },
       ]);
     }
   }
@@ -377,7 +383,7 @@ test("blocks: marketplaceLinks — รายการที่ไม่มีช
     blocks: [
       {
         ...base,
-        items: [{ id: "shop-1", label: { th: "", en: "" }, href: "javascript:alert(1)" }],
+        items: [{ id: "shop-1", label: { th: "", en: "" }, href: "javascript:alert(1)", logo: null, brand: null }],
       },
     ],
   };
@@ -394,9 +400,13 @@ test("blocks: marketplaceLinks — เติมรายการเริ่ม
   assert.ok(seeded?.type === "marketplaceLinks");
   if (seeded?.type === "marketplaceLinks") {
     assert.equal(seeded.items.length, SITE.marketplaces.length);
+    assert.equal(seeded.items.length, 7, "ค่าเริ่มต้นต้องมี 7 ปุ่ม");
     assert.equal(seeded.items[0]?.href, SITE.marketplaces[0]?.href);
-    assert.equal(seeded.items[0]?.label.th, "Shopee");
-    assert.equal(seeded.items[0]?.label.en, "Shopee");
+    assert.equal(seeded.items[0]?.label.th, "Waiwai");
+    assert.equal(seeded.items[0]?.label.en, "Waiwai");
+    assert.equal(seeded.items[0]?.logo?.path, SITE.marketplaces[0]?.logo);
+    assert.equal(seeded.items[0]?.brand, SITE.marketplaces[0]?.brand);
+    assert.equal(seeded.items.some((item) => item.id === "lineShop"), false, "LINE Shop ต้องถูกถอด");
   }
 
   doc = setMarketplaceLinkHref(doc, "m1", 0, "https://shopee.co.th/new-shop");

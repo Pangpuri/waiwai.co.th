@@ -44,6 +44,7 @@ import {
   type BlockStyle,
   type BlockTableRow,
   type HeroSlideItem,
+  type MarketplaceBrand,
   type MarketplaceLinkItem,
   type PageLayout,
   type RecipeCardItem,
@@ -465,6 +466,20 @@ function readRecipeItems(entry: Record<string, unknown>, path: string, problems:
   return items;
 }
 
+/** อ่านแบรนด์ที่มุมปุ่ม — ค่าที่ไม่รู้จักถูกเพิกเฉย (ไม่ทำให้เอกสารพัง) */
+function readMarketplaceBrand(value: unknown, path: string, problems: string[]): MarketplaceBrand | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") {
+    problems.push(`${path}: ต้องเป็นข้อความ (waiwai/serda)`);
+    return null;
+  }
+  const brand = value.trim();
+  if (brand === "") return null;
+  if (brand === "waiwai" || brand === "serda") return brand;
+  problems.push(`${path}: ค่าแบรนด์ไม่รู้จัก "${brand}" — ใช้ null`);
+  return null;
+}
+
 /** อ่านรายการช่องทางจำหน่ายของบล็อก "ที่ซื้อสินค้า" — ไม่ระบุ = ใช้ค่าเริ่มต้นจาก SITE */
 function readMarketplaceItems(
   entry: Record<string, unknown>,
@@ -501,6 +516,8 @@ function readMarketplaceItems(
       id,
       label: toText(raw["label"], `${itemPath}.label`, problems),
       href: readString(raw, "href", `${itemPath}.href`, problems),
+      logo: toMedia(raw["logo"], `${itemPath}.logo`, problems),
+      brand: readMarketplaceBrand(raw["brand"], `${itemPath}.brand`, problems),
     });
   });
 

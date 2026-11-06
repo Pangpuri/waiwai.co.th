@@ -283,10 +283,12 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
 
     case "marketplaceLinks":
       /*
-        บล็อก "ที่ซื้อสินค้า" — ข้อความและปุ่มลิงก์แก้ได้ในบล็อก (รอบ 329)
+        บล็อก "ที่ซื้อสินค้า" — ข้อความและปุ่มโลโก้ร้านแก้ได้ในบล็อก (รอบ 329 · 333)
         · heading/body/eyebrow/retailNote ไม่บังคับ (ว่าง = ไม่แสดง/ใช้ค่าเริ่มต้น)
         · รายการที่เพิ่มแล้วต้องมีชื่อไทย + ลิงก์ที่ปลอดภัยก่อนเผยแพร่
         · รายการที่ไม่มีลิงก์ = คำเตือน (ตัวเรนเดอร์ข้ามปุ่มนั้น)
+        · รายการที่ไม่มีโลโก้ = คำเตือน (ยังแสดงเป็นปุ่มข้อความได้ — ข้อมูลเก่าไม่พัง)
+        · brand = ไม่บังคับ (เฉพาะ Shopee/Lazada ที่ต้องแยกแบรนด์ — เป็นป้ายข้อความ ไม่ใช่ภาพ)
       */
       checkText(block.eyebrow, `${path}.eyebrow`, { required: false, englishRequired: false }, issues);
       checkText(block.heading, `${path}.heading`, { required: false, englishRequired: false }, issues);
@@ -296,8 +298,12 @@ function checkBlock(block: Block, path: string, issues: BlockIssue[]): void {
         const itemPath = `${path}.items[${index}]`;
         checkText(item.label, `${itemPath}.label`, { required: true, englishRequired: false }, issues);
         checkHref(item.href, `${itemPath}.href`, issues);
+        checkMedia(item.logo, `${itemPath}.logo`, issues);
         if (item.href.trim() === "") {
           issues.push(issue("warning", "marketplace-link-without-href", `${itemPath}.href`, "ปุ่มนี้ยังไม่มีลิงก์ — จะไม่แสดงบนหน้าเว็บ"));
+        }
+        if (item.logo === null) {
+          issues.push(issue("warning", "marketplace-link-without-logo", `${itemPath}.logo`, "ปุ่มนี้ยังไม่มีโลโก้ — จะแสดงเป็นปุ่มข้อความ"));
         }
       });
       return;

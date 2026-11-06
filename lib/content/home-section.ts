@@ -76,7 +76,7 @@ export type WhereToBuyView = {
 };
 
 /** ช่องทางเริ่มต้น (จากโค้ด `SITE.marketplaces`) — ใช้เมื่อฐานข้อมูลว่าง/ยังไม่ seed */
-export type MarketplaceFallback = { readonly id: string; readonly href: string };
+export type MarketplaceFallback = { readonly id: string; readonly href: string; readonly logo?: string };
 
 /**
  * รวมเนื้อหา "ที่ซื้อสินค้า": **ค่าที่ตั้งในหลังบ้านทับค่าเริ่มต้น**
@@ -107,7 +107,7 @@ export function whereToBuyViewOf(
   const marketplaces: readonly WhereToBuyMarketplaceView[] =
     stored.length > 0
       ? stored.map((row) => ({ ...row, label: row.label === "" ? labelById(row.id) : row.label }))
-      : fallback.map((row) => ({ id: row.id, label: labelById(row.id), href: row.href, logo: "" }));
+      : fallback.map((row) => ({ id: row.id, label: labelById(row.id), href: row.href, logo: row.logo ?? "" }));
 
   return {
     eyebrow: sectionFieldOf(content, "whereToBuy", "eyebrow", m.eyebrow, language),

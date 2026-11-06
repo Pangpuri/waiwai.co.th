@@ -465,11 +465,19 @@ export type NewsShowcaseBlock = BlockBase & {
   readonly ctaHref: string;
 };
 
-/** บล็อก "ที่ซื้อสินค้า" (ไดนามิก) — รอบที่ 229 · รอบ 329 เพิ่มรายการลิงก์ที่แก้ได้ในบล็อก */
+/** แบรนด์ของรายการ (Shopee/Lazada มีร้านแยก 2 แบรนด์) */
+export type MarketplaceBrand = "waiwai" | "serda";
+
+/** บล็อก "ที่ซื้อสินค้า" (ไดนามิก) — รอบที่ 229 · 329 · 333 */
 export type MarketplaceLinkItem = {
   readonly id: string;
+  /** ข้อความใต้ปุ่ม เช่น Waiwai · Serda · TikTok Shop */
   readonly label: LocalizedValue;
   readonly href: string;
+  /** โลโก้แพลตฟอร์มที่ใช้เป็นภาพหลักบนปุ่ม (null = แสดงเป็นปุ่มข้อความ) */
+  readonly logo: BlockMedia | null;
+  /** แบรนด์ของรายการ — null = ไม่มีจุดสีแบรนด์ */
+  readonly brand: MarketplaceBrand | null;
 };
 
 export type MarketplaceLinksBlock = BlockBase & {
@@ -594,7 +602,7 @@ export const BLOCK_CATALOG: readonly BlockCatalogEntry[] = [
   { type: "gallery", label: "แกลเลอรี", hint: "ชุดภาพ + เปิดดูเต็มจอ (lightbox) · เลือกสัดส่วนช่องภาพได้ (ภาพถ่าย/เอกสาร)" },
   { type: "rosterText", label: "รายชื่อคณะผู้บริหาร", hint: "ชื่อ–ตำแหน่งเป็นข้อความ (ค้นหา/อ่านออกเสียงได้)" },
   { type: "recipeCards", label: "เมนูอาหาร", hint: "การ์ดเมนู + ส่วนผสม + วิธีทำ (กดขยายดูบนหน้าเว็บ)" },
-  { type: "marketplaceLinks", label: "ที่ซื้อสินค้า", hint: "ข้อความ + ปุ่มช่องทางจำหน่ายที่แก้ได้ในบล็อก (เว้นว่าง = ใช้ลิงก์เริ่มต้น Shopee · Lazada · LINE Shop)" },
+  { type: "marketplaceLinks", label: "ที่ซื้อสินค้า", hint: "ข้อความ + ปุ่มโลโก้ร้านค้า 7 ปุ่ม (Shopee/Lazada แยก Waiwai · Serda) — เว้นว่าง = ใช้ค่าเริ่มต้น" },
   { type: "newsShowcase", label: "ข่าวล่าสุด", hint: "ดึงข่าว/กิจกรรมล่าสุดจากฐานข้อมูล (ภาพ/วันที่/คำโปรย) — เลือกจำนวนได้" },
   { type: "recipeShowcase", label: "เมนูล่าสุด", hint: "ดึงเมนูล่าสุดจากฐานข้อมูล (ภาพ/ชื่อ/วันที่) — เลือกจำนวนได้" },
   {

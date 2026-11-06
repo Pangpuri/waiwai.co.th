@@ -54,7 +54,7 @@ test("PRIMARY_NAV: เรียงตามเมนูเว็บเดิม 
 });
 
 test("buildHeaderCta: ปุ่มสั่งซื้อออนไลน์ไปยังส่วนที่ซื้อสินค้าในหน้าแรก", () => {
-  // ไม่มีหน้า /where-to-buy จึงชี้ไป anchor ที่มีปุ่ม Shopee/Lazada/LINE Shop จริง
+  // ไม่มีหน้า /where-to-buy จึงชี้ไป anchor ที่มีปุ่มโลโก้ร้านค้า 7 ปุ่มจริง
   assert.equal(buildHeaderCta("th").href, "/th#where-to-buy");
   assert.equal(buildHeaderCta("en").href, "/en#where-to-buy");
 });

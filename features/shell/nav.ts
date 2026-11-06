@@ -58,7 +58,7 @@ export const PRIMARY_NAV: readonly NavDefinition[] = [
  * ปุ่มหลักบน header (CTA) = "สั่งซื้อสินค้าออนไลน์"
  *
  * ยังไม่มีหน้า /where-to-buy จึงพาไปยังส่วน "ที่ซื้อสินค้า" ในหน้าแรก ที่มีปุ่ม
- * Shopee / Lazada / LINE Shop อยู่จริง — ไม่ปล่อยให้ปุ่มหลักของเว็บไป 404
+ * ปุ่มโลโก้ร้านค้า 7 ปุ่มอยู่จริง — ไม่ปล่อยให้ปุ่มหลักของเว็บไป 404
  * (เมื่อทำหน้า /where-to-buy เสร็จ ให้เปลี่ยน path กลับมาเป็น "/where-to-buy")
  */
 export const HEADER_CTA: NavDefinition = {

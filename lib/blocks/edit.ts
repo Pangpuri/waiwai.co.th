@@ -33,6 +33,7 @@ import {
   type BlockDocumentLanguage,
   type BlockLocation,
   type BlockStyle,
+  type MarketplaceBrand,
   type BlockType,
   type BlockVisibility,
   type HeroSlideItem,
@@ -1065,19 +1066,19 @@ export function canAddMarketplaceLink(document: BlockDocument, id: string): bool
   return block !== null && block.type === "marketplaceLinks" && block.items.length < MAX_MARKETPLACE_LINKS;
 }
 
-/** เพิ่มช่องทางว่าง (ยังไม่มีชื่อ/ลิงก์ — validator จะบังคับชื่อไทยก่อนเผยแพร่) */
+/** เพิ่มช่องทางว่าง (ยังไม่มีชื่อ/ลิงก์/โลโก้ — validator จะบังคับชื่อไทยก่อนเผยแพร่) */
 export function addMarketplaceLink(document: BlockDocument, id: string): BlockDocument {
   if (!canAddMarketplaceLink(document, id)) return document;
   return withBlock(document, id, (block) => {
     if (block.type !== "marketplaceLinks") return;
     const used = new Set(block.items.map((item) => item.id));
-    block.items.push({ id: nextPrefixedId("shop", used), label: emptyText(), href: "" });
+    block.items.push({ id: nextPrefixedId("shop", used), label: emptyText(), href: "", logo: null, brand: null });
   });
 }
 
 /**
- * เติมรายการเริ่มต้น (Shopee · Lazada · LINE Shop) ให้บล็อกที่ยังว่าง
- * ⇒ เจ้าของแก้ลิงก์ทีละปุ่มได้โดยไม่ต้องคีย์ชื่อร้านใหม่ · มีรายการอยู่แล้ว = ไม่แตะ
+ * เติมรายการเริ่มต้น (7 ปุ่มจาก Shopee · Lazada · TikTok Shop · Makro Pro · ThaiMart)
+ * ให้บล็อกที่ยังว่าง ⇒ เจ้าของแก้ลิงก์/โลโก้ทีละปุ่มได้โดยไม่ต้องคีย์ชื่อร้านใหม่ · มีรายการอยู่แล้ว = ไม่แตะ
  */
 export function seedMarketplaceItems(document: BlockDocument, id: string): BlockDocument {
   const location = findBlockLocation(document, id);
@@ -1122,6 +1123,39 @@ export function setMarketplaceLinkHref(document: BlockDocument, id: string, inde
     const item = block.items[index];
     if (item === undefined) return;
     item.href = value;
+  });
+}
+
+/** ตั้งค่าโลโก้แพลตฟอร์มของปุ่มร้าน — พาธว่าง = เอาโลโก้ออก (ปุ่มถอยเป็นข้อความ) */
+export function setMarketplaceLinkLogo(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  patch: { path?: string; altTh?: string; altEn?: string; hasWatermark?: boolean },
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "marketplaceLinks") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+
+    const base = item.logo ?? { path: "", altTh: "", altEn: "", hasWatermark: false };
+    const merged = { ...base, ...patch };
+    item.logo = merged.path.trim() === "" ? null : merged;
+  });
+}
+
+/** ตั้งค่าแบรนด์ที่มุมปุ่ม — null = ไม่มีป้ายแบรนด์ */
+export function setMarketplaceLinkBrand(
+  document: BlockDocument,
+  id: string,
+  index: number,
+  brand: MarketplaceBrand | null,
+): BlockDocument {
+  return withBlock(document, id, (block) => {
+    if (block.type !== "marketplaceLinks") return;
+    const item = block.items[index];
+    if (item === undefined) return;
+    item.brand = brand;
   });
 }
 

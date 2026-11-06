@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { WhereToBuyView } from "@/lib/content/home-section";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -32,18 +34,31 @@ export function WhereToBuy({ messages, view }: WhereToBuyProps) {
       <div className="rounded-3xl bg-brand-yellow px-6 py-12 text-accent-on-yellow sm:px-10 lg:px-14 lg:py-16">
         <SectionHeading eyebrow={view.eyebrow} title={view.title} body={view.body} />
 
-        <ul className="mt-9 flex flex-wrap gap-3">
+        <ul className="mt-9 flex flex-wrap justify-center gap-4">
           {view.marketplaces.map((marketplace) => (
-            <li key={marketplace.id}>
+            <li key={marketplace.id} className="w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.667rem)] lg:w-[calc(25%-0.75rem)]">
               <a
                 href={marketplace.href}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="inline-flex items-center gap-2 rounded-full bg-surface px-6 py-3.5 text-sm font-bold text-fg shadow-sm transition-transform hover:-translate-y-0.5"
+                className="group bg-surface text-fg border-line hover:border-line-strong focus-visible:ring-ring relative flex h-full min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:outline-none"
               >
-                {marketplace.label}
+                {marketplace.logo === "" ? null : (
+                  <span className="bg-on-brand flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm sm:size-16">
+                    <Image
+                      src={marketplace.logo}
+                      alt=""
+                      width={160}
+                      height={160}
+                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      unoptimized
+                    />
+                  </span>
+                )}
+                <span className="text-sm font-bold leading-tight">
+                  {marketplace.label}
+                </span>
                 <span className="sr-only"> {messages.a11y.newWindow}</span>
-                <span aria-hidden="true">↗</span>
               </a>
             </li>
           ))}

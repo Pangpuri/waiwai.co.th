@@ -34,6 +34,7 @@
     "products:detail-import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-product-details.ts",
     "products:logos": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-products-logos.ts",
     "products:category-defaults": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-product-category-defaults.ts",
+    "shop-logos:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-shop-logos.ts",
     "recipes:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-recipes.ts",
     "careers:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-careers.ts",
     "news:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news.ts",

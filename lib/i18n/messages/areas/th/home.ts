@@ -70,9 +70,20 @@ export const whereToBuy = {
     title: "หาซื้อไวไวได้จากที่ไหน",
     body: "สั่งออนไลน์ผ่านช่องทางอย่างเป็นทางการ หรือหาซื้อได้ที่ร้านค้าปลีกและห้างสรรพสินค้าชั้นนำทั่วประเทศ",
     marketplaces: {
+      shopee: "Waiwai",
+      "shopee-serda": "Serda",
+      lazada: "Waiwai",
+      "lazada-serda": "Serda",
+      tiktok: "TikTok Shop",
+      "makro-pro": "Makro Pro",
+      thaimart: "ThaiMart",
+    },
+    platforms: {
       shopee: "Shopee",
       lazada: "Lazada",
-      lineShop: "LINE Shop",
+      tiktok: "TikTok",
+      makroPro: "Makro Pro",
+      thaimart: "ThaiMart",
     },
     retailNote: "มีจำหน่ายที่ร้านค้าปลีก ห้างสรรพสินค้า และร้านสะดวกซื้อทั่วไป",
 };

@@ -99,8 +99,10 @@ import {
   setColumnWidth,
   setGalleryItemCaption,
   setGalleryItemImage,
+  setMarketplaceLinkBrand,
   setMarketplaceLinkHref,
   setMarketplaceLinkLabel,
+  setMarketplaceLinkLogo,
   setProductShowcaseOptions,
   setRecipeShowcaseOptions,
   setNewsShowcaseOptions,
@@ -1483,9 +1485,9 @@ export function BlockBuilder({
           );
         case "marketplaceLinks":
           /*
-            บล็อก "ที่ซื้อสินค้า" (รอบ 229 · รอบ 329) — ข้อความและ **ปุ่มลิงก์ร้าน** แก้ได้ในบล็อกนี้
-            · `items` ว่าง = ใช้ลิงก์เริ่มต้นจาก SITE (Shopee/Lazada/LINE Shop) + ข้อความจากพจนานุกรม
-            · เพิ่ม/ลบ/แก้ชื่อ–ลิงก์ได้ที่นี่ (เป็นแหล่งเดียวของส่วนนี้)
+            บล็อก "ที่ซื้อสินค้า" (รอบ 229 · 329 · 333) — ข้อความ โลโก้ และ **ปุ่มลิงก์ร้าน** แก้ได้ในบล็อกนี้
+            · `items` ว่าง = ใช้ 7 ปุ่มเริ่มต้นจาก SITE (Shopee/Lazada แยก Waiwai · Serda + TikTok Shop · Makro Pro · ThaiMart)
+            · เพิ่ม/ลบ/แก้ชื่อใต้ปุ่ม/โลโก้/ลิงก์ได้ที่นี่ (เป็นแหล่งเดียวของส่วนนี้)
           */
           return (
             <>
@@ -1547,6 +1549,38 @@ export function BlockBuilder({
                       value={item.label}
                       onChange={(language, next) =>
                         update(setMarketplaceLinkLabel(document, block.id, index, language, next))
+                      }
+                    />
+                    <div id={`${base}-market-${index}-logo`}>
+                      <ImageDrop
+                        strings={strings}
+                        compact
+                        label={strings.blockMarketplaceLogoLabel}
+                        value={item.logo}
+                        onChange={(patch) => update(setMarketplaceLinkLogo(document, block.id, index, patch))}
+                        frameAspect={1}
+                        previewFit="contain"
+                        showWatermark={false}
+                      />
+                    </div>
+                    <SelectField
+                      idBase={`${base}-market-${index}-brand`}
+                      label={strings.blockMarketplaceBrandLabel}
+                      value={item.brand ?? "none"}
+                      options={[
+                        { value: "none", label: strings.blockMarketplaceBrandNone },
+                        { value: "waiwai", label: strings.blockMarketplaceBrandWaiwai },
+                        { value: "serda", label: strings.blockMarketplaceBrandSerda },
+                      ]}
+                      onChange={(next) =>
+                        update(
+                          setMarketplaceLinkBrand(
+                            document,
+                            block.id,
+                            index,
+                            next === "waiwai" || next === "serda" ? next : null,
+                          ),
+                        )
                       }
                     />
                     <SingleField

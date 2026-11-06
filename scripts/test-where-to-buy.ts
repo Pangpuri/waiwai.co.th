@@ -85,37 +85,63 @@ test("where-to-buy: รายการในบล็อกเป็นแหล
   assert.equal(base.type, "marketplaceLinks");
   if (base.type !== "marketplaceLinks") return;
 
-  /* ไม่มีรายการในบล็อก = ใช้ SITE + ป้ายจากพจนานุกรม (พฤติกรรมเดิม) */
+  /* ไม่มีรายการในบล็อก = ใช้ SITE + ป้าย/โลโก้จากพจนานุกรม (พฤติกรรมเดิม) */
   const fallback = marketplaceLinksView(base, "th");
   assert.equal(fallback.items.length, SITE.marketplaces.length);
+  assert.equal(fallback.items.length, 7, "ค่าเริ่มต้นต้องมี 7 ปุ่ม");
   assert.equal(fallback.items[0]?.href, SITE.marketplaces[0]?.href);
   assert.equal(fallback.items[0]?.label, th.whereToBuy.marketplaces.shopee);
+  assert.equal(fallback.items[0]?.logo?.path, SITE.marketplaces[0]?.logo);
+  assert.equal(fallback.items[0]?.logo?.alt, "Shopee");
+  assert.equal(fallback.items[0]?.brand, SITE.marketplaces[0]?.brand);
   assert.equal(fallback.retailNote, th.whereToBuy.retailNote);
   assert.equal(fallback.eyebrow, "");
 
-  /* ชุดเริ่มต้นที่ใช้เติมลงบล็อก = ชุดเดียวกับ fallback (ชื่อ/ลิงก์มาจากแหล่งเดียว) */
+  /* ชุดเริ่มต้นที่ใช้เติมลงบล็อก = ชุดเดียวกับ fallback (ชื่อ/ลิงก์/โลโก้มาจากแหล่งเดียว) */
   const defaults = defaultMarketplaceItems();
   assert.equal(defaults.length, SITE.marketplaces.length);
   assert.equal(defaults[0]?.href, SITE.marketplaces[0]?.href);
   assert.equal(defaults[0]?.label.th, th.whereToBuy.marketplaces.shopee);
-  assert.equal(defaults[0]?.label.en, "Shopee");
+  assert.equal(defaults[0]?.label.en, "Waiwai");
+  assert.equal(defaults[0]?.logo?.altTh, "Shopee");
+  assert.equal(defaults[0]?.brand, SITE.marketplaces[0]?.brand);
+  assert.equal(defaults.some((item) => item.id === "lineShop"), false, "LINE Shop ต้องถูกถอด");
+
+  /* Shopee/Lazada ต้องมีแบรนด์ Waiwai + Serda แยกกันชัดเจน */
+  const shopeeBrands = defaults.filter((item) => item.logo?.altTh === "Shopee").map((item) => item.label.th);
+  const lazadaBrands = defaults.filter((item) => item.logo?.altTh === "Lazada").map((item) => item.label.th);
+  assert.deepEqual(shopeeBrands, ["Waiwai", "Serda"]);
+  assert.deepEqual(lazadaBrands, ["Waiwai", "Serda"]);
 
   /* มีรายการในบล็อก = ใช้รายการนั้น (ชื่อ/ลิงก์/eyebrow/retailNote) */
   const custom: MarketplaceLinksBlock = {
     ...base,
     eyebrow: { th: "ช่องทางอย่างเป็นทางการ", en: "" },
     retailNote: { th: "", en: "" },
-    items: [{ id: "shop-1", label: { th: "ร้านทดสอบ", en: "Test shop" }, href: "https://example.test/shop" }],
+    items: [
+      {
+        id: "shop-1",
+        label: { th: "ร้านทดสอบ", en: "Test shop" },
+        href: "https://example.test/shop",
+        logo: null,
+        brand: null,
+      },
+    ],
   };
   const view = marketplaceLinksView(custom, "th");
-  assert.deepEqual(view.items, [{ id: "shop-1", label: "ร้านทดสอบ", href: "https://example.test/shop" }]);
+  assert.deepEqual(view.items, [
+    { id: "shop-1", label: "ร้านทดสอบ", href: "https://example.test/shop", logo: null, brand: null },
+  ]);
   assert.equal(view.eyebrow, "ช่องทางอย่างเป็นทางการ");
   assert.equal(view.retailNote, th.whereToBuy.retailNote, "retailNote ว่าง = ค่าเริ่มต้น");
   assert.equal(view.isEmpty, false);
 
   /* รายการที่ไม่มีลิงก์ถูกข้าม → ถอยไปค่าเริ่มต้น (ไม่เรนเดอร์ปุ่มที่พาไปที่ว่าง) */
   const incomplete = marketplaceLinksView(
-    { ...custom, items: [{ id: "shop-2", label: { th: "ยังไม่มีลิงก์", en: "" }, href: "" }] },
+    {
+      ...custom,
+      items: [{ id: "shop-2", label: { th: "ยังไม่มีลิงก์", en: "" }, href: "", logo: null, brand: null }],
+    },
     "th",
   );
   assert.equal(incomplete.items[0]?.id, SITE.marketplaces[0]?.id);
@@ -129,10 +155,28 @@ test("where-to-buy: ชื่อร้าน/ลิงก์มาจากแ�
   const renderer = codeOf("features/blocks/block-renderer.tsx");
   assert.ok(renderer.includes("marketplaceLinksView(block, language)"), "ตัวเรนเดอร์ต้องใช้วิวจากชั้นข้อมูล");
   assert.ok(renderer.includes("if (market.isEmpty) return null"), "ไม่มีข้อมูลร้าน = ไม่เรนเดอร์บล็อก");
+  assert.ok(renderer.includes("item.logo"), "ตัวเรนเดอร์ต้องใช้โลโก้เป็นภาพหลักบนปุ่ม");
+  assert.ok(renderer.includes("item.brand"), "ตัวเรนเดอร์ต้องแสดงจุดสีแบรนด์");
+  assert.ok(renderer.includes("hover:-translate-y-1"), "ปุ่มต้องมีเอฟเฟกต์เมื่อชี้");
+  assert.ok(renderer.includes("cursor-pointer"), "ปุ่มต้องแสดง pointer");
+  assert.ok(renderer.includes("rounded-2xl"), "ปุ่มต้องมีขอบมน");
 
-  /* แผงแก้ต้องมีปุ่มเพิ่ม/ลบ + ช่องชื่อ/ลิงก์ (ย้ายมาจากหน้าจอเนื้อหาเดิม) */
+  /* แผงแก้ต้องมีปุ่มเพิ่ม/ลบ + ช่องชื่อ/ลิงก์/โลโก้/ป้ายแบรนด์ (ย้ายมาจากหน้าจอเนื้อหาเดิม) */
   const builder = codeOf("features/admin/ui/block-builder.tsx");
-  for (const needle of ["addMarketplaceLink", "removeMarketplaceLink", "setMarketplaceLinkLabel", "setMarketplaceLinkHref", "seedMarketplaceItems", "blockMarketplaceLinks", "blockUseDefaultMarketplaceLinks"]) {
+  for (const needle of [
+    "addMarketplaceLink",
+    "removeMarketplaceLink",
+    "setMarketplaceLinkLabel",
+    "setMarketplaceLinkHref",
+    "setMarketplaceLinkLogo",
+    "setMarketplaceLinkBrand",
+    "seedMarketplaceItems",
+    "blockMarketplaceLinks",
+    "blockMarketplaceLogoLabel",
+    "blockMarketplaceBrandLabel",
+    "blockMarketplaceBrandWaiwai",
+    "blockUseDefaultMarketplaceLinks",
+  ]) {
     assert.ok(builder.includes(needle), `แผงบล็อกต้องมี: ${needle}`);
   }
 });

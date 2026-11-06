@@ -751,17 +751,44 @@ function BlockView({
                   <p className="text-accent-on-yellow/90 text-sm sm:text-base">{block.body[language]}</p>
                 )}
               </div>
-              <ul className="mt-9 flex flex-wrap gap-3">
+              <ul className="mt-9 flex flex-wrap justify-center gap-4">
                 {market.items.map((item) => (
-                  <li key={item.id}>
+                  <li key={item.id} className="w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.667rem)] lg:w-[calc(25%-0.75rem)]">
                     <a
                       href={item.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={`${item.label} (${market.newTabLabel})`}
-                      className="bg-surface text-fg inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-bold shadow-sm"
+                      aria-label={
+                        item.logo === null
+                          ? `${item.label} (${market.newTabLabel})`
+                          : `${item.logo.alt} · ${item.label} (${market.newTabLabel})`
+                      }
+                      className="group bg-surface text-fg border-line hover:border-line-strong focus-visible:ring-ring relative flex h-full min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:outline-none"
                     >
-                      {item.label}
+                      {item.logo === null ? null : (
+                        <span className="bg-on-brand flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm sm:size-16">
+                          <Image
+                            src={item.logo.path}
+                            alt={item.logo.alt}
+                            width={160}
+                            height={160}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            unoptimized
+                          />
+                        </span>
+                      )}
+                      <span className="text-sm font-bold leading-tight">
+                        {item.brand === null ? null : (
+                          <span
+                            aria-hidden="true"
+                            className={`mr-1.5 inline-block size-2.5 rounded-full align-middle ${
+                              item.brand === "waiwai" ? "bg-brand-red" : "bg-fg"
+                            }`}
+                          />
+                        )}
+                        {item.label}
+                      </span>
+                      <span className="sr-only"> {market.newTabLabel}</span>
                     </a>
                   </li>
                 ))}

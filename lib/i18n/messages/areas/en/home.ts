@@ -70,9 +70,20 @@ export const whereToBuy = {
     title: "Where to find Wai Wai",
     body: "Order online through our official channels, or pick up our products at retailers and leading supermarkets nationwide.",
     marketplaces: {
+      shopee: "Waiwai",
+      "shopee-serda": "Serda",
+      lazada: "Waiwai",
+      "lazada-serda": "Serda",
+      tiktok: "TikTok Shop",
+      "makro-pro": "Makro Pro",
+      thaimart: "ThaiMart",
+    },
+    platforms: {
       shopee: "Shopee",
       lazada: "Lazada",
-      lineShop: "LINE Shop",
+      tiktok: "TikTok",
+      makroPro: "Makro Pro",
+      thaimart: "ThaiMart",
     },
     retailNote: "Available at retailers, supermarkets and convenience stores nationwide.",
 };

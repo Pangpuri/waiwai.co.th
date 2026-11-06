@@ -1,3 +1,4 @@
+import { defaultMarketplaceItems } from "@/lib/blocks/marketplace-links";
 import { BLOCK_SCHEMA_VERSION, DEFAULT_BLOCK_STYLE, type Block, type BlockDocument } from "@/lib/blocks/types";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
@@ -97,9 +98,9 @@ export function buildHomeTemplate(): BlockDocument {
     },
     {
       /*
-        บล็อกไดนามิก "ที่ซื้อสินค้า" (รอบที่ 229 · รอบ 329) — ข้อความและปุ่มร้านแก้ได้ในบล็อก
-        · `items` ว่าง = ใช้ลิงก์เริ่มต้นจาก `SITE.marketplaces` + ป้ายจากพจนานุกรม (พฤติกรรมเดิม)
-        · เจ้าของแก้ข้อความ/ปุ่มได้ที่แผงบล็อกนี้ที่เดียว (หน้าจอเนื้อหาเดิมเลิกแสดงฟอร์มส่วนนี้)
+        บล็อกไดนามิก "ที่ซื้อสินค้า" (รอบที่ 229 · รอบ 329 · รอบ 333) — ข้อความและปุ่มโลโก้ร้านแก้ได้ในบล็อก
+        · ค่าเริ่มต้น = 7 ปุ่มจาก `SITE.marketplaces` + ป้าย/โลโก้จากพจนานุกรม (Shopee/Lazada แยก Waiwai · Serda)
+        · เจ้าของแก้ข้อความ/โลโก้/ปุ่มได้ที่แผงบล็อกนี้ที่เดียว (หน้าจอเนื้อหาเดิมเลิกแสดงฟอร์มส่วนนี้)
       */
       id: "block-5",
       version: BLOCK_SCHEMA_VERSION,
@@ -109,7 +110,7 @@ export function buildHomeTemplate(): BlockDocument {
       heading: { th: th.whereToBuy.title, en: en.whereToBuy.title },
       body: { th: th.whereToBuy.body, en: en.whereToBuy.body },
       retailNote: { th: th.whereToBuy.retailNote, en: en.whereToBuy.retailNote },
-      items: [],
+      items: defaultMarketplaceItems(),
     },
   ];
 
