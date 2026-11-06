@@ -1,10 +1,18 @@
-import { UserCreateForm, UserList, type RbacRow, type RbacStrings } from "@/features/admin/ui/user-manager";
+import {
+  RoleScopeOverview,
+  UserCreateForm,
+  UserList,
+  type RbacRoleOption,
+  type RbacRow,
+  type RbacStrings,
+} from "@/features/admin/ui/user-manager";
 import { ACCOUNT_AUDIT_PREFIX, auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
-import { roleLabelOf } from "@/features/admin/rbac-labels";
+import { roleLabelOf, roleScopeOf } from "@/features/admin/rbac-labels";
 import { isDatabaseConfigured } from "@/db/pool";
 import { listAuditForActionPrefix } from "@/lib/audit/log";
 import { listActiveAdminSessions } from "@/lib/auth/sessions-repository";
 import { requireAdminUser } from "@/lib/auth/dal";
+import { ADMIN_ROLES } from "@/lib/auth/types";
 import { MIN_ADMIN_PASSWORD_LENGTH, listAdminUsers } from "@/lib/auth/users-repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 
@@ -31,14 +39,18 @@ export default async function AdminUsersPage() {
   /* เซสชันที่ล็อกอินอยู่ (รอบที่ 95) — อ่านครั้งเดียวแล้วจัดกลุ่มตามบัญชี */
   const sessions = dbMissing ? [] : await listActiveAdminSessions();
 
+  /* ขอบเขตบทบาทคำนวณจากตารางสิทธิ์จริง — ไม่มีข้อความขอบเขตที่พิมพ์ซ้ำแยกจากสิทธิ์ */
+  const roleOptions: readonly RbacRoleOption[] = ADMIN_ROLES.map((role) => ({
+    role,
+    name: roleLabelOf(role, strings),
+    scope: roleScopeOf(role, strings),
+  }));
+
   const rbacStrings: RbacStrings = {
     rbacRoleLabel: strings.rbacRoleLabel,
-    rbacRoleEditorName: strings.rbacRoleEditorName,
-    rbacRolePublisherName: strings.rbacRolePublisherName,
-    rbacRoleAdminName: strings.rbacRoleAdminName,
-    rbacRoleEditorHint: strings.rbacRoleEditorHint,
-    rbacRolePublisherHint: strings.rbacRolePublisherHint,
-    rbacRoleAdminHint: strings.rbacRoleAdminHint,
+    rbacRoleScopeTitle: strings.rbacRoleScopeTitle,
+    rbacRoleScopeHint: strings.rbacRoleScopeHint,
+    rbacRoleSelectedScope: strings.rbacRoleSelectedScope,
     rbacCreateTitle: strings.rbacCreateTitle,
     rbacCreateHint: strings.rbacCreateHint,
     rbacEmailLabel: strings.rbacEmailLabel,
@@ -118,9 +130,24 @@ export default async function AdminUsersPage() {
         <p className="text-fg-muted text-xs">{strings.rbacEnvAccountNote}</p>
       </header>
 
-      <UserCreateForm strings={rbacStrings} dbMissing={dbMissing} minLength={MIN_ADMIN_PASSWORD_LENGTH} />
+      <UserCreateForm
+        strings={rbacStrings}
+        roleOptions={roleOptions}
+        dbMissing={dbMissing}
+        minLength={MIN_ADMIN_PASSWORD_LENGTH}
+      />
 
-      {dbMissing ? null : <UserList rows={rows} selfId={actor.id} strings={rbacStrings} minLength={MIN_ADMIN_PASSWORD_LENGTH} />}
+      <RoleScopeOverview options={roleOptions} strings={rbacStrings} />
+
+      {dbMissing ? null : (
+        <UserList
+          rows={rows}
+          selfId={actor.id}
+          strings={rbacStrings}
+          roleOptions={roleOptions}
+          minLength={MIN_ADMIN_PASSWORD_LENGTH}
+        />
+      )}
 
       {/*
         ประวัติการเปลี่ยนบัญชี/สิทธิ์ (B3 · รอบที่ 90) — มาจาก audit log ที่ระบบเขียนอยู่แล้ว

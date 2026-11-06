@@ -5,6 +5,9 @@ import { test } from "node:test";
 
 import { codeOf } from "./source-scan.ts";
 
+import { permissionLabelOf, roleScopeOf } from "@/features/admin/rbac-labels";
+import { en } from "@/lib/i18n/messages/en";
+import { th } from "@/lib/i18n/messages/th";
 import { ADMIN_ROLES, isAdminRole } from "@/lib/auth/types";
 import {
   ADMIN_PERMISSIONS,
@@ -390,6 +393,38 @@ test("rbac: พจนานุกรมสองภาษามีคีย์�
     assert.ok(labels.includes(`case "${role}"`), `ต้องมีป้ายของบทบาท ${role}`);
   }
   assert.ok(!labels.includes("default:"), "ต้องเป็น switch แบบ exhaustive (เพิ่มบทบาทแล้วลืม = compile error)");
+});
+
+test("rbac: ขอบเขตบทบาทที่แสดงในหน้าจัดการบัญชีมาจากตารางสิทธิ์จริงครบทุกบทบาท", () => {
+  /* คำอธิบายสิทธิ์ต้องมีครบทั้งสองภาษา — ขาดข้อความ = หน้าจอแสดงข้อย่อยว่าง */
+  for (const dictionary of [th, en]) {
+    for (const permission of ADMIN_PERMISSIONS) {
+      const label = permissionLabelOf(permission, dictionary.admin);
+      assert.ok(label.trim().length > 0, `ขาดคำอธิบายสิทธิ์ "${permission}"`);
+    }
+
+    for (const role of ADMIN_ROLES) {
+      const scope = roleScopeOf(role, dictionary.admin);
+      assert.deepEqual(
+        scope,
+        permissionsOf(role).map((permission) => permissionLabelOf(permission, dictionary.admin)),
+        `${role}: ขอบเขตต้องตรงกับสิทธิ์จริง`,
+      );
+      assert.equal(scope.length, permissionsOf(role).length, `${role}: จำนวนข้อย่อยต้องเท่ากับจำนวนสิทธิ์`);
+    }
+  }
+
+  /* UI ต้องแสดงเป็นข้อย่อย เปลี่ยนตามบทบาทที่เลือก และมีสรุปทุกบทบาท */
+  const ui = sourceOf("features/admin/ui/user-manager.tsx");
+  assert.ok(ui.includes("list-disc"), "ขอบเขตบทบาทต้องแสดงเป็นรายการข้อย่อย");
+  assert.ok(ui.includes("RoleScopeOverview"), "ต้องมีสรุปขอบเขตของทุกบทบาท");
+  assert.ok(ui.includes("onChange={setRole}") || ui.includes("onChange={(event)"), "เลือกบทบาทแล้วต้องอัปเดตขอบเขต");
+  assert.ok(ui.includes("rbacRoleSelectedScope"), "ต้องมีหัวข้อขอบเขตของบทบาทที่เลือก");
+  assert.equal(ui.includes("rbacRoleEditorHint"), false, "ห้ามใช้คำอธิบายบทบาทเดียวตายตัวกับทุกบทบาท");
+
+  const page = sourceOf("app/admin/users/page.tsx");
+  assert.ok(page.includes("ADMIN_ROLES.map"), "ต้องสร้างตัวเลือกบทบาทจากทะเบียนกลาง");
+  assert.ok(page.includes("roleScopeOf("), "ต้องสร้างขอบเขตจากตารางสิทธิ์จริง");
 });
 
 test("rbac: สถานะของฟอร์มจัดการบัญชีครบทุกกรณีที่ action คืนได้", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   createUserAction,
@@ -11,6 +11,7 @@ import {
   toggleUserAction,
 } from "@/app/admin/users/actions";
 import { INITIAL_RBAC_STATE, type RbacActionState } from "@/features/admin/rbac-state";
+import { isAdminRole, type AdminRole } from "@/lib/auth/types";
 import { fillTemplate } from "@/lib/i18n/template";
 
 /**
@@ -22,14 +23,18 @@ import { fillTemplate } from "@/lib/i18n/template";
  * - ข้อความทุกแบบมาจากพจนานุกรมที่ส่งเข้ามา (ไม่มีข้อความฝังในคอมโพเนนต์)
  */
 
+/** ตัวเลือกบทบาทที่คำนวณจากตารางสิทธิ์จริงฝั่งเซิร์ฟเวอร์ (ส่งเข้ามาเป็นก้อนเดียว) */
+export type RbacRoleOption = {
+  readonly role: AdminRole;
+  readonly name: string;
+  readonly scope: readonly string[];
+};
+
 export type RbacStrings = {
   readonly rbacRoleLabel: string;
-  readonly rbacRoleEditorName: string;
-  readonly rbacRolePublisherName: string;
-  readonly rbacRoleAdminName: string;
-  readonly rbacRoleEditorHint: string;
-  readonly rbacRolePublisherHint: string;
-  readonly rbacRoleAdminHint: string;
+  readonly rbacRoleScopeTitle: string;
+  readonly rbacRoleScopeHint: string;
+  readonly rbacRoleSelectedScope: string;
   readonly rbacCreateTitle: string;
   readonly rbacCreateHint: string;
   readonly rbacEmailLabel: string;
@@ -97,7 +102,7 @@ export type RbacRow = {
   readonly id: string;
   readonly email: string;
   readonly displayName: string;
-  readonly role: string;
+  readonly role: AdminRole;
   readonly roleLabel: string;
   readonly disabled: boolean;
   readonly lastLoginLabel: string;
@@ -177,34 +182,110 @@ function StatusLine({
 
 function RoleSelect({
   name,
-  defaultValue,
-  strings,
+  value,
+  options,
   disabled = false,
+  onChange,
 }: {
   readonly name: string;
-  readonly defaultValue: string;
-  readonly strings: RbacStrings;
+  readonly value: AdminRole;
+  readonly options: readonly RbacRoleOption[];
   readonly disabled?: boolean;
+  readonly onChange: (role: AdminRole) => void;
 }) {
   return (
-    <select name={name} defaultValue={defaultValue} disabled={disabled} className={FIELD_CLASS}>
-      <option value="editor">{strings.rbacRoleEditorName}</option>
-      <option value="publisher">{strings.rbacRolePublisherName}</option>
-      <option value="admin">{strings.rbacRoleAdminName}</option>
+    <select
+      name={name}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => {
+        if (isAdminRole(event.target.value)) onChange(event.target.value);
+      }}
+      className={FIELD_CLASS}
+    >
+      {options.map((option) => (
+        <option key={option.role} value={option.role}>
+          {option.name}
+        </option>
+      ))}
     </select>
+  );
+}
+
+/** ขอบเขตงานแบบข้อย่อย — ใช้ทั้งในฟอร์ม (บทบาทที่เลือก) และสรุปทุกบทบาท */
+function RoleScopeList({ option }: { readonly option: RbacRoleOption }) {
+  return (
+    <ul className="text-fg-muted flex list-disc flex-col gap-1 pl-5 text-xs">
+      {option.scope.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function SelectedRoleScope({
+  option,
+  strings,
+}: {
+  readonly option: RbacRoleOption | null;
+  readonly strings: RbacStrings;
+}) {
+  if (option === null) return null;
+
+  return (
+    <div className="border-line bg-surface rounded-xl border p-3">
+      <p className="text-fg text-xs font-semibold">
+        {fillTemplate(strings.rbacRoleSelectedScope, { role: option.name })}
+      </p>
+      <div className="mt-2">
+        <RoleScopeList option={option} />
+      </div>
+    </div>
+  );
+}
+
+/** สรุปขอบเขตของทุกบทบาท — เว้นบรรทัดระหว่างบทบาทให้อ่านและเทียบกันได้ชัด */
+export function RoleScopeOverview({
+  options,
+  strings,
+}: {
+  readonly options: readonly RbacRoleOption[];
+  readonly strings: RbacStrings;
+}) {
+  return (
+    <section className="border-line bg-surface-raised flex flex-col gap-4 rounded-2xl border p-5">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-fg text-lg font-semibold">{strings.rbacRoleScopeTitle}</h2>
+        <p className="text-fg-muted text-sm">{strings.rbacRoleScopeHint}</p>
+      </div>
+      <div className="flex flex-col gap-5">
+        {options.map((option) => (
+          <div key={option.role} className="border-line border-t pt-4 first:border-t-0 first:pt-0">
+            <h3 className="text-fg text-sm font-semibold">{option.name}</h3>
+            <div className="mt-2">
+              <RoleScopeList option={option} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 export function UserCreateForm({
   strings,
+  roleOptions,
   dbMissing,
   minLength,
 }: {
   readonly strings: RbacStrings;
+  readonly roleOptions: readonly RbacRoleOption[];
   readonly dbMissing: boolean;
   readonly minLength: number;
 }) {
   const [state, action] = useActionState(createUserAction, INITIAL_RBAC_STATE);
+  const [role, setRole] = useState<AdminRole>("editor");
+  const selectedRole = roleOptions.find((option) => option.role === role) ?? null;
 
   return (
     <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
@@ -225,9 +306,9 @@ export function UserCreateForm({
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-fg font-semibold">{strings.rbacRoleLabel}</span>
-            <RoleSelect name="role" defaultValue="editor" strings={strings} />
-            <span className="text-fg-muted text-xs">{strings.rbacRoleEditorHint}</span>
+            <RoleSelect name="role" value={role} options={roleOptions} onChange={setRole} />
           </label>
+          <SelectedRoleScope option={selectedRole} strings={strings} />
           <span className="flex items-center gap-3">
             <button
               type="submit"
@@ -247,11 +328,13 @@ function UserRow({
   row,
   isSelf,
   strings,
+  roleOptions,
   minLength,
 }: {
   readonly row: RbacRow;
   readonly isSelf: boolean;
   readonly strings: RbacStrings;
+  readonly roleOptions: readonly RbacRoleOption[];
   readonly minLength: number;
 }) {
   const [roleState, roleAction] = useActionState(setRoleAction, INITIAL_RBAC_STATE);
@@ -259,6 +342,8 @@ function UserRow({
   const [resetState, resetAction] = useActionState(resetPasswordAction, INITIAL_RBAC_STATE);
   const [deleteState, deleteActionResult] = useActionState(deleteUserAction, INITIAL_RBAC_STATE);
   const [sessionState, sessionAction] = useActionState(revokeSessionsAction, INITIAL_RBAC_STATE);
+  const [role, setRole] = useState<AdminRole>(row.role);
+  const selectedRole = roleOptions.find((option) => option.role === role) ?? null;
 
   return (
     <li className="border-line flex flex-col gap-2 rounded-xl border p-3">
@@ -279,7 +364,7 @@ function UserRow({
       <div className="flex flex-wrap items-end gap-2">
         <form action={roleAction} className="flex items-end gap-2">
           <input type="hidden" name="id" value={row.id} />
-          <RoleSelect name="role" defaultValue={row.role} strings={strings} disabled={isSelf} />
+          <RoleSelect name="role" value={role} options={roleOptions} onChange={setRole} disabled={isSelf} />
           <button
             type="submit"
             disabled={isSelf}
@@ -311,6 +396,18 @@ function UserRow({
           </button>
         </form>
       </div>
+
+      {/* ขอบเขตของบทบาทที่กำลังจะบันทึก — เปิดดูได้ก่อนกด "บันทึกบทบาท" */}
+      <details className="border-line rounded-lg border p-2">
+        <summary className="text-fg-muted cursor-pointer text-xs font-semibold">
+          {fillTemplate(strings.rbacRoleSelectedScope, { role: selectedRole?.name ?? row.roleLabel })}
+        </summary>
+        {selectedRole === null ? null : (
+          <div className="mt-2">
+            <RoleScopeList option={selectedRole} />
+          </div>
+        )}
+      </details>
 
       {/* เซสชันที่ล็อกอินอยู่ (รอบที่ 95) — เห็นว่า "เครื่องไหน" และตัดได้ทันที */}
       <details className="border-line rounded-lg border p-2">
@@ -397,11 +494,13 @@ export function UserList({
   rows,
   selfId,
   strings,
+  roleOptions,
   minLength,
 }: {
   readonly rows: readonly RbacRow[];
   readonly selfId: string;
   readonly strings: RbacStrings;
+  readonly roleOptions: readonly RbacRoleOption[];
   readonly minLength: number;
 }) {
   return (
@@ -412,7 +511,14 @@ export function UserList({
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((row) => (
-            <UserRow key={row.id} row={row} isSelf={row.id === selfId} strings={strings} minLength={minLength} />
+            <UserRow
+              key={row.id}
+              row={row}
+              isSelf={row.id === selfId}
+              strings={strings}
+              roleOptions={roleOptions}
+              minLength={minLength}
+            />
           ))}
         </ul>
       )}
