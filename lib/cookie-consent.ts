@@ -11,6 +11,15 @@ export const COOKIE_CONSENT_STORAGE_KEY = "waiwai-cookie-consent";
 /** attribute ที่ติดบน <html> — ต้องตรงกับกฎ CSS ใน app/globals.css */
 export const COOKIE_CONSENT_ATTRIBUTE = "data-cookie-consent";
 
+/**
+ * attribute บน "ตัวแถบ" ที่บอกว่าแถบนี้ต้องรอป้ายประกาศไว้อาลัยปิดก่อน
+ *
+ * ทำไมต้องรอ: ประกาศไว้อาลัยเป็น modal ที่บังทั้งจอ (z สูงกว่าแถบคุกกี้)
+ * ⇒ ถ้าแสดงพร้อมกัน แถบคุกกี้จะอยู่ใต้ฉากมืด กดไม่ได้และมองไม่ชัด
+ * ⇒ ให้แถบคุกกี้ขึ้นหลังผู้ใช้ปิดประกาศ = ทีละขั้น (สอดคล้องกฎ "การเข้าเว็บมีสเตปเดียว")
+ */
+export const COOKIE_BANNER_DEFER_ATTRIBUTE = "data-cookie-defer-mourning";
+
 export const COOKIE_CONSENT_VALUES = ["all", "essential"] as const;
 
 export type CookieConsent = (typeof COOKIE_CONSENT_VALUES)[number];

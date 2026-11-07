@@ -168,6 +168,16 @@ html[data-cookie-consent] [data-cookie-banner] {
 }
 
 /*
+  เลื่อนแถบคุกกี้ออกไปก่อนจนกว่าป้ายประกาศไว้อาลัยจะถูกปิด
+  (ป้ายเป็น modal บังทั้งจอ — ถ้าโชว์พร้อมกัน แถบคุกกี้จะอยู่ใต้ฉากมืดและกดไม่ได้)
+  ค่าที่ต้องตรงกัน: data-cookie-defer-mourning (COOKIE_BANNER_DEFER_ATTRIBUTE)
+  และ data-mourning="shown" (MOURNING_ATTRIBUTE, MOURNING_STATE_SHOWN) — มีเทสต์ตรวจ
+*/
+html[data-mourning="shown"] [data-cookie-banner][data-cookie-defer-mourning] {
+  display: none;
+}
+
+/*
   ── หน้าต่างประกาศไว้อาลัย ────────────────────────────────────────────────────
   กลับด้านกับแถบคุกกี้โดยเจตนา: "ซ่อนไว้ก่อน แล้วค่อยเปิด"
   เปิดก็ต่อเมื่อสคริปต์ก่อน paint ยืนยันว่าผู้ใช้ยังไม่เคยกดปิด

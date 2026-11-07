@@ -4,6 +4,7 @@ import { Anuphan, IBM_Plex_Sans_Thai } from "next/font/google";
 import "../globals.css";
 
 import { CookieBanner } from "@/features/shell/ui/cookie-banner";
+import { DocumentStateSync } from "@/features/shell/ui/document-state-sync";
 import { InlineScript } from "@/features/shell/ui/inline-script";
 import { MourningNotice } from "@/features/shell/ui/mourning-notice";
 import { ScrollReveal } from "@/features/shell/ui/scroll-reveal";
@@ -122,6 +123,8 @@ export default async function LocaleLayout({
 
   /* ค่าป๊อปอัพไว้อาลัย: อ่านจากหลังบ้าน (ฉบับที่เผยแพร่) — ถ้าไม่มีฐานข้อมูล/ข้อมูลเสีย ใช้ค่าเริ่มต้นในโค้ด */
   const mourningNotice = await loadMourningNotice(chromeLocale);
+  /* มีป้ายประกาศที่แสดงจริงไหม — ใช้ตัดสินว่าจะเลื่อนแถบคุกกี้ออกไปก่อนหรือไม่ (ดู CookieBanner) */
+  const showsMourningNotice = mourningNotice.enabled && mourningNotice.images.length > 0;
   /* แถบเมนูจากหลังบ้าน — null = ใช้เมนูเดิมในโค้ด (ดู lib/chrome/loader.ts) */
   const navbarConfig = await loadNavbarConfig(chromeLocale);
   /* ท้ายเว็บจากหลังบ้าน — null = ใช้ของเดิมในโค้ด (W3) */
@@ -145,6 +148,9 @@ export default async function LocaleLayout({
       </head>
 
       <body className="flex min-h-dvh flex-col">
+        {/* คง attribute ที่สคริปต์ก่อน paint ตั้งไว้ (คุกกี้/ประกาศ/hero/reveal) ข้ามการสลับภาษา */}
+        <DocumentStateSync />
+
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-surface focus:px-5 focus:py-3 focus:text-sm focus:font-bold focus:text-fg focus:shadow-lg"
@@ -166,6 +172,7 @@ export default async function LocaleLayout({
 
         <CookieBanner
           policyHref={localePath(chromeLocale, "/cookie-policy")}
+          deferWhileMourningOpen={showsMourningNotice}
           labels={{
             title: messages.cookie.title,
             body: messages.cookie.body,
@@ -177,7 +184,7 @@ export default async function LocaleLayout({
 
         {/* ประกาศไว้อาลัย — ค่ามาจากหลังบ้าน (แก้ได้เอง) โดยมีค่าเริ่มต้นในโค้ด/พจนานุกรมเป็น fallback
             ⇒ ถ้าฐานข้อมูลว่างหรือยังไม่ตั้งค่า หน้าเว็บทำงานเหมือนเดิมเป๊ะ (ดู lib/mourning/loader.ts) */}
-        {mourningNotice.enabled && mourningNotice.images.length > 0 ? (
+        {showsMourningNotice ? (
           <MourningNotice
             images={mourningNotice.images}
             locale={chromeLocale}

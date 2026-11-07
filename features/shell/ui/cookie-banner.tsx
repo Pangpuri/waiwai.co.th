@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import {
+  COOKIE_BANNER_DEFER_ATTRIBUTE,
   COOKIE_CONSENT_ATTRIBUTE,
   COOKIE_CONSENT_STORAGE_KEY,
   type CookieConsent,
@@ -26,9 +27,12 @@ export type CookieBannerLabels = {
 export function CookieBanner({
   labels,
   policyHref,
+  deferWhileMourningOpen = false,
 }: {
   readonly labels: CookieBannerLabels;
   readonly policyHref: string;
+  /** true = ซ่อนแถบไว้ก่อนจนกว่าป้ายประกาศไว้อาลัยจะถูกปิด (ดู COOKIE_BANNER_DEFER_ATTRIBUTE) */
+  readonly deferWhileMourningOpen?: boolean;
 }) {
   function decide(consent: CookieConsent) {
     try {
@@ -42,6 +46,7 @@ export function CookieBanner({
   return (
     <div
       data-cookie-banner=""
+      {...(deferWhileMourningOpen ? { [COOKIE_BANNER_DEFER_ATTRIBUTE]: "" } : {})}
       role="region"
       aria-label={labels.title}
       className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-3xl rounded-2xl border border-line-strong bg-surface-raised p-4 shadow-xl sm:p-5"
