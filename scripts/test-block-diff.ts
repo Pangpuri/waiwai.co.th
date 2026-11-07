@@ -355,15 +355,20 @@ test("a11y: หน้า 'กำลังจัดทำ' และ 404 ต้�
   const pending = readFileSync("features/shell/ui/pending-page.tsx", "utf8");
   const notFound = readFileSync("features/shell/ui/not-found-content.tsx", "utf8");
 
-  assert.ok(/<h1[ >]/.test(pending), "หน้า 'กำลังจัดทำ' ต้องมี h1 (ใช้ร่วมกัน 3 หน้า: cookie-policy/terms/sustainability)");
+  assert.ok(/<h1[ >]/.test(pending), "หน้า 'กำลังจัดทำ' ต้องมี h1 (ใช้ร่วมกัน 2 หน้า: terms/sustainability)");
   assert.ok(/<h1[ >]/.test(notFound), "หน้า 404 ต้องมี h1 (ครอบ [...rest])");
 
   /* หน้าที่ใช้คอมโพเนนต์ต้องไม่เพิ่ม h1 ซ้ำอีก (1 h1 ต่อหน้า) */
-  for (const file of ["app/[lang]/cookie-policy/page.tsx", "app/[lang]/terms/page.tsx", "app/[lang]/sustainability/page.tsx"]) {
+  for (const file of ["app/[lang]/terms/page.tsx", "app/[lang]/sustainability/page.tsx"]) {
     const page = readFileSync(file, "utf8");
     assert.ok(page.includes("<PendingPage"), `${file} ต้องเรนเดอร์ PendingPage (มี h1 อยู่ในนั้น)`);
     assert.ok(!page.includes("<h1"), `${file} ห้ามมี h1 ซ้ำ`);
   }
+
+  /* หน้า cookie-policy เป็นเนื้อหาจริงแล้ว — ต้องมี h1 ของตัวเอง 1 ตัว และไม่อ้าง PendingPage */
+  const cookiePolicy = readFileSync("app/[lang]/cookie-policy/page.tsx", "utf8");
+  assert.equal((cookiePolicy.match(/<h1[ >]/g) ?? []).length, 1, "cookie-policy ต้องมี h1 1 ตัว");
+  assert.ok(!cookiePolicy.includes("<PendingPage"), "cookie-policy ต้องไม่ใช่หน้า 'กำลังจัดทำ' แล้ว");
 
   const rest = readFileSync("app/[lang]/[...rest]/page.tsx", "utf8");
   assert.ok(rest.includes("notFound()"), "[...rest] ต้องเรียก notFound() → ใช้หน้า 404 ที่มี h1");

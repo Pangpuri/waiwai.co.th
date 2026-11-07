@@ -92,9 +92,10 @@ test("links: เมนู/ท้ายเว็บ ต้องไม่ลิ�
   }
 });
 
-test("links: หน้าที่เคยเสียทั้ง 4 มี route จริง และอยู่ในรายการกลาง", () => {
-  /* รอบที่ 112: `whereToBuy` ถูกถอดออก (ลบหน้า /where-to-buy ทิ้งตามคำสั่งเจ้าของ) */
-  assert.deepEqual([...PENDING_PAGE_IDS], ["sustainability", "cookiePolicy", "terms"]);
+test("links: หน้าที่เคยเสียมี route จริง และอยู่ในรายการกลาง", () => {
+  /* รอบที่ 112: `whereToBuy` ถูกถอดออก (ลบหน้า /where-to-buy ทิ้งตามคำสั่งเจ้าของ)
+     รอบที่ 335: `cookiePolicy` ได้เนื้อหาจริง → ย้ายไป CODE_ONLY_PAGE_PATHS */
+  assert.deepEqual([...PENDING_PAGE_IDS], ["sustainability", "terms"]);
 
   for (const id of PENDING_PAGE_IDS) {
     const routePath = pendingPagePath(id);

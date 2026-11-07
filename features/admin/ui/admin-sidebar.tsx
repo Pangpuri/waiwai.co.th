@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ADMIN_SIDEBAR_STORAGE_KEY } from "@/lib/admin/ui-storage";
+
 /**
  * เมนูด้านข้างของหลังบ้าน (รอบที่ 156–157)
  *
@@ -27,8 +29,6 @@ export type AdminSidebarStrings = {
   /** บัญชีที่ล็อกอินอยู่ เช่น "admin@waiwai.co.th · ผู้ดูแลระบบ" */
   readonly account: string;
 };
-
-const STORAGE_KEY = "waiwai_admin_sidebar_open";
 
 /** ไอคอนเส้น (stroke) 24×24 — ใช้ `currentColor` จึงเปลี่ยนสีตามธีม/token ได้ */
 const ICONS: Readonly<Record<string, string>> = {
@@ -106,7 +106,7 @@ export function AdminSidebar({ groups, strings }: { readonly groups: readonly Ad
     setOpen((current) => {
       const next = !current;
       try {
-        window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+        window.localStorage.setItem(ADMIN_SIDEBAR_STORAGE_KEY, next ? "1" : "0");
       } catch {
         /* โหมดส่วนตัว/ปิด localStorage — แค่จำสถานะไม่ได้ ไม่กระทบการใช้งาน */
       }

@@ -51,8 +51,10 @@ export type FooterView = {
     readonly follow: string;
     readonly newWindow: string;
     readonly privacy: string;
+    readonly cookies: string;
   };
   readonly privacyHref: string;
+  readonly cookiesHref: string;
 };
 
 const BACKGROUNDS: Readonly<Record<FooterBackground, { readonly className: string; readonly onDark: boolean }>> = {
@@ -92,6 +94,7 @@ export function resolveFooterView(
     follow: messages.footer.followColumn,
     newWindow: messages.a11y.newWindow,
     privacy: messages.footer.links.privacy,
+    cookies: messages.footer.links.cookies,
   };
 
   /* ── ยังไม่ตั้งค่า: ของเดิมทั้งดุ้น ── */
@@ -118,6 +121,7 @@ export function resolveFooterView(
       rights: messages.footer.rights,
       labels,
       privacyHref: localePath(locale, "/privacy"),
+      cookiesHref: localePath(locale, "/cookie-policy"),
     };
   }
 
@@ -156,5 +160,6 @@ export function resolveFooterView(
     rights: pick(config.rights),
     labels,
     privacyHref: localePath(locale, "/privacy"),
+    cookiesHref: localePath(locale, "/cookie-policy"),
   };
 }

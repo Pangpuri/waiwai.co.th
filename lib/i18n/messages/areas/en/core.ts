@@ -89,12 +89,13 @@ export const footer = {
       contact: "Contact us",
       faq: "FAQ",
       privacy: "Privacy policy",
+      cookies: "Cookie policy",
     },
 };
 
 export const cookie = {
-    title: "This site uses cookies",
-    body: "We use cookies so the site works properly and to understand how it is used. You can accept all cookies or only the essential ones.",
+    title: "This site uses cookies and browser storage",
+    body: "We use cookies and browser storage only as needed to operate the site and remember your preferences — we do not use cookies for marketing or tracking.",
     accept: "Accept all",
     essentialOnly: "Essential only",
     policyLink: "Read the cookie policy",

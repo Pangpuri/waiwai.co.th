@@ -17,10 +17,6 @@ export const pendingPages = {
       description:
         "Our sustainability page (environment · community · governance) — waiting for confirmed copy and figures from the owner.",
     },
-    cookiePolicy: {
-      title: "Cookie policy",
-      description: "Cookie policy — waiting for a wording review together with the privacy policy.",
-    },
     terms: {
       title: "Website terms of use",
       description: "Terms of use — waiting for wording reviewed by the owner / legal adviser.",

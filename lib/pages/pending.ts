@@ -4,6 +4,7 @@
  * ที่มา (ปิดหนี้รอบที่ 81)
  * - ท้ายเว็บ (ค่าเริ่มต้นในโค้ด `features/shell/nav.ts`) ลิงก์ไป `/sustainability` · `/where-to-buy`
  *   · `/cookie-policy` · `/terms` — แต่ **ไม่เคยมีหน้าปลายทาง** ⇒ ผู้ใช้กดแล้วเจอ 404
+ * - รอบที่ 335: `/cookie-policy` ได้เนื้อหาจริงแล้ว ⇒ ย้ายไป `CODE_ONLY_PAGE_PATHS` และอยู่ใน sitemap
  * - ทางเลือกคือ "ซ่อนลิงก์" แต่ IA ที่ผู้ใช้อนุมัติให้เมนูตรงตามโครงเว็บจริง ⇒ เลือก **สร้างหน้าปลายทาง**
  *   ที่บอกความจริงว่า "กำลังจัดทำ" (ไม่แต่งเนื้อหาขึ้นเอง — ตามข้อตกลงเรื่องข้อความ placeholder)
  *
@@ -16,14 +17,13 @@
  * ⚠️ พอได้ข้อความจริงจากเจ้าของ: เปลี่ยนหน้าปลายทางเป็นเนื้อหาจริง แล้วเอาชื่อออกจากรายการนี้
  */
 
-export const PENDING_PAGE_IDS = ["sustainability", "cookiePolicy", "terms"] as const;
+export const PENDING_PAGE_IDS = ["sustainability", "terms"] as const;
 
 export type PendingPageId = (typeof PENDING_PAGE_IDS)[number];
 
 /** path จริงบนเว็บของแต่ละหน้า (ที่เดียวที่รู้ — ใช้ทั้งตอนสร้าง route และตอนเทสต์) */
 export const PENDING_PAGE_PATHS: Readonly<Record<PendingPageId, string>> = {
   sustainability: "/sustainability",
-  cookiePolicy: "/cookie-policy",
   terms: "/terms",
 };
 

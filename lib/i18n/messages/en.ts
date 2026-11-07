@@ -18,6 +18,7 @@ import { enAdminRevisions } from "./areas/en/adminRevisions.ts";
 import { adminRecipes } from "./areas/en/adminRecipes.ts";
 import { adminRetention } from "./areas/en/adminRetention.ts";
 import { privacyPage } from "./areas/en/privacy.ts";
+import { cookiePolicyPage } from "./areas/en/cookiePolicy.ts";
 import { maintenancePage } from "./areas/en/maintenance.ts";
 import { adminMaintenance } from "./areas/en/adminMaintenance.ts";
 import { adminErasure } from "./areas/en/adminErasure.ts";
@@ -75,6 +76,7 @@ export const en: Messages = {
   notFound,
   mourning,
   privacyPage,
+  cookiePolicyPage,
   maintenancePage,
   previewLinkPage,
   pendingPages,

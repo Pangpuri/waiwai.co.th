@@ -95,9 +95,13 @@ export function isPreviewablePage(id: string): boolean {
  * ⚠️ หน้าที่นี่ต้องมีอยู่จริงใน `app/[lang]/` ไม่งั้น sitemap จะชี้ไป 404
  *
  * ปัจจุบัน: `/privacy` (นโยบายความเป็นส่วนตัว — X2b · จำเป็นเพราะข้อความยินยอมของทุกฟอร์มอ้างถึงหน้านี้)
+ *          `/cookie-policy` (นโยบายคุกกี้ — รอบ 335 · ลิงก์จากแถบคุกกี้และท้ายเว็บ)
  */
 export const CODE_ONLY_PAGE_PATHS: readonly {
   readonly id: string;
   readonly path: string;
   readonly priority: number;
-}[] = [{ id: "privacy", path: "/privacy", priority: 0.5 }];
+}[] = [
+  { id: "privacy", path: "/privacy", priority: 0.5 },
+  { id: "cookie-policy", path: "/cookie-policy", priority: 0.4 },
+];

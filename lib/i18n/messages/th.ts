@@ -35,6 +35,7 @@ import { adminPreviewLink } from "./areas/th/adminPreviewLink.ts";
 import { thAdminNotice } from "./areas/th/adminNotice.ts";
 import { previewLinkPage } from "./areas/th/previewLink.ts";
 import { pendingPages } from "./areas/th/pendingPages.ts";
+import { cookiePolicyPage } from "./areas/th/cookiePolicy.ts";
 import { adminCareers as thAdminCareers } from "./areas/th/adminCareers.ts";
 import { adminPages } from "./areas/th/adminPages.ts";
 
@@ -74,6 +75,7 @@ export const th = {
   notFound,
   mourning,
   privacyPage,
+  cookiePolicyPage,
   maintenancePage,
   previewLinkPage,
   pendingPages,
