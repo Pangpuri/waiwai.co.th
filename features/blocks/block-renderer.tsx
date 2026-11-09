@@ -202,7 +202,12 @@ function BlockView({
         const media = image(
           block.image,
           language,
-          `bg-bg-subtle w-full rounded-2xl object-cover ${heroHeightClass(block.style)}`,
+          /*
+            มือถือ: แสดงภาพเต็มความสูงตามสัดส่วนจริง (ไม่บังคับความสูงขั้นต่ำ)
+            เพราะภาพแบนเนอร์กว้าง (เช่น 800×367) จะถูก object-cover ตัดซ้าย/ขวาจนหาย
+            — ตั้งแต่จอ sm ขึ้นไปยังใช้ความสูงขั้นต่ำตามขนาดบล็อกเหมือนเดิม
+          */
+          `bg-bg-subtle w-full rounded-2xl object-cover max-sm:h-auto max-sm:min-h-0 max-sm:object-contain ${heroHeightClass(block.style)}`,
           "100vw",
         );
         /*

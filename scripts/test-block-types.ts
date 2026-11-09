@@ -532,3 +532,21 @@ test("block-types: ภาพใหญ่ — ตัวเรนเดอร์�
   assert.ok(!branch.includes("object-cover"), "บล็อกภาพใหญ่ห้ามใช้ object-cover (จะครอปภาพ)");
   assert.ok(branch.includes("h-auto w-full"), "ต้องแสดงที่สัดส่วนจริงของไฟล์ (h-auto w-full)");
 });
+
+test("block-types: hero — มือถือต้องเห็นภาพเต็ม ไม่ถูก object-cover ตัดซ้าย/ขวา", () => {
+  /*
+    เคสจริง 2026-11-09: เจ้าของเห็นภาพแรกของหน้า /about บนมือถือขาดซ้าย/ขวา
+    เพราะภาพแบนเนอร์ 800×367 ถูกบังคับความสูงขั้นต่ำ (min-h-96) แล้ว object-cover ตัดขอบ
+    ⇒ มือถือต้องปล่อยความสูงตามสัดส่วนจริง (max-sm:min-h-0 + h-auto) และไม่ครอป (object-contain)
+  */
+  const renderer = readFileSync(path.join(PROJECT_ROOT, "features", "blocks", "block-renderer.tsx"), "utf8");
+  const start = renderer.indexOf('case "hero": {');
+  assert.ok(start > 0, "ต้องพบสาขาเรนเดอร์ของบล็อก hero");
+  const end = renderer.indexOf('case "heading":', start);
+  assert.ok(end > start, "ต้องหาจุดสิ้นสุดของสาขาได้");
+  const branch = renderer.slice(start, end);
+
+  assert.ok(branch.includes("max-sm:min-h-0"), "มือถือต้องยกเลิกความสูงขั้นต่ำของภาพ hero");
+  assert.ok(branch.includes("max-sm:h-auto"), "มือถือต้องให้ภาพสูงตามสัดส่วนจริง");
+  assert.ok(branch.includes("max-sm:object-contain"), "มือถือต้องไม่ใช้ object-cover กับภาพ hero");
+});
