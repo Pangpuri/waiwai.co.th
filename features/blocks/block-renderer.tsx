@@ -1022,6 +1022,7 @@ export function BlockDocumentView({
   editable = false,
   selectedBlockId = null,
   heading = "",
+  contactNotice,
   productData,
   recipeData,
   newsData,
@@ -1033,6 +1034,11 @@ export function BlockDocumentView({
   readonly selectedBlockId?: string | null;
   /** ชื่อหน้าสำหรับ <h1> (a11y · รอบที่ 149) — ว่าง = ไม่มี h1 */
   readonly heading?: string;
+  /**
+   * ข้อความใต้ฟอร์มติดต่อที่ผู้ดูแลแก้จาก `/admin/settings` (รอบ 337)
+   * ไม่ส่ง/ว่าง = ใช้ข้อความเดิมจากพจนานุกรม (ไม่กระทบหน้าอื่นที่ไม่มีฟอร์มติดต่อ)
+   */
+  readonly contactNotice?: string;
   /** ข้อมูลจริงของบล็อกไดนามิก (รอบที่ 213) — ผู้เรียก (หน้าเว็บ/พรีวิว) เป็นคนโหลดให้ */
   readonly productData?: ProductShowcaseData | null;
   readonly recipeData?: RecipeShowcaseData | null;
@@ -1040,7 +1046,18 @@ export function BlockDocumentView({
 }) {
   if (document.blocks.length === 0) return null;
 
-  const strings = blockRenderStringsFor(language);
+  const baseStrings = blockRenderStringsFor(language);
+  /* แทนเฉพาะ "ข้อความใต้ฟอร์มติดต่อ" — ป้าย/ข้อความอื่นยังมาจากพจนานุกรมเดิมทั้งหมด */
+  const strings: BlockRenderStrings =
+    contactNotice === undefined || contactNotice.trim() === ""
+      ? baseStrings
+      : {
+          ...baseStrings,
+          form: {
+            ...baseStrings.form,
+            contact: { ...baseStrings.form.contact, notice: contactNotice },
+          },
+        };
   /* เลย์เอาต์อ่านตามภาษาของหน้านี้ (X1.8 ต่อ · รอบที่ 92) — หน้าอังกฤษแยกเลย์เอาต์ได้ */
   const layout = layoutOf(document, language);
 

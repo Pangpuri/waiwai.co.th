@@ -21,6 +21,8 @@ import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { isPreviewablePage } from "@/lib/pages/paths";
 import { searchParamText } from "@/lib/search/params";
+import { loadSiteSettings } from "@/lib/site-settings/loader";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /**
  * พรีวิว "ในเปลือกหน้าเว็บจริง" — อยู่ใต้ `[lang]` จึงได้หัวเว็บ/ท้ายเว็บ/ฟอนต์/ธีม/โหมดมืด เหมือนหน้าจริงทุกอย่าง
@@ -57,6 +59,9 @@ export default async function PreviewPage({
   if (!isPreviewablePage(page)) notFound();
 
   const messages = await getMessagesFor(lang);
+  /* ข้อความใต้ฟอร์มติดต่อจาก site settings — ให้พรีวิวตรงกับหน้าเว็บจริง (รอบ 337) */
+  const siteSettings = await loadSiteSettings(lang);
+  const contactNotice = resolveNotice(siteSettings.notices.contactForm, lang, messages.contactPage.note);
   const query = await searchParams;
   /* ⚠️ รอบที่ 291: ค่าจาก URL ต้องผ่าน `searchParamText` (ค่าซ้ำ = array · อักขระควบคุม/NUL) */
   const requested = searchParamText(query.mode);
@@ -165,7 +170,14 @@ export default async function PreviewPage({
         {document.blocks.length === 0 ? (
           <p className="text-fg-muted px-4 py-20 text-center text-sm">{messages.admin.previewNoBlocks}</p>
         ) : (
-          <PreviewFrame initialDocument={document} language={lang} productData={await loadProductShowcaseData(document)} recipeData={await loadRecipeShowcaseData(document)} newsData={await loadNewsShowcaseData(document)} />
+          <PreviewFrame
+            initialDocument={document}
+            language={lang}
+            contactNotice={contactNotice}
+            productData={await loadProductShowcaseData(document)}
+            recipeData={await loadRecipeShowcaseData(document)}
+            newsData={await loadNewsShowcaseData(document)}
+          />
         )}
       </div>
     </div>

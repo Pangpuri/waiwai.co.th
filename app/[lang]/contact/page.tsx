@@ -17,6 +17,8 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { loadSiteSettings } from "@/lib/site-settings/loader";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /*
   ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
@@ -64,6 +66,13 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
   const messages = await getMessages(lang);
 
   /*
+    ข้อความใต้ฟอร์มติดต่อ (รอบ 337) — ผู้ดูแลแก้จาก `/admin/settings`
+    เว้นว่าง = ข้อความเดิมจากพจนานุกรม (ทั้งเลย์เอาต์โค้ดด้านล่างและบล็อกฟอร์มที่เผยแพร่)
+  */
+  const siteSettings = await loadSiteSettings(lang);
+  const contactNotice = resolveNotice(siteSettings.notices.contactForm, lang, messages.contactPage.note);
+
+  /*
     ── เนื้อหาของหน้านี้มาจากไหน (S2 · รอบที่ 82) ────────────────────────────────
     1. ถ้าหลังบ้าน **กดเผยแพร่ (มติ 2026-10-09: หน้าแรกขึ้นเว็บทันที · หน้าอื่นยังไม่ขึ้นเว็บ)** ⇒ เรนเดอร์เอกสารบล็อกที่เผยแพร่
        (ตัวเรนเดอร์เดียวกับพรีวิว ⇒ "สิ่งที่เห็นตอนแก้ = สิ่งที่ขึ้นเว็บ" 1:1)
@@ -76,7 +85,14 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
       ⚠️ ต้องส่ง `heading` เสมอ (a11y · 1 h1 ต่อหน้า) — เอกสารบล็อกไม่มี h1 ในตัวเอง
       เคสจริงรอบที่ 267: เผยแพร่แล้วหน้า /contact **ไม่มี h1 เลย** เพราะไม่ได้ส่งค่านี้
     */
-    return <BlockDocumentView document={liveDocument} language={lang} heading={messages.contactPage.title} />;
+    return (
+      <BlockDocumentView
+        document={liveDocument}
+        language={lang}
+        heading={messages.contactPage.title}
+        contactNotice={contactNotice}
+      />
+    );
   }
 
   const m = messages.contactPage;
@@ -172,7 +188,7 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
               consentRequired: m.formConsentRequired,
             }}
             notice={
-              <p className="border-line bg-surface text-fg-muted rounded-2xl border px-4 py-3 text-xs leading-relaxed">{m.note}</p>
+              <p className="border-line bg-surface text-fg-muted rounded-2xl border px-4 py-3 text-xs leading-relaxed">{contactNotice}</p>
             }
           >
             <ContactFormFields

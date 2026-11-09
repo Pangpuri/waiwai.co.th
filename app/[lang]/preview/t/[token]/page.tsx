@@ -24,6 +24,8 @@ import { listPages } from "@/lib/pages/repository";
 import { isPreviewTokenShape } from "@/lib/preview-link/plan";
 import { resolvePreviewLink } from "@/lib/preview-link/repository";
 import { listProductsByCategory } from "@/lib/products/repository";
+import { loadSiteSettings } from "@/lib/site-settings/loader";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /**
  * ลิงก์พรีวิวชั่วคราว (X2.6) — `/th/preview/t/<token>`
@@ -92,6 +94,9 @@ export default async function PreviewLinkPage({
   if (!isPreviewablePage(page)) notFound();
 
   const messages = await getMessagesFor(lang);
+  /* ข้อความใต้ฟอร์มติดต่อจาก site settings — ให้ลิงก์พรีวิวตรงกับหน้าเว็บจริง (รอบ 337) */
+  const siteSettings = await loadSiteSettings(lang);
+  const contactNotice = resolveNotice(siteSettings.notices.contactForm, lang, messages.contactPage.note);
 
   if (!isDatabaseConfigured()) {
     return (
@@ -144,6 +149,7 @@ export default async function PreviewLinkPage({
             document={document}
             language={lang}
             heading={heading}
+            contactNotice={contactNotice}
             productData={productData}
             recipeData={recipeData}
             newsData={newsData}

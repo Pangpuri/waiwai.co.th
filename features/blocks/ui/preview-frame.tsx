@@ -65,12 +65,18 @@ function closestAttribute(element: Element | null, attribute: string): string | 
 export function PreviewFrame({
   initialDocument,
   language,
+  contactNotice,
   productData = null,
   recipeData = null,
   newsData = null,
 }: {
   readonly initialDocument: BlockDocument;
   readonly language: "th" | "en";
+  /**
+   * ข้อความใต้ฟอร์มติดต่อจาก site settings (โหลดฝั่งเซิร์ฟเวอร์) — รอบ 337
+   * ส่งมาเพื่อให้พรีวิวเห็นข้อความเดียวกับหน้าเว็บจริง
+   */
+  readonly contactNotice?: string;
   /** ข้อมูลจริงของบล็อกไดนามิก — โหลดจากเซิร์ฟเวอร์ (ห้ามโหลดในนี้: พรีวิวเป็น client) */
   readonly productData?: ProductShowcaseData | null;
   readonly recipeData?: RecipeShowcaseData | null;
@@ -197,7 +203,16 @@ export function PreviewFrame({
       }}
     >
       {/* editable = ติดป้าย data-field/data-card-index ให้คลิกแก้ได้ตรงส่วน */}
-      <BlockDocumentView document={document} language={language} editable selectedBlockId={selectedBlockId} productData={productData} recipeData={recipeData} newsData={newsData} />
+      <BlockDocumentView
+        document={document}
+        language={language}
+        editable
+        selectedBlockId={selectedBlockId}
+        contactNotice={contactNotice}
+        productData={productData}
+        recipeData={recipeData}
+        newsData={newsData}
+      />
     </div>
   );
 }

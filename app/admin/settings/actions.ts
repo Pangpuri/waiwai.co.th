@@ -41,6 +41,16 @@ function toRaw(fields: Readonly<Record<string, string>>): unknown {
       email: fields["email"] ?? "",
     },
     socials,
+    notices: {
+      contactForm: {
+        th: fields["contactNoticeTh"] ?? "",
+        en: fields["contactNoticeEn"] ?? "",
+      },
+      careers: {
+        th: fields["careersNoticeTh"] ?? "",
+        en: fields["careersNoticeEn"] ?? "",
+      },
+    },
   };
 }
 

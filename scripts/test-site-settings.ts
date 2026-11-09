@@ -8,9 +8,11 @@ import { CODE_ONLY_PAGE_PATHS, PAGES_ALWAYS_NOINDEX, pathForPage } from "@/lib/p
 import { SITE } from "@/lib/site";
 import {
   EMPTY_SITE_SETTINGS,
+  MAX_NOTICE_LENGTH,
   SITE_SETTINGS_PAGE_KEY,
   defaultSiteSettings,
   parseSiteSettings,
+  resolveNotice,
   siteNameFor,
   siteSettingsErrorsOf,
   validateSiteSettings,
@@ -32,6 +34,8 @@ test("ค่าเริ่มต้น = สิ่งที่เว็บใ�
   assert.equal(settings.organization.address.th, SITE.contact.address);
   assert.equal(settings.favicon, "", "ยังไม่ตั้งไอคอน ⇒ ไม่ต้องใส่ <link rel=icon>");
   assert.equal(settings.defaultOgImage, "", "ยังไม่ตั้งรูปแชร์ ⇒ พฤติกรรมเดิม");
+  assert.deepEqual(settings.notices.contactForm, { th: "", en: "" }, "ยังไม่ตั้งข้อความ ⇒ ใช้ข้อความเดิมจากพจนานุกรม");
+  assert.deepEqual(settings.notices.careers, { th: "", en: "" }, "ยังไม่ตั้งข้อความ ⇒ ใช้ข้อความเดิมจากพจนานุกรม");
   assert.equal(siteSettingsErrorsOf(validateSiteSettings(settings)).length, 0);
 });
 
@@ -86,6 +90,48 @@ test("parseSiteSettings: รับค่าจากฟอร์ม + ตัด�
   const unknown = parseSiteSettings({ somethingElse: 1 }, th);
   assert.equal(unknown.ok, true, "คีย์ที่ไม่รู้จัก = ไม่พัง");
   if (unknown.ok) assert.equal(unknown.value.name.th, th.meta.siteName);
+});
+
+test("notices: รับข้อความแจ้งจากหลังบ้าน + ตัดช่องว่าง/ความยาว + เว้นว่าง = ใช้ค่าเดิม", () => {
+  const parsed = parseSiteSettings(
+    {
+      name: { th: "ไวไว", en: "" },
+      notices: {
+        contactForm: { th: "  ข้อความติดต่อใหม่  ", en: " New contact notice " },
+        careers: { th: "ข้อความสมัครงานใหม่", en: "" },
+      },
+    },
+    th,
+  );
+
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.deepEqual(parsed.value.notices.contactForm, {
+    th: "ข้อความติดต่อใหม่",
+    en: "New contact notice",
+  });
+  assert.deepEqual(parsed.value.notices.careers, { th: "ข้อความสมัครงานใหม่", en: "" });
+
+  /* เอกสารเก่าที่ไม่มีคีย์ notices ต้องยัง parse ผ่าน (ไม่ต้อง migration) */
+  const legacy = parseSiteSettings({ name: { th: "ไวไว", en: "" } }, th);
+  assert.equal(legacy.ok, true);
+  if (legacy.ok) assert.deepEqual(legacy.value.notices.contactForm, { th: "", en: "" });
+
+  /* notices ผิดชนิด = ปฏิเสธ (ไม่กลืนข้อมูลเสียเงียบ ๆ) */
+  assert.equal(parseSiteSettings({ name: { th: "ไวไว", en: "" }, notices: "x" }, th).ok, false);
+
+  /* เพดานความยาว: ตัดที่ MAX_NOTICE_LENGTH */
+  const long = "ก".repeat(MAX_NOTICE_LENGTH + 20);
+  const capped = parseSiteSettings({ name: { th: "ไวไว", en: "" }, notices: { contactForm: { th: long } } }, th);
+  assert.equal(capped.ok, true);
+  if (capped.ok) assert.equal(capped.value.notices.contactForm.th.length, MAX_NOTICE_LENGTH);
+});
+
+test("resolveNotice: ค่าที่กรอกชนะ · ว่าง = ข้อความเดิมของภาษานั้น", () => {
+  assert.equal(resolveNotice({ th: "ไทยใหม่", en: "English new" }, "th", "ไทยเดิม"), "ไทยใหม่");
+  assert.equal(resolveNotice({ th: "ไทยใหม่", en: "English new" }, "en", "English old"), "English new");
+  assert.equal(resolveNotice({ th: "", en: "" }, "th", "ไทยเดิม"), "ไทยเดิม");
+  assert.equal(resolveNotice({ th: "ไทยใหม่", en: "   " }, "en", "English old"), "English old", "EN ว่าง = ไม่เอาไทยไปโผล่หน้าอังกฤษ");
 });
 
 test("buildSitemapEntries: มีทั้ง 2 ภาษา · ตัดหน้าที่ noindex/ซ่อนจากเมนู", () => {

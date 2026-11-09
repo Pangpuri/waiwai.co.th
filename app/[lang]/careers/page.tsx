@@ -16,6 +16,8 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { loadSiteSettings } from "@/lib/site-settings/loader";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /*
   ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
@@ -69,6 +71,13 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
   */
 
   const m = messages.careersPage;
+
+  /*
+    ข้อความท้ายหน้า (รอบ 337) — ผู้ดูแลแก้จาก `/admin/settings`
+    เว้นว่าง = ข้อความเดิมจากพจนานุกรม
+  */
+  const siteSettings = await loadSiteSettings(lang);
+  const careersNotice = resolveNotice(siteSettings.notices.careers, lang, m.note);
 
   /*
     ── "ตำแหน่งที่เปิดรับ" มาจากไหน (รอบที่ 265 · มติ D26) ──────────────────────────
@@ -232,7 +241,7 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
           </Link>
 
           <p className="mt-8 max-w-3xl rounded-2xl border border-line bg-surface px-5 py-4 text-xs leading-relaxed text-fg-muted">
-            {m.note}
+            {careersNotice}
           </p>
         </div>
       </section>

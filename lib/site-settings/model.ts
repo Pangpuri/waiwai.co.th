@@ -12,6 +12,8 @@ import { SITE } from "@/lib/site";
  * ⚠️ พาธไฟล์ (favicon/OG) เก็บเป็นพาธในเว็บ ตามมติ D9 — ไม่เก็บ URL เต็ม
  * ⚠️ รอบ 326: ถอด `organization.hours` / `organization.mapUrl` ออก เพราะ **ไม่มีโค้ดฝั่งเว็บอ่านค่าเลย**
  *    ข้อมูลเก่าใน `page_document` ที่ยังมีสองคีย์นี้จะถูกเพิกเฉย (parse ไม่พัง) — ไม่ต้อง migration
+ * ⚠️ รอบ 337: เพิ่ม `notices` = ข้อความแจ้งที่เคยฝังในพจนานุกรม (ใต้ฟอร์มติดต่อ / ท้ายหน้าสมัครงาน)
+ *    ⇒ ผู้ดูแลแก้เองได้จาก `/admin/settings` โดย **เว้นว่าง = ข้อความเดิมจากพจนานุกรมเป๊ะ**
  */
 
 export const SITE_SETTINGS_PAGE_KEY = "site-settings";
@@ -19,6 +21,7 @@ export const SITE_SETTINGS_PAGE_KEY = "site-settings";
 export const MAX_SITE_NAME_LENGTH = 60;
 export const MAX_URL_LENGTH = 300;
 export const MAX_SOCIALS = 8;
+export const MAX_NOTICE_LENGTH = 600;
 
 export type SiteSettings = {
   readonly name: LocalizedValue;
@@ -34,6 +37,16 @@ export type SiteSettings = {
   };
   /** ลิงก์โซเชียลอย่างเป็นทางการ (ใช้กับ JSON-LD sameAs) */
   readonly socials: readonly string[];
+  /**
+   * ข้อความแจ้งบนหน้าเว็บที่ผู้ดูแลแก้เองได้
+   * - `contactForm` = ข้อความใต้ฟอร์มติดต่อ (PDPA/การเก็บข้อมูล)
+   * - `careers` = ข้อความท้ายหน้า "ร่วมงานกับไวไว" (จำนวนอัตราตามประกาศ)
+   * ⚠️ ค่าว่าง = ใช้ข้อความเดิมจากพจนานุกรมของภาษานั้น ๆ (`resolveNotice`)
+   */
+  readonly notices: {
+    readonly contactForm: LocalizedValue;
+    readonly careers: LocalizedValue;
+  };
 };
 
 export const EMPTY_SITE_SETTINGS: SiteSettings = {
@@ -47,6 +60,10 @@ export const EMPTY_SITE_SETTINGS: SiteSettings = {
     email: "",
   },
   socials: [],
+  notices: {
+    contactForm: { th: "", en: "" },
+    careers: { th: "", en: "" },
+  },
 };
 
 /** ค่าเริ่มต้น = สิ่งที่เว็บใช้อยู่จริงวันนี้ */
@@ -62,6 +79,11 @@ export function defaultSiteSettings(messages: Messages): SiteSettings {
       email: SITE.contact.email,
     },
     socials: SITE.social.map((item) => item.href),
+    /* เว้นว่าง = ใช้ข้อความเดิมจากพจนานุกรม (ไม่ตั้งค่า = พฤติกรรมเดิมเป๊ะ) */
+    notices: {
+      contactForm: { th: "", en: "" },
+      careers: { th: "", en: "" },
+    },
   };
 }
 
@@ -82,6 +104,15 @@ function toText(value: unknown, fallback: string, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : fallback;
 }
 
+/** ข้อความแจ้ง: ตัดช่องว่างหัวท้าย + จำกัดความยาว (ช่องว่าง = ใช้ข้อความเดิม) */
+function toNotice(value: unknown, fallback: LocalizedValue): LocalizedValue {
+  if (!isRecord(value)) return fallback;
+  return {
+    th: typeof value["th"] === "string" ? value["th"].trim().slice(0, MAX_NOTICE_LENGTH) : fallback.th,
+    en: typeof value["en"] === "string" ? value["en"].trim().slice(0, MAX_NOTICE_LENGTH) : fallback.en,
+  };
+}
+
 export type SiteSettingsParseResult =
   | { readonly ok: true; readonly value: SiteSettings }
   | { readonly ok: false; readonly problems: readonly string[] };
@@ -92,6 +123,8 @@ export function parseSiteSettings(raw: unknown, messages: Messages): SiteSetting
 
   const rawOrg = isRecord(raw["organization"]) ? raw["organization"] : {};
   const rawSocials = raw["socials"];
+  const rawNotices = raw["notices"] === undefined ? {} : raw["notices"];
+  if (!isRecord(rawNotices)) return { ok: false, problems: ["notices: ต้องเป็นออบเจ็กต์"] };
 
   const socials: string[] = [];
   if (rawSocials !== undefined && !Array.isArray(rawSocials)) {
@@ -116,6 +149,10 @@ export function parseSiteSettings(raw: unknown, messages: Messages): SiteSetting
         email: toText(rawOrg["email"], fallback.organization.email, 80),
       },
       socials,
+      notices: {
+        contactForm: toNotice(rawNotices["contactForm"], fallback.notices.contactForm),
+        careers: toNotice(rawNotices["careers"], fallback.notices.careers),
+      },
     },
   };
 }
@@ -187,4 +224,16 @@ export function siteSettingsErrorsOf(issues: readonly SiteSettingsIssue[]): read
 export function siteNameFor(value: SiteSettings, locale: "th" | "en"): string {
   if (locale === "en" && value.name.en.trim() !== "") return value.name.en;
   return value.name.th;
+}
+
+/**
+ * ข้อความแจ้งที่ใช้แสดงจริง: ค่าที่ผู้ดูแลกรอก (ถ้ามี) → ไม่มี = ข้อความเดิมจากพจนานุกรม
+ *
+ * ⚠️ ตั้งใจไม่ถอยไปใช้ข้อความไทยบนหน้าอังกฤษ: ถ้าไม่ได้กรอก EN ให้ใช้ค่าเริ่มต้นของ EN
+ *    (ผู้ดูแลกรอกทั้งสองช่องตามปกติ · ค่าว่างจึงหมายถึง "ยังไม่แก้" จริง ๆ)
+ */
+export function resolveNotice(value: LocalizedValue, language: "th" | "en", fallback: string): string {
+  const custom = language === "en" ? value.en : value.th;
+  const trimmed = custom.trim();
+  return trimmed === "" ? fallback : trimmed;
 }

@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { publishSettingsAction, saveSettingsAction } from "@/app/admin/settings/actions";
 import { INITIAL_SETTINGS_STATE } from "@/features/admin/settings-state";
-import { MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
+import { MAX_NOTICE_LENGTH, MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -125,6 +125,53 @@ export function SettingsForm({
             </span>
             <textarea name="socials" defaultValue={initial.socials.join("\n")} rows={3} className={FIELD_CLASS} />
           </label>
+        </fieldset>
+
+        <fieldset className="border-line flex flex-col gap-2 rounded-xl border p-3">
+          <legend className="text-fg px-1 text-xs font-semibold">{strings.settingsNoticesTitle}</legend>
+          <p className="text-fg-muted text-[11px] leading-relaxed">{strings.settingsNoticesHint}</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLASS}>{strings.settingsContactNoticeTh}</span>
+              <textarea
+                name="contactNoticeTh"
+                defaultValue={initial.notices.contactForm.th}
+                rows={3}
+                maxLength={MAX_NOTICE_LENGTH}
+                className={FIELD_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLASS}>{strings.settingsContactNoticeEn}</span>
+              <textarea
+                name="contactNoticeEn"
+                defaultValue={initial.notices.contactForm.en}
+                rows={3}
+                maxLength={MAX_NOTICE_LENGTH}
+                className={FIELD_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLASS}>{strings.settingsCareersNoticeTh}</span>
+              <textarea
+                name="careersNoticeTh"
+                defaultValue={initial.notices.careers.th}
+                rows={3}
+                maxLength={MAX_NOTICE_LENGTH}
+                className={FIELD_CLASS}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={LABEL_CLASS}>{strings.settingsCareersNoticeEn}</span>
+              <textarea
+                name="careersNoticeEn"
+                defaultValue={initial.notices.careers.en}
+                rows={3}
+                maxLength={MAX_NOTICE_LENGTH}
+                className={FIELD_CLASS}
+              />
+            </label>
+          </div>
         </fieldset>
 
         <div className="flex flex-wrap items-center gap-2">

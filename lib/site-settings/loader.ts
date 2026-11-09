@@ -4,6 +4,7 @@ import { loadDocumentRow } from "@/lib/blocks/repository";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/config";
+import type { Messages } from "@/lib/i18n/messages/th";
 import {
   SITE_SETTINGS_PAGE_KEY,
   defaultSiteSettings,
@@ -40,6 +41,28 @@ export const loadSiteSettings = cache(async (locale: Locale): Promise<SiteSettin
 });
 
 /**
+ * เติมข้อความเดิม (จากพจนานุกรมของแต่ละภาษา) ลงช่องแก้ไขเมื่อยังไม่เคยตั้งค่า
+ * ⇒ ผู้ดูแลเห็นข้อความที่เว็บกำลังแสดงอยู่จริงแล้วแก้ต่อได้ทันที
+ * ⚠️ ใช้เฉพาะหน้าจอแก้ไข — ตัวโหลดฝั่งเว็บยังคืนค่าว่าง ⇒ `resolveNotice()` ถอยไปใช้ค่าเดิมเสมอ
+ */
+function withNoticeDefaults(value: SiteSettings, messagesTh: Messages, messagesEn: Messages): SiteSettings {
+  const pick = (custom: string, fallbackText: string): string => (custom.trim() === "" ? fallbackText : custom);
+  return {
+    ...value,
+    notices: {
+      contactForm: {
+        th: pick(value.notices.contactForm.th, messagesTh.contactPage.note),
+        en: pick(value.notices.contactForm.en, messagesEn.contactPage.note),
+      },
+      careers: {
+        th: pick(value.notices.careers.th, messagesTh.careersPage.note),
+        en: pick(value.notices.careers.en, messagesEn.careersPage.note),
+      },
+    },
+  };
+}
+
+/**
  * โหลดค่าสำหรับ "หน้าจอแก้ไข" (หลังบ้าน) — ใช้ฉบับร่างถ้ามี ไม่มีก็ฉบับเผยแพร่ ไม่มีก็ค่าเริ่มต้น
  * ⇒ ผู้แก้เห็นงานที่ค้างไว้ของตัวเอง (หลักเดียวกับตัวแก้เพจ/ท้ายเว็บ)
  */
@@ -48,8 +71,8 @@ export async function loadSiteSettingsForEditing(): Promise<{
   readonly draftUpdatedAt: string | null;
   readonly publishedAt: string | null;
 }> {
-  const messages = await getMessagesFor("th");
-  const fallback = defaultSiteSettings(messages);
+  const [messages, messagesEn] = await Promise.all([getMessagesFor("th"), getMessagesFor("en")]);
+  const fallback = withNoticeDefaults(defaultSiteSettings(messages), messages, messagesEn);
   if (!isDatabaseConfigured()) return { settings: fallback, draftUpdatedAt: null, publishedAt: null };
 
   try {
@@ -69,7 +92,7 @@ export async function loadSiteSettingsForEditing(): Promise<{
           : fallback;
 
     return {
-      settings,
+      settings: withNoticeDefaults(settings, messages, messagesEn),
       draftUpdatedAt: draftRow?.updatedAt ?? null,
       publishedAt: publishedRow?.publishedAt ?? null,
     };
