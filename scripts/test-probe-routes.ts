@@ -207,7 +207,7 @@ test("probe: flow หลายขั้น — มีครบ 4 flow · เล�
   for (const local of ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost", "http://[::1]:3000"]) {
     assert.equal(isLocalProbeUrl(local), true, `${local} ต้องถือว่าในเครื่อง`);
   }
-  for (const remote of ["https://waiwai-co-th-demo.vercel.app", "http://192.168.1.9:3000", "https://www.waiwai.com", "ไม่ใช่ url"]) {
+  for (const remote of ["https://waiwai-co-th-demo.vercel.app", "http://192.168.1.9:3000", "https://www.waiwai.co.th", "ไม่ใช่ url"]) {
     assert.equal(isLocalProbeUrl(remote), false, `${remote} ต้องถือว่าไกล (flow ต้องไม่รันโดยไม่ยืนยัน)`);
   }
 });

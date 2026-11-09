@@ -21,12 +21,12 @@ export const cookiePolicyPage = {
   meta: {
     title: "Cookie policy",
     description:
-      "How waiwai.com uses cookies and browser storage — what we use, why, how long it lasts, and how you can manage it.",
+      "How www.waiwai.co.th uses cookies and browser storage — what we use, why, how long it lasts, and how you can manage it.",
   },
   eyebrow: "Cookies",
   title: "Cookie policy",
   intro:
-    "waiwai.com uses cookies and browser storage only as needed to operate the site and remember the choices you make. We do not use cookies for marketing, advertising, or behavioural tracking.",
+    "www.waiwai.co.th uses cookies and browser storage only as needed to operate the site and remember the choices you make. We do not use cookies for marketing, advertising, or behavioural tracking.",
 
   summaryTitle: "In short",
   summaryBody:

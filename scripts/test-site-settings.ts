@@ -43,6 +43,11 @@ test("คีย์ที่เก็บในฐานข้อมูลคื�
   assert.equal(SITE_SETTINGS_PAGE_KEY, "site-settings");
 });
 
+test("SITE.url: โดเมนจริงคือ www.waiwai.co.th (canonical/sitemap/JSON-LD/การ์ดตัวอย่าง)", () => {
+  assert.equal(SITE.url, "https://www.waiwai.co.th");
+  assert.equal(new URL(SITE.url).host, "www.waiwai.co.th", "การ์ดตัวอย่างต้องแสดงโดเมนเดียวกับ canonical");
+});
+
 test("siteNameFor: อังกฤษว่าง = ใช้ไทย", () => {
   const base = defaultSiteSettings(th);
   assert.equal(siteNameFor({ ...base, name: { th: "ไทย", en: "English" } }, "en"), "English");

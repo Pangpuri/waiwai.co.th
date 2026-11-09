@@ -14,7 +14,7 @@ export const privacyPage = {
   eyebrow: "Privacy",
   title: "Privacy policy",
   intro:
-    "Thai Food Products Factory Co., Ltd. (“the Company”) recognises the importance of personal data. This policy explains how the Wai Wai website (waiwai.com) collects, uses, discloses and retains personal data, and the rights of data subjects. This policy applies to personal data collected through this website.",
+    "Thai Food Products Factory Co., Ltd. (“the Company”) recognises the importance of personal data. This policy explains how the Wai Wai website (www.waiwai.co.th) collects, uses, discloses and retains personal data, and the rights of data subjects. This policy applies to personal data collected through this website.",
 
   controllerTitle: "Data controller",
   controllerIntro: "The data controller under this policy is",

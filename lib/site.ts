@@ -6,8 +6,11 @@
  */
 
 export const SITE = {
-  /** โดเมนที่ใช้ทำ canonical / sitemap / JSON-LD */
-  url: "https://www.waiwai.com",
+  /**
+   * โดเมนที่ใช้ทำ canonical / sitemap / JSON-LD / การ์ดตัวอย่าง SEO
+   * ⚠️ เจ้าของยืนยัน 2026-11-09: โดเมนจริงคือ www.waiwai.co.th (ไม่ใช่ .com)
+   */
+  url: "https://www.waiwai.co.th",
   /** ชื่อนิติบุคคลตามที่ใช้ในเอกสารราชการ (จากนโยบายเดิมของบริษัท) */
   legalName: "บริษัท โรงงานผลิตภัณฑ์อาหารไทย จำกัด",
   /** ชื่อนิติบุคคลภาษาอังกฤษ — ใช้กับหน้า EN / JSON-LD */

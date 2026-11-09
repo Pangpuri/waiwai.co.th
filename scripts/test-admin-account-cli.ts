@@ -31,12 +31,12 @@ test("บัญชี CLI: อ่านตัวเลือกถูกต้�
     "--password=004400-waiwai",
     "--name=สมชาย",
     "--role=publisher",
-    "--base=https://www.waiwai.com",
+    "--base=https://www.waiwai.co.th",
     "--json",
   ]);
   assert.equal(custom.role, "publisher");
   assert.equal(custom.name, "สมชาย");
-  assert.equal(custom.base, "https://www.waiwai.com");
+  assert.equal(custom.base, "https://www.waiwai.co.th");
   assert.equal(custom.json, true);
 
   assert.equal(parseAccountCliArgs(["--list"]).list, true, "--list ใช้ได้โดยไม่ต้องมีอีเมล");

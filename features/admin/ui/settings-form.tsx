@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { publishSettingsAction, saveSettingsAction } from "@/app/admin/settings/actions";
 import { INITIAL_SETTINGS_STATE } from "@/features/admin/settings-state";
 import { MAX_NOTICE_LENGTH, MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
+import { SITE } from "@/lib/site";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -21,6 +22,9 @@ const FIELD_CLASS =
 const LABEL_CLASS = "text-fg-muted text-xs";
 const BUTTON_CLASS =
   "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-3 py-1.5 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
+
+/** โฮสต์จริงจากค่ากลาง (`lib/site.ts`) — ห้ามพิมพ์โดเมนซ้ำในคอมโพเนนต์นี้ */
+const SITE_HOST = new URL(SITE.url).host;
 
 function SaveButton({ label, primary = false }: { readonly label: string; readonly primary?: boolean }) {
   const { pending } = useFormStatus();
@@ -205,7 +209,7 @@ export function SettingsForm({
         <p className="text-fg-muted text-[11px]">{strings.settingsPreviewGoogleHint}</p>
 
         <div className="border-line rounded-xl border p-3">
-          <p className="text-fg-muted text-[11px]">www.waiwai.com</p>
+          <p className="text-fg-muted text-[11px]">{SITE_HOST}</p>
           <p className="text-link text-base leading-snug">{exampleTitle}</p>
           <p className="text-fg-muted text-xs leading-relaxed">{exampleDescription}</p>
         </div>
