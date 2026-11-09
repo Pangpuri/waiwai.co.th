@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -49,12 +50,15 @@ export function SettingsForm({
   messages,
   exampleTitle,
   exampleDescription,
+  exampleOgImage,
 }: {
   readonly initial: SiteSettings;
   readonly messages: Messages;
-  /** ตัวอย่างหัวข้อ/คำอธิบายสำหรับการ์ดพรีวิว (จากหน้าแรก) */
+  /** ตัวอย่างหัวข้อ/คำอธิบายสำหรับการ์ดพรีวิว (จากหน้าแรก — ค่า SEO จริงถ้ามี) */
   readonly exampleTitle: string;
   readonly exampleDescription: string;
+  /** รูปแชร์ที่มีผลกับหน้าแรก (SEO รายหน้า → defaultOgImage) */
+  readonly exampleOgImage: string;
 }) {
   const strings = messages.admin;
   const [saveState, saveAction] = useActionState(saveSettingsAction, INITIAL_SETTINGS_STATE);
@@ -206,6 +210,12 @@ export function SettingsForm({
       <section className="border-line bg-surface flex flex-col gap-2 rounded-2xl border p-3">
         <h2 className="text-fg text-sm font-semibold">{strings.settingsPreviewTitle}</h2>
         <p className="text-fg-muted text-[11px]">{strings.settingsPreviewGoogleHint}</p>
+        <Link
+          href="/admin/builder/home"
+          className="text-link focus-visible:ring-ring w-fit text-[11px] font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {strings.settingsPreviewEditHomeSeo}
+        </Link>
 
         <div className="border-line rounded-xl border p-3">
           <p className="text-fg-muted text-[11px]">{SITE_HOST}</p>
@@ -215,7 +225,7 @@ export function SettingsForm({
 
         <div className="border-line bg-surface-raised flex flex-col gap-1 rounded-xl border p-3">
           <p className="text-fg text-xs font-semibold">{initial.name.th}</p>
-          <p className="text-fg-muted text-[11px]">{initial.defaultOgImage === "" ? "—" : initial.defaultOgImage}</p>
+          <p className="text-fg-muted text-[11px]">{exampleOgImage === "" ? "—" : exampleOgImage}</p>
         </div>
       </section>
     </div>

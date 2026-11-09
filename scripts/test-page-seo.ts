@@ -92,3 +92,21 @@ test("PageSeoSettings: รูป OG อัปโหลด/ลากวางไ�
   const builder = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
   assert.ok(builder.includes("<ImageLibraryProvider items={imageLibrary}>"), "PageSeoSettings ต้องอยู่ใน ImageLibraryProvider");
 });
+
+test("settings preview: ใช้ SEO จริงของหน้าแรก + มีลิงก์ไปแก้ที่หน้าแรก", () => {
+  /*
+    เคสจริง 2026-11-09: การ์ดตัวอย่างใช้ค่าจากพจนานุกรมตายตัว ไม่สะท้อน SEO ที่แก้ในหน้าแรก
+    ⇒ ผู้ใช้หาไม่เจอว่าต้องเปลี่ยนที่ไหน · ต้องอ่าน loadPageSeo("home") + fallback ค่าเริ่มต้น
+  */
+  const page = readFileSync("app/admin/settings/page.tsx", "utf8");
+  assert.ok(page.includes('loadPageSeo("home")'), "การ์ดตัวอย่างต้องอ่าน SEO จริงของหน้าแรก");
+  assert.ok(page.includes("resolveSeo("), "ต้อง resolve ค่า SEO ตามภาษา/fallback");
+  assert.ok(page.includes("exampleOgImage="), "ต้องส่งรูปแชร์ที่มีผลจริงให้การ์ด");
+
+  const form = readFileSync("features/admin/ui/settings-form.tsx", "utf8");
+  assert.ok(form.includes('href="/admin/builder/home"'), "ต้องมีลิงก์ตรงไปยัง SEO หน้าแรก");
+  assert.ok(form.includes("exampleOgImage"), "การ์ดต้องแสดงรูปแชร์ที่มีผลจริง");
+
+  const actions = readFileSync("app/admin/builder/page-actions.ts", "utf8");
+  assert.ok(actions.includes('revalidatePath("/admin/settings")'), "บันทึก SEO แล้วต้องรีเฟรชหน้าตั้งค่าด้วย");
+});

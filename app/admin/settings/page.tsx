@@ -1,6 +1,8 @@
 import { SettingsForm } from "@/features/admin/ui/settings-form";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { loadPageSeo } from "@/lib/pages/repository";
+import { resolveSeo } from "@/lib/seo/page-seo";
 import { loadSiteSettingsForEditing } from "@/lib/site-settings/loader";
 
 /**
@@ -16,7 +18,12 @@ export default async function AdminSettingsPage() {
   const strings = messages.admin;
 
   /* ใช้ฉบับร่างถ้ามี (ผู้แก้เห็นงานค้างของตัวเอง) — ไม่มีก็ฉบับเผยแพร่/ค่าเริ่มต้น */
-  const { settings, draftUpdatedAt, publishedAt } = await loadSiteSettingsForEditing();
+  const [{ settings, draftUpdatedAt, publishedAt }, homeSeo] = await Promise.all([
+    loadSiteSettingsForEditing(),
+    /* ค่าจริงของหน้าแรก: SEO ที่ตั้งจาก /admin/builder/home (ถ้ามี) → ไม่มีใช้ค่าเริ่มต้นจากพจนานุกรม */
+    loadPageSeo("home"),
+  ]);
+  const resolvedHomeSeo = homeSeo === null ? null : resolveSeo(homeSeo, "th");
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-8">
@@ -28,8 +35,9 @@ export default async function AdminSettingsPage() {
       <SettingsForm
         initial={settings}
         messages={messages}
-        exampleTitle={messages.meta.homeTitle}
-        exampleDescription={messages.meta.homeDescription}
+        exampleTitle={resolvedHomeSeo?.title ?? messages.meta.homeTitle}
+        exampleDescription={resolvedHomeSeo?.description ?? messages.meta.homeDescription}
+        exampleOgImage={resolvedHomeSeo?.ogImagePath ?? settings.defaultOgImage}
       />
 
       <p className="text-fg-muted text-xs">

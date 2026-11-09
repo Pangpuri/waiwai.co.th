@@ -75,5 +75,7 @@ export async function updatePageSeoAction(formData: FormData): Promise<void> {
 
   await updatePageSeo(id, seo, user.email);
   revalidatePath(`/admin/builder/${id}`);
+  /* การ์ดตัวอย่างในหน้าตั้งค่าอ่าน SEO ของหน้าแรก ⇒ ต้องรีเฟรชด้วยเมื่อแก้ home */
+  revalidatePath("/admin/settings");
   await refreshPublicSite("pages");
 }
