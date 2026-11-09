@@ -173,3 +173,20 @@ test("P1.5: ลิงก์จากจอหมวดสินค้าไป S
   assert.ok(page.includes("/admin/builder/product-${row.id}"), "ต้องมีลิงก์ไป builder ของหมวดนั้น");
   assert.ok(page.includes('can(user.role, "seo")'), "ลิงก์แสดงเฉพาะผู้มีสิทธิ์ SEO");
 });
+
+test("builder: ตั้งค่าหน้านี้/SEO ของหน้านี้ พับเก็บได้", () => {
+  /* คำเจ้าของ 2026-11-09: การ์ดสองใบนี้รกตา — ต้องพับเก็บ แล้วค่อยเปิดเมื่อจะแก้ */
+  const builder = codeOf("app/admin/builder/[page]/page.tsx");
+  assert.ok(builder.includes("<details"), "ต้องใช้ details ในการพับเก็บ");
+  assert.ok(builder.includes("strings.pageSettingsTitle"), "summary ต้องมีชื่อ 'ตั้งค่าหน้านี้'");
+  assert.ok(builder.includes("strings.seoTitle"), "summary ต้องมีชื่อ 'SEO ของหน้านี้'");
+  assert.ok(builder.includes("showHeader={false}"), "ซ่อนหัวข้อซ้ำในเนื้อหาที่พับ");
+  assert.ok(builder.includes("embedded"), "ไม่ให้การ์ดซ้อนกรอบใน details");
+
+  const pageSettings = codeOf("features/admin/ui/page-settings.tsx");
+  assert.ok(pageSettings.includes("showHeader?: boolean"), "PageSettings ต้องซ่อนหัวข้อได้");
+  assert.ok(pageSettings.includes("embedded?: boolean"), "PageSettings ต้องไม่มีกรอบซ้อนได้");
+
+  const seoSettings = codeOf("features/admin/ui/page-seo-settings.tsx");
+  assert.ok(seoSettings.includes("embedded?: boolean"), "PageSeoSettings ต้องไม่มีกรอบซ้อนได้");
+});

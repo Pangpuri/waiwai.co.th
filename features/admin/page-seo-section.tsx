@@ -61,6 +61,7 @@ export async function AdminPageSeoSection({
             exampleTitle={example.title}
             exampleDescription={example.description}
             showHeader={false}
+            embedded
           />
         </ImageLibraryProvider>
       </div>

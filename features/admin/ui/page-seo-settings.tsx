@@ -45,6 +45,7 @@ export function PageSeoSettings({
   exampleTitle,
   exampleDescription,
   showHeader = true,
+  embedded = false,
 }: {
   readonly page: PageRecord;
   readonly strings: Messages["admin"];
@@ -54,6 +55,8 @@ export function PageSeoSettings({
   readonly exampleDescription: string;
   /** แสดงหัวข้อในตัวหรือไม่ — ใช้เมื่อหน้าจอแม่มีหัวข้อของตัวเองแล้ว */
   readonly showHeader?: boolean;
+  /** ไม่ต้องมีกรอบ/พื้นหลังของตัวเอง — ใช้เมื่อถูกวางในการ์ดพับของหน้าจอแม่ */
+  readonly embedded?: boolean;
 }) {
   const titleHint = strings.seoTitleLength.replace("{n}", String(MAX_SEO_TITLE_LENGTH));
   const descriptionHint = strings.seoTitleLength.replace("{n}", String(MAX_SEO_DESCRIPTION_LENGTH));
@@ -84,7 +87,13 @@ export function PageSeoSettings({
     descriptionTh.trim() || exampleDescription || strings.seoPreviewFallbackDescription;
 
   return (
-    <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3">
+    <section
+      className={
+        embedded
+          ? "flex flex-col gap-3"
+          : "border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3"
+      }
+    >
       {saveMessage === "" ? null : (
         <AdminToast
           message={saveMessage}

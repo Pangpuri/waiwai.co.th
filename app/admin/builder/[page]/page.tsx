@@ -223,14 +223,30 @@ export default async function AdminBuilderPage({
       {/* หน้าเป็นวัตถุ (W1): ตั้งค่าหน้า/เมนู + SEO รายหน้า (SEO แสดงเฉพาะบทบาทที่มีสิทธิ์ seo) */}
       <ImageLibraryProvider items={imageLibrary}>
         <div className="grid gap-4 md:grid-cols-2">
-          <PageSettings page={currentPage} strings={strings} lock={pageLock} />
+          {/* พับเก็บเป็นค่าเริ่มต้น — เปิดเมื่อจะแก้ชื่อ/เมนูหรือ SEO (คำเจ้าของ 2026-11-09) */}
+          <details className="border-line bg-surface-raised rounded-2xl border p-4">
+            <summary className="text-fg cursor-pointer text-sm font-semibold">{strings.pageSettingsTitle}</summary>
+            <p className="text-fg-muted mt-1 text-xs">{strings.pageSettingsHint}</p>
+            <div className="mt-3">
+              <PageSettings page={currentPage} strings={strings} lock={pageLock} showHeader={false} embedded />
+            </div>
+          </details>
+
           {can(user.role, "seo") ? (
-            <PageSeoSettings
-              page={currentPage}
-              strings={strings}
-              exampleTitle={seoExample.title}
-              exampleDescription={seoExample.description}
-            />
+            <details className="border-line bg-surface-raised rounded-2xl border p-4">
+              <summary className="text-fg cursor-pointer text-sm font-semibold">{strings.seoTitle}</summary>
+              <p className="text-fg-muted mt-1 text-xs">{strings.seoHint}</p>
+              <div className="mt-3">
+                <PageSeoSettings
+                  page={currentPage}
+                  strings={strings}
+                  exampleTitle={seoExample.title}
+                  exampleDescription={seoExample.description}
+                  showHeader={false}
+                  embedded
+                />
+              </div>
+            </details>
           ) : null}
         </div>
       </ImageLibraryProvider>

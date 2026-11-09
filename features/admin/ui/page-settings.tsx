@@ -35,9 +35,15 @@ export function PageSettings({
   page,
   strings,
   lock,
+  showHeader = true,
+  embedded = false,
 }: {
   readonly page: PageRecord;
   readonly lock?: PageSettingsLock;
+  /** แสดงหัวข้อในตัวหรือไม่ — ใช้เมื่อหน้าจอแม่มีหัวข้อของตัวเองแล้ว */
+  readonly showHeader?: boolean;
+  /** ไม่ต้องมีกรอบ/พื้นหลังของตัวเอง — ใช้เมื่อถูกวางในการ์ดพับของหน้าจอแม่ */
+  readonly embedded?: boolean;
   readonly strings: {
     readonly pageSettingsTitle: string;
     readonly pageSettingsHint: string;
@@ -52,14 +58,22 @@ export function PageSettings({
   };
 }) {
   return (
-    <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-fg text-sm font-semibold">{strings.pageSettingsTitle}</h2>
-        <p className="text-fg-muted text-xs">{strings.pageSettingsHint}</p>
-        <p className="text-fg-muted text-[11px]">
-          {page.editor === "blocks" ? strings.pageEditorBlocks : strings.pageEditorDesigned} · <span className="font-mono">{page.id}</span>
-        </p>
-      </div>
+    <section
+      className={
+        embedded
+          ? "flex flex-col gap-3"
+          : "border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3"
+      }
+    >
+      {showHeader ? (
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.pageSettingsTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.pageSettingsHint}</p>
+          <p className="text-fg-muted text-[11px]">
+            {page.editor === "blocks" ? strings.pageEditorBlocks : strings.pageEditorDesigned} · <span className="font-mono">{page.id}</span>
+          </p>
+        </div>
+      ) : null}
 
       <form action={updatePageAction} className="flex flex-col gap-2">
         <input type="hidden" name="id" value={page.id} />
