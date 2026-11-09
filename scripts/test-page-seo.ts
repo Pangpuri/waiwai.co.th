@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import type { Metadata } from "next";
@@ -75,4 +76,19 @@ test("validatePageSeo: ยาวเกินเพดาน · OG ต้อง�
   assert.ok(validatePageSeo(seo({ ogImagePath: "//cdn.test/a.png" })).some((issue) => issue.code === "media-path-is-url"));
   assert.ok(validatePageSeo(seo({ ogImagePath: "media/a.png" })).some((issue) => issue.code === "bad-path"));
   assert.deepEqual(validatePageSeo(seo({ ogImagePath: "/media/a.png" })), []);
+});
+
+test("PageSeoSettings: รูป OG อัปโหลด/ลากวางได้จริง (ImageDrop) แล้วส่งพาธด้วย hidden input", () => {
+  /*
+    เคสจริง 2026-11-09: ช่อง OG เดิมเป็น `<input type="text">` แต่ hint บอกว่า "ลากรูปมาวาง"
+    ⇒ อัปโหลดไม่ได้ · ต้องใช้ ImageDrop ตัวเดียวกับหน้าจออื่น แล้ววางนอกฟอร์ม SEO
+    (ImageDrop มี form ของตัวเอง — nested form ไม่ได้)
+  */
+  const form = readFileSync("features/admin/ui/page-seo-settings.tsx", "utf8");
+  assert.ok(form.includes("ImageDrop"), "ช่อง OG ต้องใช้ ImageDrop (ลากวาง/เลือกไฟล์/เลือกจากคลัง)");
+  assert.ok(form.includes('name="ogImagePath"'), "ต้องส่งพาธเข้าฟอร์ม SEO ด้วย hidden input");
+  assert.ok(form.includes("showAltFields={false}"), "OG image ไม่ต้องบังคับ alt (ไม่มีผลกับ SEO)");
+
+  const builder = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(builder.includes("<ImageLibraryProvider items={imageLibrary}>"), "PageSeoSettings ต้องอยู่ใน ImageLibraryProvider");
 });

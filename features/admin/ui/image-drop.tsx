@@ -76,6 +76,11 @@ type Props = {
    * · ปลายทางที่ไม่รองรับลายน้ำ (เช่น การ์ดแคมเปญ) ส่ง `false` ⇒ ไม่มีช่องที่กดแล้วไม่มีผล (รอบที่ 195)
    */
   readonly showWatermark?: boolean;
+  /**
+   * แสดงช่องคำอธิบายภาพ (alt) ไหม (ค่าเริ่มต้น = แสดง)
+   * · ใช้กับภาพที่ไม่ต้องมี alt เช่น OG image ของหน้า SEO → `false`
+   */
+  readonly showAltFields?: boolean;
 };
 
 function failureMessage(strings: Messages["admin"], reason: UploadFailure): string {
@@ -121,6 +126,7 @@ export function ImageDrop({
   dropPrompt,
   cropAspect,
   showWatermark = true,
+  showAltFields = true,
 }: Props) {
   const [state, action] = useActionState<UploadState, FormData>(uploadImageAction, INITIAL_UPLOAD_STATE);
   /* คลังภาพในบริบทนี้ (ว่าง = ไม่มีคลัง ⇒ ซ่อนปุ่ม "เลือกจากคลัง" ไม่ทำให้ช่องภาพพัง) */
@@ -421,30 +427,34 @@ export function ImageDrop({
 
       {current.path !== "" ? (
         <div className="grid gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-fg-muted text-xs" htmlFor={`alt-th-${label}`}>
-              {strings.imageAltThLabel}
-            </label>
-            <input
-              id={`alt-th-${label}`}
-              type="text"
-              value={current.altTh}
-              onChange={(event) => onChange({ altTh: event.target.value })}
-              className={fieldClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-fg-muted text-xs" htmlFor={`alt-en-${label}`}>
-              {strings.imageAltEnLabel}
-            </label>
-            <input
-              id={`alt-en-${label}`}
-              type="text"
-              value={current.altEn}
-              onChange={(event) => onChange({ altEn: event.target.value })}
-              className={fieldClass}
-            />
-          </div>
+          {showAltFields ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-fg-muted text-xs" htmlFor={`alt-th-${label}`}>
+                  {strings.imageAltThLabel}
+                </label>
+                <input
+                  id={`alt-th-${label}`}
+                  type="text"
+                  value={current.altTh}
+                  onChange={(event) => onChange({ altTh: event.target.value })}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-fg-muted text-xs" htmlFor={`alt-en-${label}`}>
+                  {strings.imageAltEnLabel}
+                </label>
+                <input
+                  id={`alt-en-${label}`}
+                  type="text"
+                  value={current.altEn}
+                  onChange={(event) => onChange({ altEn: event.target.value })}
+                  className={fieldClass}
+                />
+              </div>
+            </>
+          ) : null}
           {showWatermark ? (
             <label className="text-fg-muted flex items-center gap-2 text-xs">
               <input

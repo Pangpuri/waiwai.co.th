@@ -217,10 +217,12 @@ export default async function AdminBuilderPage({
       */}
 
       {/* หน้าเป็นวัตถุ (W1): ตั้งค่าหน้า/เมนู + SEO รายหน้า (SEO แสดงเฉพาะบทบาทที่มีสิทธิ์ seo) */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <PageSettings page={currentPage} strings={strings} lock={pageLock} />
-        {can(user.role, "seo") ? <PageSeoSettings page={currentPage} strings={strings} /> : null}
-      </div>
+      <ImageLibraryProvider items={imageLibrary}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <PageSettings page={currentPage} strings={strings} lock={pageLock} />
+          {can(user.role, "seo") ? <PageSeoSettings page={currentPage} strings={strings} /> : null}
+        </div>
+      </ImageLibraryProvider>
 
 
       {/*
