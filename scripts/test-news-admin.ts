@@ -348,3 +348,17 @@ test("news admin: ต้องไม่มีทาง 'จัดลำดับ
   assert.ok(recipesPage.includes('kind="recipe"'), "จอเมนูอาหารยังต้องมีจัดลำดับของตัวเอง");
   assert.ok(!productsPage.includes('"news"') && !recipesPage.includes('kind="news"'), "ห้ามมีแท็บจัดลำดับข่าว");
 });
+
+test("news admin: ตัวนับรูปต้อง cast bigint → int (เคสจริง /admin/news ขึ้น 0 รูปทุกข่าว)", () => {
+  /*
+    Postgres `count(*)` = bigint ⇒ `pg` คืน **สตริง** ⇒ `countOf()` รุ่นเดิมคืน 0
+    ทั้งที่ body มีบล็อกชนิด image อยู่จริง
+  */
+  const repo = readFileSync("lib/news/repository.ts", "utf8");
+  assert.ok(repo.includes("count(*)::int"), "SQL ต้อง cast count(*) เป็น int ก่อนส่งให้ countOf");
+  assert.ok(repo.includes('typeof value === "string"'), "countOf ต้องรับสตริงตัวเลขจาก pg ได้ด้วย");
+
+  const page = readFileSync("app/admin/news/page.tsx", "utf8");
+  assert.ok(page.includes("item.blockCount"), "หน้ารายการต้องแสดงจำนวนบล็อกจริง");
+  assert.ok(page.includes("item.imageCount"), "หน้ารายการต้องแสดงจำนวนรูปจริง");
+});

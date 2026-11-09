@@ -358,13 +358,18 @@ export type AdminNewsInput = {
   readonly body: readonly NewsBlock[];
 };
 
+/**
+ * ⚠️ ต้อง cast count(*) เป็น int — count(*) ของ Postgres เป็น bigint และ pg คืนเป็นสตริง
+ * ⇒ countOf() รุ่นเดิม (รับเฉพาะ number) ทำให้ทุกข่าวขึ้น "0 รูป" ทั้งที่มีบล็อกภาพ
+ * (เคสจริง 2026-11-09 · หน้า /admin/news)
+ */
 const ADMIN_NEWS_COLUMNS = `n.id, n.source_id, n.title_th, n.title_en, n.excerpt_th, n.excerpt_en,
        n.cover_media_id, n.body, n.published_label, n.status, n.deleted_at,
        to_char(n.published_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as published_local,
        to_char(n.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local,
        m.width as cover_width, m.height as cover_height,
        jsonb_array_length(n.body) as block_count,
-       (select count(*) from jsonb_array_elements(n.body) e where e ->> 'type' = 'image') as image_count`;
+       (select count(*)::int from jsonb_array_elements(n.body) e where e ->> 'type' = 'image') as image_count`;
 
 const ADMIN_NEWS_ORDER = "order by n.published_at desc nulls last, n.id desc";
 
@@ -387,7 +392,16 @@ function statusOf(value: unknown): AdminNewsStatus {
 }
 
 function countOf(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  /*
+    กันถอยหลัง: `pg` คืน bigint/numeric เป็น **สตริง** (เช่น count(*) ก่อน cast)
+    ⇒ รับทั้ง number และสตริงตัวเลข · ค่าอื่น/ว่าง = 0
+  */
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 function toAdminListItem(row: Record<string, unknown>): AdminNewsListItem | null {

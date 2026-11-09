@@ -2852,7 +2852,10 @@ async function checkNewsAdmin(): Promise<void> {
         coverPath: null,
         publishedLocal: "2026-06-01T10:30",
         status: "published",
-        body: [{ type: "paragraph", text: "เนื้อหาหลังเผยแพร่" }],
+        body: [
+          { type: "paragraph", text: "เนื้อหาหลังเผยแพร่" },
+          { type: "image", mediaId: "check-db-news-image", alt: "ภาพทดสอบหลังบ้าน" },
+        ],
       },
       NEWS_CHECK_ACTOR,
     );
@@ -2862,10 +2865,15 @@ async function checkNewsAdmin(): Promise<void> {
 
     /* ค้นหาในหลังบ้านเจอ */
     const found = await listNewsForAdmin({ tab: "published", search: "ทดสอบหลังบ้าน", page: 1 });
-    assert.ok(
-      found.items.some((item) => item.id === id),
-      "ค้นหาในหลังบ้านต้องเจอข่าวที่เพิ่งเผยแพร่",
-    );
+    const listed = found.items.find((item) => item.id === id);
+    assert.ok(listed !== undefined, "ค้นหาในหลังบ้านต้องเจอข่าวที่เพิ่งเผยแพร่");
+    /*
+      เคสจริง 2026-11-09: หน้า /admin/news ขึ้น “0 รูป” ทุกข่าว
+      เพราะ `count(*)` ของ Postgres เป็น bigint ⇒ `pg` คืนสตริง ⇒ `countOf()` คืน 0
+      ด่านนี้ต้องเทียบกับ body จริง ไม่ใช่แค่ typeof
+    */
+    assert.equal(listed.blockCount, 2, "blockCount ต้องตรงกับจำนวนบล็อกใน body");
+    assert.equal(listed.imageCount, 1, "imageCount ต้องนับบล็อกภาพจริง (bigint cast เป็น int)");
 
     /* ย้ายเข้าถังขยะ ⇒ หายจากเว็บ แต่หลังบ้านยังเห็น + กู้คืนได้ */
     await setNewsTrashed(id, true, NEWS_CHECK_ACTOR);
