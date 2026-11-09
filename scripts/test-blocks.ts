@@ -605,9 +605,10 @@ test("block builder: save/publish/schedule/restore ต้องส่ง version
   assert.ok(actions.includes("publishDraftIfCurrent"), "action ต้องเผยแพร่แบบ guarded");
   assert.ok(actions.includes('String(formData.get("force") ?? "") === "1"'), "บันทึกทับต้องเป็นเจตนาชัดเจน");
   assert.ok(page.includes("draftVersion={draftRow?.version ?? null}"), "หน้าต้องส่ง version เข้าตัวสร้าง");
+  assert.ok(page.includes("action={startFromTemplateAction}"), "หน้าต้องมีฟอร์มเริ่มจากเทมเพลต");
   assert.ok(
-    page.includes('<input type="hidden" name="version" value={draftRow?.version ?? ""} />'),
-    "ฟอร์มเริ่มจากเทมเพลตต้องแนบ version",
+    !page.includes('<input type="hidden" name="version" value={draftRow?.version ?? ""} />'),
+    "ฟอร์มเทมเพลตแสดงเฉพาะเมื่อยังไม่มีฉบับร่าง จึงไม่ต้องแนบ version",
   );
   assert.ok(actions.includes("?template=conflict"), "เทมเพลตที่ชน version ต้องพากลับพร้อมรหัส conflict");
 

@@ -449,9 +449,9 @@ test("★ templates: จดหมายข่าวใช้บล็อกฟ�
   assert.deepEqual([...blockCoverageGaps("home")], [], "รอบที่ 229: หน้าแรกมีบล็อกครบ (รวมที่ซื้อสินค้า)");
 });
 
-/** ★ รอบที่ 225 (เคลียร์หนี้ UX) — ปุ่มเทมเพลตต้องเห็นเสมอ + มีฉบับร่างต้องยืนยันก่อนทับ */
-test("★ templates: ใช้เทมเพลตทับฉบับร่างต้องยืนยัน (fail-closed ทั้ง UI และเซิร์ฟเวอร์)", () => {
-  /* ตรรกะจริง */
+/** ★ รอบที่ 338 — เทมเพลตเป็น "จุดเริ่มต้น" เท่านั้น และการคืนค่าเริ่มต้นมีทางเดียว */
+test("★ templates: ใช้เทมเพลตได้เฉพาะเมื่อยังไม่มีฉบับร่าง และมีปุ่มคืนค่าเริ่มต้นหน้าเดียว", () => {
+  /* ตรรกะจริงของเซิร์ฟเวอร์ยัง fail-closed (กันการยิงฟอร์มตรง) */
   assert.deepEqual(decideTemplateApply({ hasDraft: false, confirmValue: "" }), { allowed: true }, "ยังไม่มีฉบับร่าง = ไม่ต้องยืนยัน");
   assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: "" }), { allowed: false, reason: "needs-confirm" });
   assert.deepEqual(decideTemplateApply({ hasDraft: true, confirmValue: "nope" }), { allowed: false, reason: "needs-confirm" });
@@ -461,55 +461,67 @@ test("★ templates: ใช้เทมเพลตทับฉบับร่�
   /* ด่านบนเซิร์ฟเวอร์ (ห้ามเชื่อ UI อย่างเดียว) */
   const action = readFileSync("app/admin/builder/actions.ts", "utf8");
   assert.ok(action.includes("decideTemplateApply({"), "action ต้องเรียกตรรกะกลาง");
-  assert.ok(action.includes('formData.get("confirm")'), "action ต้องอ่านค่ายีดยืนยันจากฟอร์ม");
+  assert.ok(action.includes('formData.get("confirm")'), "action ต้องอ่านค่ายืนยันจากฟอร์ม");
 
-  /* UI: แผงต้องแสดงเสมอ + มี checkbox ยืนยัน (required) เมื่อมีฉบับร่าง */
+  /* UI: เทมเพลต = จุดเริ่มต้นเท่านั้น — ไม่มีตัวเลือกทับฉบับร่าง */
   const page = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(page.includes("hasBlockTemplate(page) && draftRow === null"), "แผงเทมเพลตต้องแสดงเฉพาะเมื่อยังไม่มีฉบับร่าง");
   assert.ok(page.includes("data-template-form="), "ต้องมีฟอร์มเทมเพลตในหน้าตัวสร้าง");
-  assert.ok(page.includes('name="confirm"') && page.includes("required"), "ต้องมี checkbox ยืนยันแบบ required");
-  assert.ok(page.includes("startFromTemplateReplace"), "มีฉบับร่างแล้วต้องบอกว่า 'ทับฉบับร่าง'");
-  /* รอบที่ 227: กดใช้เทมเพลตโดยไม่ติ๊ก ⇒ ต้องมีข้อความบอก (ไม่เงียบ) */
-  assert.ok(page.includes("data-template-notice="), "ต้องมีข้อความแจ้งเมื่อยังไม่ติ๊กยืนยัน");
-  assert.ok(page.includes("startFromTemplateNeedsConfirm"), "ข้อความต้องมาจากพจนานุกรม");
-  const actionRound227 = readFileSync("app/admin/builder/actions.ts", "utf8");
-  assert.ok(actionRound227.includes('?template=confirm'), "action ต้องพากลับพร้อมสัญญาณแจ้งเตือน");
-  assert.ok(!page.includes("{draftRow === null ? (\n        <section"), "แผงต้องไม่อยู่ในเงื่อนไข 'ไม่มีฉบับร่าง' อีกต่อไป");
+  assert.ok(!page.includes("startFromTemplateReplace"), "ห้ามมีหัวข้อ 'ทับฉบับร่าง' อีก");
+  assert.ok(!page.includes("startFromTemplateOverwrite"), "ห้ามมี checkbox ทับฉบับร่างอีก");
+  assert.ok(!page.includes("data-template-notice="), "ไม่มีข้อความแจ้งการทับฉบับร่างอีก");
+
+  /* คืนค่าเริ่มต้น: มีปุ่มเดียวและถ้อยคำชัด */
+  assert.ok(page.includes("data-layout-revert"), "ต้องมีแผงคืนค่าเริ่มต้น");
+  assert.ok(page.includes("layoutRevertTitle"), "หัวข้อต้องมาจากพจนานุกรม");
+  assert.ok(page.includes("layoutRevertButton"), "ปุ่มต้องมาจากพจนานุกรม");
+  const thLive = readFileSync("lib/i18n/messages/areas/th/adminLive.ts", "utf8");
+  const enLive = readFileSync("lib/i18n/messages/areas/en/adminLive.ts", "utf8");
+  assert.ok(thLive.includes("คืนค่าเริ่มต้นหน้านี้"), "TH ต้องเรียก 'คืนค่าเริ่มต้นหน้านี้'");
+  assert.ok(enLive.includes("Restore this page to its default"), "EN ต้องเรียก 'Restore this page to its default'");
+  assert.ok(!thLive.includes("หน้านี้กำลังใช้บล็อกกับเว็บจริงอยู่"), "ห้ามกลับไปใช้หัวข้อเดิมที่ทำให้สับสน");
 });
 
 /**
- * ★ รอบนี้ — แก้ "ความเข้าใจผิด" ของปุ่มเทมเพลต
+ * ★ รอบที่ 338 — เทมเพลตต้องเป็น "จุดเริ่มต้น" ไม่ใช่การคืนค่าเริ่มต้น
  *
- * ปุ่มเดิมชื่อ "เริ่มจากเนื้อหาปัจจุบัน" และคำโปรยบอกว่า "ดึงข้อความชุดเดียวกับหน้าเว็บที่ใช้อยู่"
- * แต่ของจริงสร้างจาก **เทมเพลตในโค้ด** ⇒ เคยทำให้เข้าใจว่าเป็นสำเนาหน้าที่เผยแพร่ (ทั้งที่ home/certifications ต่างกันจริง)
- * ด่านนี้ล็อกถ้อยคำไว้: ห้ามกลับไปเรียก "เนื้อหาปัจจุบัน" และห้ามอ้างสวิตช์ "ใช้กับหน้าเว็บจริง" ที่ถูกถอดตั้งแต่รอบ 240
+ * ปุ่มเดิมมีสองแบบ ("ใช้เทมเพลตตั้งต้น" กับ "ใช้เทมเพลตตั้งต้น (ทับฉบับร่าง)")
+ * ทำให้สับสนว่าอันไหนคือการคืนค่าเริ่มต้น ⇒ เหลือเฉพาะตอนยังไม่มีฉบับร่าง
+ * และการคืนค่าเริ่มต้นมีทางเดียวที่ "คืนค่าเริ่มต้นหน้านี้"
  */
-test("★ templates: ปุ่มเทมเพลตต้องบอกความจริงว่าเป็น 'เทมเพลตในโค้ด' ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่", () => {
+test("★ templates: ปุ่มเทมเพลตต้องบอกว่าเป็น 'จุดเริ่มต้น' ไม่ใช่การคืนค่าเริ่มต้น", () => {
   const th = sourceOf("lib/i18n/messages/areas/th/adminTemplate.ts");
   const en = sourceOf("lib/i18n/messages/areas/en/adminTemplate.ts");
 
   for (const [locale, dict] of [["th", th], ["en", en]] as const) {
     assert.ok(dict.includes("startFromTemplateTitle"), `${locale}: ต้องมีหัวข้อของแผงเทมเพลต`);
-    assert.ok(dict.includes("startFromTemplateSourceNote"), `${locale}: ต้องบอกว่าไม่ใช่การกู้คืนของเดิม`);
+    assert.ok(dict.includes("startFromTemplateSourceNote"), `${locale}: ต้องบอกทางไปประวัติการเผยแพร่`);
     assert.ok(!dict.includes("เนื้อหาปัจจุบัน"), `${locale}: ห้ามกลับไปเรียก "เนื้อหาปัจจุบัน"`);
     assert.ok(!dict.includes("current content"), `${locale}: ห้ามกลับไปเรียก "current content"`);
     assert.ok(!dict.includes("ใช้กับหน้าเว็บจริง"), `${locale}: สวิตช์นี้ถูกถอดตั้งแต่รอบ 240 — ห้ามอ้างถึง`);
     assert.ok(!dict.includes("use with the live site"), `${locale}: สวิตช์นี้ถูกถอดตั้งแต่รอบ 240 — ห้ามอ้างถึง`);
+    assert.ok(!dict.includes("startFromTemplateReplace"), `${locale}: ห้ามมีปุ่มทับฉบับร่าง`);
+    assert.ok(!dict.includes("startFromTemplateOverwrite"), `${locale}: ห้ามมี checkbox ทับฉบับร่าง`);
+    assert.ok(!dict.includes("ทับฉบับร่าง"), `${locale}: ห้ามใช้ถ้อยคำที่ทำให้สับสนกับการคืนค่าเริ่มต้น`);
+    assert.ok(!dict.includes("replaces the draft"), `${locale}: ห้ามใช้ถ้อยคำที่ทำให้สับสนกับการคืนค่าเริ่มต้น`);
   }
 
-  assert.ok(th.includes("เทมเพลตที่เขียนไว้ในโค้ด"), "TH: คำโปรยต้องบอกว่าเป็นเทมเพลตในโค้ด");
-  assert.ok(th.includes("ไม่ใช่สำเนาของหน้าที่เผยแพร่อยู่"), "TH: คำโปรยต้องบอกว่าไม่ใช่สำเนาหน้าที่เผยแพร่");
-  assert.ok(en.includes("template in code"), "EN: คำโปรยต้องบอกว่าเป็นเทมเพลตในโค้ด");
-  assert.ok(en.includes("not a copy of the published page"), "EN: คำโปรยต้องบอกว่าไม่ใช่สำเนาหน้าที่เผยแพร่");
+  assert.ok(th.includes("เทมเพลตที่เตรียมไว้ในระบบ"), "TH: คำโปรยต้องบอกว่าเป็นเทมเพลตที่เตรียมไว้");
+  assert.ok(th.includes("อาจต่างจากหน้าเว็บที่เผยแพร่อยู่"), "TH: คำโปรยต้องบอกว่าอาจต่างจากหน้าเว็บ");
+  assert.ok(en.includes("template prepared in the system"), "EN: คำโปรยต้องบอกว่าเป็นเทมเพลตที่เตรียมไว้");
+  assert.ok(en.includes("may differ from the live page"), "EN: คำโปรยต้องบอกว่าอาจต่างจากหน้าเว็บ");
 
   /* รายชื่อหน้าที่มีเทมเพลตต้องไม่ล้าสมัย (careers/products/recipes/news ถูกถอดจากตัวสร้างแล้ว) */
   assert.ok(!th.includes("ร่วมงานกับไวไว"), "TH: รายการต้องไม่ล้าสมัย");
   assert.ok(!en.includes("Careers"), "EN: รายการต้องไม่ล้าสมัย");
 
-  /* UI: ใช้หัวข้อใหม่ + แสดงหมายเหตุว่าไม่ใช่การกู้คืนของเดิม */
+  /* UI: หัวข้อ/หมายเหตุมาจากพจนานุกรม + แผงแสดงเฉพาะเมื่อยังไม่มีฉบับร่าง */
   const page = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
   assert.ok(page.includes("startFromTemplateTitle"), "หน้าจอต้องใช้หัวข้อใหม่");
   assert.ok(page.includes("startFromTemplateSourceNote"), "ข้อความหมายเหตุต้องมาจากพจนานุกรม");
   assert.ok(page.includes("data-template-source-note="), "หน้าจอต้องแสดงหมายเหตุให้เห็นจริง");
+  assert.ok(page.includes("hasBlockTemplate(page) && draftRow === null"), "แผงต้องแสดงเฉพาะเมื่อยังไม่มีฉบับร่าง");
+  assert.ok(!page.includes("startFromTemplateReplace"), "หน้าจอต้องไม่มีปุ่มทับฉบับร่าง");
   assert.ok(!page.includes("draftRow === null ? strings.emptyPage : strings.startFromTemplateReplace"), "ห้ามกลับไปใช้หัวข้อเดิม");
 });
 

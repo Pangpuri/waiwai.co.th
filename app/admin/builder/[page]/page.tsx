@@ -78,9 +78,7 @@ export default async function AdminBuilderPage({
   const user = await requireAdminUser("content");
   const { page } = await params;
   const query = await searchParams;
-  const templateNotice = query.template === "confirm";
-  const templateConflict = query.template === "conflict";
-  /* รอบที่ 246: ผลของการกด "กลับไปใช้ดีไซน์เดิม" (Server Action ปฏิเสธ/สำเร็จ แล้ว redirect กลับมาพร้อมรหัส) */
+  /* รอบที่ 246: ผลของการกด "คืนค่าเริ่มต้นหน้านี้" (Server Action ปฏิเสธ/สำเร็จ แล้ว redirect กลับมาพร้อมรหัส) */
   const layoutNotice = query.layout ?? null;
   /* รอบที่ 249: ผลของการกด "ล้างประวัติ" (?history=pruned|nothing|needs-confirm) */
   const historyNotice = query.history ?? null;
@@ -253,10 +251,10 @@ export default async function AdminBuilderPage({
 
 
       {/*
-        รอบที่ 225 (เคลียร์หนี้ UX): แผง "เทมเพลตตั้งต้น" แสดง**เสมอ** สำหรับหน้าที่มีเทมเพลต
-        · ยังไม่มีฉบับร่าง ⇒ กดได้เลย · มีฉบับร่างแล้ว ⇒ ต้องติ๊กยืนยันก่อนทับ
-        · ด่านจริงอยู่ที่ Server Action (`decideTemplateApply` — ไม่ติ๊ก = ไม่ทำอะไรเลย)
-        ⚠️ รอบนี้แก้ "ความเข้าใจผิด": ปุ่มนี้สร้างจาก **เทมเพลตในโค้ด** ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่
+        รอบที่ 338: เทมเพลต = "จุดเริ่มต้น" เท่านั้น — แสดงเฉพาะเมื่อยังไม่มีฉบับร่าง
+        · มีฉบับร่างแล้ว ⇒ ไม่มีปุ่มทับ (กันสับสนกับ "คืนค่าเริ่มต้นหน้านี้")
+        · การคืนค่าเริ่มต้นมีทางเดียว = แผง "คืนค่าเริ่มต้นหน้านี้" ด้านล่าง
+        ⚠️ ปุ่มนี้สร้างจาก **เทมเพลตที่เตรียมไว้ในระบบ** ไม่ใช่สำเนาหน้าที่เผยแพร่อยู่
       */}
       {isImportedContentPage(page) ? (
         /*
@@ -271,42 +269,17 @@ export default async function AdminBuilderPage({
           <h2 className="text-fg text-lg font-semibold">{strings.importedContentTitle}</h2>
           <p className="text-fg-muted text-sm">{strings.importedContentBody}</p>
         </section>
-      ) : hasBlockTemplate(page) ? (
+      ) : hasBlockTemplate(page) && draftRow === null ? (
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5">
-          <h2 className="text-fg text-lg font-semibold">
-            {draftRow === null ? strings.startFromTemplateTitle : strings.startFromTemplateReplace}
-          </h2>
+          <h2 className="text-fg text-lg font-semibold">{strings.startFromTemplateTitle}</h2>
           <p className="text-fg-muted text-sm">{strings.startFromTemplateHint}</p>
           {/* รอบนี้: บอกตรง ๆ ว่าปุ่มนี้ไม่ใช่การกู้คืนของเดิม — ไปใช้ประวัติการเผยแพร่แทน */}
           <p className="text-fg-muted text-xs" data-template-source-note="">
             {strings.startFromTemplateSourceNote}
           </p>
           <TemplateCoverageNote {...coverage} />
-          {templateNotice ? (
-            <p className="text-brand-red text-sm" data-template-notice="confirm">
-              {strings.startFromTemplateNeedsConfirm}
-            </p>
-          ) : null}
-          {templateConflict ? (
-            <p className="text-brand-red text-sm" data-template-notice="conflict">
-              {strings.startFromTemplateConflict}
-            </p>
-          ) : null}
           <form action={startFromTemplateAction} className="flex flex-col gap-3" data-template-form="">
             <input type="hidden" name="page" value={page} />
-            <input type="hidden" name="version" value={draftRow?.version ?? ""} />
-            {draftRow === null ? null : (
-              <label className="text-fg-muted flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  name="confirm"
-                  value="overwrite"
-                  required
-                  className="border-line accent-brand-red size-4 rounded border"
-                />
-                {strings.startFromTemplateOverwrite}
-              </label>
-            )}
             <button
               type="submit"
               className="bg-brand-red text-on-brand focus-visible:ring-ring w-fit rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -324,9 +297,9 @@ export default async function AdminBuilderPage({
       ) : null}
 
       {/*
-        ── กลับไปใช้ดีไซน์เดิมของเว็บ (รอบที่ 246 · มติเจ้าของ) ──────────────────────────────
-        เคสจริง: เจ้าของถาม *"กลับดีฟอลยังไงครับ"* — รอบที่ 240 ถอดสวิตช์ออกไปแล้ว จึงไม่มีทางถอยจากหลังบ้าน
-        ⇒ แสดง **เฉพาะเมื่อหน้านี้ใช้บล็อกกับเว็บจริงอยู่** (`isLive` อ่านจาก DB) และเป็น **ทิศเดียว** (ปิดเท่านั้น)
+        ── คืนค่าเริ่มต้นหน้านี้ (รอบที่ 246 · ปรับถ้อยคำรอบที่ 338) ──────────────────────────────
+        เคสจริง: เจ้าของถาม *"กลับดีฟอลยังไงครับ"* — นี่คือ **ทางเดียว** ที่คืนหน้าไปใช้ดีไซน์เดิม
+        ⇒ แสดง **เฉพาะเมื่อหน้านี้ใช้เลย์เอาต์ที่จัดไว้กับเว็บจริง** (`isLive` อ่านจาก DB) และเป็น **ทิศเดียว**
         ⚠️ ด่านจริงอยู่ที่ Server Action (`decideRevertLayout`: ไม่ติ๊กยืนยัน = ไม่ทำอะไรเลย)
       */}
       {/* ⚠️ รอบที่ 260: ผูกกับ isBlockBuilderPage (หน้า about ไม่มีเทมเพลตตั้งต้น แต่ต้องกลับไปใช้ดีไซน์เดิมได้) */}

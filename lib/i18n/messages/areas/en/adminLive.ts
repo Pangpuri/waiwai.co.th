@@ -23,14 +23,14 @@ export const adminLive = {
     A **one-way exit**, not a switch: it only turns blocks off · to use blocks again, press “Publish”.
     ⇒ The copy must always say “nothing is lost” and “how to turn it back on”.
   */
-  layoutRevertTitle: "This page is currently using blocks on the live site",
+  layoutRevertTitle: "Restore this page to its default",
   layoutRevertHint:
-    "You can go back to the site’s original design at any time — everything you built stays (draft + full history) · to use blocks again, press “Publish”",
-  layoutRevertConfirm: "Confirm: go back to the site’s original design (stops using blocks on this page — no content is lost)",
-  layoutRevertButton: "Go back to the site’s original design",
-  layoutRevertNeedsConfirm: "Nothing changed — tick the confirmation first to stop using blocks on this page",
-  layoutRevertNotLive: "This page is not using blocks on the live site — nothing changed",
-  layoutRevertDone: "Back to the site’s original design — everything you built is still saved · press “Publish” to use blocks here again",
+    "This page is currently using a custom layout on the live site — use the button below to go back to the site’s original design · everything you built stays saved, but it will not be shown on the site · to use it again, press “Publish”",
+  layoutRevertConfirm: "Confirm: restore this page to its default — go back to the site’s original design (everything you built stays saved)",
+  layoutRevertButton: "Restore this page to its default",
+  layoutRevertNeedsConfirm: "Nothing changed — tick the confirmation first",
+  layoutRevertNotLive: "This page already uses the original design — nothing changed",
+  layoutRevertDone: "This page has been restored to its default — back to the site’s original design · everything you built is still saved · press “Publish” to use it again",
   /* Audit-log trace (shown in history / my activity) */
-  auditLayoutRevert: "Reverted to the site’s original design",
+  auditLayoutRevert: "Restored the page to its default",
 };

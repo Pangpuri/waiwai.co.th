@@ -10,21 +10,17 @@ export const adminTemplate = {
   previewPartsNav: "Header nav only",
   previewPartsFooter: "Footer only",
   previewPartsNotice: "Announcement notice only",
-  startFromTemplateTitle: "Start from the built-in template",
-  startFromTemplate: "Use the built-in template",
-  startFromTemplateReplace: "Use the built-in template (replaces the draft)",
-  startFromTemplateOverwrite: "Tick to confirm replacing the current draft",
-  startFromTemplateNeedsConfirm: "Not applied — you did not tick the confirmation. Your draft is unchanged",
-  startFromTemplateConflict: "The draft was changed elsewhere — nothing was overwritten. Reload and try again.",
+  startFromTemplateTitle: "Start the content from a template",
+  startFromTemplate: "Use this template to start",
   startFromTemplateHint:
-    "Builds the content from this page's “template in code” — it is not a copy of the published page, so it may differ from the live site. Edit freely afterwards; your chosen layout is kept.",
+    "This page has no draft yet — start the content from the template prepared in the system, then edit it freely. The template may differ from the live page.",
   startFromTemplateSourceNote:
-    "To go back to content that was published before, use “Publish history” below — this button creates a fresh set from the template; it does not restore the old one.",
-  templateMissingBody: "This page has no block template yet — its content comes from an importer or the screen dedicated to that section.",
+    "To go back to content that was published before, use “Publish history” below.",
+  templateMissingBody: "This page has no starting template — its content comes from the import system or the screen dedicated to that section.",
   /* Round 260: pages built by an importer have no "start from template" button on purpose */
-  importedContentTitle: "This page is built by an importer (no starting template)",
+  importedContentTitle: "This page uses imported content (no starting template)",
   importedContentBody:
-    "This page's content comes from the reviewed content set, so there is no “start from template” button — that button would overwrite every part that has been reviewed and edited. You can still edit each block's text and images from the preview on the right. To rebuild the whole page, run this page's import script locally, then publish here.",
+    "This page's content comes from the reviewed content set, so there is no start-from-template button. You can still edit each block's text and images from the preview on the right. If you need to rebuild the whole page, please contact the system administrator.",
   templateMissingList:
     "Pages with a block template today: Home · Contact · Certifications · Executives · Product category pages (About is built by an importer and is not built from a template)",
   templateCoverageTitle: "Not covered by this template yet",
