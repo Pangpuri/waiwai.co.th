@@ -4,7 +4,9 @@ import { test } from "node:test";
 
 import type { Metadata } from "next";
 
+import { th } from "@/lib/i18n/messages/th";
 import { EMPTY_PAGE_SEO, hasSeoOverride, validatePageSeo, type PageSeo } from "@/lib/pages/model";
+import { pageSeoExample } from "@/lib/pages/seo-example";
 import { applySeoToMetadata, pickSeoText, resolveSeo } from "@/lib/seo/page-seo";
 
 /** เทสต์ SEO ต่อหน้า (W2) — ตรรกะล้วน ไม่ต้องมีฐานข้อมูล */
@@ -109,4 +111,38 @@ test("settings preview: ใช้ SEO จริงของหน้าแรก
 
   const actions = readFileSync("app/admin/builder/page-actions.ts", "utf8");
   assert.ok(actions.includes('revalidatePath("/admin/settings")'), "บันทึก SEO แล้วต้องรีเฟรชหน้าตั้งค่าด้วย");
+});
+
+test("per-page SEO preview: หน้าหลักใช้ค่าเริ่มต้นตรงกับ metadata จริง", () => {
+  assert.deepEqual(pageSeoExample("home", th), {
+    title: th.meta.homeTitle,
+    description: th.meta.homeDescription,
+  });
+  assert.deepEqual(pageSeoExample("about", th), {
+    title: th.about.meta.title,
+    description: th.about.meta.description,
+  });
+  assert.deepEqual(pageSeoExample("executives", th), {
+    title: th.about.executives.meta.title,
+    description: th.about.executives.meta.description,
+  });
+  assert.deepEqual(pageSeoExample("contact", th), {
+    title: th.contactPage.meta.title,
+    description: th.contactPage.meta.description,
+  });
+
+  /* หน้าที่ไม่มีในทะเบียน (เช่น รายละเอียดสินค้า) — ให้ UI fallback เป็นชื่อหน้าเอง */
+  assert.deepEqual(pageSeoExample("product-instant-noodles", th), { title: "", description: "" });
+});
+
+test("per-page SEO preview: การ์ดใน builder อัปเดตตามที่พิมพ์", () => {
+  const form = readFileSync("features/admin/ui/page-seo-settings.tsx", "utf8");
+  assert.ok(form.includes("seoPreviewTitle"), "ต้องมีการ์ดตัวอย่างในแท็บ SEO ของหน้านี้");
+  assert.ok(form.includes("previewTitle"), "หัวข้อตัวอย่างต้องคำนวณจากค่าที่พิมพ์");
+  assert.ok(form.includes("previewDescription"), "คำอธิบายตัวอย่างต้องคำนวณจากค่าที่พิมพ์");
+
+  const builder = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(builder.includes("pageSeoExample("), "builder ต้องส่งค่าเริ่มต้นจริงของหน้านั้นให้การ์ด");
+  assert.ok(builder.includes("exampleTitle={seoExample.title}"), "ต้องส่งหัวข้อเริ่มต้น");
+  assert.ok(builder.includes("exampleDescription={seoExample.description}"), "ต้องส่งคำอธิบายเริ่มต้น");
 });

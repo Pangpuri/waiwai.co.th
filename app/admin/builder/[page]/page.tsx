@@ -16,6 +16,7 @@ import { listBlockPresets } from "@/lib/blocks/presets";
 import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
+import { pageSeoExample } from "@/lib/pages/seo-example";
 import { listProductDetailPagePaths } from "@/lib/products/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
@@ -94,6 +95,9 @@ export default async function AdminBuilderPage({
   const pages = await listPages(defaultPages(messages));
   const currentPage = pages.find((entry) => entry.id === page);
   if (currentPage === undefined) notFound();
+
+  /* ค่าเริ่มต้นจริงของหน้านี้สำหรับการ์ดตัวอย่าง SEO (เว้นช่องว่าง = ค่าเหล่านี้มีผลบนเว็บ) */
+  const seoExample = pageSeoExample(currentPage.id, messages);
 
   /*
     ⚠️ รอบที่ 266: หน้าที่ **ไม่มีเทมเพลตและไม่ได้มาจากตัวนำเข้า** = ไม่มีจอตัวสร้าง
@@ -220,7 +224,14 @@ export default async function AdminBuilderPage({
       <ImageLibraryProvider items={imageLibrary}>
         <div className="grid gap-4 md:grid-cols-2">
           <PageSettings page={currentPage} strings={strings} lock={pageLock} />
-          {can(user.role, "seo") ? <PageSeoSettings page={currentPage} strings={strings} /> : null}
+          {can(user.role, "seo") ? (
+            <PageSeoSettings
+              page={currentPage}
+              strings={strings}
+              exampleTitle={seoExample.title}
+              exampleDescription={seoExample.description}
+            />
+          ) : null}
         </div>
       </ImageLibraryProvider>
 
