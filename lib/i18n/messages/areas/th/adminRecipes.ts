@@ -60,7 +60,7 @@ export const adminRecipes = {
   recipesAdminErrorTitle: "บันทึกไม่ได้ — ต้องมีชื่อเมนู (ไทย)",
   recipesAdminErrorVideo: "บันทึกไม่ได้ — รหัสวิดีโอไม่ถูกต้อง",
   recipesAdminErrorDate: "บันทึกไม่ได้ — วันเผยแพร่ต้องเป็นรูปแบบปี-เดือน-วัน หรือเว้นว่าง",
-  recipesAdminErrorDatabase: "บันทึกไม่ได้ — ยังไม่ได้ตั้งค่าฐานข้อมูล",
+  recipesAdminErrorDatabase: "บันทึกไม่ได้ — ระบบยังไม่พร้อม",
   recipesAdminErrorNotFound: "บันทึกไม่ได้ — ไม่พบเมนูนี้ (อาจถูกลบไปแล้ว)",
   recipesAdminTrashedNotice: "เมนูนี้อยู่ในถังขยะ — กดกู้คืนจากหน้ารายการก่อนจึงจะขึ้นเว็บ",
   recipesAdminPreview: "พรีวิวการ์ดเมนู",

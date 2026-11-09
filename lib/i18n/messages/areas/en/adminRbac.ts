@@ -7,7 +7,7 @@
 export const adminRbac = {
   rbacUsersTitle: "Admin accounts",
   rbacUsersHint: "Accounts that can sign in · the role decides what they may do · every change is logged.",
-  rbacDbMissing: "No database configured — accounts cannot be managed (the env account still works).",
+  rbacDbMissing: "The account system is not ready — please contact the system administrator.",
   rbacRoleLabel: "Role",
   rbacRoleEditorName: "Editor",
   rbacRolePublisherName: "Publisher",
@@ -41,7 +41,7 @@ export const adminRbac = {
   rbacBadPassword: "The password must be at least {min} characters",
   rbacFailed: "That did not work — please try again",
   rbacListTitle: "All accounts",
-  rbacEmpty: "No accounts in the database yet — use the env account to create the first one above.",
+  rbacEmpty: "No accounts yet — create the first one from the form above.",
   rbacColEmail: "Email",
   rbacColName: "Name",
   rbacColStatus: "Status",
@@ -60,7 +60,7 @@ export const adminRbac = {
   rbacLastAdminBlocked: "Not allowed — at least one active administrator must remain",
   rbacSelfBlocked: "You cannot change your own role or disable your own account",
   rbacEnvAccountNote:
-    "The env account (break-glass) is not listed here — if the database is empty it still gets you in to create the first account.",
+    "The system's backup administrator account is not listed here — use it to create the first account when none exists.",
   deniedTitle: "Your account cannot open this section",
   deniedBody: "Your role does not cover this part — ask an administrator if you need more access.",
   deniedBack: "Back to the dashboard",
@@ -86,7 +86,7 @@ export const adminRbac = {
   rbacSessionCurrent: "This session",
   /* Permanent account deletion (B3, round 90) */
   rbacDelete: "Delete account permanently",
-  rbacDeleteHint: "Removes this account from the database for good — cannot be undone. To only block sign-in, use \"Disable\".",
+  rbacDeleteHint: "Removes this account permanently — cannot be undone. To only block sign-in, use “Disable”.",
   rbacDeleteConfirmLabel: "Type this account's email to confirm",
   rbacDeleteAcknowledge: "I understand this cannot be undone and the account will be deleted permanently",
   rbacDeletedDone: "Account deleted permanently",

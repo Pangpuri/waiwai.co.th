@@ -71,7 +71,7 @@ export const adminCareers = {
   invalid: "Some fields are missing or invalid — check “Position title (Thai)” and the numbers",
   missing: "This posting was not found (it may have been deleted)",
   duplicate: "Could not create the posting (duplicate ID) — please try again",
-  noDatabase: "No database configured — cannot save",
+  noDatabase: "The system is not ready — cannot save",
   trashedHint: "This posting is in the trash — restore it from the list before editing",
   previewHeading: "Preview on the site",
   previewHint: "This card uses the same renderer as /careers — changes appear as you type",

@@ -12,7 +12,7 @@ export const adminPreviewLink: Pick<Messages["admin"], keyof typeof thAdminPrevi
   previewLinkTitle: "Temporary preview links",
   previewLinkHint: "Create a link so a manager or the marketing team can view the draft without an admin account.",
   previewLinkTtlNote:
-    "Links last {hours} · only the token hash is stored, so a link can never be shown again (copy it right after creating).",
+    "Links last {hours} · the system keeps only a protected link code, so a link can never be shown again (copy it right after creating).",
   previewLinkCreate: "Create a new link",
   previewLinkCreateAction: "Create link",
   previewLinkCreated: "Link created — copy it now (it will not be shown again)",

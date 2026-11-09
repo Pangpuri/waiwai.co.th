@@ -36,7 +36,7 @@ export const adminSchedule: Pick<Messages["admin"], keyof typeof thAdminSchedule
   /* ── Card on the admin overview ────────────────────────────────────────── */
   scheduleCardTitle: "Scheduled work",
   scheduleCardHint:
-    "Pages with a schedule are published when due (checked at admin sign-in, by the button below, or by the cron job `npm run db:publish-scheduled`).",
+    "Scheduled pages are published when due — checked when an admin signs in, or use the button below.",
   scheduleCardNone: "No page has a publish schedule",
   scheduleCardDue: "{count} page(s) are due",
   scheduleCardNext: "Next: {time} (UTC)",
@@ -46,7 +46,7 @@ export const adminSchedule: Pick<Messages["admin"], keyof typeof thAdminSchedule
   scheduleCardOpen: "Open editor",
   scheduleCardClear: "Clear schedule",
   schedulePublishNow: "Publish due pages now",
-  schedulePublishNowHint: "Use this when a scheduled page is due but has not gone live yet (e.g. no cron job is set up).",
+  schedulePublishNowHint: "Use this when a scheduled page is due but has not gone live yet.",
 
   /* ── Audit log trail ──────────────────────────────────────────────────── */
   auditPublishScheduled: "Published on schedule",

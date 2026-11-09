@@ -36,7 +36,7 @@ export const adminPreviewLink = {
   previewLinkRevoked: "ยกเลิกแล้ว",
   previewLinkNotFound: "ไม่พบลิงก์นี้ (อาจถูกลบไปแล้ว)",
   previewLinkTooMany: "ลิงก์ที่ยังใช้ได้ครบเพดานแล้ว ({max}) — ยกเลิกลิงก์เก่าก่อนสร้างใหม่",
-  previewLinkDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — สร้างลิงก์ไม่ได้",
+  previewLinkDbMissing: "ระบบยังไม่พร้อม — สร้างลิงก์ไม่ได้",
   previewLinkRevokeWarning: "ยกเลิกแล้วลิงก์นี้ใช้ไม่ได้ทันที (ผู้จัดการที่ถืออยู่จะเปิดไม่ได้)",
   previewLinkNoStoreWarning: "หน้านี้เป็นเครื่องมือของเจ้าหน้าที่ — ห้ามแชร์ลิงก์นี้เอง",
   previewLinkAutoDeleteNote:

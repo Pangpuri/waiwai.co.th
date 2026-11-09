@@ -33,7 +33,7 @@ export const adminSchedule = {
   /* ── การ์ดบนหน้าภาพรวมหลังบ้าน ───────────────────────────────────────── */
   scheduleCardTitle: "งานที่ตั้งเวลาไว้",
   scheduleCardHint:
-    "หน้าที่ตั้งเวลาไว้จะถูกเผยแพร่เมื่อถึงกำหนด (ตรวจตอนล็อกอินหลังบ้าน · ปุ่มด้านล่าง · หรือ cron `npm run db:publish-scheduled`)",
+    "หน้าที่ตั้งเวลาไว้จะถูกเผยแพร่เมื่อถึงกำหนด — ระบบตรวจให้เมื่อมีผู้ดูแลเข้าหลังบ้าน หรือกดปุ่มด้านล่าง",
   scheduleCardNone: "ยังไม่มีหน้าใดตั้งกำหนดเวลาไว้",
   scheduleCardDue: "ครบกำหนดแล้ว {count} หน้า",
   scheduleCardNext: "กำหนดถัดไป {time} (UTC)",
@@ -43,7 +43,7 @@ export const adminSchedule = {
   scheduleCardOpen: "เปิดหน้าแก้",
   scheduleCardClear: "ล้างกำหนด",
   schedulePublishNow: "เผยแพร่ที่ครบกำหนดเดี๋ยวนี้",
-  schedulePublishNowHint: "ใช้เมื่อมีงานครบกำหนดแล้วแต่ยังไม่ถูกเผยแพร่ (เช่น ยังไม่ได้ตั้ง cron บนเซิร์ฟเวอร์)",
+  schedulePublishNowHint: "ใช้เมื่อมีงานครบกำหนดแล้วแต่ยังไม่ถูกเผยแพร่",
 
   /* ── ร่องรอยใน audit log ─────────────────────────────────────────────── */
   auditPublishScheduled: "เผยแพร่ตามกำหนดเวลา",

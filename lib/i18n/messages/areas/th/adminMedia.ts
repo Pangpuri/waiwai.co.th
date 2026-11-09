@@ -5,7 +5,7 @@
  */
 export const adminMedia = {
   mediaTitle: "คลังภาพ",
-  mediaHint: "ภาพทั้งหมดที่อัปโหลดเข้าฐานข้อมูล — ค้นหา ใช้ซ้ำ แทนไฟล์ และลบเมื่อไม่ใช้แล้ว",
+  mediaHint: "ภาพทั้งหมดที่อัปโหลดเข้าสู่ระบบ — ค้นหา ใช้ซ้ำ แทนไฟล์ และลบเมื่อไม่ใช้แล้ว",
   mediaSearch: "ค้นหา (ชื่อไฟล์/คำอธิบายภาพ)",
   mediaSearchAction: "ค้นหา",
   mediaClear: "ล้างคำค้น",
@@ -18,11 +18,11 @@ export const adminMedia = {
   mediaUsageNews: "ข่าวสาร",
   mediaUsageSeo: "SEO (ภาพแชร์/ไอคอน)",
   mediaUnused: "ยังไม่ถูกใช้",
-  mediaPath: "พาธสำหรับใช้",
+  mediaPath: "ลิงก์สำหรับใช้",
   mediaAltTh: "คำอธิบายภาพ (ไทย)",
   mediaAltEn: "คำอธิบายภาพ (อังกฤษ)",
   mediaSaveAlt: "บันทึกคำอธิบาย",
-  mediaReplace: "แทนไฟล์ (พาธเดิม)",
+  mediaReplace: "แทนไฟล์ (ลิงก์เดิม)",
   mediaReplaceAction: "แทนไฟล์",
   mediaDelete: "ย้ายไปถังขยะ",
   mediaDeleteBlocked: "ลบไม่ได้ — ภาพนี้ยังถูกใช้อยู่",

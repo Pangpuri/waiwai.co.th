@@ -9,7 +9,7 @@ import type { adminMedia as thAdminMedia } from "@/lib/i18n/messages/areas/th/ad
 
 export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaTitle: "Media library",
-  mediaHint: "Every image uploaded to the database — search, reuse, replace and delete when unused.",
+  mediaHint: "Every image uploaded to the system — search, reuse, replace and delete when unused.",
   mediaSearch: "Search (filename / alt text)",
   mediaSearchAction: "Search",
   mediaClear: "Clear",
@@ -22,11 +22,11 @@ export const adminMedia: Pick<Messages["admin"], keyof typeof thAdminMedia> = {
   mediaUsageNews: "News",
   mediaUsageSeo: "SEO (share image / icon)",
   mediaUnused: "Not used yet",
-  mediaPath: "Path to use",
+  mediaPath: "Link to use",
   mediaAltTh: "Alt text (Thai)",
   mediaAltEn: "Alt text (English)",
   mediaSaveAlt: "Save alt text",
-  mediaReplace: "Replace file (same path)",
+  mediaReplace: "Replace file (same link)",
   mediaReplaceAction: "Replace",
   mediaDelete: "Move to trash",
   mediaDeleteBlocked: "Cannot delete — this image is still in use",

@@ -6,7 +6,7 @@
 export const adminRetention = {
   retentionTitle: "ระยะเก็บข้อมูลส่วนบุคคล",
   retentionHint:
-    "ระบบลบข้อมูลที่หมดอายุให้เองอัตโนมัติ (ทำไม่ถี่กว่า 24 ชม. และทำงานเมื่อมีผู้ดูแลเข้าหลังบ้าน) — ถ้าต้องการให้ตรงเวลาเสมอ ให้ตั้ง cron รัน `npm run db:purge` บนเซิร์ฟเวอร์",
+    "ระบบลบข้อมูลที่หมดอายุให้เองอัตโนมัติ (ตรวจไม่บ่อยกว่า 24 ชม. และทำงานเมื่อมีผู้ดูแลเข้าหลังบ้าน) — หากต้องการให้ทำงานตรงเวลาเสมอ กรุณาติดต่อผู้ดูแลระบบ",
   retentionColData: "ประเภทข้อมูล",
   retentionColKeep: "เก็บนาน",
   retentionColCutoff: "ตัดข้อมูลก่อน",
@@ -22,7 +22,7 @@ export const adminRetention = {
   retentionContentTrashDue: "ถังขยะเนื้อหา (สินค้า/เมนู/ข่าว) จะถูกลบถาวรอีก {count} รายการ",
   retentionPurgeNow: "ลบข้อมูลที่หมดอายุตอนนี้",
   retentionPurgeWarning: "ลบถาวรและกู้คืนไม่ได้ — ไฟล์เรซูเม่ของใบสมัครที่หมดอายุถูกลบไปด้วย",
-  retentionDbMissing: "ยังไม่ได้ตั้งค่าฐานข้อมูล — ต้องมี DATABASE_URL ก่อนจึงจะลบตามระยะเก็บได้",
+  retentionDbMissing: "ระบบยังไม่พร้อม — กรุณาติดต่อผู้ดูแลระบบ",
   retentionLabelContact: "ข้อความจากฟอร์มติดต่อ",
   retentionLabelNewsletter: "อีเมลรับข่าวสาร",
   retentionLabelCareers: "ใบสมัครงาน + เรซูเม่",

@@ -41,9 +41,6 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: S
         <section className="border-line bg-surface-raised flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
           <h2 className="text-fg text-lg font-semibold">{strings.setupTitle}</h2>
           <p className="text-fg-muted text-sm">{strings.setupBody}</p>
-          <code className="border-line bg-bg-subtle text-fg block overflow-x-auto rounded-xl border px-3 py-2 text-xs">
-            {strings.setupCommand}
-          </code>
         </section>
       )}
     </main>

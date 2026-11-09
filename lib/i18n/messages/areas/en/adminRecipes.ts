@@ -62,7 +62,7 @@ export const adminRecipes: Pick<Messages["admin"], keyof typeof thAdminRecipes> 
   recipesAdminErrorTitle: "Cannot save - a Thai recipe name is required.",
   recipesAdminErrorVideo: "Cannot save - the video id is not valid.",
   recipesAdminErrorDate: "Cannot save - the published date must be YYYY-MM-DD, or left empty.",
-  recipesAdminErrorDatabase: "Cannot save - the database is not configured.",
+  recipesAdminErrorDatabase: "Cannot save - the system is not ready.",
   recipesAdminErrorNotFound: "Cannot save - this recipe was not found (it may have been deleted).",
   recipesAdminTrashedNotice: "This recipe is in the trash - restore it from the list before it can show on the site.",
   recipesAdminPreview: "Recipe card preview",

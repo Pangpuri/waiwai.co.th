@@ -15,7 +15,7 @@ export const adminHero = {
   heroAdminMoveDown: "Move down",
   heroAdminDragHint: "Drag a card to reorder (or use the up/down buttons)",
   heroAdminSave: "Save",
-  heroAdminImage: "Image path",
+  heroAdminImage: "Image location",
   heroAdminAltTh: "Image description (Thai)",
   heroAdminAltEn: "Image description (English)",
   heroAdminOrder: "Order",
@@ -77,7 +77,7 @@ export const adminHero = {
   /* ── The home hero row in the builder (round 250) ── */
   builderHeroRowTitle: "Home hero (slides + text)",
   builderHeroRowHint:
-    "This section is intentionally **not a block** — it has a single owner (the slides screen / the content screen) so it cannot be edited in two places · On the live site it is always first.",
+    "This section can only be edited from the slides or content screen (to avoid editing it in two places) · On the live site it is always first.",
   builderHeroEditSlides: "Edit slides / effects",
   builderHeroEditTexts: "Edit text (TH/EN)",
   /* ── Site header text (round 251) ── */
@@ -98,7 +98,7 @@ export const adminHero = {
   textsRestoreDefaults: "Restore defaults",
   textsDefaultsNotice: "Showing the system defaults — not saved yet · review/adjust, then click “Save text”",
   textsBackToSaved: "Back to saved values",
-  textsInvalid: "Not saved — the button target must be /path or https://",
+  textsInvalid: "Not saved — the button link is invalid",
   textsFields: "Fields to fix: {fields}",
   textsLabelTh: "Thai",
   textsLabelEn: "English (optional)",

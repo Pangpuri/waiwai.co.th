@@ -6,7 +6,7 @@
 export const adminRetention = {
   retentionTitle: "Personal data retention",
   retentionHint:
-    "Expired data is deleted automatically (at most once every 24 hours, and only when an admin visits the back office). To delete on a fixed schedule, add a cron job that runs `npm run db:purge` on the server.",
+    "Expired data is deleted automatically (checked at most once every 24 hours, when an admin visits the back office). If you need it to run at a fixed time, please contact the system administrator.",
   retentionColData: "Data type",
   retentionColKeep: "Kept for",
   retentionColCutoff: "Deletes rows older than",
@@ -22,7 +22,7 @@ export const adminRetention = {
   retentionContentTrashDue: "Content trash (products/recipes/news): {count} item(s) will be deleted permanently",
   retentionPurgeNow: "Delete expired data now",
   retentionPurgeWarning: "Permanent and irreversible — résumé files of expired applications are deleted too.",
-  retentionDbMissing: "The database is not configured yet — DATABASE_URL is required before retention can run.",
+  retentionDbMissing: "The system is not ready — please contact the system administrator.",
   retentionLabelContact: "Contact form messages",
   retentionLabelNewsletter: "Newsletter subscribers",
   retentionLabelCareers: "Job applications + résumés",

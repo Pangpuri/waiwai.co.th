@@ -18,6 +18,6 @@ export const adminHeroCards = {
   feedbackSlideRestored: "Slide restored",
   feedbackSlidePurged: "Slide deleted forever",
   feedbackErrorInvalid: "Could not save — missing or invalid data (see the fields below)",
-  feedbackErrorSaveFailed: "Could not save — the database is unavailable, please try again",
+  feedbackErrorSaveFailed: "Could not save — the system is temporarily unavailable, please try again",
   /* Round 195: name the field that failed (the generic message made it look like nothing was missing) */
 };
