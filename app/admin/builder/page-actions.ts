@@ -5,7 +5,13 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
 
 import { requireAdminUser } from "@/lib/auth/dal";
 import { isDatabaseConfigured } from "@/lib/content/repository";
-import { normalizePageName, validatePageName, validatePageSeo, type PageSeo } from "@/lib/pages/model";
+import {
+  normalizePageName,
+  validatePageName,
+  validatePageSeo,
+  type PageSeo,
+  type PageSeoSaveState,
+} from "@/lib/pages/model";
 import { updatePage, updatePageSeo } from "@/lib/pages/repository";
 
 /**
@@ -52,13 +58,16 @@ export async function updatePageAction(formData: FormData): Promise<void> {
 }
 
 /** บันทึกค่า SEO ของหน้า (W2) — ว่างได้ทุกช่อง = ใช้ค่าเดิมจากพจนานุกรม */
-export async function updatePageSeoAction(formData: FormData): Promise<void> {
+export async function updatePageSeoAction(
+  _previous: PageSeoSaveState,
+  formData: FormData,
+): Promise<PageSeoSaveState> {
   /* SEO รายหน้า = สิทธิ์ของผู้เผยแพร่ขึ้นไป (X1.10) — ตรงกับบทบาทที่นิยามใน lib/auth/roles.ts */
   const user = await requireAdminUser("seo");
-  if (!isDatabaseConfigured()) return;
+  if (!isDatabaseConfigured()) return { status: "error" };
 
   const id = String(formData.get("id") ?? "").trim();
-  if (id === "") return;
+  if (id === "") return { status: "invalid" };
 
   const cut = (name: string, max: number) => String(formData.get(name) ?? "").trim().slice(0, max);
 
@@ -71,11 +80,12 @@ export async function updatePageSeoAction(formData: FormData): Promise<void> {
     noindex: formData.get("seoNoindex") === "1",
   };
 
-  if (validatePageSeo(seo).length > 0) return;
+  if (validatePageSeo(seo).length > 0) return { status: "invalid" };
 
   await updatePageSeo(id, seo, user.email);
   revalidatePath(`/admin/builder/${id}`);
   /* การ์ดตัวอย่างในหน้าตั้งค่าอ่าน SEO ของหน้าแรก ⇒ ต้องรีเฟรชด้วยเมื่อแก้ home */
   revalidatePath("/admin/settings");
   await refreshPublicSite("pages");
+  return { status: "saved" };
 }

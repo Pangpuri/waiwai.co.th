@@ -4,6 +4,8 @@ import type { AdminNewsDetail } from "@/lib/news/repository";
 import type { AdminJobPosting } from "@/lib/careers/repository";
 import type { AdminRecipeListItem } from "@/lib/recipes/repository";
 import type { NewsBlock } from "@/lib/news/body";
+import { parseNewsSeo } from "@/lib/news/model";
+import type { PageSeo } from "@/lib/pages/model";
 
 /**
  * "ประวัติรุ่น" ของ สินค้า / เมนูอาหาร / ข่าว (B1 · รอบที่ 143) — **ตรรกะล้วน ไม่มี DB**
@@ -130,6 +132,13 @@ export function newsSnapshotOf(detail: AdminNewsDetail): RevisionSnapshot {
     status: detail.status,
     coverPath: detail.coverPath,
     body: detail.body,
+    /* SEO รายข่าว — เก็บแบนเพื่อให้ revisionDiff อ่านออก (ไม่เป็น [object Object]) */
+    seoTitleTh: detail.seo.titleTh,
+    seoTitleEn: detail.seo.titleEn,
+    seoDescriptionTh: detail.seo.descriptionTh,
+    seoDescriptionEn: detail.seo.descriptionEn,
+    seoOgImagePath: detail.seo.ogImagePath,
+    seoNoindex: detail.seo.noindex,
   };
 }
 
@@ -208,6 +217,7 @@ export type NewsRestore = {
     readonly excerptEn: string;
     readonly publishedLocal: string | null;
     readonly status: "draft" | "published";
+    readonly seo: PageSeo;
   };
 };
 
@@ -223,6 +233,14 @@ export function newsRestoreOf(snapshot: RevisionSnapshot): NewsRestore {
       excerptEn: snapshotText(snapshot["excerptEn"]),
       publishedLocal: typeof snapshot["publishedLocal"] === "string" ? snapshot["publishedLocal"] : null,
       status: snapshot["status"] === "draft" ? "draft" : "published",
+      seo: parseNewsSeo({
+        titleTh: snapshot["seoTitleTh"],
+        titleEn: snapshot["seoTitleEn"],
+        descriptionTh: snapshot["seoDescriptionTh"],
+        descriptionEn: snapshot["seoDescriptionEn"],
+        ogImagePath: snapshot["seoOgImagePath"],
+        noindex: snapshot["seoNoindex"],
+      }),
     },
   };
 }

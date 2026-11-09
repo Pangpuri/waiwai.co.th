@@ -13,6 +13,7 @@ import {
 import { CATALOG_ITEMS, catalogHref, catalogSlugs } from "@/features/products/catalog";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
+import { EMPTY_PAGE_SEO } from "@/lib/pages/model";
 import type { ProductCategoryCardRecord, ProductHighlightRecord } from "@/lib/products/repository";
 import type { NewsRecord } from "@/lib/news/repository";
 import type { RecipeRecord } from "@/lib/recipes/repository";
@@ -91,6 +92,7 @@ const newsRow: NewsRecord = {
   body: [],
   publishedLocal: "2026-09-12T11:28",
   publishedLabel: "12 กันยายน 2026 11:28",
+  seo: EMPTY_PAGE_SEO,
 };
 
 /* ── 1) หมวดสินค้า: ลิงก์ต้องชี้ slug จริงเสมอ ─────────────────────────────── */

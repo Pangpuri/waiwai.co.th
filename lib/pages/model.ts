@@ -28,6 +28,11 @@ export type PageSeo = {
   readonly noindex: boolean;
 };
 
+/** ผลการบันทึก SEO รายหน้า — ใช้กับ `useActionState` + toast (ไม่ส่งข้อความจากเซิร์ฟเวอร์) */
+export type PageSeoSaveState = { readonly status: "idle" | "saved" | "invalid" | "error" };
+
+export const INITIAL_PAGE_SEO_SAVE_STATE: PageSeoSaveState = { status: "idle" };
+
 export type PageRecord = {
   readonly id: string;
   readonly nameTh: string;

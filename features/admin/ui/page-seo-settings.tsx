@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 
 import { updatePageSeoAction } from "@/app/admin/builder/page-actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
-import { MAX_SEO_DESCRIPTION_LENGTH, MAX_SEO_TITLE_LENGTH, type PageRecord } from "@/lib/pages/model";
+import {
+  INITIAL_PAGE_SEO_SAVE_STATE,
+  MAX_SEO_DESCRIPTION_LENGTH,
+  MAX_SEO_TITLE_LENGTH,
+  type PageRecord,
+} from "@/lib/pages/model";
 import { SITE } from "@/lib/site";
 import type { Messages } from "@/lib/i18n/messages/th";
 
@@ -38,6 +44,7 @@ export function PageSeoSettings({
   strings,
   exampleTitle,
   exampleDescription,
+  showHeader = true,
 }: {
   readonly page: PageRecord;
   readonly strings: Messages["admin"];
@@ -45,9 +52,20 @@ export function PageSeoSettings({
   readonly exampleTitle: string;
   /** คำอธิบายเริ่มต้นจริงของหน้านี้ — ใช้เมื่อช่องว่าง */
   readonly exampleDescription: string;
+  /** แสดงหัวข้อในตัวหรือไม่ — ใช้เมื่อหน้าจอแม่มีหัวข้อของตัวเองแล้ว */
+  readonly showHeader?: boolean;
 }) {
   const titleHint = strings.seoTitleLength.replace("{n}", String(MAX_SEO_TITLE_LENGTH));
   const descriptionHint = strings.seoTitleLength.replace("{n}", String(MAX_SEO_DESCRIPTION_LENGTH));
+  const [saveState, saveAction] = useActionState(updatePageSeoAction, INITIAL_PAGE_SEO_SAVE_STATE);
+  const saveMessage =
+    saveState.status === "saved"
+      ? strings.seoSaved
+      : saveState.status === "invalid"
+        ? strings.seoInvalid
+        : saveState.status === "error"
+          ? strings.seoFailed
+          : "";
   const [titleTh, setTitleTh] = useState(page.seo.titleTh);
   const [descriptionTh, setDescriptionTh] = useState(page.seo.descriptionTh);
   const [ogImage, setOgImage] = useState({
@@ -67,10 +85,20 @@ export function PageSeoSettings({
 
   return (
     <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-3">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-fg text-sm font-semibold">{strings.seoTitle}</h2>
-        <p className="text-fg-muted text-xs">{strings.seoHint}</p>
-      </div>
+      {saveMessage === "" ? null : (
+        <AdminToast
+          message={saveMessage}
+          tone={saveState.status === "saved" ? "success" : "error"}
+          trigger={saveState}
+        />
+      )}
+
+      {showHeader ? (
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-fg text-sm font-semibold">{strings.seoTitle}</h2>
+          <p className="text-fg-muted text-xs">{strings.seoHint}</p>
+        </div>
+      ) : null}
 
       {/* การ์ดตัวอย่าง — อัปเดตทันทีขณะพิมพ์/อัปโหลดรูป */}
       <div className="flex flex-col gap-2">
@@ -108,7 +136,7 @@ export function PageSeoSettings({
         />
       </div>
 
-      <form action={updatePageSeoAction} className="flex flex-col gap-2">
+      <form action={saveAction} className="flex flex-col gap-2">
         <input type="hidden" name="id" value={page.id} />
         <input type="hidden" name="ogImagePath" value={ogImage.path} />
 

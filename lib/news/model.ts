@@ -9,6 +9,7 @@
  */
 
 import { bangkokInstantOf } from "@/lib/import/thai-date";
+import { EMPTY_PAGE_SEO, type PageSeo } from "@/lib/pages/model";
 
 export const MAX_NEWS_TITLE_LENGTH = 400;
 export const MAX_NEWS_EXCERPT_LENGTH = 600;
@@ -50,6 +51,25 @@ export function newsPathOfSourceId(sourceId: string): string {
 
 export function newsPathOfId(id: string): string {
   return newsPathOfSourceId(newsSourceIdOfId(id));
+}
+
+/**
+ * แปลงค่า SEO ของข่าวจาก DB/สแนปช็อต → `PageSeo`
+ * - ใช้ `PageSeo` ตัวเดียวกับหน้าเว็บ (validator/ตัวอ่าน metadata ใช้ร่วมกัน)
+ * - ค่าที่ไม่ใช่สตริง/ไม่มี = ค่าว่าง (ไม่ทำให้หน้าพัง)
+ */
+export function parseNewsSeo(value: unknown): PageSeo {
+  if (typeof value !== "object" || value === null) return EMPTY_PAGE_SEO;
+  const record = value as Record<string, unknown>;
+  const text = (key: string): string => (typeof record[key] === "string" ? (record[key] as string) : "");
+  return {
+    titleTh: text("titleTh"),
+    titleEn: text("titleEn"),
+    descriptionTh: text("descriptionTh"),
+    descriptionEn: text("descriptionEn"),
+    ogImagePath: text("ogImagePath"),
+    noindex: record["noindex"] === true,
+  };
 }
 
 /** ค่าที่ใส่ `timestamptz` ได้ (เวลาไทย → มีเขตเวลา) — null = ไม่มีวันที่ */

@@ -10,6 +10,7 @@ import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
 import { loadNewsForAdmin } from "@/lib/news/repository";
+import { EMPTY_PAGE_SEO } from "@/lib/pages/model";
 
 /**
  * หลังบ้าน — หน้าจอแก้ข่าว/กิจกรรม (รอบที่ 123 · ฟอร์มง่ายแบบ WP classic editor)
@@ -80,6 +81,7 @@ export default async function AdminNewsEditorPage({
           library={library}
           previewSizes={previewSizes}
           trashed={existing?.trashed ?? false}
+          seo={existing?.seo ?? EMPTY_PAGE_SEO}
         />
       </div>
 

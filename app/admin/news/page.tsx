@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { deleteNewsForeverAction, trashNewsAction } from "@/app/admin/news/actions";
+import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -37,7 +38,7 @@ export default async function AdminNewsPage({
 }: {
   readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
@@ -90,6 +91,9 @@ export default async function AdminNewsPage({
           {m.newsAdminNew}
         </Link>
       </div>
+
+      {/* SEO ของหน้า /news — หน้านี้มี URL จริง แต่ไม่มีจอ builder แล้ว (รอบ 269) */}
+      <AdminPageSeoSection pageId="news" messages={messages} role={user.role} className="mt-6" />
 
       <nav aria-label={m.newsAdminTitle} className="mt-6 flex flex-wrap items-center gap-2">
         {TAB_IDS.map((item) => (

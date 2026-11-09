@@ -10,6 +10,7 @@ import { NewsBodyBlocks } from "@/features/admin/ui/news-body-blocks";
 import { NewsPreview, type NewsPreviewSize } from "@/features/admin/ui/news-preview";
 import { newsBlocksToEditor, parseNewsEditorBlocks, type NewsEditorBlock } from "@/lib/news/editor-blocks";
 import type { NewsBlock } from "@/lib/news/body";
+import type { PageSeo } from "@/lib/pages/model";
 import { INITIAL_NEWS_SAVE_STATE, INITIAL_NEWS_UPLOAD_STATE } from "@/features/admin/news-state";
 
 /**
@@ -43,6 +44,8 @@ type NewsEditorFormProps = {
   /** ขนาดรูปสำหรับพรีวิว (ส่งเป็นรายการธรรมดา — Map ข้าม RSC boundary ไม่ได้) */
   readonly previewSizes: readonly NewsPreviewSize[];
   readonly trashed: boolean;
+  /** SEO รายข่าว — ว่างทั้งหมด = ใช้ข้อมูลข่าวเดิม */
+  readonly seo: PageSeo;
 };
 
 const INPUT_CLASS =
@@ -61,6 +64,12 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
   const [excerptEn, setExcerptEn] = useState(props.excerptEn);
   const [publishedLocal, setPublishedLocal] = useState(props.publishedLocal);
   const [blocks, setBlocks] = useState<readonly NewsEditorBlock[]>(() => newsBlocksToEditor(props.initialBody));
+  const [seoTitleTh, setSeoTitleTh] = useState(props.seo.titleTh);
+  const [seoTitleEn, setSeoTitleEn] = useState(props.seo.titleEn);
+  const [seoDescriptionTh, setSeoDescriptionTh] = useState(props.seo.descriptionTh);
+  const [seoDescriptionEn, setSeoDescriptionEn] = useState(props.seo.descriptionEn);
+  const [seoOgImage, setSeoOgImage] = useState(props.seo.ogImagePath);
+  const [seoNoindex, setSeoNoindex] = useState(props.seo.noindex);
   const m = props.strings;
 
   /* ข้อความผลลัพธ์ — มาจากพจนานุกรมเท่านั้น (Server Action ส่งกลับแค่รหัสเหตุผล) */
@@ -74,9 +83,11 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
             ? m.newsAdminErrorTitle
             : state.reason === "body"
               ? m.newsAdminErrorBody
-              : state.reason === "database"
-                ? m.newsAdminErrorDatabase
-                : m.newsAdminErrorNotFound
+              : state.reason === "seo"
+                ? m.newsAdminErrorSeo
+                : state.reason === "database"
+                  ? m.newsAdminErrorDatabase
+                  : m.newsAdminErrorNotFound
           : "";
 
   return (
@@ -186,6 +197,103 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
         <span className={LABEL_CLASS}>{m.newsAdminFieldBody}</span>
         <NewsBodyBlocks strings={m} initial={blocks} library={props.library} onChange={setBlocks} />
       </div>
+
+      {/* SEO รายข่าว — ใช้กับ metadata/OG ของ `/news/<source_id>` โดยตรง */}
+      <details className="border-line rounded-xl border p-3">
+        <summary className="text-fg cursor-pointer text-sm font-semibold">{m.newsAdminSeoTitle}</summary>
+        <p className="text-fg-muted mt-1 text-xs">{m.newsAdminSeoHint}</p>
+
+        <div className="border-line mt-3 rounded-xl border p-3">
+          <p className="text-fg-muted text-[11px]">{m.newsAdminSeoPreview}</p>
+          <p className="text-link text-base leading-snug">{seoTitleTh.trim() || titleTh}</p>
+          <p className="text-fg-muted text-xs leading-relaxed">{seoDescriptionTh.trim() || excerptTh}</p>
+          <p className="text-fg-muted mt-1 text-[11px]">{m.newsAdminSeoPreviewHint}</p>
+        </div>
+
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.newsAdminSeoTitleTh}</span>
+            <input
+              type="text"
+              name="seoTitleTh"
+              value={seoTitleTh}
+              onChange={(event) => setSeoTitleTh(event.target.value)}
+              maxLength={70}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.newsAdminSeoTitleEn}</span>
+            <input
+              type="text"
+              name="seoTitleEn"
+              value={seoTitleEn}
+              onChange={(event) => setSeoTitleEn(event.target.value)}
+              maxLength={70}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.newsAdminSeoDescriptionTh}</span>
+            <textarea
+              name="seoDescriptionTh"
+              value={seoDescriptionTh}
+              onChange={(event) => setSeoDescriptionTh(event.target.value)}
+              maxLength={170}
+              rows={3}
+              className={INPUT_CLASS}
+            />
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.newsAdminSeoDescriptionEn}</span>
+            <textarea
+              name="seoDescriptionEn"
+              value={seoDescriptionEn}
+              onChange={(event) => setSeoDescriptionEn(event.target.value)}
+              maxLength={170}
+              rows={3}
+              className={INPUT_CLASS}
+            />
+          </label>
+        </div>
+
+        <div className="mt-3">
+          <CoverImagePicker
+            labels={{
+              field: m.newsAdminSeoOgImage,
+              empty: m.newsAdminCoverNone,
+              previewAlt: m.newsAdminCoverAlt,
+              upload: m.newsAdminUpload,
+              uploadHint: m.newsAdminUploadHint,
+              uploading: m.newsAdminUploading,
+              uploadFailed: m.newsAdminUploadFailed,
+              pickFromLibrary: m.newsAdminPickImage,
+              cancel: m.newsAdminCancel,
+              remove: m.newsAdminCoverRemove,
+              storedInLibrary: m.newsAdminCoverStoredInLibrary,
+              noImages: m.newsAdminNoImages,
+            }}
+            value={seoOgImage}
+            onChange={setSeoOgImage}
+            library={props.library}
+            uploadAction={uploadNewsImageAction}
+            initialUploadState={INITIAL_NEWS_UPLOAD_STATE}
+            fieldName="seoOgImagePath"
+          />
+        </div>
+
+        <label className="text-fg-muted mt-3 flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            name="seoNoindex"
+            value="1"
+            checked={seoNoindex}
+            onChange={(event) => setSeoNoindex(event.target.checked)}
+            className="border-line accent-brand-red size-4 rounded border"
+          />
+          {m.newsAdminSeoNoindex}
+        </label>
+      </details>
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" disabled={pending} className={BUTTON_CLASS}>

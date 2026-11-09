@@ -6,7 +6,7 @@
  * - ฝั่งจอภาพแปลงรหัส → ข้อความจากพจนานุกรมเอง (krit: ข้อความทั้งหมดมาจากพจนานุกรม)
  */
 
-export type NewsSaveReason = "title" | "body" | "database" | "not-found" | null;
+export type NewsSaveReason = "title" | "body" | "seo" | "database" | "not-found" | null;
 
 export type NewsSaveStatus = "idle" | "saved" | "draft" | "error";
 

@@ -13,6 +13,7 @@ import {
   parseNewsImageToken,
 } from "@/lib/news/editor-text";
 import { countEditorImages, newsBlocksToEditor, parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
+import { parseNewsSeo } from "@/lib/news/model";
 
 /**
  * เทสต์หลังบ้านข่าว (รอบที่ 123) — "ฟอร์มง่าย" ที่ต้องไม่ทำข้อมูลเดิมเสียหาย
@@ -213,7 +214,8 @@ test("news admin: ภาพปกอัปโหลดจากเครื่�
   assert.ok(picker.includes("ImageFileInput"), "ช่องไฟล์ต้องใช้ ImageFileInput (ย่อภาพในเบราว์เซอร์ก่อนส่ง)");
   assert.ok(picker.includes("mediaIdFromPath"), "ต้องแปลงพาธ /media/<id> เป็นรหัสภาพ (มติ D9)");
   assert.ok(picker.includes("<ImageGridPicker"), "อัลบั้มภาพยังเลือกภาพปกได้เป็นทางสำรอง");
-  assert.ok(picker.includes('name="coverPath"'), "ค่าภาพปกต้องถูกส่งไปเซิร์ฟเวอร์ในช่อง coverPath");
+  assert.ok(picker.includes('fieldName = "coverPath"'), "ค่าเริ่มต้นของช่องต้องเป็น coverPath");
+  assert.ok(picker.includes("name={fieldName}"), "hidden input ใช้ชื่อช่องที่ผู้เรียกกำหนด (เช่น seoOgImagePath)");
   assert.ok(form.includes("<CoverImagePicker"), "หน้าจอแก้ข่าวต้องใช้ตัวเลือกภาพปกกลาง");
   assert.equal(
     (form.match(/<select name="coverPath"/g) ?? []).length,
@@ -361,4 +363,39 @@ test("news admin: ตัวนับรูปต้อง cast bigint → int (�
   const page = readFileSync("app/admin/news/page.tsx", "utf8");
   assert.ok(page.includes("item.blockCount"), "หน้ารายการต้องแสดงจำนวนบล็อกจริง");
   assert.ok(page.includes("item.imageCount"), "หน้ารายการต้องแสดงจำนวนรูปจริง");
+});
+
+test("news SEO: ฟอร์มข่าวมีช่อง SEO + metadata อ่านค่าจาก record.seo", () => {
+  const repo = readFileSync("lib/news/repository.ts", "utf8");
+  assert.ok(repo.includes("seo_title_th"), "repository ต้องเลือก/เขียนคอลัมน์ SEO");
+  assert.ok(repo.includes("parseNewsSeo"), "ต้องแปลงค่า SEO ด้วยตัวกลาง");
+
+  const form = readFileSync("features/admin/ui/news-editor-form.tsx", "utf8");
+  assert.ok(form.includes('name="seoTitleTh"'), "ฟอร์มต้องมีหัวข้อ SEO ไทย");
+  assert.ok(form.includes('name="seoDescriptionTh"'), "ฟอร์มต้องมีคำอธิบาย SEO ไทย");
+  assert.ok(form.includes('fieldName="seoOgImagePath"'), "รูปแชร์ต้องส่งด้วยชื่อช่องของ SEO");
+  assert.ok(form.includes("newsAdminSeoTitle"), "ต้องมีหัวข้อส่วน SEO จากพจนานุกรม");
+
+  const page = readFileSync("app/[lang]/news/[id]/page.tsx", "utf8");
+  assert.ok(page.includes("async () => record.seo"), "metadata ต้องใช้ SEO ของข่าวจริง");
+});
+
+test("parseNewsSeo: ค่าที่ไม่ใช่สตริง/ไม่มี = ค่าว่าง (ไม่ทำให้หน้าพัง)", () => {
+  assert.deepEqual(parseNewsSeo(null), {
+    titleTh: "",
+    titleEn: "",
+    descriptionTh: "",
+    descriptionEn: "",
+    ogImagePath: "",
+    noindex: false,
+  });
+  assert.deepEqual(parseNewsSeo({ titleTh: "ก", noindex: true }), {
+    titleTh: "ก",
+    titleEn: "",
+    descriptionTh: "",
+    descriptionEn: "",
+    ogImagePath: "",
+    noindex: true,
+  });
+  assert.equal(parseNewsSeo({ titleTh: 123 }).titleTh, "");
 });

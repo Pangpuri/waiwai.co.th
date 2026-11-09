@@ -12,6 +12,7 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
 import { storeImageFile } from "@/lib/media/upload";
 import { parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
+import { validatePageSeo, type PageSeo } from "@/lib/pages/model";
 import {
   createNewsForAdmin,
   deleteNewsForever,
@@ -85,6 +86,18 @@ export async function saveNewsAction(_previous: NewsSaveState, formData: FormDat
   const coverRaw = field(formData, "coverPath").trim();
   /* อ่านแถวเดิมเฉพาะกรณี "ฟิลด์หาย" (หายาก) — ไม่ยิงคิวรีเพิ่มในเส้นทางปกติ */
   const existingCover = coverKeyPresent || id === "" ? null : ((await loadNewsForAdmin(id))?.coverPath ?? null);
+
+  /* SEO รายข่าว — ใช้ validator ตัวเดียวกับหน้าเว็บ (เพดาน 70/170 · OG ต้องเป็นพาธในเว็บ) */
+  const seo: PageSeo = {
+    titleTh: field(formData, "seoTitleTh").trim().slice(0, 70),
+    titleEn: field(formData, "seoTitleEn").trim().slice(0, 70),
+    descriptionTh: field(formData, "seoDescriptionTh").trim().slice(0, 170),
+    descriptionEn: field(formData, "seoDescriptionEn").trim().slice(0, 170),
+    ogImagePath: field(formData, "seoOgImagePath").trim().slice(0, 300),
+    noindex: formData.get("seoNoindex") === "1",
+  };
+  if (validatePageSeo(seo).length > 0) return { status: "error", reason: "seo", createdId: null };
+
   const input: AdminNewsInput = {
     titleTh,
     titleEn: field(formData, "titleEn").trim(),
@@ -94,6 +107,7 @@ export async function saveNewsAction(_previous: NewsSaveState, formData: FormDat
     publishedLocal: parsePublishedLocal(field(formData, "publishedLocal")),
     status: statusOf(field(formData, "status")),
     body,
+    seo,
   };
 
   if (id === "") {

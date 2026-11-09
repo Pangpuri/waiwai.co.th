@@ -63,8 +63,8 @@ export async function generateMetadata({
   const description = excerptOf(record, lang);
 
   /*
-    ⚠️ ข่าวแต่ละชิ้น **ไม่มีแถว SEO ของตัวเอง** ในฐานข้อมูล (ตาราง `page` ผูกกับหน้าเมนู)
-    ⇒ ส่งตัวโหลดที่คืน null · ค่ามาจากข้อมูลข่าว + พจนานุกรมล้วน
+    รอบที่ 338: ข่าวแต่ละชิ้นมี SEO override ของตัวเองในตาราง `news`
+    (หัวข้อ/คำอธิบาย/รูปแชร์/noindex) · เว้นว่าง = ค่าเดิมจากข้อมูลข่าว + พจนานุกรมเป๊ะ
   */
   return withPageSeo(
     lang,
@@ -73,15 +73,14 @@ export async function generateMetadata({
       title: { absolute: `${title} — ${messages.newsPage.title}` },
       description: description === "" ? messages.newsPage.meta.description : description,
       alternates: buildAlternates(lang, newsPathOfSourceId(record.sourceId)),
-      /* รอบที่ 173 (มติเจ้าของ): เปิด index — ข่าวมีเนื้อหาจริง · หลังบ้านสั่ง noindex กลับได้ผ่าน withPageSeo
-         ⚠️ ข่าวแต่ละชิ้นไม่มีแถว SEO ของตัวเอง ⇒ ตัวโหลดคืน null ⇒ ช่อง noindex สั่งกลับไม่ได้รายชิ้น */
+      /* รอบที่ 173 (มติเจ้าของ): เปิด index — ข่าวมีเนื้อหาจริง · หลังบ้านสั่ง noindex กลับได้ผ่าน withPageSeo */
       openGraph: {
         title,
         description: description === "" ? messages.newsPage.meta.description : description,
         images: record.coverPath === null ? undefined : [{ url: record.coverPath, alt: title }],
       },
     },
-    async () => null,
+    async () => record.seo,
   );
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { deleteRecipeForeverAction, reorderRecipesAction, trashRecipeAction } from "@/app/admin/recipes/actions";
+import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
 import { SortableList } from "@/features/admin/ui/sortable-list";
 import { listReorderItems, type ReorderItem } from "@/lib/admin/reorder";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -34,7 +35,7 @@ export default async function AdminRecipesPage({
 }: {
   readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
@@ -90,6 +91,9 @@ export default async function AdminRecipesPage({
           {m.recipesAdminNew}
         </Link>
       </div>
+
+      {/* SEO ของหน้า /recipes — หน้านี้มี URL จริง แต่ไม่มีจอ builder แล้ว (รอบ 269) */}
+      <AdminPageSeoSection pageId="recipes" messages={messages} role={user.role} className="mt-6" />
 
       <nav aria-label={m.recipesAdminTitle} className="mt-6 flex flex-wrap items-center gap-2">
         {VIEW_IDS.map((item) => (

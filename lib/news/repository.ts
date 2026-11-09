@@ -2,7 +2,8 @@ import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
 import { mediaIdFromPath } from "@/lib/media/usage";
 import { parseNewsBody, type NewsBlock } from "@/lib/news/body";
-import type { NewsInput } from "@/lib/news/model";
+import { parseNewsSeo, type NewsInput } from "@/lib/news/model";
+import { EMPTY_PAGE_SEO, type PageSeo } from "@/lib/pages/model";
 import { normalizeSearchText } from "@/lib/search/params";
 
 /**
@@ -45,10 +46,13 @@ export type NewsRecord = {
   /** `YYYY-MM-DDTHH:MM` (เวลาไทย) หรือ null */
   readonly publishedLocal: string | null;
   readonly publishedLabel: string;
+  /** ค่า SEO รายข่าว (ว่างทั้งหมด = ใช้ชื่อ/คำโปรย/ภาพปกเดิม) */
+  readonly seo: PageSeo;
 };
 
 const NEWS_COLUMNS = `n.id, n.source_id, n.source_url, n.title_th, n.title_en, n.excerpt_th, n.excerpt_en,
        n.cover_media_id, n.body, n.published_label,
+       n.seo_title_th, n.seo_title_en, n.seo_description_th, n.seo_description_en, n.og_image_path, n.seo_noindex,
        to_char(n.published_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as published_local,
        m.width as cover_width, m.height as cover_height`;
 
@@ -61,6 +65,18 @@ function text(value: unknown): string {
 
 function positiveInt(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/** ค่า SEO จากแถวข่าว — ใช้ตัวแปลงกลาง `parseNewsSeo()` */
+function seoOf(row: Record<string, unknown>): PageSeo {
+  return parseNewsSeo({
+    titleTh: row.seo_title_th,
+    titleEn: row.seo_title_en,
+    descriptionTh: row.seo_description_th,
+    descriptionEn: row.seo_description_en,
+    ogImagePath: row.og_image_path,
+    noindex: row.seo_noindex,
+  });
 }
 
 function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
@@ -85,6 +101,7 @@ function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
     body: parseNewsBody(row.body),
     publishedLocal: publishedLocal === "" ? null : publishedLocal,
     publishedLabel: text(row.published_label),
+    seo: seoOf(row),
   };
 }
 
@@ -343,6 +360,7 @@ export type AdminNewsDetail = AdminNewsListItem & {
   readonly excerptEn: string;
   readonly publishedLabel: string;
   readonly body: readonly NewsBlock[];
+  readonly seo: PageSeo;
 };
 
 export type AdminNewsInput = {
@@ -356,6 +374,8 @@ export type AdminNewsInput = {
   readonly publishedLocal: string | null;
   readonly status: AdminNewsStatus;
   readonly body: readonly NewsBlock[];
+  /** ค่า SEO รายข่าว — ไม่ส่ง/ไม่ระบุ = ค่าว่าง (ใช้ข้อมูลข่าวเดิม) */
+  readonly seo?: PageSeo;
 };
 
 /**
@@ -365,6 +385,7 @@ export type AdminNewsInput = {
  */
 const ADMIN_NEWS_COLUMNS = `n.id, n.source_id, n.title_th, n.title_en, n.excerpt_th, n.excerpt_en,
        n.cover_media_id, n.body, n.published_label, n.status, n.deleted_at,
+       n.seo_title_th, n.seo_title_en, n.seo_description_th, n.seo_description_en, n.og_image_path, n.seo_noindex,
        to_char(n.published_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as published_local,
        to_char(n.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local,
        m.width as cover_width, m.height as cover_height,
@@ -543,6 +564,7 @@ export async function loadNewsForAdmin(id: string): Promise<AdminNewsDetail | nu
       excerptEn: text(row.excerpt_en),
       publishedLabel: text(row.published_label),
       body: parseNewsBody(row.body),
+      seo: seoOf(row),
     };
   } catch {
     return null;
@@ -559,10 +581,13 @@ function newAdminNewsIds(now: Date): { readonly id: string; readonly sourceId: s
 /** สร้างข่าวใหม่จากหลังบ้าน — คืน id ที่สร้าง */
 export async function createNewsForAdmin(input: AdminNewsInput, actor: string): Promise<string> {
   const { id, sourceId } = newAdminNewsIds(new Date());
+  const seo = input.seo ?? EMPTY_PAGE_SEO;
   await getPool().query(
     `insert into news (id, source_id, source_url, title_th, title_en, excerpt_th, excerpt_en,
-                       cover_media_id, body, published_at, published_label, status, updated_at, updated_by)
-       values ($1, $2, '', $3, $4, $5, $6, $7, $8::jsonb, $9::timestamptz, '', $10, now(), $11)`,
+                       cover_media_id, body, published_at, published_label, status, updated_at, updated_by,
+                       seo_title_th, seo_title_en, seo_description_th, seo_description_en, og_image_path, seo_noindex)
+       values ($1, $2, '', $3, $4, $5, $6, $7, $8::jsonb, $9::timestamptz, '', $10, now(), $11,
+               $12, $13, $14, $15, $16, $17)`,
     [
       id,
       sourceId,
@@ -575,6 +600,12 @@ export async function createNewsForAdmin(input: AdminNewsInput, actor: string): 
       input.publishedLocal === null ? null : `${input.publishedLocal}:00+07:00`,
       input.status,
       actor,
+      seo.titleTh,
+      seo.titleEn,
+      seo.descriptionTh,
+      seo.descriptionEn,
+      seo.ogImagePath,
+      seo.noindex,
     ],
   );
   return id;
@@ -582,11 +613,14 @@ export async function createNewsForAdmin(input: AdminNewsInput, actor: string): 
 
 /** บันทึกทับข่าวที่มีอยู่ (หลังบ้าน) */
 export async function updateNewsForAdmin(id: string, input: AdminNewsInput, actor: string): Promise<void> {
+  const seo = input.seo ?? EMPTY_PAGE_SEO;
   await getPool().query(
     `update news
         set title_th = $2, title_en = $3, excerpt_th = $4, excerpt_en = $5,
             cover_media_id = $6, body = $7::jsonb, published_at = $8::timestamptz,
-            status = $9, updated_at = now(), updated_by = $10
+            status = $9, updated_at = now(), updated_by = $10,
+            seo_title_th = $11, seo_title_en = $12, seo_description_th = $13,
+            seo_description_en = $14, og_image_path = $15, seo_noindex = $16
       where id = $1`,
     [
       id,
@@ -599,6 +633,12 @@ export async function updateNewsForAdmin(id: string, input: AdminNewsInput, acto
       input.publishedLocal === null ? null : `${input.publishedLocal}:00+07:00`,
       input.status,
       actor,
+      seo.titleTh,
+      seo.titleEn,
+      seo.descriptionTh,
+      seo.descriptionEn,
+      seo.ogImagePath,
+      seo.noindex,
     ],
   );
 }

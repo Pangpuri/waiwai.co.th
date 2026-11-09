@@ -2856,12 +2856,29 @@ async function checkNewsAdmin(): Promise<void> {
           { type: "paragraph", text: "เนื้อหาหลังเผยแพร่" },
           { type: "image", mediaId: "check-db-news-image", alt: "ภาพทดสอบหลังบ้าน" },
         ],
+        seo: {
+          titleTh: "SEO ข่าวทดสอบ",
+          titleEn: "Admin news SEO check",
+          descriptionTh: "คำอธิบาย SEO ข่าวทดสอบ",
+          descriptionEn: "Admin news SEO description",
+          ogImagePath: "/media/check-db-news-image",
+          noindex: true,
+        },
       },
       NEWS_CHECK_ACTOR,
     );
     const published = await loadNewsBySourceId(sourceId);
     assert.ok(published !== null, "เผยแพร่แล้วต้องอ่านจากเว็บได้");
     assert.equal(published.publishedLocal, "2026-06-01T10:30", "เวลาไทยต้องกลับมาค่าเดิม");
+    /* SEO รายข่าว (รอบ 338): ต้องเก็บ/อ่านกลับครบทุกช่อง */
+    assert.deepEqual(published.seo, {
+      titleTh: "SEO ข่าวทดสอบ",
+      titleEn: "Admin news SEO check",
+      descriptionTh: "คำอธิบาย SEO ข่าวทดสอบ",
+      descriptionEn: "Admin news SEO description",
+      ogImagePath: "/media/check-db-news-image",
+      noindex: true,
+    });
 
     /* ค้นหาในหลังบ้านเจอ */
     const found = await listNewsForAdmin({ tab: "published", search: "ทดสอบหลังบ้าน", page: 1 });

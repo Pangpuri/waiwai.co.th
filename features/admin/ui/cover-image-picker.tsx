@@ -56,6 +56,8 @@ export type CoverImagePickerProps = {
   readonly library: readonly ImageGridItem[];
   readonly uploadAction: CoverUploadAction;
   readonly initialUploadState: CoverUploadState;
+  /** ชื่อช่อง hidden ที่ส่งพาธ — ค่าเริ่มต้น `coverPath` (ใช้ `seoOgImagePath` กับ SEO รายข่าว) */
+  readonly fieldName?: string;
 };
 
 const INPUT_CLASS =
@@ -71,6 +73,7 @@ export function CoverImagePicker({
   library,
   uploadAction,
   initialUploadState,
+  fieldName = "coverPath",
 }: CoverImagePickerProps) {
   const [picking, setPicking] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -170,8 +173,8 @@ export function CoverImagePicker({
         </div>
       ) : null}
 
-      {/* ค่าที่ส่งไปเซิร์ฟเวอร์ = พาธของภาพปก (ว่าง = ไม่ใช้ภาพปก) */}
-      <input type="hidden" name="coverPath" value={value} />
+      {/* ค่าที่ส่งไปเซิร์ฟเวอร์ = พาธของภาพ (ว่าง = ไม่ใช้ภาพ) */}
+      <input type="hidden" name={fieldName} value={value} />
     </div>
   );
 }

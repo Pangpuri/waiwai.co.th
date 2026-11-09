@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { deleteJobForeverAction, reorderJobsAction, trashJobAction } from "@/app/admin/careers/actions";
+import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -51,7 +52,7 @@ export default async function AdminCareersPage({
 }: {
   readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
 
@@ -121,6 +122,9 @@ export default async function AdminCareersPage({
           {m.newPosting}
         </Link>
       </div>
+
+      {/* SEO ของหน้า /careers — ตัว builder ถูกถอด (รอบ 266) แต่หน้านี้มี URL จริง */}
+      <AdminPageSeoSection pageId="careers" messages={messages} role={user.role} className="mt-6" />
 
       <nav aria-label={m.title} className="mt-6 flex flex-wrap items-center gap-2">
         {TAB_IDS.map((item) => (

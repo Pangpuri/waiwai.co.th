@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { can } from "@/lib/auth/roles";
 import { AdminToast } from "@/features/admin/ui/admin-toast";
 import {
   deleteCategoryAction,
@@ -58,7 +59,7 @@ export default async function AdminProductCategoriesPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
@@ -198,6 +199,14 @@ export default async function AdminProductCategoriesPage({
                   {row.isHidden ? m2.hiddenBadge : m2.visibleBadge}
                 </span>
                 {row.isHidden ? <span className="text-fg-muted text-[11px]">{m2.hiddenHint}</span> : null}
+                {can(user.role, "seo") ? (
+                  <Link
+                    href={`/admin/builder/product-${row.id}`}
+                    className="text-link ml-auto text-[11px] font-semibold underline underline-offset-4"
+                  >
+                    {m.seoTitle} →
+                  </Link>
+                ) : null}
               </div>
 
               <div className="mt-3">

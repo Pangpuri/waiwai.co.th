@@ -536,7 +536,14 @@ create table if not exists news (
   status text not null default 'published',   -- draft | published
   deleted_at timestamptz,
   -- รอบที่ 177 (migration 0026): ใครลบ — คู่กับ deleted_at เสมอ
-  deleted_by text
+  deleted_by text,
+  -- รอบที่ 338 (migration 0045): SEO override รายข่าว — ว่าง = ใช้ข้อมูลข่าวเดิม
+  seo_title_th       text    not null default '',
+  seo_title_en       text    not null default '',
+  seo_description_th text    not null default '',
+  seo_description_en text    not null default '',
+  og_image_path      text    not null default '',
+  seo_noindex        boolean not null default false
 );
 
 create index if not exists news_published_idx on news (published_at desc nulls last, id desc);

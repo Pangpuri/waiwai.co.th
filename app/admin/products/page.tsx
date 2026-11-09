@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { requireAdminUser } from "@/lib/auth/dal";
+import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
 import { ProductCategoryForm } from "@/features/admin/ui/product-category-form";
 import type { ProductLibraryItem } from "@/features/admin/ui/product-editor-form";
 import { SortableList } from "@/features/admin/ui/sortable-list";
@@ -47,7 +48,7 @@ export default async function AdminProductsPage({
 }: {
   readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const m = messages.admin;
 
@@ -130,6 +131,9 @@ export default async function AdminProductsPage({
           {m.adminProductsNew}
         </Link>
       </div>
+
+      {/* SEO ของหน้า /products — หน้านี้มี URL จริง แต่ไม่มีจอ builder แล้ว (รอบ 269) */}
+      <AdminPageSeoSection pageId="products" messages={messages} role={user.role} className="mt-6" />
 
       {/* แท็บ: ใช้งาน / ถังขยะ / จัดลำดับ (ลิงก์ธรรมดา ไม่ต้องมี JS · ตัวนับมาจากฐานข้อมูล) */}
       <nav className="mt-6 flex flex-wrap items-center gap-2" aria-label={m.adminProductsTitle}>

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import type { Metadata } from "next";
 
 import { th } from "@/lib/i18n/messages/th";
@@ -145,4 +147,29 @@ test("per-page SEO preview: การ์ดใน builder อัปเดตต�
   assert.ok(builder.includes("pageSeoExample("), "builder ต้องส่งค่าเริ่มต้นจริงของหน้านั้นให้การ์ด");
   assert.ok(builder.includes("exampleTitle={seoExample.title}"), "ต้องส่งหัวข้อเริ่มต้น");
   assert.ok(builder.includes("exampleDescription={seoExample.description}"), "ต้องส่งคำอธิบายเริ่มต้น");
+});
+
+test("P1: หน้าสินค้า/เมนู/ข่าว/รับสมัครงานมีแผง SEO แบบหน้า-level", () => {
+  const section = codeOf("features/admin/page-seo-section.tsx");
+  assert.ok(section.includes("findPage(pageId)"), "ต้องอ่านแถว page จริง");
+  assert.ok(section.includes("PageSeoSettings"), "ต้องใช้ฟอร์ม SEO ตัวเดียวกับ builder");
+  assert.ok(section.includes('can(role, "seo")'), "แสดงเฉพาะผู้มีสิทธิ์ SEO");
+
+  const expected: readonly { readonly file: string; readonly pageId: string }[] = [
+    { file: "app/admin/products/page.tsx", pageId: "products" },
+    { file: "app/admin/recipes/page.tsx", pageId: "recipes" },
+    { file: "app/admin/news/page.tsx", pageId: "news" },
+    { file: "app/admin/careers/page.tsx", pageId: "careers" },
+  ];
+  for (const entry of expected) {
+    const source = codeOf(entry.file);
+    assert.ok(source.includes("AdminPageSeoSection"), `${entry.file} ต้องมีแผง SEO`);
+    assert.ok(source.includes(`pageId="${entry.pageId}"`), `${entry.file} ต้องชี้ page id ที่ถูก`);
+  }
+});
+
+test("P1.5: ลิงก์จากจอหมวดสินค้าไป SEO ของหน้า detail", () => {
+  const page = codeOf("app/admin/product-categories/page.tsx");
+  assert.ok(page.includes("/admin/builder/product-${row.id}"), "ต้องมีลิงก์ไป builder ของหมวดนั้น");
+  assert.ok(page.includes('can(user.role, "seo")'), "ลิงก์แสดงเฉพาะผู้มีสิทธิ์ SEO");
 });
