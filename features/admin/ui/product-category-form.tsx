@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 
 import { saveProductCategoryAction, uploadProductImageAction } from "@/app/admin/products/actions";
 import { INITIAL_ADMIN_UPLOAD_STATE, INITIAL_CATEGORY_SAVE_STATE } from "@/features/admin/product-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageFileInput } from "@/features/admin/ui/image-file-input";
 import { PreviewFrame, SITE_CATEGORY_CARD_WIDTH } from "@/features/admin/ui/preview-frame";
 import type { ProductLibraryItem } from "@/features/admin/ui/product-editor-form";
@@ -301,14 +302,7 @@ export function ProductCategoryForm(props: ProductCategoryFormProps) {
       </div>
 
       {statusMessage === "" ? null : (
-        <p
-          role="status"
-          className={`border-line bg-bg-subtle mt-3 rounded-xl border px-3 py-2 text-sm ${
-            state.status === "error" ? "text-danger" : "text-fg"
-          }`}
-        >
-          {statusMessage}
-        </p>
+        <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
       )}
 
       <div className="mt-3">

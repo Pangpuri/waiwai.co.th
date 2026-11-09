@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { saveNewsAction, uploadNewsImageAction } from "@/app/admin/news/actions";
 import type { Messages } from "@/lib/i18n/messages/th";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { CoverImagePicker } from "@/features/admin/ui/cover-image-picker";
 import { NewsBodyBlocks } from "@/features/admin/ui/news-body-blocks";
 import { NewsPreview, type NewsPreviewSize } from "@/features/admin/ui/news-preview";
@@ -84,14 +85,7 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
       <input type="hidden" name="id" value={props.id} />
 
       {statusMessage === "" ? null : (
-        <p
-          role="status"
-          className={`border-line bg-bg-subtle rounded-xl border px-4 py-3 text-sm ${
-            state.status === "error" ? "text-danger" : "text-fg"
-          }`}
-        >
-          {statusMessage}
-        </p>
+        <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
       )}
 
       {props.trashed ? (

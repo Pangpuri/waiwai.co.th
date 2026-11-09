@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 
 import { saveRecipeAction, uploadRecipeImageAction } from "@/app/admin/recipes/actions";
 import { INITIAL_RECIPE_SAVE_STATE, INITIAL_RECIPE_UPLOAD_STATE } from "@/features/admin/recipe-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { CoverImagePicker } from "@/features/admin/ui/cover-image-picker";
 import { RecipeVideoList, type RecipeVideoListStrings } from "@/features/recipes/ui/recipe-video-list";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -134,14 +135,7 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
         ) : null}
 
         {statusMessage === "" ? null : (
-          <p
-            role="status"
-            className={`border-line bg-bg-subtle rounded-xl border px-4 py-3 text-sm ${
-              state.status === "error" ? "text-danger" : "text-fg"
-            }`}
-          >
-            {statusMessage}
-          </p>
+          <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
         )}
 
         <p className="text-fg-muted text-xs">{m.recipesAdminSlugLocked}</p>

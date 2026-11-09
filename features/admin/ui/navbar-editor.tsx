@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { publishNavbarAction, saveNavbarDraftAction } from "@/app/admin/builder/navbar/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { latestVersionOf } from "@/lib/blocks/version";
 import { toggleOpenId } from "@/lib/chrome/accordion";
@@ -217,6 +218,7 @@ export function NavbarEditor({
   const statusLine = (state: BuilderState): string | null => {
     if (state.status === "idle") return null;
     if (state.status === "conflict") return str(rawStrings["draftConflictTitle"], "");
+    if (state.status === "draft-saved") return str(rawStrings["savedDraft"], "");
     if (state.status === "published") return draftState.status === "published" ? null : str(rawStrings["publishedBadge"], "");
     return null;
   };
@@ -623,6 +625,16 @@ export function NavbarEditor({
         </form>
 
         {statusLine(draftState) ?? statusLine(publishState)}
+        <AdminToast
+          message={statusLine(draftState) ?? ""}
+          tone={draftState.status === "conflict" ? "error" : "success"}
+          trigger={draftState}
+        />
+        <AdminToast
+          message={statusLine(publishState) ?? ""}
+          tone={publishState.status === "conflict" ? "error" : "success"}
+          trigger={publishState}
+        />
       </div>
     </div>
   );

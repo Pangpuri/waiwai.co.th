@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { saveCategoryAction } from "@/app/admin/product-categories/actions";
 import { INITIAL_CATEGORY_FORM_STATE } from "@/features/admin/category-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { CategoryImagePicker } from "@/features/admin/ui/category-image-picker";
 import { PreviewFrame, SITE_CATEGORY_CARD_WIDTH } from "@/features/admin/ui/preview-frame";
 import { ProductCategoryCard } from "@/features/products/ui/category-card";
@@ -234,14 +235,7 @@ export function CategoryEditorForm(props: CategoryEditorFormProps) {
       </div>
 
       {statusMessage === "" ? null : (
-        <p
-          role="status"
-          className={`border-line bg-bg-subtle mt-3 rounded-xl border px-3 py-2 text-sm ${
-            state.status === "error" ? "text-danger" : "text-fg"
-          }`}
-        >
-          {statusMessage}
-        </p>
+        <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
       )}
 
       <div className="mt-3">

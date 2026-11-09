@@ -10,6 +10,7 @@ import {
   saveChromePresetAction,
   undoChromePresetAction,
 } from "@/app/admin/builder/chrome/preset-actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import {
   INITIAL_CHROME_PRESET_IMPORT_STATE,
   INITIAL_CHROME_PRESET_STATE,
@@ -158,7 +159,10 @@ function StatusLine({
   if (message === null) return null;
 
   return (
-    <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>{message}</span>
+    <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>
+      <AdminToast message={message} tone={state.status === "ok" ? "success" : "error"} trigger={state} />
+      {message}
+    </span>
   );
 }
 
@@ -288,7 +292,10 @@ export function ChromePresetIoPanel({
             <span className="flex flex-wrap items-center gap-2">
               <Submit label={strings.chromePresetImport} />
               {message === null ? null : (
-                <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>{message}</span>
+                <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>
+                  <AdminToast message={message} tone={state.status === "ok" ? "success" : "error"} trigger={state} />
+                  {message}
+                </span>
               )}
             </span>
           </form>

@@ -7,6 +7,7 @@ import { useFormStatus } from "react-dom";
 
 import { publishMourningAction, resetMourningToDefaultsAction, saveMourningDraftAction } from "@/app/admin/builder/mourning/actions";
 import { INITIAL_BUILDER_STATE, type BuilderState } from "@/features/admin/builder-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { latestVersionOf } from "@/lib/blocks/version";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -154,6 +155,7 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
       role="status"
       className={`flex flex-col gap-1 rounded-xl border p-3 text-sm ${failed ? "border-brand-red bg-surface" : "border-line bg-surface-raised"}`}
     >
+      <AdminToast message={message} tone={failed ? "error" : "success"} trigger={state} />
       <p className="text-fg font-semibold">{message}</p>
       {state.problems.length > 0 ? (
         <ul className="text-fg-muted list-disc pl-5 text-xs">

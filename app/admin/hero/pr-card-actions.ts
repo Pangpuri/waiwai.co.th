@@ -26,18 +26,18 @@ import { isDatabaseConfigured, loadPageContent, savePageContent } from "@/lib/co
  */
 export async function saveHeroCardAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser("content");
-  if (!isDatabaseConfigured()) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  if (!isDatabaseConfigured()) redirect("/admin/hero?tab=campaigns&error=save-failed#hero-card");
 
   const parsed = parseHeroCardInput(formData);
   /* ฟอร์มฝั่งจอมี `required` อยู่แล้ว — ตรงนี้เป็นด่านกันจริงที่ฝั่งเซิร์ฟเวอร์ */
-  if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid");
+  if (!parsed.ok) redirect("/admin/hero?tab=campaigns&error=invalid#hero-card");
 
   const loaded = await loadPageContent(HOME_PAGE_SPEC);
-  if (loaded.unknownKeys.length > 0) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  if (loaded.unknownKeys.length > 0) redirect("/admin/hero?tab=campaigns&error=save-failed#hero-card");
 
   const heroSection = HOME_PAGE_SPEC.sections.find((section) => section.key === "hero");
   const cardGroup = heroSection?.items.find((group) => group.key === "card");
-  if (cardGroup === undefined) redirect("/admin/hero?tab=campaigns&error=save-failed");
+  if (cardGroup === undefined) redirect("/admin/hero?tab=campaigns&error=save-failed#hero-card");
 
   let draft = toDraft(HOME_PAGE_SPEC, loaded.content);
   /* ยังไม่มีการ์ดในฐานข้อมูล (ยังไม่ seed) = เพิ่มให้ก่อน แล้วเขียนทับด้วยค่าที่กรอก */
@@ -67,7 +67,7 @@ export async function saveHeroCardAction(formData: FormData): Promise<void> {
   /* กรอบภาพการ์ด (รอบที่ 208) — เก็บที่ hero_setting (ไม่แตะโครงเนื้อหา EAV) */
   const frame = frameOf(typeof formData.get("imageFrame") === "string" ? String(formData.get("imageFrame")) : "");
   const frameSaved = await saveHeroCardFrame(frame, user.email);
-  if (!frameSaved) redirect("/admin/hero?error=save-failed");
+  if (!frameSaved) redirect("/admin/hero?error=save-failed#hero-card");
   await recordAudit({
     action: "hero-save",
     actorEmail: user.email,
@@ -75,5 +75,5 @@ export async function saveHeroCardAction(formData: FormData): Promise<void> {
     detail: `hero-card-save:${frame}`,
   });
   await refreshPublicSite("page");
-  redirect("/admin/hero?tab=campaigns&saved=card-saved");
+  redirect("/admin/hero?tab=campaigns&saved=card-saved#hero-card");
 }

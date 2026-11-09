@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import {
   deleteCategoryAction,
   reorderCategoriesAction,
@@ -123,14 +124,7 @@ export default async function AdminProductCategoriesPage({
 
       {/* ผลของการลบหมวด (มาจาก `?deleted=` / `?error=`) — บอกให้ชัดว่าเกิดอะไรขึ้น */}
       {deleteMessage === "" ? null : (
-        <p
-          role="status"
-          className={`rounded-xl border px-3 py-2 text-sm ${
-            deleteError === "" ? "border-line bg-bg-subtle text-fg" : "border-brand-red text-brand-red bg-surface"
-          }`}
-        >
-          {deleteMessage}
-        </p>
+        <AdminToast message={deleteMessage} tone={deleteError === "" ? "success" : "error"} trigger={query} />
       )}
 
       {/* สถานะค่าเริ่มต้นถาวร — บอกตรง ๆ ว่าพร้อมใช้หรือยังต้องรันสคริปต์ */}

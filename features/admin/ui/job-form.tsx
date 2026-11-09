@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { createJobAction, saveJobAction } from "@/app/admin/careers/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { INITIAL_JOB_FORM_STATE } from "@/features/admin/careers-state";
 import { JobBoard } from "@/features/careers/ui/job-board";
 import type { Board, BoardLabels } from "@/features/careers/board";
@@ -285,14 +286,7 @@ export function JobForm(props: JobFormProps) {
         </div>
 
         {statusMessage === "" ? null : (
-          <p
-            role="status"
-            className={`border-line bg-bg-subtle mt-4 rounded-xl border px-3 py-2 text-sm ${
-              state.status === "error" ? "text-danger" : "text-fg"
-            }`}
-          >
-            {statusMessage}
-          </p>
+          <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
         )}
 
         {state.status === "saved" && props.mode === "create" && state.createdId !== "" ? (

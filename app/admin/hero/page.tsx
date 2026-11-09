@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { HeroPrCardEditor } from "@/features/admin/ui/hero-pr-card-editor";
 import { HeroTextsForm } from "@/features/admin/ui/hero-texts-form";
 import { HeroSlideManager } from "@/features/admin/ui/hero-slide-manager";
@@ -116,9 +117,11 @@ export default async function AdminHeroPage({
       </header>
 
       {feedback === null ? null : (
-        <div role="status" className="border-line bg-surface text-fg rounded-xl border px-3 py-2 text-sm">
-          <p>{feedback.kind === "saved" ? "✓ " + savedMessages[feedback.code] : "⚠ " + errorMessages[feedback.code]}</p>
-        </div>
+        <AdminToast
+          message={feedback.kind === "saved" ? savedMessages[feedback.code] : errorMessages[feedback.code]}
+          tone={feedback.kind === "saved" ? "success" : "error"}
+          trigger={feedback}
+        />
       )}
 
       {/* แท็บ: สไลด์ | แคมเปญ (รอบที่ 190) */}
@@ -127,7 +130,7 @@ export default async function AdminHeroPage({
         เดิมมีแผงบอกทางไปแก้ที่หน้าจอ "เนื้อหาแบบมีโครง" · เจ้าของสั่งย้ายมาเป็น **ส่วนของตัวเองในหน้าแคมเปญ**
         ⇒ แก้ข้อความสั้น + อัปโหลดภาพได้ที่นี่ ไม่ต้องออกจากหน้านี้ · รอบ 330 ถอดหน้าจอเดิมออกแล้ว
       */}
-      <section className="flex flex-col gap-2">
+      <section id="hero-card" className="flex flex-col gap-2">
         <HeroPrCardEditor card={prCardDraft} frame={setting.prCardFrame} strings={s} />
         <p className="text-fg-muted text-[11px]">
           {s.wiggleCardHint} · {wiggleCard.title}
@@ -140,15 +143,21 @@ export default async function AdminHeroPage({
         ⇒ หน้าจอ "เนื้อหาหน้าแรก" ไม่แสดงส่วน hero แล้ว (กันแก้ได้สองที่) — ค่าเก็บที่เดิม (EAV)
         ⚠️ ฟอร์มเป็น Server Action ล้วน (ไม่ต้องมี JS) · ค่าที่ส่งกลับมาบอกผลด้วยรหัสใน URL
       */}
-      <HeroTextsForm
-        current={textsCurrent}
-        strings={s}
-        problemFields={heroTextFieldCodesOf(problemFieldsRaw)}
-        showingDefaults={showDefaults}
-      />
+      <div id="hero-texts">
+        <HeroTextsForm
+          current={textsCurrent}
+          strings={s}
+          problemFields={heroTextFieldCodesOf(problemFieldsRaw)}
+          showingDefaults={showDefaults}
+        />
+      </div>
 
 
-      <form action={saveHeroSettingAction} className="border-line bg-surface flex flex-wrap items-end gap-3 rounded-xl border p-3">
+      <form
+        id="hero-effect"
+        action={saveHeroSettingAction}
+        className="border-line bg-surface flex flex-wrap items-end gap-3 rounded-xl border p-3"
+      >
         <label className="text-fg-muted flex flex-col gap-1 text-xs">
           {s.heroAdminEffect}
           <select name="effect" defaultValue={setting.effect} className="border-line text-fg rounded-md border px-2 py-1 text-xs">
@@ -173,21 +182,23 @@ export default async function AdminHeroPage({
           {s.heroAdminEffectSave}
         </button>
       </form>
-      <form action={addHeroSlideAction}>
-        <button type="submit" className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold">
-          {s.heroAdminAdd}
-        </button>
-      </form>
-      <p className="text-fg-muted -mt-3 text-xs">{s.heroAdminAddHint}</p>
+      <section id="hero-slides" className="flex flex-col gap-3">
+        <form action={addHeroSlideAction}>
+          <button type="submit" className="bg-brand-red text-on-brand rounded-md px-3 py-1.5 text-sm font-semibold">
+            {s.heroAdminAdd}
+          </button>
+        </form>
+        <p className="text-fg-muted -mt-3 text-xs">{s.heroAdminAddHint}</p>
 
-      {slides.length === 0 ? (
-        <p className="border-line text-fg-muted rounded-xl border border-dashed p-6 text-sm">{s.heroAdminEmpty}</p>
-      ) : (
-        <HeroSlideManager slides={slides} strings={s} />
-      )}
+        {slides.length === 0 ? (
+          <p className="border-line text-fg-muted rounded-xl border border-dashed p-6 text-sm">{s.heroAdminEmpty}</p>
+        ) : (
+          <HeroSlideManager slides={slides} strings={s} />
+        )}
+      </section>
 
       {/* ── ถังขยะสไลด์ (รอบที่ 186) — กู้คืนได้ · ลบถาวรต้องยืนยัน ───────────────── */}
-      <section className="border-line flex flex-col gap-3 rounded-xl border p-4">
+      <section id="hero-trash" className="border-line flex flex-col gap-3 rounded-xl border p-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-fg text-lg font-semibold">{s.heroTrashTitle}</h2>
           <p className="text-fg-muted text-xs">{s.heroTrashHint}</p>

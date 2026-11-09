@@ -9,6 +9,7 @@ import {
   deletePreviewLinkAction,
   revokePreviewLinkAction,
 } from "@/app/admin/preview-links/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import {
   INITIAL_PREVIEW_LINK_STATE,
   type PreviewLinkActionState,
@@ -135,6 +136,7 @@ function StatusLine({
   return (
     <div className="flex flex-col gap-1">
       <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>
+        <AdminToast message={message} tone={state.status === "ok" ? "success" : "error"} trigger={state} />
         {message}
       </span>
       {state.path === null ? null : (

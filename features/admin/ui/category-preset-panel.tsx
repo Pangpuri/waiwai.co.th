@@ -8,6 +8,7 @@ import {
   importCategoryPresetAction,
   saveCategoryPresetAction,
 } from "@/app/admin/product-categories/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { INITIAL_CATEGORY_PRESET_STATE } from "@/features/admin/category-state";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -79,12 +80,7 @@ export function CategoryPresetPanel(props: CategoryPresetPanelProps) {
         </a>
       </form>
       {saveMessage === "" ? null : (
-        <p
-          role="status"
-          className={`mt-2 text-sm ${saveState.status === "error" ? "text-danger" : "text-fg"}`}
-        >
-          {saveMessage}
-        </p>
+        <AdminToast message={saveMessage} tone={saveState.status === "error" ? "error" : "success"} trigger={saveState} />
       )}
 
       {/* นำเข้าจากไฟล์ */}
@@ -103,9 +99,7 @@ export function CategoryPresetPanel(props: CategoryPresetPanelProps) {
         </button>
       </form>
       {importMessage === "" ? null : (
-        <p role="status" className={`mt-2 text-sm ${importState.status === "error" ? "text-danger" : "text-fg"}`}>
-          {importMessage}
-        </p>
+        <AdminToast message={importMessage} tone={importState.status === "error" ? "error" : "success"} trigger={importState} />
       )}
 
       {/* รายการชุดที่บันทึกไว้ */}

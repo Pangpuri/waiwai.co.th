@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 
 import { publishFooterAction, saveFooterDraftAction } from "@/app/admin/builder/footer/actions";
 import { INITIAL_BUILDER_STATE } from "@/features/admin/builder-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { NavIcon } from "@/features/shell/ui/nav-icon";
 import { latestVersionOf } from "@/lib/blocks/version";
@@ -67,6 +68,8 @@ type Strings = {
   readonly footerMoveDown: string;
   readonly draftPrefix: string;
   readonly draftConflictTitle: string;
+  readonly savedDraft: string;
+  readonly publishedBadge: string;
 };
 
 const FIELD_CLASS =
@@ -628,9 +631,30 @@ export function FooterEditor({
             {strings.footerPublish}
           </button>
         </form>
-        {draftState.status === "published" ? null : null}
         {conflict ? <span className="text-brand-red text-xs font-semibold">{strings.draftConflictTitle}</span> : null}
         {publishState.status === "published" ? <span className="text-fg-muted text-xs">✓</span> : null}
+        <AdminToast
+          message={
+            draftState.status === "conflict"
+              ? strings.draftConflictTitle
+              : draftState.status === "draft-saved"
+                ? strings.savedDraft
+                : ""
+          }
+          tone={draftState.status === "conflict" ? "error" : "success"}
+          trigger={draftState}
+        />
+        <AdminToast
+          message={
+            publishState.status === "conflict"
+              ? strings.draftConflictTitle
+              : publishState.status === "published"
+                ? strings.publishedBadge
+                : ""
+          }
+          tone={publishState.status === "conflict" ? "error" : "success"}
+          trigger={publishState}
+        />
       </div>
     </div>
   );

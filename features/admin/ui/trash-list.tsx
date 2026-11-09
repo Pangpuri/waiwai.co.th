@@ -9,6 +9,7 @@ import {
   purgeTrashNowAction,
   restoreTrashAction,
 } from "@/app/admin/trash/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { INITIAL_TRASH_STATE, type TrashActionState } from "@/features/admin/trash-state";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { TrashViewKind } from "@/lib/trash/plan";
@@ -130,7 +131,10 @@ function StatusLine({ state, strings }: { readonly state: TrashActionState; read
   const message = messageOf(state, strings);
   if (message === null) return null;
   return (
-    <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>{message}</span>
+    <span className={state.status === "ok" ? "text-fg-muted text-[11px]" : "text-brand-red text-[11px]"}>
+      <AdminToast message={message} tone={state.status === "ok" ? "success" : "error"} trigger={state} />
+      {message}
+    </span>
   );
 }
 

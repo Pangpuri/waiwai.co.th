@@ -10,6 +10,7 @@ import {
   setRoleAction,
   toggleUserAction,
 } from "@/app/admin/users/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { INITIAL_RBAC_STATE, type RbacActionState } from "@/features/admin/rbac-state";
 import { isAdminRole, type AdminRole } from "@/lib/auth/types";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -168,6 +169,7 @@ function StatusLine({
 
   return (
     <span className={state.status === "ok" ? "text-fg-muted text-xs" : "text-brand-red text-xs"}>
+      <AdminToast message={text ?? ""} tone={state.status === "ok" ? "success" : "error"} trigger={state} />
       {text}
       {/* รหัสผ่านที่ระบบสร้าง: แสดงครั้งเดียวในกล่องอ่านอย่างเดียว */}
       {state.password === null ? null : (

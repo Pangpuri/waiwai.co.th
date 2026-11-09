@@ -57,6 +57,7 @@ type MovedKeys =
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",
+  toastDismiss: "Dismiss notification",
   loginTitle: "Sign in to the admin area",
   loginIntro: "Authorised staff only · You are signed out automatically after 8 hours of inactivity.",
   emailLabel: "Email",

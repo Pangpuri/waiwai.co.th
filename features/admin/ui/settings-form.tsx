@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { publishSettingsAction, saveSettingsAction } from "@/app/admin/settings/actions";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { INITIAL_SETTINGS_STATE } from "@/features/admin/settings-state";
 import { MAX_NOTICE_LENGTH, MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
 import { SITE } from "@/lib/site";
@@ -188,9 +189,7 @@ export function SettingsForm({
             {strings.settingsPublish}
           </button>
           {statusText === "" ? null : (
-            <p role={state.status === "invalid" || state.status === "failed" ? "alert" : "status"} className="text-fg-muted text-xs">
-              {statusText}
-            </p>
+            <AdminToast message={statusText} tone={state.status === "invalid" || state.status === "failed" ? "error" : "success"} trigger={state} />
           )}
         </div>
 

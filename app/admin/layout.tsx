@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "../globals.css";
 
 import { roleLabelOf } from "@/features/admin/rbac-labels";
+import { AdminToastHost } from "@/features/admin/ui/admin-toast";
 import { AdminSidebar, type AdminNavGroup } from "@/features/admin/ui/admin-sidebar";
 import { MaintenanceBypassPing } from "@/features/admin/ui/maintenance-bypass-ping";
 import { getSessionUser } from "@/lib/auth/dal";
@@ -127,6 +128,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               }}
             />
             <div className="min-w-0 flex-1">{children}</div>
+            {/* ข้อความผลการบันทึก/ลบของทุกจอหลังบ้าน — ลอยมุมจอ ไม่ดันเนื้อหา (รอบ 337) */}
+            <AdminToastHost dismissLabel={messages.admin.toastDismiss} />
           </div>
         )}
       </body>

@@ -6,6 +6,7 @@ import { useActionState, useState } from "react";
 
 import { saveProductAction, uploadProductImageAction } from "@/app/admin/products/actions";
 import { INITIAL_ADMIN_UPLOAD_STATE, INITIAL_PRODUCT_SAVE_STATE } from "@/features/admin/product-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageFileInput } from "@/features/admin/ui/image-file-input";
 import { ProductListSection, type ProductListStrings } from "@/features/products/ui/product-list";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -229,14 +230,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-5">
         {statusMessage === "" ? null : (
-          <p
-            role="status"
-            className={`border-line bg-bg-subtle rounded-xl border px-4 py-3 text-sm ${
-              state.status === "error" ? "text-danger" : "text-fg"
-            }`}
-          >
-            {statusMessage}
-          </p>
+          <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
         )}
 
         <p className="text-fg-muted text-xs">{m.adminProductsSlugLocked}</p>

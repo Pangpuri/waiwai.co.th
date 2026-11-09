@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { createCategoryAction } from "@/app/admin/product-categories/actions";
 import { INITIAL_CATEGORY_FORM_STATE } from "@/features/admin/category-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { CategoryImagePicker } from "@/features/admin/ui/category-image-picker";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -122,14 +123,7 @@ export function CategoryCreateForm(props: CategoryCreateFormProps) {
       </div>
 
       {statusMessage === "" ? null : (
-        <p
-          role="status"
-          className={`border-line bg-bg-subtle mt-3 rounded-xl border px-3 py-2 text-sm ${
-            state.status === "error" ? "text-danger" : "text-fg"
-          }`}
-        >
-          {statusMessage}
-        </p>
+        <AdminToast message={statusMessage} tone={state.status === "error" ? "error" : "success"} trigger={state} />
       )}
 
       <div className="mt-3">

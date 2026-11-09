@@ -28,17 +28,17 @@ import { isDatabaseConfigured, loadPageContent, savePageContent } from "@/lib/co
  */
 export async function saveHeroTextsAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser("content");
-  if (!isDatabaseConfigured()) redirect("/admin/hero?error=save-failed");
+  if (!isDatabaseConfigured()) redirect("/admin/hero?error=save-failed#hero-texts");
 
   const parsed = parseHeroTextsInput(formData);
   /* รอบที่ 331: ข้อความว่างผ่านได้ (ว่าง = ซ่อน) — ด่านฝั่งเซิร์ฟเวอร์ยังตรวจรูปแบบปลายทาง */
   if (!parsed.ok) {
     const fields = parsed.problems.join(",");
-    redirect(`/admin/hero?error=invalid&fields=${encodeURIComponent(fields)}`);
+    redirect(`/admin/hero?error=invalid&fields=${encodeURIComponent(fields)}#hero-texts`);
   }
 
   const loaded = await loadPageContent(HOME_PAGE_SPEC);
-  if (loaded.unknownKeys.length > 0) redirect("/admin/hero?error=save-failed");
+  if (loaded.unknownKeys.length > 0) redirect("/admin/hero?error=save-failed#hero-texts");
 
   let draft = toDraft(HOME_PAGE_SPEC, loaded.content);
   const fields = heroTextsFieldsOf(parsed.value);
@@ -55,5 +55,5 @@ export async function saveHeroTextsAction(formData: FormData): Promise<void> {
     detail: "hero-texts-save",
   });
   await refreshPublicSite("page");
-  redirect("/admin/hero?saved=texts-saved");
+  redirect("/admin/hero?saved=texts-saved#hero-texts");
 }

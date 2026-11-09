@@ -18,6 +18,7 @@ import { uploadImageAction } from "@/app/admin/media/actions";
 import { INITIAL_BUILDER_STATE, type BuilderConflict, type BuilderState } from "@/features/admin/builder-state";
 import { INITIAL_SCHEDULE_STATE, type ScheduleProblem } from "@/features/admin/schedule-state";
 import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
+import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
@@ -497,6 +498,7 @@ function StatusPanel({ state, strings }: { readonly state: BuilderState; readonl
       role="status"
       className={`flex flex-col gap-1 rounded-xl border p-3 text-sm ${failed ? "border-brand-red bg-surface" : "border-line bg-surface-raised"}`}
     >
+      <AdminToast message={message} tone={failed ? "error" : "success"} trigger={state} />
       <p className="text-fg font-semibold">{message}</p>
       {/*
         รอบที่ 239/240: บอกให้ตรงว่าหน้าเว็บเปลี่ยนหรือยัง (ห้ามเงียบ — เคสจริง "กดเผยแพร่แล้วไม่ติด")
