@@ -28,6 +28,34 @@ export type HeroPageSlide = {
   readonly isActive: boolean;
 };
 
+/**
+ * ฉบับร่างของช่องภาพในหน้าจอจัดการสไลด์ (ยังไม่บันทึก)
+ * ใช้ร่วมกับ `ImageDrop` ที่ส่ง patch มาเฉพาะช่องที่ผู้ใช้แก้
+ */
+export type HeroSlideDraft = {
+  readonly path: string;
+  readonly altTh: string;
+  readonly altEn: string;
+};
+
+/** ฉบับร่างตั้งต้นของสไลด์ที่ยังไม่มีภาพ */
+export const EMPTY_HERO_SLIDE_DRAFT: HeroSlideDraft = { path: "", altTh: "", altEn: "" };
+
+/**
+ * รวม patch จากช่องภาพเข้ากับฉบับร่าง โดย **ช่องที่ patch ไม่ได้ส่งมาต้องคงค่าเดิม**
+ *
+ * ⚠️ บั๊กจริง 2026-11-10: `ImageDrop` ส่ง `{ altTh }` มาเมื่อแก้คำอธิบายภาพเท่านั้น
+ * แต่หน้าจอเดิมเขียน `path: next.path ?? ""` ⇒ พาธภาพถูกล้าง ภาพหายทันทีที่พิมพ์คำอธิบาย
+ * (ค่า `path: ""` ที่ส่งมาชัด ๆ ยังต้องล้างได้จริง — ผู้ใช้กด "ลบภาพ")
+ */
+export function mergeHeroSlideDraft(base: HeroSlideDraft, patch: Partial<HeroSlideDraft>): HeroSlideDraft {
+  return {
+    path: patch.path ?? base.path,
+    altTh: patch.altTh ?? base.altTh,
+    altEn: patch.altEn ?? base.altEn,
+  };
+}
+
 /** ค่าที่รับจากฟอร์มหลังบ้าน (ยังไม่ผ่านการตรวจ) */
 export type HeroSlideInput = {
   readonly mediaPath: string;

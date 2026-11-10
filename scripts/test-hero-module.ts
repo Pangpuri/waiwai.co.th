@@ -14,14 +14,17 @@ import {
   HERO_INTERVAL_MAX_MS,
   HERO_INTERVAL_MIN_MS,
   clampIntervalMs,
+  EMPTY_HERO_SLIDE_DRAFT,
   focusFromObjectPosition,
   isHeroEffect,
+  mergeHeroSlideDraft,
   parseHeroSetting,
   isLocalMediaPath,
   moveHeroPageSlide,
   parseHeroSlideInput,
   sortHeroPageSlides,
   type HeroPageSlide,
+  type HeroSlideDraft,
 } from "@/lib/hero/model";
 
 /**
@@ -73,6 +76,59 @@ test("hero module: ตรวจค่าที่รับจากฟอร์�
   assert.equal(clampFocus(Number.NaN), 50);
   assert.equal(clampZoom(Number.POSITIVE_INFINITY), 1);
   assert.ok(MAX_HERO_PAGE_SLIDES >= 2 && MAX_HERO_PAGE_SLIDES <= 10, "เพดานสไลด์ต้องสมเหตุสมผล");
+});
+
+test("hero module (2026-11-10): แก้คำอธิบายภาพในช่องภาพต้องไม่ล้างพาธภาพ", () => {
+  const base: HeroSlideDraft = { path: "/media/slide-1", altTh: "ภาพเดิม", altEn: "old alt" };
+
+  /* happy path — ImageDrop ส่งมาเฉพาะ altTh เมื่อผู้ใช้พิมพ์คำอธิบาย ⇒ พาธ/อังกฤษต้องคงเดิม */
+  assert.deepEqual(mergeHeroSlideDraft(base, { altTh: "ภาพใหม่" }), {
+    path: "/media/slide-1",
+    altTh: "ภาพใหม่",
+    altEn: "old alt",
+  });
+  assert.deepEqual(mergeHeroSlideDraft(base, { altEn: "new alt" }).path, "/media/slide-1", "แก้ alt อังกฤษก็ต้องไม่ล้างภาพ");
+
+  /* เปลี่ยนภาพจริง = พาธใหม่ทับของเดิม พร้อม alt ที่ส่งมาด้วย */
+  assert.deepEqual(mergeHeroSlideDraft(base, { path: "/media/slide-2", altTh: "ภาพที่สอง", altEn: "" }), {
+    path: "/media/slide-2",
+    altTh: "ภาพที่สอง",
+    altEn: "",
+  });
+
+  /* edge — กด "ลบภาพ" ส่ง path: "" มาชัด ๆ ⇒ ต้องล้างจริง (ไม่ใช่คืนค่าเดิม) */
+  assert.deepEqual(mergeHeroSlideDraft(base, { path: "", altTh: "", altEn: "" }), EMPTY_HERO_SLIDE_DRAFT);
+
+  /* edge — patch ที่ไม่มีฟิลด์ของฉบับร่าง (เช่น hasWatermark จาก ImageDrop) = ไม่เปลี่ยนอะไร */
+  const unrelated: Partial<HeroSlideDraft> & { hasWatermark: boolean } = { hasWatermark: true };
+  assert.deepEqual(mergeHeroSlideDraft(base, unrelated), base);
+
+  /* กันถอยหลัง: หน้าจอต้องใช้ตัวช่วยนี้ ไม่ใช่เขียน path fallback เป็นค่าว่างเอง */
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  assert.ok(manager.includes("mergeHeroSlideDraft"), "หน้าจอจัดการสไลด์ต้องใช้ mergeHeroSlideDraft");
+  assert.ok(!manager.includes('path: next.path ?? ""'), "ห้ามล้างพาธเมื่อ patch ไม่ได้ส่ง path มา");
+});
+
+test("hero module (2026-11-10): คำอธิบายภาพ TH/EN มีช่องเดียว — อยู่ในฟอร์มบันทึก", () => {
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  const imageDropAt = manager.indexOf("<ImageDrop");
+  const saveFormAt = manager.indexOf("<form action={saveHeroSlideAction}");
+
+  assert.ok(imageDropAt > 0 && saveFormAt > imageDropAt, "ต้องมีช่องภาพก่อนฟอร์มบันทึก (ไม่ซ้อนฟอร์ม)");
+
+  /* ImageDrop ต้องไม่แสดงช่อง alt ของตัวเองซ้ำกับฟอร์มบันทึก */
+  const imageDropBlock = manager.slice(imageDropAt, saveFormAt);
+  assert.ok(imageDropBlock.includes("showAltFields={false}"), "ช่องภาพต้องปิดช่อง alt ภายใน");
+
+  /* ชุดที่เหลือต้องเป็นช่องในฟอร์มบันทึก และผูกกับฉบับร่าง (ค่าที่แก้จึงถูกส่งตอนกดบันทึก) */
+  const saveFormBlock = manager.slice(saveFormAt, manager.indexOf("</form>", saveFormAt));
+  assert.ok(saveFormBlock.includes('name="altTh"'), "alt ไทยต้องอยู่ในฟอร์มบันทึก");
+  assert.ok(saveFormBlock.includes('name="altEn"'), "alt อังกฤษต้องอยู่ในฟอร์มบันทึก");
+  assert.ok(saveFormBlock.includes("value={draft.altTh}") && saveFormBlock.includes("value={draft.altEn}"));
+
+  /* กันช่องซ้ำกลับมา: ทั้งไฟล์ต้องมีช่อง alt ไทย/อังกฤษ อย่างละจุดเท่านั้น */
+  assert.equal((manager.match(/name="altTh"/g) ?? []).length, 1, "alt ไทยต้องมีจุดกรอกเดียว");
+  assert.equal((manager.match(/name="altEn"/g) ?? []).length, 1, "alt อังกฤษต้องมีจุดกรอกเดียว");
 });
 
 test("hero module: เรียงลำดับ/ย้ายสไลด์ได้ และผลนิ่งเมื่อลำดับเท่ากัน", () => {

@@ -11,7 +11,12 @@ import {
 } from "@/app/admin/hero/actions";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS, heroFocusPresetId } from "@/lib/blocks/hero-slides";
-import type { HeroPageSlide } from "@/lib/hero/model";
+import {
+  EMPTY_HERO_SLIDE_DRAFT,
+  mergeHeroSlideDraft,
+  type HeroPageSlide,
+  type HeroSlideDraft,
+} from "@/lib/hero/model";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 /**
@@ -20,7 +25,7 @@ import type { Messages } from "@/lib/i18n/messages/th";
  * - **ลากการ์ดเพื่อสลับลำดับ** (HTML5 drag & drop · ไม่เพิ่ม dependency) แล้วส่งลำดับใหม่เข้า Server Action
  *   · มีปุ่ม "เลื่อนขึ้น/ลง" เป็นทางสำรองสำหรับคีย์บอร์ด/จอสัมผัส (a11y)
  * - **ช่องภาพใช้ `ImageDrop` ตัวเดียวกับตัวสร้างหน้า/สินค้า** (รอบที่ 187) ⇒ เลือกจากคลังภาพ · อัปโหลดจากเครื่อง ·
- *   ลากวาง · ย่อภาพอัตโนมัติ · แก้คำอธิบายภาพในตัว
+ *   ลากวาง · ย่อภาพอัตโนมัติ · **คำอธิบายภาพแก้ที่ฟอร์มบันทึกด้านล่างที่เดียว** (ปิดช่อง alt ใน ImageDrop)
  * - **การ์ด "+" ท้ายกริด** — ให้เห็นชัดว่ากดเพิ่มสไลด์ได้ (เจ้าของขอ)
  * - ต่อการ์ด: จุดโฟกัส 9 จุด · ซูม · เปิด/ปิด · ลบ (ย้ายเข้าถังขยะ)
  *   · ทุกอย่างเป็น `<form>` ธรรมดา ⇒ **ใช้ได้แม้ปิด JavaScript** (ลากไม่ได้ แต่กดปุ่มได้)
@@ -36,7 +41,7 @@ export function HeroSlideManager({
 }) {
   const [order, setOrder] = useState<readonly string[]>(slides.map((slide) => slide.id));
   /* ฉบับร่างของแต่ละใบ: ช่องภาพ/คำอธิบายแก้ในหน้าจอก่อน แล้วกด "บันทึก" จึงส่งเข้าเซิร์ฟเวอร์ */
-  const [drafts, setDrafts] = useState<Record<string, { path: string; altTh: string; altEn: string }>>(() =>
+  const [drafts, setDrafts] = useState<Record<string, HeroSlideDraft>>(() =>
     Object.fromEntries(slides.map((slide) => [slide.id, { path: slide.mediaPath, altTh: slide.altTh, altEn: slide.altEn }])),
   );
   const dragging = useRef<string | null>(null);
@@ -45,12 +50,13 @@ export function HeroSlideManager({
   const byId = new Map(slides.map((slide) => [slide.id, slide]));
   const ordered = order.map((id) => byId.get(id)).filter((slide): slide is HeroPageSlide => slide !== undefined);
 
-  function draftOf(id: string): { path: string; altTh: string; altEn: string } {
-    return drafts[id] ?? { path: "", altTh: "", altEn: "" };
+  function draftOf(id: string): HeroSlideDraft {
+    return drafts[id] ?? EMPTY_HERO_SLIDE_DRAFT;
   }
 
-  function patchDraft(id: string, patch: Partial<{ path: string; altTh: string; altEn: string }>): void {
-    setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { path: "", altTh: "", altEn: "" }), ...patch } }));
+  function patchDraft(id: string, patch: Partial<HeroSlideDraft>): void {
+    /* รวมแบบ functional: patch จาก ImageDrop มีเฉพาะช่องที่เปลี่ยน ⇒ ช่องอื่นต้องคงค่าเดิม */
+    setDrafts((prev) => ({ ...prev, [id]: mergeHeroSlideDraft(prev[id] ?? EMPTY_HERO_SLIDE_DRAFT, patch) }));
   }
 
   function submitOrder(next: readonly string[]): void {
@@ -144,18 +150,17 @@ export function HeroSlideManager({
                   strings={strings}
                   compact
                   label={strings.heroAdminImage}
+                  /*
+                    คำอธิบายภาพแก้ที่ฟอร์มบันทึกด้านล่าง "ที่เดียว"
+                    (เดิม ImageDrop แสดงช่อง alt TH/EN ของตัวเองซ้ำกับฟอร์มบันทึก ⇒ ผู้ใช้สับสนว่าต้องกรอกที่ไหน)
+                  */
+                  showAltFields={false}
                   value={
                     draft.path.trim() === ""
                       ? null
                       : { path: draft.path, altTh: draft.altTh, altEn: draft.altEn, hasWatermark: false }
                   }
-                  onChange={(next) =>
-                    patchDraft(slide.id, {
-                      path: next.path ?? "",
-                      altTh: next.altTh ?? draft.altTh,
-                      altEn: next.altEn ?? draft.altEn,
-                    })
-                  }
+                  onChange={(next) => patchDraft(slide.id, next)}
                 />
 
               <form action={saveHeroSlideAction} className="flex flex-col gap-2">
