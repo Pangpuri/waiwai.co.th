@@ -188,6 +188,15 @@ export async function getTrashedMediaBinary(id: string): Promise<MediaBinary | n
   };
 }
 
+/** ชื่อไฟล์ของภาพในคลัง — ใช้เป็นคำอธิบายภาพสำรองเมื่อผู้ใช้เว้น alt ว่าง (null = ไม่พบ) */
+export async function findMediaFilename(id: string): Promise<string | null> {
+  const result = await getPool().query<{ filename: string }>(
+    `select filename from media where id = $1 and deleted_at is null`,
+    [id],
+  );
+  return result.rows[0]?.filename ?? null;
+}
+
 export async function listMedia(limit = 40): Promise<readonly MediaListItem[]> {
   const result = await getPool().query<{
     id: string;

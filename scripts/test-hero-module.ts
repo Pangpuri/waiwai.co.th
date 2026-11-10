@@ -7,6 +7,8 @@ import { codeOf, stripComments } from "./source-scan.ts";
 import { managedHeroSlideViews } from "@/features/home/slides";
 import {
   MAX_HERO_PAGE_SLIDES,
+  DEFAULT_HERO_ALT_TH,
+  altFromFilename,
   clampFocus,
   clampZoom,
   DEFAULT_HERO_SETTING,
@@ -15,8 +17,10 @@ import {
   HERO_INTERVAL_MIN_MS,
   clampIntervalMs,
   EMPTY_HERO_SLIDE_DRAFT,
+  fallbackHeroAltTh,
   focusFromObjectPosition,
   isHeroEffect,
+  mediaIdFromPath,
   mergeHeroSlideDraft,
   parseHeroSetting,
   isLocalMediaPath,
@@ -129,6 +133,36 @@ test("hero module (2026-11-10): คำอธิบายภาพ TH/EN มี�
   /* กันช่องซ้ำกลับมา: ทั้งไฟล์ต้องมีช่อง alt ไทย/อังกฤษ อย่างละจุดเท่านั้น */
   assert.equal((manager.match(/name="altTh"/g) ?? []).length, 1, "alt ไทยต้องมีจุดกรอกเดียว");
   assert.equal((manager.match(/name="altEn"/g) ?? []).length, 1, "alt อังกฤษต้องมีจุดกรอกเดียว");
+});
+
+test("hero module (2026-11-10): alt ว่างได้ — เติมชื่อไฟล์เป็นคำอธิบายสำรอง", () => {
+  assert.equal(altFromFilename("promo-summer.webp"), "promo-summer", "ตัดนามสกุล");
+  assert.equal(altFromFilename("folder/hero.JPG"), "hero", "ตัดโฟลเดอร์ + นามสกุลตัวพิมพ์ใหญ่");
+  assert.equal(altFromFilename("ไม่มีนามสกุล"), "ไม่มีนามสกุล");
+  assert.equal(altFromFilename(""), "");
+
+  assert.equal(mediaIdFromPath("/media/AbC_123-xyz"), "AbC_123-xyz");
+  assert.equal(mediaIdFromPath("/media/AbC_123-xyz?x=1"), "", "พาธที่มี query ไม่ใช่ id ของคลัง");
+  assert.equal(mediaIdFromPath("/slide/hero.jpg"), "");
+
+  /* happy path: ภาพในคลังใช้ชื่อไฟล์จริง · ไม่พบชื่อไฟล์ = ชื่อกลาง · ไฟล์ในโปรเจกต์ = ชื่อไฟล์จากพาธ */
+  assert.equal(fallbackHeroAltTh("/media/AbC_123", "summer sale.png"), "summer sale");
+  assert.equal(fallbackHeroAltTh("/media/AbC_123", null), DEFAULT_HERO_ALT_TH);
+  assert.equal(fallbackHeroAltTh("/slide/hero.jpg"), "hero");
+  assert.equal(fallbackHeroAltTh(""), "", "ไม่มีภาพ = ไม่ต้องมี alt");
+
+  const actions = readFileSync("app/admin/hero/actions.ts", "utf8");
+  assert.ok(actions.includes("resolveHeroAltTh"), "action ต้องเติม alt สำรองก่อนบันทึก");
+  assert.ok(actions.includes("findMediaFilename"), "ภาพในคลังต้องอ่านชื่อไฟล์จริง");
+  assert.ok(!actions.includes('if (altTh === "" && mediaPath !== "") return;'), "ห้ามปฏิเสธ alt ว่างแบบเงียบ");
+
+  const manager = readFileSync("features/admin/ui/hero-slide-manager.tsx", "utf8");
+  assert.ok(manager.includes("heroAdminAltOptionalHint"), "หน้าจอต้องบอกว่าเว้นว่างได้");
+
+  for (const locale of ["th", "en"]) {
+    const area = readFileSync(`lib/i18n/messages/areas/${locale}/adminHero.ts`, "utf8");
+    assert.ok(area.includes("heroAdminAltOptionalHint"), `พจนานุกรม ${locale} ต้องมีคำอธิบายว่าเว้นว่างได้`);
+  }
 });
 
 test("hero module: เรียงลำดับ/ย้ายสไลด์ได้ และผลนิ่งเมื่อลำดับเท่ากัน", () => {

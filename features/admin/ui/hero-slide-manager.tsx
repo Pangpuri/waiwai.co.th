@@ -188,6 +188,7 @@ export function HeroSlideManager({
                     className="border-line text-fg rounded-md border px-2 py-1 text-xs"
                   />
                 </label>
+                <p className="text-fg-muted text-[11px]">{strings.heroAdminAltOptionalHint}</p>
                 <div className="flex gap-2">
                   <label className="text-fg-muted flex flex-1 flex-col gap-1 text-xs">
                     {strings.heroAdminFocus}

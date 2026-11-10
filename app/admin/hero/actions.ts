@@ -7,7 +7,7 @@ import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS } from "@/lib/blocks/hero-slides";
-import { clampFocus, clampZoom, isLocalMediaPath, parseHeroSetting } from "@/lib/hero/model";
+import { clampFocus, clampZoom, fallbackHeroAltTh, isLocalMediaPath, mediaIdFromPath, parseHeroSetting } from "@/lib/hero/model";
 import {
   createHeroPageSlide,
   listHeroPageSlidesForAdmin,
@@ -18,13 +18,14 @@ import {
   trashHeroPageSlide,
   updateHeroPageSlide,
 } from "@/lib/hero/repository";
+import { findMediaFilename } from "@/lib/media/repository";
 
 /**
  * Server Action ของหลังบ้าน "สไลด์ & แคมเปญ" (รอบที่ 184 · เฟส 3)
  *
  * กติกาเดียวกับหลังบ้านสินค้า/เมนู/ข่าว
  * - **ตรวจสิทธิ์ทุก action** (`requireAdminUser("content")`)
- * - **ไม่เชื่อข้อมูลจากเบราว์เซอร์** — พาธภาพต้องเป็นพาธในเว็บ (มติ D9) · จุดโฟกัส/ซูมถูกบีบช่วงค่า · alt ไทยบังคับ
+ * - **ไม่เชื่อข้อมูลจากเบราว์เซอร์** — พาธภาพต้องเป็นพาธในเว็บ (มติ D9) · จุดโฟกัส/ซูมถูกบีบช่วงค่า · alt ไทยเว้นว่างได้ (ใช้ชื่อไฟล์สำรอง)
  * - เขียน audit ทุกครั้ง (`hero-save`) · สั่ง `refreshPublicSite("page")` ให้หน้าแรกอัปเดตทันที (ISR)
  */
 
@@ -115,6 +116,23 @@ export async function reorderHeroSlidesAction(formData: FormData): Promise<void>
   }
 }
 
+/**
+ * เติมคำอธิบายภาพสำรองเมื่อผู้ใช้เว้นช่อง alt ว่าง
+ * - ภาพในคลัง `/media/<id>` → ชื่อไฟล์จริงจากตาราง `media` (ไม่พบ = ชื่อกลาง)
+ * - ไฟล์ในโปรเจกต์ → ชื่อไฟล์จากพาธ
+ * ⚠️ การอ่านชื่อไฟล์ล้มเหลวต้องไม่ทำให้บันทึกสไลด์ล้ม — ถอยไปใช้ชื่อกลาง
+ */
+async function resolveHeroAltTh(mediaPath: string, altTh: string): Promise<string> {
+  if (mediaPath === "" || altTh !== "") return altTh;
+  const mediaId = mediaIdFromPath(mediaPath);
+  if (mediaId === "") return fallbackHeroAltTh(mediaPath);
+  try {
+    return fallbackHeroAltTh(mediaPath, await findMediaFilename(mediaId));
+  } catch {
+    return fallbackHeroAltTh(mediaPath);
+  }
+}
+
 /** บันทึกรายละเอียดสไลด์ (ภาพ · คำอธิบาย · จุดโฟกัส · ซูม · เปิด/ปิด) */
 export async function saveHeroSlideAction(formData: FormData): Promise<void> {
   const user = await requireAdminUser("content");
@@ -122,7 +140,7 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
   if (id === "") return;
 
   const mediaPath = typeof formData.get("mediaPath") === "string" ? String(formData.get("mediaPath")).trim() : "";
-  const altTh = typeof formData.get("altTh") === "string" ? String(formData.get("altTh")).trim() : "";
+  const altThInput = typeof formData.get("altTh") === "string" ? String(formData.get("altTh")).trim() : "";
   const altEn = typeof formData.get("altEn") === "string" ? String(formData.get("altEn")).trim() : "";
   const focusId = typeof formData.get("focus") === "string" ? String(formData.get("focus")) : "";
   const preset = HERO_FOCUS_PRESETS.find((item) => item.id === focusId) ?? HERO_FOCUS_PRESETS[4];
@@ -132,7 +150,8 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
 
   /* ภาพว่าง = ยังไม่เลือก (ยอมให้บันทึกได้ แต่จะไม่แสดงบนหน้าเว็บ) · ใส่พาธที่ผิดรูปแบบ = ไม่บันทึก */
   if (mediaPath !== "" && !isLocalMediaPath(mediaPath)) return;
-  if (altTh === "" && mediaPath !== "") return;
+  /* alt ว่าง = ยอมรับ (เจ้าของเลือก 2026-11-10) แล้วเติมชื่อไฟล์ให้อัตโนมัติ */
+  const altTh = await resolveHeroAltTh(mediaPath, altThInput);
 
   const ok = await updateHeroPageSlide(
     id,

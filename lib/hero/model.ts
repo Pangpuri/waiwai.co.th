@@ -56,6 +56,35 @@ export function mergeHeroSlideDraft(base: HeroSlideDraft, patch: Partial<HeroSli
   };
 }
 
+/** alt สำรองเมื่อผู้ใช้เว้นคำอธิบายภาพว่าง (ไม่ปล่อยให้ภาพไม่มีคำอธิบาย) */
+export const DEFAULT_HERO_ALT_TH = "ภาพสไลด์หน้าแรก";
+
+/** ดึง id ของภาพในคลังจากพาธ `/media/<id>` (พาธอื่นคืนสตริงว่าง) */
+export function mediaIdFromPath(mediaPath: string): string {
+  const match = /^\/media\/([A-Za-z0-9_-]+)$/.exec(mediaPath.trim());
+  return match?.[1] ?? "";
+}
+
+/** ชื่อไฟล์ → คำอธิบายภาพแบบอ่านง่าย (ตัดโฟลเดอร์/นามสกุลออก) */
+export function altFromFilename(filename: string): string {
+  const base = filename.trim().split(/[\\/]/).pop() ?? "";
+  return base.replace(/\.[a-z0-9]+$/i, "").trim();
+}
+
+/**
+ * คำอธิบายภาพสำรอง: ใช้ชื่อไฟล์จริงของภาพก่อน · ถ้าเป็นภาพในคลังและหาไม่พบ ใช้ชื่อกลาง
+ *
+ * ใช้ตอนบันทึกเมื่อผู้ใช้เว้นช่อง alt ว่าง — เจ้าของเลือก (2026-11-10) ว่า
+ * "เว้นว่างได้ แต่ต้องมีชื่อภาพไว้แสดงผล" ⇒ ไม่ปล่อย alt ว่างและไม่ต้องแก้ schema
+ */
+export function fallbackHeroAltTh(mediaPath: string, mediaFilename: string | null = null): string {
+  if (mediaPath.trim() === "") return "";
+  const fromMedia = altFromFilename(mediaFilename ?? "");
+  if (fromMedia !== "") return fromMedia;
+  if (mediaIdFromPath(mediaPath) !== "") return DEFAULT_HERO_ALT_TH;
+  return altFromFilename(mediaPath) || DEFAULT_HERO_ALT_TH;
+}
+
 /** ค่าที่รับจากฟอร์มหลังบ้าน (ยังไม่ผ่านการตรวจ) */
 export type HeroSlideInput = {
   readonly mediaPath: string;
@@ -95,7 +124,9 @@ export function isLocalMediaPath(value: string): boolean {
 
 /**
  * ตรวจค่าที่ส่งมาจากฟอร์ม/เบราว์เซอร์ก่อนบันทึก (ไม่เชื่อข้อมูลที่มาจากข้างนอก)
- * - ภาพต้องเป็นพาธในเว็บ · **alt ไทยต้องมี** (a11y + ด่าน check:content ของโปรเจกต์) · อังกฤษไม่บังคับแต่ถ้ามีต้องคู่กัน
+ * - ภาพต้องเป็นพาธในเว็บ · **alt ไทยต้องมี** สำหรับผู้เรียกที่ไม่มีข้อมูลชื่อไฟล์ (เช่น ตัวนำเข้า)
+ *   · หน้าจอหลังบ้านเว้นว่างได้ แล้วใช้ `fallbackHeroAltTh()` เติมชื่อไฟล์ก่อนบันทึก (เจ้าของเลือก 2026-11-10)
+ * - อังกฤษไม่บังคับแต่ถ้ามีต้องคู่กัน
  * - ช่วงค่าถูก "บีบ" ไม่ "ปฏิเสธ" (ผู้ใช้เลื่อนแถบแล้วเกินขอบไม่ควรถูกด่า)
  */
 export function parseHeroSlideInput(raw: unknown): HeroSlideParseOutcome {
