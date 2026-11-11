@@ -8,6 +8,7 @@ import { saveProductAction, uploadProductImageAction } from "@/app/admin/product
 import { INITIAL_ADMIN_UPLOAD_STATE, INITIAL_PRODUCT_SAVE_STATE } from "@/features/admin/product-state";
 import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { ImageFileInput } from "@/features/admin/ui/image-file-input";
+import { ImageGridPicker } from "@/features/admin/ui/image-grid-picker";
 import { ProductListSection, type ProductListStrings } from "@/features/products/ui/product-list";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
@@ -120,6 +121,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
   /* ภาษาของพรีวิว (รอบที่ 141) — การตลาดใส่ EN เองแล้วต้องเห็นว่าหน้า EN ออกมาอย่างไร */
   const [previewLanguage, setPreviewLanguage] = useState<"th" | "en">(props.language);
   const [uploading, setUploading] = useState(false);
+  const [pickingImage, setPickingImage] = useState(false);
 
   function setField(key: keyof typeof fields, value: string): void {
     setFields((current) => ({ ...current, [key]: value }));
@@ -453,19 +455,33 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
               )}
             </span>
             <div className="min-w-56 flex-1">
-              <select
-                name="imagePath"
-                value={fields.imagePath}
-                onChange={(event) => setField("imagePath", event.target.value)}
-                className={INPUT_CLASS}
-              >
-                <option value="">{m.adminProductsFieldNoImage}</option>
-                {props.library.map((item) => (
-                  <option key={item.id} value={item.path}>
-                    {item.filename}
-                  </option>
-                ))}
-              </select>
+              <input type="hidden" name="imagePath" value={fields.imagePath} />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPickingImage((current) => !current)}
+                  className={BUTTON_CLASS}
+                >
+                  {pickingImage ? m.adminProductsCancelLibrary : m.adminProductsPickFromLibrary}
+                </button>
+                {fields.imagePath === "" ? null : (
+                  <button type="button" onClick={() => setField("imagePath", "")} className={BUTTON_CLASS}>
+                    {m.adminProductsClearImage}
+                  </button>
+                )}
+              </div>
+              {pickingImage ? (
+                <div className="border-line mt-2 rounded-lg border p-2">
+                  <ImageGridPicker
+                    library={props.library}
+                    noImages={m.adminProductsNoLibraryImages}
+                    onPick={(mediaId) => {
+                      setField("imagePath", `/media/${mediaId}`);
+                      setPickingImage(false);
+                    }}
+                  />
+                </div>
+              ) : null}
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <div className="min-w-48 flex-1">
                   <ImageFileInput

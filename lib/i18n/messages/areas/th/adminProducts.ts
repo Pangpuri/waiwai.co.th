@@ -96,4 +96,8 @@ export const adminProducts = {
   adminProductsCategorySave: "บันทึกหมวดนี้",
   adminProductsCategorySaved: "บันทึกคำอธิบายหมวดแล้ว",
   adminProductsCategoryError: "บันทึกหมวดไม่ได้ — ลองอีกครั้ง",
+  adminProductsPickFromLibrary: "เลือกจากคลังภาพ",
+  adminProductsCancelLibrary: "ปิดคลังภาพ",
+  adminProductsNoLibraryImages: "ยังไม่มีภาพในคลัง",
+  adminProductsClearImage: "ไม่ใช้ภาพ",
 };

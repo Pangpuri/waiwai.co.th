@@ -6,6 +6,7 @@ import { useState } from "react";
 import { uploadProductImageAction } from "@/app/admin/products/actions";
 import { INITIAL_ADMIN_UPLOAD_STATE } from "@/features/admin/product-state";
 import { ImageFileInput } from "@/features/admin/ui/image-file-input";
+import { ImageGridPicker } from "@/features/admin/ui/image-grid-picker";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { mediaIdFromPath } from "@/lib/media/usage";
 
@@ -39,6 +40,7 @@ export function CategoryImagePicker(props: CategoryImagePickerProps) {
   const m = props.strings;
   const [uploading, setUploading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   /** อัปโหลดภาพจากเครื่อง — เรียก Server Action เอง (ห้าม `<form>` ซ้อน) */
   async function submitUpload(event: React.MouseEvent<HTMLButtonElement>): Promise<void> {
@@ -85,19 +87,29 @@ export function CategoryImagePicker(props: CategoryImagePickerProps) {
             />
           )}
         </div>
-        <select
-          name={props.name}
-          value={props.value}
-          onChange={(event) => props.onChange(event.target.value)}
-          className={`${INPUT_CLASS} mt-2`}
-        >
-          <option value="">{m.noImageHint}</option>
-          {props.library.map((item) => (
-            <option key={item.id} value={item.path}>
-              {item.filename}
-            </option>
-          ))}
-        </select>
+        <input type="hidden" name={props.name} value={props.value} />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setPicking((current) => !current)} className={BUTTON_CLASS}>
+            {picking ? m.cancelLibrary : m.pickFromLibrary}
+          </button>
+          {props.value === "" ? null : (
+            <button type="button" onClick={() => props.onChange("")} className={BUTTON_CLASS}>
+              {m.clearImage}
+            </button>
+          )}
+        </div>
+        {picking ? (
+          <div className="border-line mt-2 rounded-lg border p-2">
+            <ImageGridPicker
+              library={props.library}
+              noImages={m.noLibraryImages}
+              onPick={(mediaId) => {
+                props.onChange(`/media/${mediaId}`);
+                setPicking(false);
+              }}
+            />
+          </div>
+        ) : null}
       </label>
       <p className="text-fg-muted mt-1 text-[11px]">{props.hint}</p>
       {/* ⚠️ ปุ่มอยู่ใน `<div>` เดียวกับช่องไฟล์ ⇒ handler หา input ด้วย closest("div") ได้ */}

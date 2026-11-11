@@ -101,4 +101,8 @@ export const enAdminCategories = {
   uploadHint: "PNG/JPEG/WebP · up to 5MB (resized automatically)",
   uploading: "Uploading…",
   uploadFailed: "Upload failed - check the file type/size",
+  pickFromLibrary: "Choose from library",
+  cancelLibrary: "Close library",
+  noLibraryImages: "No images in the library yet",
+  clearImage: "No image",
 };

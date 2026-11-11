@@ -99,4 +99,8 @@ export const adminProducts: Pick<Messages["admin"], keyof typeof thAdminProducts
   adminProductsCategorySave: "Save this category",
   adminProductsCategorySaved: "Category description saved.",
   adminProductsCategoryError: "Cannot save the category - please try again.",
+  adminProductsPickFromLibrary: "Choose from library",
+  adminProductsCancelLibrary: "Close library",
+  adminProductsNoLibraryImages: "No images in the library yet",
+  adminProductsClearImage: "No image",
 };

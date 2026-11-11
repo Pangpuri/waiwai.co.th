@@ -102,4 +102,8 @@ export const thAdminCategories = {
   uploadHint: "PNG/JPEG/WebP · ไม่เกิน 5MB (ระบบย่อให้เอง)",
   uploading: "กำลังอัปโหลด…",
   uploadFailed: "อัปโหลดไม่สำเร็จ — ตรวจชนิด/ขนาดไฟล์",
+  pickFromLibrary: "เลือกจากคลังภาพ",
+  cancelLibrary: "ปิดคลังภาพ",
+  noLibraryImages: "ยังไม่มีภาพในคลัง",
+  clearImage: "ไม่ใช้ภาพ",
 };

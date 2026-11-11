@@ -81,6 +81,7 @@ const listPage = codeOf("app/admin/products/page.tsx");
 const editorPage = readFileSync("app/admin/products/[id]/page.tsx", "utf8");
 const editorForm = readFileSync("features/admin/ui/product-editor-form.tsx", "utf8");
 const categoryForm = readFileSync("features/admin/ui/product-category-form.tsx", "utf8");
+const categoryImagePicker = readFileSync("features/admin/ui/category-image-picker.tsx", "utf8");
 const publicList = readFileSync("features/products/ui/product-list.tsx", "utf8");
 
 /** นับแท็กฟอร์มจริง (`<form` + ช่องว่าง/ขึ้นบรรทัดใหม่) — ไม่นับที่พูดถึงในคอมเมนต์ */
@@ -135,6 +136,15 @@ test("products admin: อัปโหลดภาพจากเครื่อ�
   assert.ok(actions.includes("storeImageFile("), "ต้องใช้ท่ออัปโหลดกลาง");
   assert.ok(editorForm.includes("ImageFileInput"), "ช่องอัปโหลดสินค้าต้องใช้ ImageFileInput (ย่อภาพในเบราว์เซอร์ก่อนส่ง)");
   assert.ok(categoryForm.includes("ImageFileInput"), "ช่องอัปโหลดภาพหมวดต้องใช้ ImageFileInput ด้วย");
+});
+
+test("products admin: เลือกภาพจากคลังต้องเห็นรูปจริง (ไม่ใช่ dropdown ชื่อไฟล์)", () => {
+  assert.ok(editorForm.includes("ImageGridPicker"), "จอสินค้าต้องใช้ตารางภาพจริง");
+  assert.ok(editorForm.includes("adminProductsPickFromLibrary"), "ต้องมีปุ่มเปิดคลังภาพ");
+  assert.ok(!editorForm.includes('name="imagePath"\n                value='), "ห้ามใช้ select ชื่อไฟล์เป็นตัวเลือกภาพ");
+  assert.ok(categoryImagePicker.includes("ImageGridPicker"), "ช่องภาพหมวดต้องใช้ตารางภาพจริง");
+  assert.ok(categoryImagePicker.includes("pickFromLibrary"), "ต้องมีปุ่มเปิดคลังภาพ");
+  assert.ok(!categoryImagePicker.includes("<select"), "ห้ามใช้ select ชื่อไฟล์เป็นตัวเลือกภาพ");
 });
 
 test("products admin: พรีวิวต้องใช้ตัวเรนเดอร์เดียวกับหน้าเว็บจริง (กัน 'พรีวิวโกหก')", () => {
