@@ -4,7 +4,7 @@ import Link from "next/link";
 import { fillTemplate } from "@/lib/i18n/template";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
-import { newsPathOfSourceId } from "@/lib/news/model";
+import { formatNewsDate, formatViewCount, newsPathOfSourceId } from "@/lib/news/model";
 import type { NewsRecord } from "@/lib/news/repository";
 
 /**
@@ -19,6 +19,8 @@ export type NewsListStrings = {
   readonly listTitle: string;
   readonly count: string;
   readonly readMore: string;
+  readonly published: string;
+  readonly views: string;
   readonly noCover: string;
   readonly previous: string;
   readonly next: string;
@@ -30,6 +32,8 @@ export function newsListStringsOf(page: Messages["newsPage"]): NewsListStrings {
     listTitle: page.dbListTitle,
     count: page.dbListCount,
     readMore: page.dbReadMore,
+    published: page.dbPublished,
+    views: page.dbViewCount,
     noCover: page.dbNoCover,
     previous: page.dbPrevious,
     next: page.dbNext,
@@ -52,6 +56,8 @@ export function NewsCard({
   readonly strings: NewsListStrings;
 }) {
   const title = titleOf(record, language);
+  const published = formatNewsDate(record.publishedLocal, language);
+  const views = fillTemplate(strings.views, { count: formatViewCount(record.viewCount, language) });
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-bg">
@@ -73,10 +79,15 @@ export function NewsCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-5">
-        {/*
-          รอบ 342 (เจ้าของยืนยัน): การ์ดข่าวเหลือ **เฉพาะพาดหัวตัวหนา** — ซ่อนวันที่/คำโปรย/ปุ่มอ่านต่อ
-          ⇒ เห็นหัวข้อชัดที่สุด และไม่ต้องแสดงข้อมูลซ้ำกับหน้ารายละเอียด
-        */}
+        {/* รอบ 342 ต่อ (คำเจ้าของ): ใต้ภาพแสดงวันที่เผยแพร่ + จำนวนเข้าชม */}
+        <div className="text-fg-muted mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {published === "" ? null : (
+            <time dateTime={record.publishedLocal ?? undefined}>
+              {`${strings.published} ${published}`}
+            </time>
+          )}
+          <span>{views}</span>
+        </div>
         <h3 className="text-base leading-snug font-bold text-fg">
           <Link href={localePath(language, newsPathOfSourceId(record.sourceId))} className="hover:underline">
             {title}

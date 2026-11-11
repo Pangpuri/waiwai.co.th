@@ -225,3 +225,13 @@ test("recipes/news/careers page copy: แยกคีย์ต่อหน้า
   assert.ok(adminCareers.includes("<PageCopyForm"));
   assert.ok(adminCareers.includes("saveCareersPageCopyAction"));
 });
+
+test("news cards: ใต้ภาพมีวันที่เผยแพร่ + จำนวนเข้าชม", () => {
+  const source = readFileSync("features/news/ui/news-list.tsx", "utf8");
+  assert.ok(source.includes("formatNewsDate(record.publishedLocal"));
+  assert.ok(source.includes("formatViewCount(record.viewCount"));
+  assert.ok(source.includes("published: page.dbPublished"));
+  assert.ok(source.includes("views: page.dbViewCount"));
+  assert.ok(source.includes("strings.published"));
+  assert.ok(source.includes("strings.views"));
+});
