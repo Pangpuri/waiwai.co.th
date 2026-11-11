@@ -141,7 +141,7 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
 
   const mediaPath = typeof formData.get("mediaPath") === "string" ? String(formData.get("mediaPath")).trim() : "";
   const localeRaw = typeof formData.get("locale") === "string" ? String(formData.get("locale")).trim() : "";
-  const locale = isHeroSlideLocale(localeRaw) ? localeRaw : "all";
+  const locale = isHeroSlideLocale(localeRaw) ? localeRaw : "th";
   const altThInput = typeof formData.get("altTh") === "string" ? String(formData.get("altTh")).trim() : "";
   const altEn = typeof formData.get("altEn") === "string" ? String(formData.get("altEn")).trim() : "";
   const focusId = typeof formData.get("focus") === "string" ? String(formData.get("focus")) : "";

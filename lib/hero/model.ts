@@ -16,7 +16,7 @@ import { HERO_ZOOM_MAX, HERO_ZOOM_MIN } from "@/lib/blocks/types";
 export const MAX_HERO_PAGE_SLIDES = 6;
 
 /** สไลด์หนึ่งใบของหน้าแรก */
-export const HERO_SLIDE_LOCALES = ["all", "th", "en"] as const;
+export const HERO_SLIDE_LOCALES = ["th", "en"] as const;
 export type HeroSlideLocale = (typeof HERO_SLIDE_LOCALES)[number];
 
 export function isHeroSlideLocale(value: string): value is HeroSlideLocale {
@@ -26,7 +26,7 @@ export function isHeroSlideLocale(value: string): value is HeroSlideLocale {
 export type HeroPageSlide = {
   readonly id: string;
   readonly sortOrder: number;
-  /** ภาษาเป้าหมาย (migration 0049) — ไม่ระบุ = all */
+  /** ภาษาเป้าหมาย (migration 0049/0050) — ไม่ระบุ = ไทย (ข้อมูลเก่า) */
   readonly locale?: HeroSlideLocale;
   readonly mediaPath: string;
   readonly altTh: string;
@@ -155,7 +155,7 @@ export function parseHeroSlideInput(raw: unknown): HeroSlideParseOutcome {
   if (altEn !== "" && altTh === "") problems.push("altEn: มีคำอธิบายอังกฤษแต่ไม่มีไทย");
 
   const localeRaw = textOf(record["locale"]);
-  const locale: HeroSlideLocale = isHeroSlideLocale(localeRaw) ? localeRaw : "all";
+  const locale: HeroSlideLocale = isHeroSlideLocale(localeRaw) ? localeRaw : "th";
 
   if (problems.length > 0) return { ok: false, problems };
 
@@ -175,24 +175,21 @@ export function parseHeroSlideInput(raw: unknown): HeroSlideParseOutcome {
 }
 
 /** เรียงสไลด์ตามลำดับที่ตั้งไว้ (ค่าน้อยก่อน · ลำดับเท่ากันใช้ id ให้ผลนิ่ง) */
-/** อ่านค่าภาษาจากค่าดิบ (ไม่รู้จัก = all) */
+/** อ่านค่าภาษาจากค่าดิบ (ไม่รู้จัก = ไทย) */
 function textOf(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
 /**
- * เลือกสไลด์ที่แสดงตามภาษา:
- * - มีสไลด์เฉพาะภาษานั้น ≥ 1 ใบ → ใช้เฉพาะของภาษานั้น
- * - ไม่มี → ใช้สไลด์ all (พฤติกรรมเดิม)
- * ⇒ สไลด์ EN 1 ใบ = ภาพเดี่ยว ไม่มีปุ่มสไลด์
+ * เลือกสไลด์ที่แสดงตามภาษา — **หนึ่งสไลด์อยู่ได้ภาษาหรือภาษาเดียว**
+ * (รอบ 342 ต่อ: ตัดตัวเลือก "ทั้งสองภาษา" ออก เพราะอ่านแล้วสับสนกับพฤติกรรมเดิม)
+ * → คืนเฉพาะสไลด์ของภาษานั้น · ไม่มี = คืน [] (หน้าเว็บถอยไปใช้เทมเพลตเดิม)
  */
 export function selectHeroSlidesForLocale(
   slides: readonly HeroPageSlide[],
   locale: "th" | "en",
 ): readonly HeroPageSlide[] {
-  const specific = slides.filter((slide) => slide.locale === locale);
-  if (specific.length > 0) return specific;
-  return slides.filter((slide) => (slide.locale ?? "all") === "all");
+  return slides.filter((slide) => (slide.locale ?? "th") === locale);
 }
 
 export function sortHeroPageSlides(slides: readonly HeroPageSlide[]): readonly HeroPageSlide[] {

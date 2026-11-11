@@ -7,7 +7,7 @@ import { isProductMarket, validateProductInput } from "@/lib/products/model";
 import { productHasDetails } from "@/lib/products/display";
 import { parseProductsPageCopy, PRODUCTS_PAGE_COPY_KEY } from "@/lib/products/page-copy-model";
 import { parseYouTubeViewCount } from "@/lib/recipes/youtube-views";
-import { selectHeroSlidesForLocale, type HeroPageSlide } from "@/lib/hero/model";
+import { isHeroSlideLocale, selectHeroSlidesForLocale, type HeroPageSlide } from "@/lib/hero/model";
 import {
   NEWS_VIEW_DEDUPE_MS,
   parseNewsViewMarks,
@@ -121,14 +121,20 @@ const slide = (id: string, locale: HeroPageSlide["locale"]): HeroPageSlide => ({
   isActive: true,
 });
 
-test("hero locale: มีสไลด์เฉพาะภาษา = ใช้เฉพาะภาษานั้น · ไม่มี = ถอย all", () => {
-  const mixed = [slide("all", "all"), slide("th", "th"), slide("en", "en")];
+test("hero locale: เหลือ 2 ภาษา · สไลด์แยกไทย/อังกฤษชัดเจน ไม่มี all", () => {
+  const mixed = [slide("th", "th"), slide("en", "en")];
   assert.deepEqual(selectHeroSlidesForLocale(mixed, "th").map((s) => s.id), ["th"]);
   assert.deepEqual(selectHeroSlidesForLocale(mixed, "en").map((s) => s.id), ["en"]);
 
-  const onlyAll = [slide("a", "all"), slide("b", "all")];
-  assert.deepEqual(selectHeroSlidesForLocale(onlyAll, "en").map((s) => s.id), ["a", "b"]);
+  /* ข้อมูลเก่าที่ไม่มี locale = ถือเป็นไทย (ไม่หายจากหน้าไทย) */
+  const legacy = [{ ...slide("legacy", "th"), locale: undefined }];
+  assert.deepEqual(selectHeroSlidesForLocale(legacy, "th").map((s) => s.id), ["legacy"]);
+  assert.deepEqual(selectHeroSlidesForLocale(legacy, "en"), []);
   assert.deepEqual(selectHeroSlidesForLocale([], "th"), []);
+
+  assert.equal(isHeroSlideLocale("all"), false);
+  assert.equal(isHeroSlideLocale("th"), true);
+  assert.equal(isHeroSlideLocale("en"), true);
 });
 
 /* ── 342: สิทธิ์นับวิว (least privilege) ─────────────────────────────────── */

@@ -42,7 +42,7 @@ function toSlide(row: HeroSlideRow): HeroPageSlide {
   return {
     id: row.id,
     sortOrder: row.sort_order,
-    locale: isHeroSlideLocale(row.locale) ? row.locale : "all",
+    locale: isHeroSlideLocale(row.locale) ? row.locale : "th",
     mediaPath: row.media_path,
     altTh: row.alt_th,
     altEn: row.alt_en,
@@ -118,7 +118,7 @@ export async function saveHeroPageSlide(
     [
       slide.id,
       slide.sortOrder,
-      slide.locale ?? "all",
+      slide.locale ?? "th",
       slide.mediaPath,
       slide.altTh,
       slide.altEn,
@@ -143,7 +143,7 @@ export async function createHeroPageSlide(actor: string): Promise<string | null>
   const id = `hero-${Date.now().toString(36)}`;
   const result = await getPool().query(
     `insert into hero_slide (id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
-     values ($1, (select coalesce(max(sort_order), 0) + 10 from hero_slide), 'all', '', '', '', 50, 50, 1, true, $2)
+     values ($1, (select coalesce(max(sort_order), 0) + 10 from hero_slide), 'th', '', '', '', 50, 50, 1, true, $2)
      on conflict (id) do nothing`,
     [id, actor],
   );

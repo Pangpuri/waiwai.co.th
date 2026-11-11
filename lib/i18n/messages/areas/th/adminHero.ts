@@ -18,7 +18,6 @@ export const adminHero = {
   heroAdminImage: "ที่อยู่ภาพ",
   heroAdminAltTh: "คำอธิบายภาพ (ไทย)",
   heroAdminLocale: "แสดงภาษา",
-  heroLocaleAll: "ทั้งสองภาษา",
   heroLocaleTh: "เฉพาะภาษาไทย",
   heroLocaleEn: "เฉพาะภาษาอังกฤษ",
   heroAdminAltEn: "คำอธิบายภาพ (อังกฤษ)",
