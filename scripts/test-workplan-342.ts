@@ -207,16 +207,21 @@ test("products page copy: อ่าน/ตัดช่องว่าง/จำ�
   assert.deepEqual(parseProductsPageCopy({ eyebrow: { th: "x".repeat(200) } })?.eyebrow.th.length, 80);
 });
 
-test("recipes/news page copy: แยกคีย์ต่อหน้า + ฟอร์มหลังบ้านผูกครบ", () => {
+test("recipes/news/careers page copy: แยกคีย์ต่อหน้า + ฟอร์มหลังบ้านผูกครบ", () => {
   const recipes = readFileSync("lib/recipes/page-copy.ts", "utf8");
   const news = readFileSync("lib/news/page-copy.ts", "utf8");
+  const careers = readFileSync("lib/careers/page-copy.ts", "utf8");
   assert.ok(recipes.includes('RECIPES_PAGE_COPY_KEY = "recipes-page-copy"'));
   assert.ok(news.includes('NEWS_PAGE_COPY_KEY = "news-page-copy"'));
+  assert.ok(careers.includes('CAREERS_PAGE_COPY_KEY = "careers-page-copy"'));
 
   const adminRecipes = readFileSync("app/admin/recipes/page.tsx", "utf8");
   const adminNews = readFileSync("app/admin/news/page.tsx", "utf8");
+  const adminCareers = readFileSync("app/admin/careers/page.tsx", "utf8");
   assert.ok(adminRecipes.includes("<PageCopyForm"));
   assert.ok(adminRecipes.includes("saveRecipesPageCopyAction"));
   assert.ok(adminNews.includes("<PageCopyForm"));
   assert.ok(adminNews.includes("saveNewsPageCopyAction"));
+  assert.ok(adminCareers.includes("<PageCopyForm"));
+  assert.ok(adminCareers.includes("saveCareersPageCopyAction"));
 });

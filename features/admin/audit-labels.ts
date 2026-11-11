@@ -60,6 +60,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "products-page-copy-save": "แก้ข้อความหัวหน้าผลิตภัณฑ์",
     "recipes-page-copy-save": "แก้ข้อความหัวหน้าเมนูอาหาร",
     "news-page-copy-save": "แก้ข้อความหัวหน้าข่าวสาร",
+    "careers-page-copy-save": "แก้ข้อความหัวหน้าร่วมงานกับไวไว",
     /* หมวดสินค้า (มติ D25 · รอบที่ 264) — ป้ายเป็นข้อความตรง ๆ (พื้นที่ admin ชนเพดานแล้ว) */
     "product-category-create": "เพิ่มหมวดสินค้า",
     "product-category-hide": "ซ่อน/แสดงหมวดสินค้า",

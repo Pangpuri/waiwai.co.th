@@ -76,6 +76,8 @@ export const adminCareers = {
   previewHeading: "Preview on the site",
   previewHint: "This card uses the same renderer as /careers — changes appear as you type",
   notSpecifiedPreview: "Not specified",
+  careersPageCopyTitle: "Careers page heading text",
+  careersPageCopyHint: "This text appears at the top of /careers in Thai and English — leave a field empty to keep the existing dictionary text for that language",
 };
 
 export type AdminCareersMessages = typeof adminCareers;

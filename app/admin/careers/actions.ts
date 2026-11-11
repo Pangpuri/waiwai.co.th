@@ -25,7 +25,10 @@ import {
   type JobWriteInput,
 } from "@/lib/careers/repository";
 import { reorderRows } from "@/lib/admin/reorder";
+import { parsePageCopy } from "@/lib/page-copy/model";
+import { saveAndPublishCareersPageCopy } from "@/lib/careers/page-copy";
 import type { JobFormState, JobReorderState } from "@/features/admin/careers-state";
+import type { PageCopyState } from "@/features/admin/page-copy-state";
 
 /**
  * Server Action ของหลังบ้าน "ประกาศรับสมัครงาน" (/admin/careers) — รอบที่ 265 · มติเจ้าของ D26
@@ -39,6 +42,38 @@ import type { JobFormState, JobReorderState } from "@/features/admin/careers-sta
  */
 
 const LIST_PATH = "/admin/careers";
+
+/** ข้อความหัวหน้า /careers — บันทึก + เผยแพร่ทันที (รอบ 342) */
+export async function saveCareersPageCopyAction(
+  _previous: PageCopyState,
+  formData: FormData,
+): Promise<PageCopyState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database" };
+
+  const copy = parsePageCopy({
+    eyebrow: { th: field(formData, "eyebrowTh"), en: field(formData, "eyebrowEn") },
+    title: { th: field(formData, "titleTh"), en: field(formData, "titleEn") },
+    intro: { th: field(formData, "introTh"), en: field(formData, "introEn") },
+  });
+  if (copy === null) return { status: "error", reason: "invalid" };
+
+  try {
+    await saveAndPublishCareersPageCopy(copy, user.email);
+  } catch {
+    return { status: "error", reason: "database" };
+  }
+
+  await recordAudit({
+    action: "careers-page-copy-save",
+    actorEmail: user.email,
+    target: "careers-page-copy",
+    detail: "published",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: "" };
+}
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);

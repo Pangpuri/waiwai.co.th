@@ -1,7 +1,13 @@
 import Link from "next/link";
 
-import { deleteJobForeverAction, reorderJobsAction, trashJobAction } from "@/app/admin/careers/actions";
+import {
+  deleteJobForeverAction,
+  reorderJobsAction,
+  saveCareersPageCopyAction,
+  trashJobAction,
+} from "@/app/admin/careers/actions";
 import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
+import { PageCopyForm } from "@/features/admin/ui/page-copy-form";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -9,6 +15,7 @@ import { jobDepartment, jobStats, type JobPosting } from "@/lib/careers/model";
 import { listJobPostingsForAdmin, type AdminJobPosting } from "@/lib/careers/repository";
 import { SortableList } from "@/features/admin/ui/sortable-list";
 import { searchParamText } from "@/lib/search/params";
+import { loadCareersPageCopyForEditing } from "@/lib/careers/page-copy";
 
 /**
  * หลังบ้าน — "ประกาศรับสมัครงาน" ของหน้า /careers (รอบที่ 265 · มติเจ้าของ D26)
@@ -61,7 +68,7 @@ export default async function AdminCareersPage({
   const tab = tabOf(searchParamText(query.tab));
   const search = searchParamText(query.q, 80);
 
-  const all = await listJobPostingsForAdmin();
+  const [all, careersPageCopy] = await Promise.all([listJobPostingsForAdmin(), loadCareersPageCopyForEditing()]);
   const visible = all.filter((posting) => inTab(posting, tab) && matches(posting, search));
   const active = all.filter((posting) => posting.deletedAt === null);
   const stats = jobStats(active);
@@ -122,6 +129,26 @@ export default async function AdminCareersPage({
           {m.newPosting}
         </Link>
       </div>
+
+      <PageCopyForm
+        initial={careersPageCopy}
+        action={saveCareersPageCopyAction}
+        strings={{
+          title: m.careersPageCopyTitle,
+          hint: m.careersPageCopyHint,
+          eyebrowTh: messages.admin.pageCopyFieldEyebrowTh,
+          eyebrowEn: messages.admin.pageCopyFieldEyebrowEn,
+          titleTh: messages.admin.pageCopyFieldTitleTh,
+          titleEn: messages.admin.pageCopyFieldTitleEn,
+          introTh: messages.admin.pageCopyFieldIntroTh,
+          introEn: messages.admin.pageCopyFieldIntroEn,
+          save: messages.admin.pageCopySave,
+          saving: messages.admin.pageCopySaving,
+          saved: messages.admin.pageCopySaved,
+          invalid: messages.admin.pageCopyInvalid,
+          failed: messages.admin.pageCopyFailed,
+        }}
+      />
 
       {/* SEO ของหน้า /careers — ตัว builder ถูกถอด (รอบ 266) แต่หน้านี้มี URL จริง */}
       <AdminPageSeoSection pageId="careers" messages={messages} role={user.role} className="mt-6" />

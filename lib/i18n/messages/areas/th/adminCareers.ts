@@ -79,6 +79,8 @@ export const adminCareers = {
   previewHeading: "ตัวอย่างบนหน้าเว็บ",
   previewHint: "การ์ดนี้ใช้ตัวเรนเดอร์เดียวกับหน้า /careers — พิมพ์แล้วเห็นทันที",
   notSpecifiedPreview: "ไม่ระบุ",
+  careersPageCopyTitle: "ข้อความหัวหน้าร่วมงานกับไวไว",
+  careersPageCopyHint: "ข้อความนี้แสดงด้านบนหน้า /careers ทั้งภาษาไทยและอังกฤษ — เว้นว่างช่องใด = ใช้ข้อความเดิมของภาษานั้น",
 };
 
 export type AdminCareersMessages = typeof adminCareers;

@@ -34,6 +34,8 @@ export type AuditAction =
   | "recipes-page-copy-save"
   /** ข้อความหัวหน้า /news (รอบ 342) */
   | "news-page-copy-save"
+  /** ข้อความหัวหน้า /careers (รอบ 342) */
+  | "careers-page-copy-save"
   /* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/จัดลำดับ/พรีเซ็ต (มติ D25 · รอบที่ 264) */
   | "product-category-create"
   | "product-category-hide"

@@ -9,6 +9,7 @@ import { JOBS } from "@/features/careers/jobs";
 import { isDatabaseConfigured } from "@/db/pool";
 import { jobTitle } from "@/lib/careers/model";
 import { listJobPostings } from "@/lib/careers/repository";
+import { loadCareersPageCopy } from "@/lib/careers/page-copy";
 import { ApplicationForm } from "@/features/careers/ui/application-form";
 import { JobBoard } from "@/features/careers/ui/job-board";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
@@ -76,8 +77,11 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
     ข้อความท้ายหน้า (รอบ 337) — ผู้ดูแลแก้จาก `/admin/settings`
     เว้นว่าง = ข้อความเดิมจากพจนานุกรม
   */
-  const siteSettings = await loadSiteSettings(lang);
+  const [siteSettings, pageCopy] = await Promise.all([loadSiteSettings(lang), loadCareersPageCopy(lang)]);
   const careersNotice = resolveNotice(siteSettings.notices.careers, lang, m.note);
+  const eyebrow = resolveNotice(pageCopy.eyebrow, lang, m.eyebrow);
+  const title = resolveNotice(pageCopy.title, lang, m.title);
+  const intro = resolveNotice(pageCopy.intro, lang, m.intro);
 
   /*
     ── "ตำแหน่งที่เปิดรับ" มาจากไหน (รอบที่ 265 · มติ D26) ──────────────────────────
@@ -109,15 +113,15 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
 
           <p className="mt-8 inline-flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-accent uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {m.eyebrow}
+            {eyebrow}
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
-            {m.title}
+            {title}
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            {m.intro}
+            {intro}
           </p>
 
         </div>
