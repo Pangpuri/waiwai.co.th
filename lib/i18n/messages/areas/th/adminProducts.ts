@@ -100,4 +100,5 @@ export const adminProducts = {
   adminProductsCancelLibrary: "ปิดคลังภาพ",
   adminProductsNoLibraryImages: "ยังไม่มีภาพในคลัง",
   adminProductsClearImage: "ไม่ใช้ภาพ",
+  adminProductsAllMarkets: "ทุกประเภท",
 };

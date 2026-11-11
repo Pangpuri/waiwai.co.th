@@ -147,6 +147,15 @@ test("products admin: เลือกภาพจากคลังต้อง�
   assert.ok(!categoryImagePicker.includes("<select"), "ห้ามใช้ select ชื่อไฟล์เป็นตัวเลือกภาพ");
 });
 
+test("products admin: มีตัวกรองสินค้าในประเทศ/ส่งออกหลัง dropdown หมวด", () => {
+  assert.ok(listPage.includes('name="category"'), "ต้องมีตัวกรองหมวด");
+  assert.ok(listPage.includes('name="market"'), "ต้องมีตัวกรองตลาด");
+  assert.ok(listPage.includes("isProductMarket(rawMarket)"), "ต้องตรวจค่าตลาดจาก URL");
+  assert.ok(listPage.includes('market: market === "" ? undefined : market'), "ต้องส่งตัวกรองตลาดลง repository");
+  assert.ok(listPage.includes("m.adminProductsMarketDomestic") && listPage.includes("m.adminProductsMarketExport"));
+  assert.ok(repository.includes("p.market = $"), "ชั้นข้อมูลต้องกรองด้วย p.market");
+});
+
 test("products admin: พรีวิวต้องใช้ตัวเรนเดอร์เดียวกับหน้าเว็บจริง (กัน 'พรีวิวโกหก')", () => {
   assert.ok(
     /import \{ ProductListSection, type ProductListStrings \} from "@\/features\/products\/ui\/product-list"/.test(editorForm),

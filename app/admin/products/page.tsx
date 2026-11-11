@@ -11,7 +11,7 @@ import { listReorderCategoryIds, listReorderItems } from "@/lib/admin/reorder";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { listMedia } from "@/lib/media/repository";
-import { isCatalogCategoryId } from "@/lib/products/model";
+import { isCatalogCategoryId, isProductMarket, type ProductMarket } from "@/lib/products/model";
 import { adminProductCounts, listProductCategoriesForAdmin, listProductsForAdmin, type AdminProductTab } from "@/lib/products/repository";
 import { searchParamText } from "@/lib/search/params";
 import { deleteProductForeverAction, reorderProductsAction, trashProductAction } from "./actions";
@@ -57,12 +57,14 @@ export default async function AdminProductsPage({
   const search = searchParamText(query.q, 80);
   const rawCategory = searchParamText(query.category);
   const categoryId = isCatalogCategoryId(rawCategory) ? rawCategory : "";
+  const rawMarket = searchParamText(query.market);
+  const market: ProductMarket | "" = isProductMarket(rawMarket) ? rawMarket : "";
   const view = viewOf(searchParamText(query.tab));
   /* ลำดับในฐานข้อมูลแยก `sort` ออกจากแท็บของ repository */
   const listTab: AdminProductTab = view === "trash" ? "trash" : "all";
 
   const [listed, categoryRows, media, counts, sortCategoryIds] = await Promise.all([
-    listProductsForAdmin({ categoryId, search, tab: listTab }),
+    listProductsForAdmin({ categoryId, market: market === "" ? undefined : market, search, tab: listTab }),
     listProductCategoriesForAdmin(),
     listMedia(60),
     adminProductCounts(),
@@ -111,6 +113,7 @@ export default async function AdminProductsPage({
       if (sortCategory !== "") params.set("category", sortCategory);
     } else {
       if (categoryId !== "") params.set("category", categoryId);
+      if (market !== "") params.set("market", market);
       if (search !== "") params.set("q", search);
     }
     const queryString = params.toString();
@@ -224,6 +227,18 @@ export default async function AdminProductsPage({
             ))}
           </select>
         </label>
+        <label className="block">
+          <span className="text-fg-muted mb-1 block text-xs font-semibold">{m.adminProductsFieldMarket}</span>
+          <select
+            name="market"
+            defaultValue={market}
+            className="border-line bg-surface text-fg focus-visible:ring-ring rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <option value="">{m.adminProductsAllMarkets}</option>
+            <option value="domestic">{m.adminProductsMarketDomestic}</option>
+            <option value="export">{m.adminProductsMarketExport}</option>
+          </select>
+        </label>
         <label className="block min-w-64 flex-1">
           <span className="text-fg-muted mb-1 block text-xs font-semibold">{m.adminProductsSearch}</span>
           <input
@@ -240,7 +255,7 @@ export default async function AdminProductsPage({
         >
           {m.adminProductsApply}
         </button>
-        {search === "" && categoryId === "" ? null : (
+        {search === "" && categoryId === "" && market === "" ? null : (
           <Link
             href={view === "trash" ? "/admin/products?tab=trash" : "/admin/products"}
             className="text-fg-muted px-2 py-2 text-sm underline underline-offset-4"
@@ -278,6 +293,9 @@ export default async function AdminProductsPage({
               </div>
               <p className="text-fg-muted mt-2 text-xs">
                 {categoryName(item.categoryId)}
+                <span className="border-line bg-bg-subtle ml-2 rounded-full border px-2 py-0.5 text-[11px] font-semibold">
+                  {item.market === "export" ? m.adminProductsMarketExport : m.adminProductsMarketDomestic}
+                </span>
                 {item.trashed ? (
                   <span className="border-line bg-bg-subtle text-fg-muted ml-2 rounded-full border px-2 py-0.5 text-[11px] font-semibold">
                     {m.adminProductsTrashed}

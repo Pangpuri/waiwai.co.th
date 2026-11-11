@@ -103,4 +103,5 @@ export const adminProducts: Pick<Messages["admin"], keyof typeof thAdminProducts
   adminProductsCancelLibrary: "Close library",
   adminProductsNoLibraryImages: "No images in the library yet",
   adminProductsClearImage: "No image",
+  adminProductsAllMarkets: "All markets",
 };
