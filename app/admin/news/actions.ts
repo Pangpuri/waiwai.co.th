@@ -5,6 +5,7 @@ import { newsRestoreOf, newsSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import type { NewsSaveState, NewsUploadState } from "@/features/admin/news-state";
+import type { PageCopyState } from "@/features/admin/page-copy-state";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { revalidateAdminPath } from "@/lib/cache/refresh";
@@ -12,6 +13,8 @@ import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isDatabaseConfigured } from "@/db/pool";
 import { storeImageFile } from "@/lib/media/upload";
 import { parseNewsEditorBlocks } from "@/lib/news/editor-blocks";
+import { parsePageCopy } from "@/lib/page-copy/model";
+import { saveAndPublishNewsPageCopy } from "@/lib/news/page-copy";
 import { validatePageSeo, type PageSeo } from "@/lib/pages/model";
 import {
   createNewsForAdmin,
@@ -36,6 +39,38 @@ import {
  */
 
 const LIST_PATH = "/admin/news";
+
+/** ข้อความหัวหน้า /news — บันทึก + เผยแพร่ทันที (รอบ 342) */
+export async function saveNewsPageCopyAction(
+  _previous: PageCopyState,
+  formData: FormData,
+): Promise<PageCopyState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database" };
+
+  const copy = parsePageCopy({
+    eyebrow: { th: field(formData, "eyebrowTh"), en: field(formData, "eyebrowEn") },
+    title: { th: field(formData, "titleTh"), en: field(formData, "titleEn") },
+    intro: { th: field(formData, "introTh"), en: field(formData, "introEn") },
+  });
+  if (copy === null) return { status: "error", reason: "invalid" };
+
+  try {
+    await saveAndPublishNewsPageCopy(copy, user.email);
+  } catch {
+    return { status: "error", reason: "database" };
+  }
+
+  await recordAudit({
+    action: "news-page-copy-save",
+    actorEmail: user.email,
+    target: "news-page-copy",
+    detail: "published",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: "" };
+}
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);

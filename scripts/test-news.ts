@@ -343,7 +343,7 @@ test("news: หน้ารายการ/หน้าแบ่งหน้า 
   assert.ok(shared.includes("countNews("), "ต้องรู้จำนวนทั้งหมดเพื่อแบ่งหน้า");
   assert.ok(shared.includes("NewsFilter"), "ต้องมีแถวกรอง (ปี พ.ศ. · ล่าสุด/เก่าสุด)");
   assert.ok(!shared.includes("searchParams"), "ห้ามใช้ searchParams ในหน้าจอรวมเช่นกัน");
-  assert.ok(shared.includes("heading={m.title}"), "โหมดบล็อกต้องส่ง heading (a11y · 1 h1 ต่อหน้า)");
+  assert.ok(shared.includes("heading={title}"), "โหมดบล็อกต้องส่ง heading (a11y · 1 h1 ต่อหน้า)");
 
   const pageN = sourceOf("app/[lang]/news/page/[page]/page.tsx");
   assert.ok(pageN.includes("export const revalidate = 300;"));

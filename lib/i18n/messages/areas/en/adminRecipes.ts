@@ -83,4 +83,6 @@ export const adminRecipes: Pick<Messages["admin"], keyof typeof thAdminRecipes> 
   recipesAdminDeleteForeverWarning: "Deleting forever cannot be undone",
   auditRecipeDelete: "Recipe deleted forever",
   auditRecipeRestore: "Recipe restored",
+  recipesPageCopyTitle: "Recipes page heading text",
+  recipesPageCopyHint: "This text appears at the top of /recipes in Thai and English — leave a field empty to keep the existing dictionary text for that language",
 };

@@ -16,8 +16,10 @@ import {
   type NewsListView,
 } from "@/lib/news/list-view";
 import { countNews, listNews, listNewsYears, NEWS_PER_PAGE } from "@/lib/news/repository";
+import { loadNewsPageCopy } from "@/lib/news/page-copy";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /**
  * **หน้ารายการข่าวที่ใช้ร่วมกันทุกมุมมอง** (รอบที่ 271 · มติเจ้าของ D29)
@@ -68,6 +70,10 @@ export async function newsViewMetadata(lang: Locale, view: NewsListView): Promis
 export async function NewsListViewPage({ lang, view }: { readonly lang: Locale; readonly view: NewsListView }) {
   const messages = await getMessages(lang);
   const m = messages.newsPage;
+  const pageCopy = await loadNewsPageCopy(lang);
+  const eyebrow = resolveNotice(pageCopy.eyebrow, lang, m.eyebrow);
+  const title = resolveNotice(pageCopy.title, lang, m.title);
+  const intro = resolveNotice(pageCopy.intro, lang, m.intro);
 
   const offset = (view.page - 1) * NEWS_PER_PAGE;
   /*
@@ -109,13 +115,13 @@ export async function NewsListViewPage({ lang, view }: { readonly lang: Locale; 
   if (liveDocument !== null) {
     return (
       <>
-        <BlockDocumentView document={liveDocument} language={lang} heading={m.title} />
+        <BlockDocumentView document={liveDocument} language={lang} heading={title} />
         {listSection}
       </>
     );
   }
 
-  const crumbLabel = view.year === null ? m.title : `${m.title} · ${String(view.year + 543)}`;
+  const crumbLabel = view.year === null ? title : `${title} · ${String(view.year + 543)}`;
 
   return (
     <>
@@ -136,14 +142,14 @@ export async function NewsListViewPage({ lang, view }: { readonly lang: Locale; 
 
           <p className="mt-8 inline-flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-accent uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {m.eyebrow}
+            {eyebrow}
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
-            {m.title}
+            {title}
           </h1>
 
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">{m.intro}</p>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">{intro}</p>
 
         </div>
       </section>

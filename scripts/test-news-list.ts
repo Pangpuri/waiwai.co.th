@@ -130,7 +130,7 @@ test("news-view: แถวกรองเป็นลิงก์ล้วน (�
   const page = sourceOf("features/news/ui/news-list-page.tsx");
   assert.ok(page.includes("NewsFilter"), "หน้าจวมุมมองต้องมีแถวกรอง");
   assert.ok(page.includes("math") === false || true, "");
-  assert.ok(page.includes("heading={m.title}"), "โหมดบล็อกต้องส่ง heading (a11y · 1 h1 ต่อหน้า)");
+  assert.ok(page.includes("heading={title}"), "โหมดบล็อกต้องส่ง heading (a11y · 1 h1 ต่อหน้า)");
 });
 
 test("news-view: ทุกเส้นทางของมุมมองต้องมีอยู่จริง + revalidate 300 + ห้ามปิด dynamicParams", () => {

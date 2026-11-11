@@ -1,11 +1,13 @@
 import Link from "next/link";
 
-import { deleteNewsForeverAction, trashNewsAction } from "@/app/admin/news/actions";
+import { deleteNewsForeverAction, saveNewsPageCopyAction, trashNewsAction } from "@/app/admin/news/actions";
 import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
+import { PageCopyForm } from "@/features/admin/ui/page-copy-form";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { listMedia } from "@/lib/media/repository";
+import { loadNewsPageCopyForEditing } from "@/lib/news/page-copy";
 import {
   ADMIN_NEWS_PER_PAGE,
   adminNewsCounts,
@@ -48,10 +50,11 @@ export default async function AdminNewsPage({
   const search = searchParamText(query.q, 80);
   const page = pageOf(searchParamText(query.page));
 
-  const [counts, listed, library] = await Promise.all([
+  const [counts, listed, library, newsPageCopy] = await Promise.all([
     adminNewsCounts(),
     listNewsForAdmin({ tab, search, page }),
     listMedia(1),
+    loadNewsPageCopyForEditing(),
   ]);
 
   const pageCount = Math.max(1, Math.ceil(listed.total / ADMIN_NEWS_PER_PAGE));
@@ -91,6 +94,26 @@ export default async function AdminNewsPage({
           {m.newsAdminNew}
         </Link>
       </div>
+
+      <PageCopyForm
+        initial={newsPageCopy}
+        action={saveNewsPageCopyAction}
+        strings={{
+          title: m.newsPageCopyTitle,
+          hint: m.newsPageCopyHint,
+          eyebrowTh: m.pageCopyFieldEyebrowTh,
+          eyebrowEn: m.pageCopyFieldEyebrowEn,
+          titleTh: m.pageCopyFieldTitleTh,
+          titleEn: m.pageCopyFieldTitleEn,
+          introTh: m.pageCopyFieldIntroTh,
+          introEn: m.pageCopyFieldIntroEn,
+          save: m.pageCopySave,
+          saving: m.pageCopySaving,
+          saved: m.pageCopySaved,
+          invalid: m.pageCopyInvalid,
+          failed: m.pageCopyFailed,
+        }}
+      />
 
       {/* SEO ของหน้า /news — หน้านี้มี URL จริง แต่ไม่มีจอ builder แล้ว (รอบ 269) */}
       <AdminPageSeoSection pageId="news" messages={messages} role={user.role} className="mt-6" />

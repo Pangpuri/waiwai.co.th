@@ -81,4 +81,6 @@ export const adminRecipes = {
   recipesAdminDeleteForeverWarning: "ลบถาวรแล้วกู้คืนไม่ได้",
   auditRecipeDelete: "ลบเมนูอาหารถาวร",
   auditRecipeRestore: "กู้คืนเมนูอาหาร",
+  recipesPageCopyTitle: "ข้อความหัวหน้าเมนูอาหาร",
+  recipesPageCopyHint: "ข้อความนี้แสดงด้านบนหน้า /recipes ทั้งภาษาไทยและอังกฤษ — เว้นว่างช่องใด = ใช้ข้อความเดิมของภาษานั้น",
 };

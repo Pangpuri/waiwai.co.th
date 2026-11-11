@@ -10,7 +10,9 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { listRecipes } from "@/lib/recipes/repository";
+import { loadRecipesPageCopy } from "@/lib/recipes/page-copy";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /*
   ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
@@ -70,6 +72,10 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
   */
   const [liveDocument, recipes] = await Promise.all([loadLiveBlockDocument("recipes"), listRecipes()]);
   const m = messages.recipesPage;
+  const pageCopy = await loadRecipesPageCopy(lang);
+  const eyebrow = resolveNotice(pageCopy.eyebrow, lang, m.eyebrow);
+  const title = resolveNotice(pageCopy.title, lang, m.title);
+  const intro = resolveNotice(pageCopy.intro, lang, m.intro);
   const listStrings = recipeVideoListStringsOf(m);
 
   if (liveDocument !== null) {
@@ -95,15 +101,15 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
 
           <p className="mt-8 inline-flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-accent uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {m.eyebrow}
+            {eyebrow}
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
-            {m.title}
+            {title}
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            {m.intro}
+            {intro}
           </p>
 
         </div>

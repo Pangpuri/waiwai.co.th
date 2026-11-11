@@ -30,6 +30,10 @@ export type AuditAction =
   | "product-category-save"
   /** ข้อความหัวหน้า /products (รอบ 342) — แก้จากหน้าหมวดสินค้า */
   | "products-page-copy-save"
+  /** ข้อความหัวหน้า /recipes (รอบ 342) */
+  | "recipes-page-copy-save"
+  /** ข้อความหัวหน้า /news (รอบ 342) */
+  | "news-page-copy-save"
   /* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/จัดลำดับ/พรีเซ็ต (มติ D25 · รอบที่ 264) */
   | "product-category-create"
   | "product-category-hide"

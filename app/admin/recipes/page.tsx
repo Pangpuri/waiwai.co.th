@@ -1,12 +1,19 @@
 import Link from "next/link";
 
-import { deleteRecipeForeverAction, reorderRecipesAction, trashRecipeAction } from "@/app/admin/recipes/actions";
+import {
+  deleteRecipeForeverAction,
+  reorderRecipesAction,
+  saveRecipesPageCopyAction,
+  trashRecipeAction,
+} from "@/app/admin/recipes/actions";
 import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
+import { PageCopyForm } from "@/features/admin/ui/page-copy-form";
 import { SortableList } from "@/features/admin/ui/sortable-list";
 import { listReorderItems, type ReorderItem } from "@/lib/admin/reorder";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { listMedia } from "@/lib/media/repository";
+import { loadRecipesPageCopyForEditing } from "@/lib/recipes/page-copy";
 import { formatRecipeDate } from "@/lib/recipes/model";
 import { adminRecipeCounts, listRecipesForAdmin, type AdminRecipeTab } from "@/lib/recipes/repository";
 import { searchParamText } from "@/lib/search/params";
@@ -46,11 +53,12 @@ export default async function AdminRecipesPage({
   /* แท็บ `sort` ไม่ใช่แท็บของ repository ⇒ คิวรีรายการใช้ `all` แทน (แท็บ sort ไม่แสดงตาราง) */
   const listTab: AdminRecipeTab = tab === "sort" ? "all" : tab;
 
-  const [counts, listed, library, reorderItems] = await Promise.all([
+  const [counts, listed, library, reorderItems, recipesPageCopy] = await Promise.all([
     adminRecipeCounts(),
     listRecipesForAdmin({ tab: listTab, search }),
     listMedia(1),
     tab === "sort" ? listReorderItems("recipe") : Promise.resolve<readonly ReorderItem[]>([]),
+    loadRecipesPageCopyForEditing(),
   ]);
 
   const tabLabel: Record<AdminRecipeView, string> = {
@@ -91,6 +99,26 @@ export default async function AdminRecipesPage({
           {m.recipesAdminNew}
         </Link>
       </div>
+
+      <PageCopyForm
+        initial={recipesPageCopy}
+        action={saveRecipesPageCopyAction}
+        strings={{
+          title: m.recipesPageCopyTitle,
+          hint: m.recipesPageCopyHint,
+          eyebrowTh: m.pageCopyFieldEyebrowTh,
+          eyebrowEn: m.pageCopyFieldEyebrowEn,
+          titleTh: m.pageCopyFieldTitleTh,
+          titleEn: m.pageCopyFieldTitleEn,
+          introTh: m.pageCopyFieldIntroTh,
+          introEn: m.pageCopyFieldIntroEn,
+          save: m.pageCopySave,
+          saving: m.pageCopySaving,
+          saved: m.pageCopySaved,
+          invalid: m.pageCopyInvalid,
+          failed: m.pageCopyFailed,
+        }}
+      />
 
       {/* SEO ของหน้า /recipes — หน้านี้มี URL จริง แต่ไม่มีจอ builder แล้ว (รอบ 269) */}
       <AdminPageSeoSection pageId="recipes" messages={messages} role={user.role} className="mt-6" />

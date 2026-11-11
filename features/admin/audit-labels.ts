@@ -58,6 +58,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "product-category-save": strings.auditProductCategorySave,
     /* ข้อความหัวหน้า /products (รอบ 342) — แก้จากหน้าหมวดสินค้า */
     "products-page-copy-save": "แก้ข้อความหัวหน้าผลิตภัณฑ์",
+    "recipes-page-copy-save": "แก้ข้อความหัวหน้าเมนูอาหาร",
+    "news-page-copy-save": "แก้ข้อความหัวหน้าข่าวสาร",
     /* หมวดสินค้า (มติ D25 · รอบที่ 264) — ป้ายเป็นข้อความตรง ๆ (พื้นที่ admin ชนเพดานแล้ว) */
     "product-category-create": "เพิ่มหมวดสินค้า",
     "product-category-hide": "ซ่อน/แสดงหมวดสินค้า",

@@ -97,13 +97,13 @@ test("news admin: ฝั่งเว็บสาธารณะต้องก�
 });
 
 test("news admin: ทุก action ต้องตรวจสิทธิ์ + เขียน audit + สั่งสร้างหน้าเว็บใหม่", () => {
-  /* 5 action ในไฟล์นี้ (บันทึก · ย้าย/กู้ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ) — นับแบบ >= เพราะมีการอ้างถึงในคอมเมนต์ด้วย */
+  /* 6 action ในไฟล์นี้ (บันทึก · ย้าย/กู้ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ · ข้อความหัวหน้า) — นับแบบ >= เพราะมีการอ้างถึงในคอมเมนต์ด้วย */
   const permissionChecks = (actions.match(/requireAdminUser\("content"\)/g) ?? []).length;
-  assert.ok(permissionChecks >= 5, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
+  assert.ok(permissionChecks >= 6, `ต้องตรวจสิทธิ์ทุก action (พบ ${String(permissionChecks)} ครั้ง)`);
   assert.equal(
     (actions.match(/^export async function/gm) ?? []).length,
-    5,
-    "ไฟล์นี้มี 5 action (บันทึก · ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ)",
+    6,
+    "ไฟล์นี้มี 6 action (บันทึก · ถังขยะ · ลบถาวร · อัปโหลดภาพ · กู้คืนประวัติ · ข้อความหัวหน้า)",
   );
   assert.ok(actions.includes("recordAudit("), "ทุกการแก้เนื้อหาต้องมีร่องรอย audit");
   assert.ok(actions.includes('refreshPublicSite("page")'), "บันทึกแล้วต้องสั่งสร้างหน้าเว็บใหม่ (ISR)");

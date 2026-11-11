@@ -112,4 +112,6 @@ export const adminNews: Pick<Messages["admin"], keyof typeof thAdminNews> = {
   newsAdminPreviewEmpty: "No content yet — add a paragraph or image on the left",
   newsAdminPreviewHint: "How readers will see it on the site (uses the same renderer as the live page)",
   newsAdminCaptionSample: "Sample caption",
+  newsPageCopyTitle: "News & activities page heading text",
+  newsPageCopyHint: "This text appears at the top of /news in Thai and English — leave a field empty to keep the existing dictionary text for that language",
 } as const;

@@ -5,6 +5,7 @@ import { recipeRestoreOf, recipeSnapshotOf } from "@/lib/revisions/model";
 import { revalidatePath } from "next/cache";
 
 import { INITIAL_RECIPE_UPLOAD_STATE, type RecipeSaveState, type RecipeUploadState } from "@/features/admin/recipe-state";
+import type { PageCopyState } from "@/features/admin/page-copy-state";
 import type { ReorderState } from "@/features/admin/ui/sortable-list";
 import { parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
 import { recordAudit } from "@/lib/audit/log";
@@ -22,6 +23,8 @@ import {
   type AdminRecipeStatus,
 } from "@/lib/recipes/repository";
 import { recipeIdOfSourceId, validateRecipeInput, youTubeIdFromInput, type RecipeInput } from "@/lib/recipes/model";
+import { parsePageCopy } from "@/lib/page-copy/model";
+import { saveAndPublishRecipesPageCopy } from "@/lib/recipes/page-copy";
 
 /**
  * Server Action ของหลังบ้านเมนูอาหาร (รอบที่ 135 · แบบ WordPress "Posts")
@@ -35,6 +38,38 @@ import { recipeIdOfSourceId, validateRecipeInput, youTubeIdFromInput, type Recip
  */
 
 const LIST_PATH = "/admin/recipes";
+
+/** ข้อความหัวหน้า /recipes — บันทึก + เผยแพร่ทันที (รอบ 342) */
+export async function saveRecipesPageCopyAction(
+  _previous: PageCopyState,
+  formData: FormData,
+): Promise<PageCopyState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database" };
+
+  const copy = parsePageCopy({
+    eyebrow: { th: field(formData, "eyebrowTh"), en: field(formData, "eyebrowEn") },
+    title: { th: field(formData, "titleTh"), en: field(formData, "titleEn") },
+    intro: { th: field(formData, "introTh"), en: field(formData, "introEn") },
+  });
+  if (copy === null) return { status: "error", reason: "invalid" };
+
+  try {
+    await saveAndPublishRecipesPageCopy(copy, user.email);
+  } catch {
+    return { status: "error", reason: "database" };
+  }
+
+  await recordAudit({
+    action: "recipes-page-copy-save",
+    actorEmail: user.email,
+    target: "recipes-page-copy",
+    detail: "published",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: "" };
+}
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
