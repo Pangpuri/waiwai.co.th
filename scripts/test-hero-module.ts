@@ -256,7 +256,7 @@ test("hero module: ต่อสายหน้าแรก — สไลด์�
   assert.ok(hero.includes("HERO_SLIDES.map"), "เทมเพลตเดิมต้องยังอยู่ (ไม่ลบของเดิม)");
 
   const loader = readFileSync("features/home/home-hero-view.ts", "utf8");
-  assert.ok(loader.includes("listHeroPageSlides()"), "loader hero ต้องอ่านสไลด์จากชั้นข้อมูลของโมดูล");
+  assert.ok(loader.includes("listHeroPageSlides(locale)"), "loader hero ต้องอ่านสไลด์จากชั้นข้อมูลของโมดูล");
   assert.ok(loader.includes("managedHeroSlideViews("), "loader hero ต้องแปลงวิวผ่านตัวช่วยกลาง");
   const page = readFileSync("app/[lang]/page.tsx", "utf8");
   assert.ok(page.includes("loadHomeHeroView("), "หน้าแรกต้องใช้ loader hero ตัวกลาง");

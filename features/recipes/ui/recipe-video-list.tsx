@@ -1,9 +1,11 @@
+import { formatNumber } from "@/lib/format";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { formatRecipeDate, recipeTitleOf, youTubeWatchUrlOf } from "@/lib/recipes/model";
 import type { RecipeRecord } from "@/lib/recipes/repository";
 
+import { RecipeImageLightbox } from "./recipe-image-lightbox";
 import { VideoFacade } from "./video-facade";
 
 /**
@@ -26,6 +28,11 @@ export type RecipeVideoListStrings = {
   readonly watchOnYouTube: string;
   readonly published: string;
   readonly noCover: string;
+  readonly views: string;
+  readonly recipeDetails: string;
+  readonly imageOpen: string;
+  readonly imageClose: string;
+  readonly imageDialog: string;
 };
 
 export function recipeVideoListStringsOf(page: Messages["recipesPage"]): RecipeVideoListStrings {
@@ -37,6 +44,11 @@ export function recipeVideoListStringsOf(page: Messages["recipesPage"]): RecipeV
     watchOnYouTube: page.dbWatch,
     published: page.dbPublished,
     noCover: page.dbNoCover,
+    views: page.dbViews,
+    recipeDetails: page.dbRecipeDetails,
+    imageOpen: page.dbRecipeImageOpen,
+    imageClose: page.dbImageClose,
+    imageDialog: page.dbImageDialog,
   };
 }
 
@@ -70,6 +82,8 @@ export function RecipeVideoList({
             const computedTitle = recipeTitleOf(recipe.titleTh, recipe.titleEn, language);
             const title = computedTitle === "" && titlePlaceholder !== undefined ? titlePlaceholder : computedTitle;
             const published = formatRecipeDate(recipe.publishedOn, language);
+            const details = language === "en" && recipe.detailsEn.trim() !== "" ? recipe.detailsEn : recipe.detailsTh;
+            const hasRecipe = details.trim() !== "" || recipe.recipeImagePath !== null;
             return (
               <li key={recipe.id} className="flex flex-col rounded-2xl border border-line bg-bg p-4">
                 <VideoFacade
@@ -85,7 +99,34 @@ export function RecipeVideoList({
 
                 <h3 className="mt-4 text-base leading-snug font-bold text-fg">{title}</h3>
 
+                <p className="mt-1 text-xs text-fg-muted">
+                  {fillTemplate(strings.views, { count: formatNumber(recipe.viewCount, language) })}
+                </p>
                 <p className="mt-1 text-xs text-fg-muted">{strings.privacyNote}</p>
+
+                {hasRecipe ? (
+                  <details className="product-card-details border-line mt-3 rounded-xl border px-3 py-2">
+                    <summary className="product-card-details-summary text-fg focus-visible:ring-ring flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
+                      {strings.recipeDetails}
+                    </summary>
+                    <div className="product-card-details-body mt-3 flex flex-col gap-3">
+                      {details.trim() === "" ? null : (
+                        <p className="text-fg text-sm leading-relaxed whitespace-pre-line">{details}</p>
+                      )}
+                      {recipe.recipeImagePath === null ? null : (
+                        <RecipeImageLightbox
+                          src={recipe.recipeImagePath}
+                          alt={title}
+                          labels={{
+                            open: strings.imageOpen,
+                            close: strings.imageClose,
+                            dialog: strings.imageDialog,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </details>
+                ) : null}
 
                 <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                   {published === "" ? null : <span className="text-fg-muted">{`${strings.published} ${published}`}</span>}

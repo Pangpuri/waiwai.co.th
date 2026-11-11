@@ -29,12 +29,26 @@ export type ProductCategoryInput = {
   readonly descriptionEn: string;
 };
 
+/**
+ * ประเภทตลาดของสินค้า (migration 0046)
+ * - `domestic` = สินค้าขายในประเทศ (ค่าเริ่มต้นของข้อมูลเดิม)
+ * - `export` = สินค้าส่งออก (นำเข้าจากหน้า /en/pages/<id> ของเว็บเดิม)
+ */
+export const PRODUCT_MARKETS = ["domestic", "export"] as const;
+export type ProductMarket = (typeof PRODUCT_MARKETS)[number];
+
+export function isProductMarket(value: string): value is ProductMarket {
+  return (PRODUCT_MARKETS as readonly string[]).includes(value);
+}
+
 export type ProductInput = {
   readonly id: string;
   readonly categoryId: string;
   readonly sourceId: string;
   /** พาธในเว็บเดิม (เก็บไว้ตรวจย้อนหลัง — ไม่ใช่พาธของเว็บเรา) */
   readonly sourceUrl: string;
+  /** ประเภทตลาด (migration 0046) — ไม่ส่ง = domestic (ข้อมูลเดิม) */
+  readonly market?: ProductMarket;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly groupTh: string;
@@ -104,6 +118,9 @@ export function validateProductInput(input: ProductInput): readonly ImportIssue[
   }
   if (!isCatalogCategoryId(input.categoryId)) {
     issues.push({ code: "unknown-category", path: "categoryId", message: `ไม่รู้จักหมวด "${input.categoryId}"` });
+  }
+  if (input.market !== undefined && !isProductMarket(input.market)) {
+    issues.push({ code: "unknown-market", path: "market", message: `ไม่รู้จักประเภทตลาด "${input.market}"` });
   }
   if (input.nameTh.trim() === "") {
     issues.push({ code: "empty-name-th", path: "nameTh", message: "ชื่อสินค้าไทยห้ามว่าง" });

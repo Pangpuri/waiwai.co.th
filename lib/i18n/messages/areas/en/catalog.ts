@@ -56,6 +56,9 @@ export const productsPage = {
     },
     /* Products in this category — imported from the old site (S4, round 103) */
     dbListTitle: "Products in this category",
+    marketTabsLabel: "Product market",
+    marketDomestic: "Domestic products",
+    marketExport: "Export products",
     dbListCount: "{count} items",
     dbDetails: "Product details",
     dbIngredients: "Ingredients",

@@ -100,6 +100,7 @@ export default async function AdminProductEditorPage({
             id: existing?.id ?? "",
             sourceId: existing?.sourceId ?? "",
             categoryId: existing?.categoryId ?? categories[0]?.slug ?? "",
+            market: existing?.market ?? "domestic",
             nameTh: existing?.nameTh ?? "",
             nameEn: existing?.nameEn ?? "",
             groupTh: existing?.groupTh ?? "",

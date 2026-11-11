@@ -30,14 +30,14 @@ export function ProductCategoryCard(props: ProductCategoryCardProps) {
   const inner = (
     <>
       {/* ภาพโลโก้หมวดความกว้างคงที่ — ใช้ object-contain ไม่ครอปภาพ */}
-      <span className="flex h-44 items-center justify-center rounded-xl border border-line bg-bg-subtle p-4">
+      <span className="flex aspect-[4/3] w-full items-center justify-center rounded-xl border border-line bg-bg-subtle p-3 sm:aspect-auto sm:h-44 sm:p-4">
         <Image
           src={props.imageSrc}
           alt={props.imageAlt}
           width={props.imageWidth}
           height={props.imageHeight}
           sizes={IMAGE_SIZES}
-          className="h-full w-auto object-contain"
+          className="h-full w-auto max-w-full object-contain"
         />
       </span>
 

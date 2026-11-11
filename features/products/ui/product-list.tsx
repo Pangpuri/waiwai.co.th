@@ -5,6 +5,7 @@ import {
   productAllergensOf,
   productDetailsOf,
   productGroupOf,
+  productHasDetails,
   productNameOf,
   productNetWeightOf,
   productPackagingOf,
@@ -76,32 +77,47 @@ export function ProductListSection({
   products,
   language,
   strings,
+  showHeader = true,
 }: {
   readonly products: readonly ProductRecord[];
   readonly language: Locale;
   readonly strings: ProductListStrings;
+  /** false = ใช้ในแท็บ (ผู้เรียกแสดงหัวข้อ/จำนวนเอง) */
+  readonly showHeader?: boolean;
 }) {
   if (products.length === 0) return null;
 
   return (
-    <section className="border-line bg-bg-subtle border-t" aria-labelledby="product-list-title">
+    <section
+      className="border-line bg-bg-subtle border-t"
+      aria-labelledby={showHeader ? "product-list-title" : undefined}
+    >
       <div className="container-site py-12 lg:py-16">
-        <h2 id="product-list-title" className="text-fg text-2xl font-bold lg:text-3xl">
-          {strings.title}
-        </h2>
-        <p className="text-fg-muted mt-1 text-sm">{fillTemplate(strings.count, { count: products.length })}</p>
+        {showHeader ? (
+          <>
+            <h2 id="product-list-title" className="text-fg text-2xl font-bold lg:text-3xl">
+              {strings.title}
+            </h2>
+            <p className="text-fg-muted mt-1 text-sm">{fillTemplate(strings.count, { count: products.length })}</p>
+          </>
+        ) : null}
 
         {/*
           ⚠️ บทเรียน 2026-10-17 (เจ้าของ: "มุมมองมือถือ … รายละเอียดสินค้าล้นจอ"): กริดต้องมี **คอลัมน์ขั้นต่ำแบบหดได้**
           (`grid-cols-1` = `minmax(0, 1fr)`) — เดิมปล่อยเป็นคอลัมน์อัตโนมัติ ⇒ การ์ดขยายตามตารางส่วนผสม `min-w-[26rem]`
           ⇒ ที่ 390px หน้าเว็บกว้าง 496px (ล้นแนวนอน) · ตอนนี้ตารางเลื่อนในกรอบ `overflow-x-auto` ของการ์ดแทน
         */}
-        <ul className="product-card-grid mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className={`product-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${showHeader ? "mt-8" : ""}`}>
           {products.map((product) => {
             const label = productNameOf(product, language);
             const group = productGroupOf(product, language);
             const tagline = productTaglineOf(product, language);
             const details = productDetailsOf(product, language);
+            const netWeight = productNetWeightOf(product, language);
+            const packaging = productPackagingOf(product, language);
+            const allergens = productAllergensOf(product, language);
+            /* รอบ 342: ไม่มีข้อมูลในกล่อง = ไม่แสดง dropdown (สินค้าส่งออกบางตัวมีแค่ชื่อ/ภาพ) */
+            const hasDetails = productHasDetails(product, language);
 
             /* `min-w-0` = การ์ดยอมหดต่ำกว่า min-content ของตารางส่วนผสม (กันล้นจอบนมือถือ) */
             return (
@@ -115,65 +131,67 @@ export function ProductListSection({
                     width={product.imageWidth ?? 480}
                     height={product.imageHeight ?? 480}
                     sizes="(max-width: 640px) 80vw, 300px"
-                    className="mx-auto h-40 w-auto object-contain"
+                    className="mx-auto h-40 w-auto max-w-full object-contain"
                   />
                 )}
 
                 <h3 className="text-fg mt-3 text-base leading-snug font-semibold">{label}</h3>
                 {group === "" ? null : <p className="text-fg-muted mt-0.5 text-xs">{group}</p>}
 
-                <details className="product-card-details border-line mt-3 rounded-xl border px-3 py-2">
-                  <summary className="product-card-details-summary text-fg focus-visible:ring-ring flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
-                    {strings.details}
-                  </summary>
+                {hasDetails ? (
+                  <details className="product-card-details border-line mt-3 rounded-xl border px-3 py-2">
+                    <summary className="product-card-details-summary text-fg focus-visible:ring-ring flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none">
+                      {strings.details}
+                    </summary>
 
-                  <div className="product-card-details-body mt-3 flex flex-col gap-4">
-                    {tagline === "" ? null : <p className="text-fg text-sm">{tagline}</p>}
+                    <div className="product-card-details-body mt-3 flex flex-col gap-4">
+                      {tagline === "" ? null : <p className="text-fg text-sm">{tagline}</p>}
 
-                    {product.ingredients.length === 0 ? null : (
-                      <div>
-                        <p className="text-fg-muted text-xs font-semibold">{strings.ingredients}</p>
-                        <div className="mt-1 overflow-x-auto">
-                          <table className="w-full min-w-[26rem] border-collapse text-left text-xs">
-                            <thead>
-                              <tr className="text-fg-muted">
-                                <th scope="col" className="border-line border-b py-1 pr-2 font-semibold">
-                                  {strings.ingredientName}
-                                </th>
-                                <th scope="col" className="border-line border-b py-1 pr-2 font-semibold">
-                                  {strings.ingredientNameEn}
-                                </th>
-                                <th scope="col" className="border-line border-b py-1 font-semibold">
-                                  {strings.ingredientPercent}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {product.ingredients.map((ingredient, index) => (
-                                <tr key={`${product.id}-${index}`}>
-                                  <td className="border-line text-fg border-b py-1 pr-2">{ingredient.nameTh}</td>
-                                  <td className="border-line text-fg-muted border-b py-1 pr-2">{ingredient.nameEn}</td>
-                                  <td className="border-line text-fg border-b py-1">{ingredient.percentText}</td>
+                      {product.ingredients.length === 0 ? null : (
+                        <div>
+                          <p className="text-fg-muted text-xs font-semibold">{strings.ingredients}</p>
+                          <div className="mt-1 overflow-x-auto">
+                            <table className="w-full min-w-[26rem] border-collapse text-left text-xs">
+                              <thead>
+                                <tr className="text-fg-muted">
+                                  <th scope="col" className="border-line border-b py-1 pr-2 font-semibold">
+                                    {strings.ingredientName}
+                                  </th>
+                                  <th scope="col" className="border-line border-b py-1 pr-2 font-semibold">
+                                    {strings.ingredientNameEn}
+                                  </th>
+                                  <th scope="col" className="border-line border-b py-1 font-semibold">
+                                    {strings.ingredientPercent}
+                                  </th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {product.ingredients.map((ingredient, index) => (
+                                  <tr key={`${product.id}-${index}`}>
+                                    <td className="border-line text-fg border-b py-1 pr-2">{ingredient.nameTh}</td>
+                                    <td className="border-line text-fg-muted border-b py-1 pr-2">{ingredient.nameEn}</td>
+                                    <td className="border-line text-fg border-b py-1">{ingredient.percentText}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <dl className="flex flex-col gap-1">
-                      <SpecRow label={strings.netWeight} value={productNetWeightOf(product, language)} />
-                      <SpecRow label={strings.fda} value={product.fdaNumber} />
-                      <SpecRow label={strings.packaging} value={productPackagingOf(product, language)} />
-                      <SpecRow label={strings.allergens} value={productAllergensOf(product, language)} />
-                    </dl>
+                      <dl className="flex flex-col gap-1">
+                        <SpecRow label={strings.netWeight} value={netWeight} />
+                        <SpecRow label={strings.fda} value={product.fdaNumber} />
+                        <SpecRow label={strings.packaging} value={packaging} />
+                        <SpecRow label={strings.allergens} value={allergens} />
+                      </dl>
 
-                    {details === "" ? null : (
-                      <p className="text-fg-muted text-xs leading-relaxed">{details}</p>
-                    )}
-                  </div>
-                </details>
+                      {details === "" ? null : (
+                        <p className="text-fg-muted text-xs leading-relaxed">{details}</p>
+                      )}
+                    </div>
+                  </details>
+                ) : null}
               </li>
             );
           })}

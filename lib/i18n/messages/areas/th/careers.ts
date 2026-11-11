@@ -27,7 +27,7 @@ export const careersPage = {
       departments: "ฝ่ายที่เปิดรับ",
     },
     boardTitle: "ตำแหน่งที่เปิดรับ",
-    boardIntro: "เลือกดูตามฝ่าย หรือกด “ทั้งหมด” เพื่อดูทุกตำแหน่ง",
+    boardIntro: "ตำแหน่งที่เปิดรับทั้งหมด",
     filterGroup: "กรองตำแหน่งตามฝ่าย",
     filterAll: "ทั้งหมด",
     positionUnit: "ตำแหน่ง",

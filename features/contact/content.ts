@@ -67,9 +67,11 @@ export type ContactPlant = {
   readonly id: "omYai" | "raiKhing";
   readonly nameKey: "plant1" | "plant2";
   readonly addressKey: "plant1Address" | "plant2Address";
+  /** เบอร์โทรของโรงงานนั้น — แสดงในการ์ดเดียวกับที่อยู่ (รอบ 342) */
+  readonly phone: { readonly display: string; readonly tel: string };
 };
 
 export const CONTACT_PLANTS: readonly ContactPlant[] = [
-  { id: "omYai", nameKey: "plant1", addressKey: "plant1Address" },
-  { id: "raiKhing", nameKey: "plant2", addressKey: "plant2Address" },
+  { id: "omYai", nameKey: "plant1", addressKey: "plant1Address", phone: CONTACT_PHONES[0] ?? { display: "", tel: "" } },
+  { id: "raiKhing", nameKey: "plant2", addressKey: "plant2Address", phone: CONTACT_PHONES[1] ?? { display: "", tel: "" } },
 ];

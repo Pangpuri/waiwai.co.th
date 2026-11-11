@@ -84,6 +84,7 @@ export function revisionDiff(from: RevisionSnapshot, to: RevisionSnapshot): read
 export function productSnapshotOf(detail: AdminProductDetail): RevisionSnapshot {
   return {
     categoryId: detail.categoryId,
+    market: detail.market,
     nameTh: detail.nameTh,
     nameEn: detail.nameEn,
     groupTh: detail.groupTh,
@@ -114,9 +115,12 @@ export function recipeSnapshotOf(detail: AdminRecipeListItem): RevisionSnapshot 
     titleTh: detail.titleTh,
     titleEn: detail.titleEn,
     videoId: detail.videoId,
+    detailsTh: detail.detailsTh,
+    detailsEn: detail.detailsEn,
     publishedOn: detail.publishedOn,
     sortOrder: detail.sortOrder,
     coverPath: detail.coverPath,
+    recipeImagePath: detail.recipeImagePath,
     status: detail.status,
   };
 }
@@ -185,6 +189,7 @@ export function productRestoreOf(snapshot: RevisionSnapshot): ProductRestore {
     input: {
       id: "",
       categoryId: snapshotText(snapshot["categoryId"]),
+      market: snapshot["market"] === "export" ? "export" : "domestic",
       sourceId: "",
       sourceUrl: "",
       nameTh: snapshotText(snapshot["nameTh"]),
@@ -247,10 +252,13 @@ export function newsRestoreOf(snapshot: RevisionSnapshot): NewsRestore {
 
 export type RecipeRestore = {
   readonly coverPath: string | null;
+  readonly recipeImagePath: string | null;
   readonly values: {
     readonly titleTh: string;
     readonly titleEn: string;
     readonly videoId: string;
+    readonly detailsTh: string;
+    readonly detailsEn: string;
     readonly publishedOn: string | null;
     readonly sortOrder: number;
     readonly status: "draft" | "published";
@@ -260,10 +268,13 @@ export type RecipeRestore = {
 export function recipeRestoreOf(snapshot: RevisionSnapshot): RecipeRestore {
   return {
     coverPath: typeof snapshot["coverPath"] === "string" ? snapshot["coverPath"] : null,
+    recipeImagePath: typeof snapshot["recipeImagePath"] === "string" ? snapshot["recipeImagePath"] : null,
     values: {
       titleTh: snapshotText(snapshot["titleTh"]),
       titleEn: snapshotText(snapshot["titleEn"]),
       videoId: snapshotText(snapshot["videoId"]),
+      detailsTh: snapshotText(snapshot["detailsTh"]),
+      detailsEn: snapshotText(snapshot["detailsEn"]),
       publishedOn: typeof snapshot["publishedOn"] === "string" ? snapshot["publishedOn"] : null,
       sortOrder: typeof snapshot["sortOrder"] === "number" ? snapshot["sortOrder"] : 0,
       status: snapshot["status"] === "draft" ? "draft" : "published",

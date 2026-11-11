@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { HERO_SLIDES } from "@/features/home/slides";
+import { EN_HERO_SRC, HERO_SLIDES } from "@/features/home/slides";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import {
@@ -125,7 +125,7 @@ test("HERO_SLIDES: ไม่มีไฟล์ภาพค้างใน public
     ยังค้างอยู่ใน public/ ซึ่งจะติดไปกับ build/deploy โดยไม่มีใครใช้
     → ด่านนี้เตือนให้ย้ายไฟล์ที่ยังไม่ใช้กลับไปโฟลเดอร์ต้นทาง `slide/` (ถูก .gitignore ไว้)
   */
-  const used = new Set(HERO_SLIDES.map((slide) => slide.src.replace("/slide/", "")));
+  const used = new Set([...HERO_SLIDES.map((slide) => slide.src.replace("/slide/", "")), EN_HERO_SRC.replace("/slide/", "")]);
   const onDisk = readdirSync(path.join(PROJECT_ROOT, "public", "slide"));
 
   const orphans = onDisk.filter((name) => !used.has(name));

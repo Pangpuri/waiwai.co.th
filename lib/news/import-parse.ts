@@ -98,6 +98,8 @@ export type ParsedNewsCard = {
   readonly excerpt: string;
   /** ภาพย่อ 400×300 จากหน้าข่าว (ใช้เป็นภาพปก) */
   readonly coverUrl: string;
+  /** ยอดวิวจากเว็บเดิม (0 = อ่านไม่ได้/ไม่มี) */
+  readonly viewCount: number;
 };
 
 function dateLabelOf(listingRow: string): string {
@@ -123,6 +125,8 @@ export function parseNewsListingPage(html: string): readonly ParsedNewsCard[] {
 
     const publishedLabel = dateLabelOf(chunk);
     const excerpt = textOf(chunk.match(/class="item-description"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "");
+    const viewRaw = chunk.match(/class="item-views"[^>]*>[\s\S]*?<\/i>\s*([0-9,]+)/i)?.[1] ?? "";
+    const viewCount = Number.parseInt(viewRaw.replace(/,/g, ""), 10);
 
     cards.push({
       sourceId,
@@ -132,6 +136,7 @@ export function parseNewsListingPage(html: string): readonly ParsedNewsCard[] {
       publishedLocal: parseThaiDateTime(publishedLabel),
       excerpt,
       coverUrl,
+      viewCount: Number.isFinite(viewCount) && viewCount >= 0 ? viewCount : 0,
     });
   }
 

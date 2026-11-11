@@ -31,6 +31,17 @@ export type RecipeRecord = {
   readonly coverPath: string | null;
   readonly coverWidth: number | null;
   readonly coverHeight: number | null;
+  /** ข้อความสูตร (migration 0048) — ว่าง = ไม่มีสูตรให้กาง */
+  readonly detailsTh: string;
+  readonly detailsEn: string;
+  /** ภาพสูตร (migration 0048) — null = ไม่มีภาพ */
+  readonly recipeImagePath: string | null;
+  readonly recipeImageWidth: number | null;
+  readonly recipeImageHeight: number | null;
+  /** ยอดวิว YouTube ที่แคชไว้ (migration 0048) */
+  readonly viewCount: number;
+  /** เวลารีเฟรชยอดวิวล่าสุด (ISO) หรือ null */
+  readonly viewCountUpdatedAt: string | null;
   readonly videoProvider: "youtube";
   readonly videoId: string;
   /** ISO `YYYY-MM-DD` หรือ null */
@@ -50,6 +61,21 @@ function positiveInt(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
+/** `bigint`/`numeric` ของ Postgres อาจกลับมาเป็นสตริง — แปลงเป็นจำนวนเต็ม ≥ 0 */
+function countValue(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(text(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+/** `timestamptz` → ISO string (หรือ null) — แปลงที่ชั้นข้อมูลเสมอ */
+function isoStamp(value: unknown): string | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  const raw = text(value).trim();
+  if (raw === "") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
 function toRecipeRecord(row: Record<string, unknown>): RecipeRecord | null {
   const id = text(row.id).trim();
   const titleTh = text(row.title_th).trim();
@@ -65,6 +91,13 @@ function toRecipeRecord(row: Record<string, unknown>): RecipeRecord | null {
     coverPath: mediaPath(row.cover_media_id),
     coverWidth: positiveInt(row.cover_width),
     coverHeight: positiveInt(row.cover_height),
+    detailsTh: text(row.details_th),
+    detailsEn: text(row.details_en),
+    recipeImagePath: mediaPath(row.recipe_image_media_id),
+    recipeImageWidth: positiveInt(row.recipe_image_width),
+    recipeImageHeight: positiveInt(row.recipe_image_height),
+    viewCount: countValue(row.view_count),
+    viewCountUpdatedAt: isoStamp(row.view_count_updated_at),
     videoProvider: "youtube",
     videoId,
     publishedOn: text(row.published_on) === "" ? null : text(row.published_on),
@@ -82,10 +115,14 @@ export async function listRecipes(): Promise<readonly RecipeRecord[]> {
   try {
     const result = await readQuery<Record<string, unknown>>(
       `select r.id, r.source_id, r.source_url, r.title_th, r.title_en, r.cover_media_id,
+              r.details_th, r.details_en, r.recipe_image_media_id, r.view_count,
+              r.view_count_updated_at,
               r.video_provider, r.video_id, r.published_on::text as published_on, r.sort_order,
-              m.width as cover_width, m.height as cover_height
+              m.width as cover_width, m.height as cover_height,
+              ri.width as recipe_image_width, ri.height as recipe_image_height
          from recipe r
          left join media m on m.id = r.cover_media_id
+         left join media ri on ri.id = r.recipe_image_media_id
         where ${PUBLIC_RECIPE_CONDITION}
         order by r.sort_order, r.id`,
     );
@@ -191,6 +228,25 @@ export async function listRecipeIds(): Promise<readonly string[]> {
   }
 }
 
+/**
+ * บันทึกยอดวิว YouTube ที่ดึงมา (รอบ 342) — เขียนเฉพาะแถวที่ยังใช้งาน
+ * ⚠️ ใช้โดยสคริปต์ `recipes:views` (หลังบ้าน) ไม่ใช่หน้าเว็บสาธารณะ
+ */
+export async function setRecipeViewCount(id: string, count: number): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  const key = id.trim();
+  if (key === "" || !Number.isFinite(count) || count < 0) return false;
+  try {
+    const result = await getPool().query(
+      "update recipe set view_count = $2, view_count_updated_at = now() where id = $1 and deleted_at is null",
+      [key, Math.floor(count)],
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 /** ลบเมนู 1 รายการ **ถาวร** (ใช้ในด่านตรวจ/สคริปต์นำเข้า/ล้างข้อมูลทดสอบ)
  *  ⚠️ หลังบ้านต้องใช้ `deleteRecipeForever()` (มีประตูถังขยะ) ไม่ใช่ตัวนี้ */
 export async function deleteRecipe(id: string): Promise<void> {
@@ -223,6 +279,15 @@ export type AdminRecipeListItem = {
   readonly coverPath: string | null;
   readonly coverWidth: number | null;
   readonly coverHeight: number | null;
+  /** ข้อความสูตร (migration 0048) */
+  readonly detailsTh: string;
+  readonly detailsEn: string;
+  /** ภาพสูตร (migration 0048) */
+  readonly recipeImagePath: string | null;
+  readonly recipeImageWidth: number | null;
+  readonly recipeImageHeight: number | null;
+  readonly viewCount: number;
+  readonly viewCountUpdatedAt: string | null;
   /** ISO `YYYY-MM-DD` หรือ null */
   readonly publishedOn: string | null;
   readonly sortOrder: number;
@@ -237,18 +302,25 @@ export type AdminRecipeInput = {
   readonly titleTh: string;
   readonly titleEn: string;
   readonly videoId: string;
+  /** ข้อความสูตร TH/EN (migration 0048) — ไม่ส่ง = ว่าง */
+  readonly detailsTh?: string;
+  readonly detailsEn?: string;
   /** ISO `YYYY-MM-DD` หรือ null = ไม่ระบุ */
   readonly publishedOn: string | null;
   readonly sortOrder: number;
   /** `/media/<id>` หรือ null (ค่าว่าง = เอาภาพปกออก) */
   readonly coverPath: string | null;
+  /** ภาพสูตร — undefined = ไม่ส่ง/ว่าง = ไม่มีภาพ */
+  readonly recipeImagePath?: string | null;
   readonly status: AdminRecipeStatus;
 };
 
 const ADMIN_RECIPE_COLUMNS = `r.id, r.source_id, r.title_th, r.title_en, r.cover_media_id, r.video_id,
+       r.details_th, r.details_en, r.recipe_image_media_id, r.view_count, r.view_count_updated_at,
        r.published_on::text as published_on, r.sort_order, r.status, r.deleted_at,
        to_char(r.updated_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as updated_local,
-       m.width as cover_width, m.height as cover_height`;
+       m.width as cover_width, m.height as cover_height,
+       ri.width as recipe_image_width, ri.height as recipe_image_height`;
 
 const ADMIN_RECIPE_ORDER = "order by r.sort_order, r.id";
 
@@ -279,6 +351,13 @@ function toAdminRecipe(row: Record<string, unknown>): AdminRecipeListItem | null
     coverPath: mediaPath(row.cover_media_id),
     coverWidth: positiveInt(row.cover_width),
     coverHeight: positiveInt(row.cover_height),
+    detailsTh: text(row.details_th),
+    detailsEn: text(row.details_en),
+    recipeImagePath: mediaPath(row.recipe_image_media_id),
+    recipeImageWidth: positiveInt(row.recipe_image_width),
+    recipeImageHeight: positiveInt(row.recipe_image_height),
+    viewCount: countValue(row.view_count),
+    viewCountUpdatedAt: isoStamp(row.view_count_updated_at),
     publishedOn: publishedOn === "" ? null : publishedOn,
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
     updatedLocal: updatedLocal === "" ? null : updatedLocal,
@@ -343,6 +422,7 @@ export async function listRecipesForAdmin(input: {
       `select ${ADMIN_RECIPE_COLUMNS}
          from recipe r
          left join media m on m.id = r.cover_media_id
+         left join media ri on ri.id = r.recipe_image_media_id
         where ${where}
         ${ADMIN_RECIPE_ORDER}`,
       params,
@@ -370,6 +450,7 @@ export async function loadRecipeForAdmin(id: string): Promise<AdminRecipeDetail 
       `select ${ADMIN_RECIPE_COLUMNS}
          from recipe r
          left join media m on m.id = r.cover_media_id
+         left join media ri on ri.id = r.recipe_image_media_id
         where r.id = $1
         limit 1`,
       [key],
@@ -391,8 +472,9 @@ export async function createRecipeForAdmin(input: AdminRecipeInput, actor: strin
   const sourceId = String(Date.now());
   const id = `r${sourceId}`;
   await getPool().query(
-    `insert into recipe (id, source_id, source_url, title_th, title_en, cover_media_id, video_provider, video_id, published_on, sort_order, status, updated_at, updated_by)
-       values ($1, $2, '', $3, $4, $5, 'youtube', $6, $7::date, $8, $9, now(), $10)`,
+    `insert into recipe (id, source_id, source_url, title_th, title_en, cover_media_id, video_provider, video_id,
+                         details_th, details_en, recipe_image_media_id, published_on, sort_order, status, updated_at, updated_by)
+       values ($1, $2, '', $3, $4, $5, 'youtube', $6, $7, $8, $9, $10::date, $11, $12, now(), $13)`,
     [
       id,
       sourceId,
@@ -400,6 +482,9 @@ export async function createRecipeForAdmin(input: AdminRecipeInput, actor: strin
       input.titleEn,
       mediaIdFromPath(input.coverPath ?? ""),
       input.videoId,
+      input.detailsTh ?? "",
+      input.detailsEn ?? "",
+      mediaIdFromPath(input.recipeImagePath ?? ""),
       input.publishedOn,
       input.sortOrder,
       input.status,
@@ -414,7 +499,8 @@ export async function updateRecipeForAdmin(id: string, input: AdminRecipeInput, 
   await getPool().query(
     `update recipe
         set title_th = $2, title_en = $3, cover_media_id = $4, video_id = $5,
-            published_on = $6::date, sort_order = $7, status = $8, updated_at = now(), updated_by = $9
+            details_th = $6, details_en = $7, recipe_image_media_id = $8,
+            published_on = $9::date, sort_order = $10, status = $11, updated_at = now(), updated_by = $12
       where id = $1`,
     [
       id,
@@ -422,6 +508,9 @@ export async function updateRecipeForAdmin(id: string, input: AdminRecipeInput, 
       input.titleEn,
       mediaIdFromPath(input.coverPath ?? ""),
       input.videoId,
+      input.detailsTh ?? "",
+      input.detailsEn ?? "",
+      mediaIdFromPath(input.recipeImagePath ?? ""),
       input.publishedOn,
       input.sortOrder,
       input.status,

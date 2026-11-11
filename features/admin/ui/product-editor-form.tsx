@@ -12,6 +12,7 @@ import { ProductListSection, type ProductListStrings } from "@/features/products
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { mediaIdFromPath } from "@/lib/media/usage";
+import type { ProductMarket } from "@/lib/products/model";
 import type { ProductRecord } from "@/lib/products/repository";
 
 /**
@@ -39,6 +40,8 @@ export type ProductEditorInitial = {
   readonly id: string;
   readonly sourceId: string;
   readonly categoryId: string;
+  /** ประเภทตลาด (migration 0046) */
+  readonly market: ProductMarket;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly groupTh: string;
@@ -86,6 +89,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
 
   const [fields, setFields] = useState({
     categoryId: props.initial.categoryId,
+    market: props.initial.market,
     nameTh: props.initial.nameTh,
     nameEn: props.initial.nameEn,
     groupTh: props.initial.groupTh,
@@ -174,6 +178,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
   const previewRecord: ProductRecord = {
     id: props.initial.id === "" ? "preview" : props.initial.id,
     categoryId: fields.categoryId,
+    market: fields.market,
     nameTh: fields.nameTh,
     nameEn: fields.nameEn,
     groupTh: fields.groupTh,
@@ -249,6 +254,18 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   {item.name}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>{m.adminProductsFieldMarket}</span>
+            <select
+              name="market"
+              value={fields.market}
+              onChange={(event) => setField("market", event.target.value)}
+              className={INPUT_CLASS}
+            >
+              <option value="domestic">{m.adminProductsMarketDomestic}</option>
+              <option value="export">{m.adminProductsMarketExport}</option>
             </select>
           </label>
           <label className="block">

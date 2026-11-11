@@ -134,7 +134,7 @@ function CardView({
         </h3>
       ) : null}
       {hasText(card.body) ? (
-        <p className="text-fg-muted mt-1 text-sm" {...editAttrs(editable, "body", { cardIndex: index })}>
+        <p className="text-fg-muted mt-1 text-sm whitespace-pre-line" {...editAttrs(editable, "body", { cardIndex: index })}>
           {text(card.body, language)}
         </p>
       ) : null}
@@ -830,7 +830,7 @@ function BlockView({
                       <Image src={item.image} alt={item.title} width={640} height={360} sizes="(max-width: 640px) 100vw, 400px" className="h-auto w-full rounded-lg object-cover" />
                     )}
                     {item.dateLabel === "" ? null : <span className="text-fg-muted text-xs">{item.dateLabel}</span>}
-                    <span className="text-fg text-sm font-semibold">{item.title}</span>
+                    <span className="text-fg text-sm font-bold">{item.title}</span>
                     {item.excerpt === "" ? null : <span className="text-fg-muted text-xs">{item.excerpt}</span>}
                   </a>
                 </li>
@@ -928,7 +928,7 @@ function BlockView({
                     </h3>
                   ) : null}
                   {hasText(item.body) ? (
-                    <p className="text-fg-muted mt-1 text-sm" {...editAttrs(editable, "body", { cardIndex: index })}>
+                    <p className="text-fg-muted mt-1 text-sm whitespace-pre-line" {...editAttrs(editable, "body", { cardIndex: index })}>
                       {text(item.body, language)}
                     </p>
                   ) : null}

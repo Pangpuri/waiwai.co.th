@@ -29,6 +29,11 @@ export const recipesPage = {
     dbWatch: "Open in YouTube",
     dbPublished: "Published",
     dbNoCover: "No cover image yet",
+    dbViews: "Views: {count}",
+    dbRecipeDetails: "View recipe",
+    dbRecipeImageOpen: "Open recipe image",
+    dbImageClose: "Close image",
+    dbImageDialog: "Recipe image",
 };
 
 export const newsPage = {
@@ -51,6 +56,7 @@ export const newsPage = {
     dbListTitle: "Wai Wai news and activities",
     dbListCount: "{count} news items",
     dbReadMore: "Read more",
+    dbViewCount: "Views: {count}",
     dbNoCover: "No cover image yet",
     dbPrevious: "Previous",
     dbNext: "Next",

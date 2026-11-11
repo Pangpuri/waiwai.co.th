@@ -9,7 +9,8 @@ import { buildAlternates, isLocale, localePath, type Locale } from "@/lib/i18n/c
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadMediaSizes } from "@/lib/media/repository";
 import { newsBodyImageIds } from "@/lib/news/body";
-import { formatNewsDate, newsPathOfSourceId } from "@/lib/news/model";
+import { fillTemplate } from "@/lib/i18n/template";
+import { formatNewsDate, formatViewCount, newsPathOfSourceId } from "@/lib/news/model";
 import { listNewsSourceIds, loadNewsBySourceId, type NewsRecord } from "@/lib/news/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
 
@@ -95,6 +96,7 @@ export default async function NewsDetailPage({ params }: PageProps<"/[lang]/news
   const m = messages.newsPage;
   const title = titleOf(record, lang);
   const date = formatNewsDate(record.publishedLocal, lang, true);
+  const viewLabel = fillTemplate(m.dbViewCount, { count: formatViewCount(record.viewCount, lang) });
   const sizes = await loadMediaSizes(newsBodyImageIds(record.body));
 
   return (
@@ -114,7 +116,10 @@ export default async function NewsDetailPage({ params }: PageProps<"/[lang]/news
             {title}
           </h1>
 
-          {date === "" ? null : <p className="mt-4 text-sm font-semibold text-fg-muted">{`${m.dbPublished} ${date}`}</p>}
+          <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-fg-muted">
+            {date === "" ? null : <span>{`${m.dbPublished} ${date}`}</span>}
+            <span>{viewLabel}</span>
+          </p>
         </div>
       </section>
 
@@ -140,6 +145,17 @@ export default async function NewsDetailPage({ params }: PageProps<"/[lang]/news
             {m.dbBackToNews}
           </Link>
         </p>
+
+        {/* ตัวนับวิว: <img> 1×1 ที่ขอทุกครั้งที่เปิดหน้า แม้ HTML จะมาจาก cache (ไม่เพิ่ม JS) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={localePath(lang, `/news/${record.sourceId}/view`)}
+          alt=""
+          width={1}
+          height={1}
+          className="sr-only"
+          loading="eager"
+        />
       </article>
     </>
   );

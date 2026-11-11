@@ -119,7 +119,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
           ) : null}
         </div>
 
-        <div className="grid gap-8 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
           {view.groups.map((column) => (
             <nav key={column.id} aria-label={column.title}>
               <h2 className={`font-display text-sm font-bold tracking-wide ${textStrong}`}>

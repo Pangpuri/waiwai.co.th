@@ -7,7 +7,7 @@ import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { HERO_FOCUS_PRESETS, HERO_ZOOM_PRESETS } from "@/lib/blocks/hero-slides";
-import { clampFocus, clampZoom, fallbackHeroAltTh, isLocalMediaPath, mediaIdFromPath, parseHeroSetting } from "@/lib/hero/model";
+import { clampFocus, clampZoom, fallbackHeroAltTh, isHeroSlideLocale, isLocalMediaPath, mediaIdFromPath, parseHeroSetting } from "@/lib/hero/model";
 import {
   createHeroPageSlide,
   listHeroPageSlidesForAdmin,
@@ -140,6 +140,8 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
   if (id === "") return;
 
   const mediaPath = typeof formData.get("mediaPath") === "string" ? String(formData.get("mediaPath")).trim() : "";
+  const localeRaw = typeof formData.get("locale") === "string" ? String(formData.get("locale")).trim() : "";
+  const locale = isHeroSlideLocale(localeRaw) ? localeRaw : "all";
   const altThInput = typeof formData.get("altTh") === "string" ? String(formData.get("altTh")).trim() : "";
   const altEn = typeof formData.get("altEn") === "string" ? String(formData.get("altEn")).trim() : "";
   const focusId = typeof formData.get("focus") === "string" ? String(formData.get("focus")) : "";
@@ -156,6 +158,7 @@ export async function saveHeroSlideAction(formData: FormData): Promise<void> {
   const ok = await updateHeroPageSlide(
     id,
     {
+      locale,
       mediaPath,
       altTh,
       altEn,

@@ -28,6 +28,8 @@ export type AuditAction =
   /* สินค้า (รอบที่ 132) */
   | "product-save"
   | "product-category-save"
+  /** ข้อความหัวหน้า /products (รอบ 342) — แก้จากหน้าหมวดสินค้า */
+  | "products-page-copy-save"
   /* หมวดสินค้า: เพิ่ม/ซ่อน/คืนค่าเริ่มต้น/จัดลำดับ/พรีเซ็ต (มติ D25 · รอบที่ 264) */
   | "product-category-create"
   | "product-category-hide"

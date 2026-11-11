@@ -167,6 +167,14 @@ export function HeroSlideManager({
                 <input type="hidden" name="id" value={slide.id} />
                 <input type="hidden" name="mediaPath" value={draft.path} />
 
+                <label className="text-fg-muted flex flex-col gap-1 text-xs">
+                  {strings.heroAdminLocale}
+                  <select name="locale" defaultValue={slide.locale} className="border-line text-fg rounded-md border px-2 py-1 text-xs">
+                    <option value="all">{strings.heroLocaleAll}</option>
+                    <option value="th">{strings.heroLocaleTh}</option>
+                    <option value="en">{strings.heroLocaleEn}</option>
+                  </select>
+                </label>
 
                 <label className="text-fg-muted flex flex-col gap-1 text-xs">
                   {strings.heroAdminAltTh}

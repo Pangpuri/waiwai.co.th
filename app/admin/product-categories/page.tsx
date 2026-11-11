@@ -11,6 +11,7 @@ import {
 import { CategoryCreateForm } from "@/features/admin/ui/category-create-form";
 import { CategoryEditorForm } from "@/features/admin/ui/category-editor-form";
 import { CategoryPresetPanel } from "@/features/admin/ui/category-preset-panel";
+import { ProductsPageCopyForm } from "@/features/admin/ui/products-page-copy-form";
 import { SortableList } from "@/features/admin/ui/sortable-list";
 import { CATALOG_ITEMS } from "@/features/products/catalog";
 import { requireAdminUser } from "@/lib/auth/dal";
@@ -29,6 +30,7 @@ import {
   listCategoryPresets,
 } from "@/lib/products/categories-repository";
 import { categoryNameOf } from "@/lib/products/display";
+import { loadProductsPageCopyForEditing } from "@/lib/products/page-copy";
 
 /**
  * หลังบ้าน — **"หมวดสินค้า"** (รอบที่ 264 · มติเจ้าของ D25 · 2026-10-14)
@@ -78,12 +80,13 @@ export default async function AdminProductCategoriesPage({
             ? ""
             : messages.adminCategories.deleteCategoryHint;
 
-  const [rows, defaults, presets, media, reorderItems] = await Promise.all([
+  const [rows, defaults, presets, media, reorderItems, productsPageCopy] = await Promise.all([
     listAdminCategories(),
     listCategoryDefaults(),
     listCategoryPresets(),
     listMedia(60),
     listReorderItems("category"),
+    loadProductsPageCopyForEditing(),
   ]);
 
   const m2 = messages.adminCategories;
@@ -127,6 +130,9 @@ export default async function AdminProductCategoriesPage({
       {deleteMessage === "" ? null : (
         <AdminToast message={deleteMessage} tone={deleteError === "" ? "success" : "error"} trigger={query} />
       )}
+
+      {/* ข้อความหัวหน้า /products — ย้ายมาไว้ที่นี่ตามคำเจ้าของ (รอบ 342) */}
+      <ProductsPageCopyForm initial={productsPageCopy} strings={m2} />
 
       {/* สถานะค่าเริ่มต้นถาวร — บอกตรง ๆ ว่าพร้อมใช้หรือยังต้องรันสคริปต์ */}
       <p className={HELP_CLASS}>

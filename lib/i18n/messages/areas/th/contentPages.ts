@@ -29,6 +29,11 @@ export const recipesPage = {
     dbWatch: "เปิดใน YouTube",
     dbPublished: "เผยแพร่เมื่อ",
     dbNoCover: "ยังไม่มีภาพปก",
+    dbViews: "เข้าชม {count} ครั้ง",
+    dbRecipeDetails: "ดูสูตรอาหาร",
+    dbRecipeImageOpen: "เปิดดูภาพสูตร",
+    dbImageClose: "ปิดภาพ",
+    dbImageDialog: "ภาพสูตรอาหาร",
 };
 
 export const newsPage = {
@@ -51,6 +56,7 @@ export const newsPage = {
     dbListTitle: "ข่าวสารและกิจกรรมของไวไว",
     dbListCount: "ทั้งหมด {count} ข่าว",
     dbReadMore: "อ่านต่อ",
+    dbViewCount: "เข้าชม {count} ครั้ง",
     dbNoCover: "ยังไม่มีภาพข่าว",
     dbPrevious: "ก่อนหน้า",
     dbNext: "ถัดไป",

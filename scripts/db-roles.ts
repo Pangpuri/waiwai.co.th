@@ -64,6 +64,14 @@ export const PUBLIC_READ_TABLES: readonly string[] = [
 /** ตารางที่ **ฟอร์มสาธารณะ** เขียน/อ่าน (ทางเขียนเดียวที่คนนอกแตะได้) */
 export const PUBLIC_FORM_TABLES: readonly string[] = ["form_submission", "form_attachment"];
 
+/**
+ * คอลัมน์ที่ role ฟอร์มได้เพิ่มเพื่อ **นับวิวข่าว** (migration 0047)
+ * - select เฉพาะคอลัมน์ที่ใช้ใน WHERE (ไม่เปิดอ่านเนื้อหาข่าวทั้งตาราง)
+ * - update เฉพาะ `view_count` (แตะยอดวิวได้อย่างเดียว)
+ */
+export const NEWS_VIEW_GRANT_COLUMNS: readonly string[] = ["view_count"];
+export const NEWS_VIEW_WHERE_COLUMNS: readonly string[] = ["source_id", "status", "deleted_at"];
+
 /** ตารางอ่อนไหวที่ role **อ่านของหน้าเว็บ** ต้องไม่มีสิทธิ์เด็ดขาด */
 export const FORBIDDEN_FOR_PUBLIC_READ: readonly string[] = [
   "admin_user",
@@ -154,6 +162,15 @@ function grantStatements(role: string, tables: readonly string[], kind: "read" |
   return statements;
 }
 
+/** สิทธิ์เพิ่มของ role ฟอร์มสำหรับ "นับวิวข่าว" — แคบที่สุดเท่าที่คำสั่ง UPDATE ต้องใช้ */
+function newsViewGrantStatements(role: string): readonly string[] {
+  const columns = [...NEWS_VIEW_WHERE_COLUMNS, ...NEWS_VIEW_GRANT_COLUMNS].join(", ");
+  return [
+    `grant select (${columns}) on news to ${role}`,
+    `grant update (${NEWS_VIEW_GRANT_COLUMNS.join(", ")}) on news to ${role}`,
+  ];
+}
+
 async function applyStatements(statements: readonly string[], dryRun: boolean): Promise<void> {
   for (const statement of statements) {
     if (dryRun) continue;
@@ -207,6 +224,7 @@ async function main(): Promise<void> {
 
   const readStatements = grantStatements(READ_ROLE, PUBLIC_READ_TABLES, "read");
   const formStatements = grantStatements(FORM_ROLE, PUBLIC_FORM_TABLES, "form");
+  const metricStatements = newsViewGrantStatements(FORM_ROLE);
 
   if (options.dryRun) {
     process.stdout.write("── SQL ที่จะรัน (dry-run) ──\n");
@@ -216,10 +234,11 @@ async function main(): Promise<void> {
   await applyStatements(readStatements, options.dryRun);
   const roleForm = await ensureRole(FORM_ROLE, options.formPassword, options.dryRun);
   await applyStatements(formStatements, options.dryRun);
+  await applyStatements(metricStatements, options.dryRun);
   const seqStatements = await grantSequenceUsage(FORM_ROLE, PUBLIC_FORM_TABLES, options.dryRun);
 
   if (options.dryRun) {
-    for (const statement of [roleRead, ...readStatements, roleForm, ...formStatements, ...seqStatements]) {
+    for (const statement of [roleRead, ...readStatements, roleForm, ...formStatements, ...metricStatements, ...seqStatements]) {
       process.stdout.write(`  ${statement};\n`);
     }
     process.stdout.write("\n(dry-run — ไม่ได้แตะฐานข้อมูล)\n");
@@ -231,7 +250,7 @@ async function main(): Promise<void> {
 
   process.stdout.write(`✓ สร้าง/รีเฟรช role เรียบร้อย\n`);
   process.stdout.write(`  · ${READ_ROLE}  → SELECT ${String(PUBLIC_READ_TABLES.length)} ตาราง: ${PUBLIC_READ_TABLES.join(", ")}\n`);
-  process.stdout.write(`  · ${FORM_ROLE} → SELECT/INSERT: ${PUBLIC_FORM_TABLES.join(", ")}\n\n`);
+  process.stdout.write(`  · ${FORM_ROLE} → SELECT/INSERT: ${PUBLIC_FORM_TABLES.join(", ")} · UPDATE news.view_count\n\n`);
 
   const mustReveal = options.reveal || options.roGenerated || options.formGenerated;
   process.stdout.write("── ตั้งค่า env (ห้าม commit) ──\n");

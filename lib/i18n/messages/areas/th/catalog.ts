@@ -54,6 +54,9 @@ export const productsPage = {
     },
     /* รายการสินค้าในหมวด — ข้อมูลที่นำเข้าจากเว็บเดิม (S4 รอบที่ 103) */
     dbListTitle: "สินค้าในหมวดนี้",
+    marketTabsLabel: "ประเภทสินค้า",
+    marketDomestic: "สินค้าในประเทศ",
+    marketExport: "สินค้าส่งออก",
     dbListCount: "ทั้งหมด {count} รายการ",
     dbDetails: "รายละเอียดสินค้า",
     dbIngredients: "ส่วนผสม",

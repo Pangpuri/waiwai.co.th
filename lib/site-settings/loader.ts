@@ -59,6 +59,22 @@ function withNoticeDefaults(value: SiteSettings, messagesTh: Messages, messagesE
         en: pick(value.notices.careers.en, messagesEn.careersPage.note),
       },
     },
+    pageCopy: {
+      products: {
+        eyebrow: {
+          th: pick(value.pageCopy.products.eyebrow.th, messagesTh.productsPage.eyebrow),
+          en: pick(value.pageCopy.products.eyebrow.en, messagesEn.productsPage.eyebrow),
+        },
+        title: {
+          th: pick(value.pageCopy.products.title.th, messagesTh.productsPage.title),
+          en: pick(value.pageCopy.products.title.en, messagesEn.productsPage.title),
+        },
+        intro: {
+          th: pick(value.pageCopy.products.intro.th, messagesTh.productsPage.intro),
+          en: pick(value.pageCopy.products.intro.en, messagesEn.productsPage.intro),
+        },
+      },
+    },
   };
 }
 

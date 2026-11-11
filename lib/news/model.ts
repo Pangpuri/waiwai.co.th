@@ -118,6 +118,16 @@ export function formatNewsDate(publishedLocal: string | null, language: "th" | "
   }
 }
 
+/** จำนวนวิวแบบมีตัวคั่นหลักพัน — ค่าผิดรูป = 0 (ไม่ทำให้หน้าพัง) */
+export function formatViewCount(value: number, language: "th" | "en"): string {
+  const safe = Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+  try {
+    return new Intl.NumberFormat(language === "th" ? "th-TH" : "en-GB").format(safe);
+  } catch {
+    return String(safe);
+  }
+}
+
 export function validateNewsInput(input: NewsInput): readonly NewsIssue[] {
   const issues: NewsIssue[] = [];
 

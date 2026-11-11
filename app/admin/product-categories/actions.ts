@@ -7,6 +7,7 @@ import {
   type CategoryFormState,
   type CategoryPresetState,
   type CategoryReorderState,
+  type ProductsPageCopyState,
 } from "@/features/admin/category-state";
 import { isDatabaseConfigured } from "@/db/pool";
 import { parseOrderCsv, reorderRows } from "@/lib/admin/reorder";
@@ -41,6 +42,8 @@ import {
 } from "@/lib/products/categories-repository";
 /* โหมดเขียนภาพใช้ตัวกลางตัวเดิม (บทเรียนจริงรอบที่ 263: ไม่มีคีย์ในฟอร์ม = ไม่แตะภาพ) */
 import { imageWriteMode } from "@/lib/products/media-mode";
+import { parseProductsPageCopy } from "@/lib/products/page-copy-model";
+import { saveAndPublishProductsPageCopy } from "@/lib/products/page-copy";
 
 /**
  * Server Action ของหน้าจอ **"หมวดสินค้า"** (รอบที่ 264 · มติ D25)
@@ -129,6 +132,45 @@ export async function saveCategoryAction(
   revalidateAdminPath(LIST_PATH);
   await refreshPublicSite("page");
   return { status: "saved", reason: "", createdSlug: "" };
+}
+
+/**
+ * ข้อความหัวหน้า `/products` (eyebrow/title/intro) — รอบ 342
+ * เจ้าของขอให้แก้ที่หน้าจอ **"หมวดสินค้า"** ไม่ใช่หน้าตั้งค่าองค์กร
+ *
+ * - เก็บแยกคีย์ `products-page-copy` ⇒ กดบันทึกแล้วเผยแพร่ทันที
+ * - ไม่ไปยุ่ง/เผยแพร่งานค้างของ `site-settings`
+ * - ค่าว่าง = หน้าเว็บถอยไปใช้ข้อความเดิมจากพจนานุกรม
+ */
+export async function saveProductsPageCopyAction(
+  _previous: ProductsPageCopyState,
+  formData: FormData,
+): Promise<ProductsPageCopyState> {
+  const user = await requireAdminUser("content");
+  if (!isDatabaseConfigured()) return { status: "error", reason: "database" };
+
+  const copy = parseProductsPageCopy({
+    eyebrow: { th: field(formData, "eyebrowTh"), en: field(formData, "eyebrowEn") },
+    title: { th: field(formData, "titleTh"), en: field(formData, "titleEn") },
+    intro: { th: field(formData, "introTh"), en: field(formData, "introEn") },
+  });
+  if (copy === null) return { status: "error", reason: "invalid" };
+
+  try {
+    await saveAndPublishProductsPageCopy(copy, user.email);
+  } catch {
+    return { status: "error", reason: "database" };
+  }
+
+  await recordAudit({
+    action: "products-page-copy-save",
+    actorEmail: user.email,
+    target: "products-page-copy",
+    detail: "published",
+  });
+  revalidateAdminPath(LIST_PATH);
+  await refreshPublicSite("page");
+  return { status: "saved", reason: "" };
 }
 
 /**

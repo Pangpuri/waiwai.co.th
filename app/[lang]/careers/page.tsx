@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 
 import { buildBoard, buildPostingBoard } from "@/features/careers/board";
 import { CAREERS_CONTACT } from "@/features/careers/contact";
-import { JOBS, countPositions, departmentsInUse, totalOpenings } from "@/features/careers/jobs";
+import { JOBS } from "@/features/careers/jobs";
 import { isDatabaseConfigured } from "@/db/pool";
-import { jobStats, jobTitle } from "@/lib/careers/model";
+import { jobTitle } from "@/lib/careers/model";
 import { listJobPostings } from "@/lib/careers/repository";
 import { ApplicationForm } from "@/features/careers/ui/application-form";
 import { JobBoard } from "@/features/careers/ui/job-board";
@@ -95,16 +95,6 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
   const databaseReady = isDatabaseConfigured();
   const board = databaseReady ? buildPostingBoard(postings, messages, lang) : buildBoard(messages);
 
-  /* ตัวเลขในส่วนหัวคำนวณจากข้อมูลจริง (ชุดเดียวกับที่แสดงบนกระดาน) */
-  const counts = databaseReady
-    ? jobStats(postings)
-    : { positions: countPositions(), openings: totalOpenings(), departments: departmentsInUse().length };
-  const stats: readonly { readonly value: number; readonly label: string }[] = [
-    { value: counts.positions, label: m.stats.positions },
-    { value: counts.openings, label: m.stats.openings },
-    { value: counts.departments, label: m.stats.departments },
-  ];
-
   return (
     <>
       <section className="border-b border-line bg-bg-subtle">
@@ -130,21 +120,6 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
             {m.intro}
           </p>
 
-          <ul className="mt-9 flex flex-wrap gap-3">
-            {stats.map((stat) => (
-              <li
-                key={stat.label}
-                className="rounded-2xl border border-line bg-surface px-5 py-4"
-              >
-                <span className="block font-display text-3xl leading-none font-extrabold text-fg">
-                  {stat.value}
-                </span>
-                <span className="mt-1.5 block text-xs font-semibold text-fg-muted">
-                  {stat.label}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
 

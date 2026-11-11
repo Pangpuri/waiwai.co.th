@@ -72,6 +72,13 @@ const recipeRow: RecipeRecord = {
   coverPath: "/media/cover1",
   coverWidth: 800,
   coverHeight: 600,
+  detailsTh: "",
+  detailsEn: "",
+  recipeImagePath: null,
+  recipeImageWidth: null,
+  recipeImageHeight: null,
+  viewCount: 0,
+  viewCountUpdatedAt: null,
   videoProvider: "youtube",
   videoId: "abc123",
   publishedOn: "2026-08-01",
@@ -93,6 +100,7 @@ const newsRow: NewsRecord = {
   publishedLocal: "2026-09-12T11:28",
   publishedLabel: "12 กันยายน 2026 11:28",
   seo: EMPTY_PAGE_SEO,
+  viewCount: 0,
 };
 
 /* ── 1) หมวดสินค้า: ลิงก์ต้องชี้ slug จริงเสมอ ─────────────────────────────── */

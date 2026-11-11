@@ -8,6 +8,7 @@ import { INITIAL_RECIPE_SAVE_STATE, INITIAL_RECIPE_UPLOAD_STATE } from "@/featur
 import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { CoverImagePicker } from "@/features/admin/ui/cover-image-picker";
 import { RecipeVideoList, type RecipeVideoListStrings } from "@/features/recipes/ui/recipe-video-list";
+import { formatNumber } from "@/lib/format";
 import { fillTemplate } from "@/lib/i18n/template";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { youTubeIdFromInput } from "@/lib/recipes/model";
@@ -39,6 +40,13 @@ export type RecipeEditorInitial = {
   readonly sortOrder: number;
   /** `/media/<id>` หรือ "" */
   readonly coverPath: string;
+  /** ข้อความสูตร TH/EN (migration 0048) */
+  readonly detailsTh: string;
+  readonly detailsEn: string;
+  /** `/media/<id>` หรือ "" */
+  readonly recipeImagePath: string;
+  /** ยอดวิว YouTube ที่แคชไว้ (อ่านอย่างเดียวในฟอร์ม) */
+  readonly viewCount: number;
   readonly status: "draft" | "published";
 };
 
@@ -64,9 +72,12 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     titleTh: props.initial.titleTh,
     titleEn: props.initial.titleEn,
     videoId: props.initial.videoId,
+    detailsTh: props.initial.detailsTh,
+    detailsEn: props.initial.detailsEn,
     publishedOn: props.initial.publishedOn,
     sortOrder: String(props.initial.sortOrder),
     coverPath: props.initial.coverPath,
+    recipeImagePath: props.initial.recipeImagePath,
     status: props.initial.status as "draft" | "published",
   });
   /* ภาษาของพรีวิว (รอบที่ 137) — แยกจากค่าที่บันทึก: ดูด่าน EN ได้โดยไม่ต้องสลับทั้งหน้าจอ */
@@ -93,6 +104,13 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     coverPath: fields.coverPath === "" ? null : fields.coverPath,
     coverWidth: null,
     coverHeight: null,
+    detailsTh: fields.detailsTh,
+    detailsEn: fields.detailsEn,
+    recipeImagePath: fields.recipeImagePath === "" ? null : fields.recipeImagePath,
+    recipeImageWidth: null,
+    recipeImageHeight: null,
+    viewCount: props.initial.viewCount,
+    viewCountUpdatedAt: null,
     videoProvider: "youtube",
     videoId: detectedVideoId ?? "",
     publishedOn: fields.publishedOn === "" ? null : fields.publishedOn,
@@ -239,6 +257,55 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
           uploadAction={uploadRecipeImageAction}
           initialUploadState={INITIAL_RECIPE_UPLOAD_STATE}
         />
+
+        {/* ข้อความสูตร (migration 0048) — ว่างได้ · ไม่มีทั้งข้อความและภาพ = การ์ดจะไม่มีการกางรายละเอียด */}
+        <label className="block">
+          <span className={LABEL_CLASS}>{m.recipesAdminFieldDetails}</span>
+          <textarea
+            name="detailsTh"
+            value={fields.detailsTh}
+            onChange={(event) => setField("detailsTh", event.target.value)}
+            rows={5}
+            className={INPUT_CLASS}
+          />
+        </label>
+        <label className="block">
+          <span className={LABEL_CLASS}>{m.recipesAdminFieldDetailsEn}</span>
+          <textarea
+            name="detailsEn"
+            value={fields.detailsEn}
+            onChange={(event) => setField("detailsEn", event.target.value)}
+            rows={5}
+            className={INPUT_CLASS}
+          />
+        </label>
+
+        {/* ภาพสูตร (migration 0048) — ภาพย่อพอดีการ์ด + กดดูเต็มจอได้ */}
+        <CoverImagePicker
+          labels={{
+            field: m.recipesAdminFieldRecipeImage,
+            empty: m.recipesAdminNoRecipeImage,
+            previewAlt: m.recipesAdminFieldRecipeImage,
+            upload: m.recipesAdminUpload,
+            uploadHint: m.recipesAdminUploadHint,
+            uploading: m.recipesAdminUploading,
+            uploadFailed: m.recipesAdminUploadFailed,
+            pickFromLibrary: m.recipesAdminPickImage,
+            cancel: m.recipesAdminCancel,
+            remove: m.recipesAdminRecipeImageRemove,
+            storedInLibrary: m.recipesAdminCoverStoredInLibrary,
+            noImages: m.recipesAdminNoImages,
+          }}
+          value={fields.recipeImagePath}
+          onChange={(next) => setField("recipeImagePath", next)}
+          library={props.library}
+          uploadAction={uploadRecipeImageAction}
+          initialUploadState={INITIAL_RECIPE_UPLOAD_STATE}
+        />
+
+        <p className="text-fg-muted text-xs">
+          {m.recipesAdminViewCount}: {formatNumber(props.initial.viewCount, "th")} · {m.recipesAdminViewCountHint}
+        </p>
 
         <div>
           <button type="submit" disabled={pending} className={PRIMARY_CLASS}>

@@ -5,7 +5,8 @@ import type { ImageWriteMode } from "@/lib/products/media-mode";
 import { readQuery } from "@/lib/db/read";
 /* ลำดับตั้งต้นของหมวด = ลำดับในโค้ด (migration 0039 · รอบที่ 264) */
 import { defaultSortOrderOf } from "@/lib/products/categories";
-import type { ProductCategoryInput, ProductIngredientInput, ProductInput } from "@/lib/products/model";
+import type { ProductCategoryInput, ProductIngredientInput, ProductInput, ProductMarket } from "@/lib/products/model";
+import { isProductMarket } from "@/lib/products/model";
 import { normalizeSearchText } from "@/lib/search/params";
 
 /**
@@ -33,6 +34,8 @@ export type ProductIngredientRecord = {
 export type ProductRecord = {
   readonly id: string;
   readonly categoryId: string;
+  /** ประเภทตลาด (migration 0046) — domestic/export */
+  readonly market: ProductMarket;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly groupTh: string;
@@ -90,7 +93,7 @@ export type ProductCategoryRecord = {
   "column reference \"id\" is ambiguous" แล้วหน้าจะไม่แสดงสินค้าเลยทั้งที่ข้อมูลอยู่ (เจอจริงตอนเขียนด่าน check:db)
 */
 const PRODUCT_COLUMNS =
-  "p.id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.sort_order";
+  "p.id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.sort_order";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -98,6 +101,12 @@ function text(value: unknown): string {
 
 function mediaPath(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? `/media/${value}` : null;
+}
+
+/** ค่าประเภทตลาดจาก DB — ค่าแปลกปลอม/ยังไม่ migrate = domestic (ไม่ทำให้หน้าพัง) */
+function marketOf(value: unknown): ProductMarket {
+  const raw = text(value);
+  return isProductMarket(raw) ? raw : "domestic";
 }
 
 function readIngredients(raw: unknown): readonly ProductIngredientRecord[] {
@@ -122,6 +131,7 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
   return {
     id,
     categoryId,
+    market: marketOf(row.market),
     nameTh,
     nameEn: text(row.name_en),
     groupTh: text(row.group_th),
@@ -290,8 +300,12 @@ export async function findCategoryHistoryBySlug(slug: string): Promise<CategoryS
  * สินค้าในหมวด (เรียงตามลำดับที่นำเข้า) พร้อมส่วนผสม — คืน `[]` เสมอถ้าอ่านไม่ได้
  * ⚠️ รอบที่ 280: รับ **slug หรือ id ของหมวด** (join `product_category` แล้วเทียบทั้งสองช่อง)
  *    ⇒ หน้าที่เปิดด้วย slug ที่เปลี่ยนไปแล้วยังได้สินค้าครบ
+ * 🆕 รอบ 342: แยกตาม `market` (domestic/export) — ค่าเริ่มต้น = domestic (พฤติกรรมเดิม)
  */
-export async function listProductsByCategory(categoryIdOrSlug: string): Promise<readonly ProductRecord[]> {
+export async function listProductsByCategory(
+  categoryIdOrSlug: string,
+  market: ProductMarket = "domestic",
+): Promise<readonly ProductRecord[]> {
   const value = categoryIdOrSlug.trim();
   if (!isDatabaseConfigured() || value === "") return [];
   try {
@@ -311,10 +325,11 @@ export async function listProductsByCategory(categoryIdOrSlug: string): Promise<
          left join product_ingredient i on i.product_id = p.id
          left join media m on m.id = p.image_media_id
         where (c.slug = $1 or c.id = $1)
+          and p.market = $2
           and ${PUBLIC_PRODUCT_CONDITION}
         group by p.id
         order by p.sort_order, p.id`,
-      [value],
+      [value, market],
     );
 
     const items: ProductRecord[] = [];
@@ -328,14 +343,14 @@ export async function listProductsByCategory(categoryIdOrSlug: string): Promise<
   }
 }
 
-/** จำนวนสินค้าต่อหมวด — ใช้แสดงผลสรุป (คืน {} ถ้าอ่านไม่ได้) */
+/** จำนวนสินค้า **ในประเทศ** ต่อหมวด — ใช้แสดงผลสรุป (คืน {} ถ้าอ่านไม่ได้) */
 export async function countProductsByCategory(): Promise<Readonly<Record<string, number>>> {
   if (!isDatabaseConfigured()) return {};
   try {
     const result = await readQuery<{ category_id: string; total: string }>(
       `select p.category_id, count(*)::text as total
          from product p
-        where ${PUBLIC_PRODUCT_CONDITION}
+        where ${PUBLIC_PRODUCT_CONDITION} and p.market = 'domestic'
         group by p.category_id`,
     );
     const counts: Record<string, number> = {};
@@ -449,7 +464,8 @@ export async function listProductCategoryCards(): Promise<readonly ProductCatego
          /* โลโก้การ์ด (migration 0037) — ภาพคนละใบกับภาพหัวหมวด */
          left join media lm on lm.id = c.logo_media_id
          /* ⚠️ รอบที่ 139: ใส่เงื่อนไขถังขยะใน join (ไม่ใช่ where) เพื่อให้หมวดที่ไม่มีสินค้าเหลือยังได้การ์ดอยู่ */
-         left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION}
+         /* รอบ 342: นับเฉพาะสินค้าในประเทศ (แท็บเริ่มต้น) — สินค้าส่งออกมีแท็บของตัวเอง */
+         left join product p on p.category_id = c.id and ${PUBLIC_PRODUCT_CONDITION} and p.market = 'domestic'
         where c.is_hidden = false
         group by c.id, c.sort_order, c.is_hidden, m.id, m.width, m.height, lm.id, lm.width, lm.height
         order by c.sort_order, c.id`,
@@ -519,7 +535,7 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
               m.height      as "imageHeight"
          from product p
          join media m on m.id = p.image_media_id
-        where ${PUBLIC_PRODUCT_CONDITION}
+        where ${PUBLIC_PRODUCT_CONDITION} and p.market = 'domestic'
         order by p.category_id, p.sort_order, p.id`,
     );
 
@@ -702,14 +718,15 @@ export async function upsertProduct(
       ),
       upserted as (
         insert into product (
-          id, category_id, source_id, source_url, name_th, name_en, group_th, group_en,
+          id, category_id, market, source_id, source_url, name_th, name_en, group_th, group_en,
           tagline_th, tagline_en, details_th, details_en, allergens_th, allergens_en,
           net_weight_th, net_weight_en, fda_number, packaging_th, packaging_en,
           image_media_id, sort_order, updated_at, updated_by
-        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-                  $20, $21, now(), $22)
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+                  $21, $22, now(), $23)
         on conflict (id) do update set
           category_id    = ${guardedColumn(options.writeMode, "category_id")},
+          market         = ${guardedColumn(options.writeMode, "market")},
           source_id      = excluded.source_id,
           source_url     = excluded.source_url,
           name_th        = ${guardedColumn(options.writeMode, "name_th")},
@@ -738,6 +755,7 @@ export async function upsertProduct(
     [
       input.id,
       input.categoryId,
+      input.market ?? "domestic",
       input.sourceId,
       input.sourceUrl,
       input.nameTh,
@@ -824,6 +842,8 @@ export type AdminProductListItem = {
   readonly id: string;
   readonly sourceId: string;
   readonly categoryId: string;
+  /** ประเภทตลาด (migration 0046) */
+  readonly market: ProductMarket;
   readonly nameTh: string;
   readonly nameEn: string;
   readonly groupTh: string;
@@ -855,7 +875,7 @@ export type AdminProductDetail = AdminProductListItem & {
   readonly ingredients: readonly ProductIngredientRecord[];
 };
 
-const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.name_th, p.name_en, p.group_th, p.group_en,
+const ADMIN_PRODUCT_COLUMNS = `p.id, p.source_id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en,
        p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en,
        p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.sort_order,
        (p.deleted_at is not null) as trashed,
@@ -875,6 +895,7 @@ function toAdminProduct(row: Record<string, unknown>): AdminProductListItem | nu
     id,
     sourceId: typeof row.source_id === "string" ? row.source_id : "",
     categoryId: typeof row.category_id === "string" ? row.category_id : "",
+    market: marketOf(row.market),
     nameTh: typeof row.name_th === "string" ? row.name_th : "",
     nameEn: typeof row.name_en === "string" ? row.name_en : "",
     groupTh: typeof row.group_th === "string" ? row.group_th : "",
@@ -939,6 +960,7 @@ export async function setProductTrashed(id: string, trashed: boolean, actor: str
 /** รายการสินค้าสำหรับหลังบ้าน (กรองตามหมวด + ค้นหา + แท็บ) */
 export async function listProductsForAdmin(input: {
   readonly categoryId?: string;
+  readonly market?: ProductMarket;
   readonly search?: string;
   readonly tab?: AdminProductTab;
 }): Promise<{ readonly items: readonly AdminProductListItem[]; readonly total: number }> {
@@ -954,6 +976,10 @@ export async function listProductsForAdmin(input: {
   if (category !== "") {
     params.push(category);
     where.push(`p.category_id = $${String(params.length)}`);
+  }
+  if (input.market !== undefined) {
+    params.push(input.market);
+    where.push(`p.market = $${String(params.length)}`);
   }
   /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ห้ามให้อักขระควบคุม/NUL ถึง SQL */
   const term = normalizeSearchText(input.search ?? "", 80);

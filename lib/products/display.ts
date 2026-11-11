@@ -73,6 +73,30 @@ export function productPackagingOf(product: BilingualProductText, language: Loca
   return bilingualProductText(product.packagingTh, product.packagingEn, language);
 }
 
+/**
+ * สินค้านี้มี "ข้อมูลให้กาง" ไหม — ใช้ตัดสินว่าจะแสดง `<details>` หรือไม่
+ *
+ * รอบ 342 (คำเจ้าของ): สินค้าส่งออกบางรายการมีแค่ชื่อ/ภาพ ไม่มีคำโปรย ส่วนผสม น้ำหนัก ฯลฯ
+ * ⇒ การ์ดไม่ควรบอกว่า "รายละเอียดสินค้า" แล้วกดออกมาเจอกล่องว่าง
+ *
+ * กติกา: มีข้อมูลอย่างน้อย 1 ช่องจากทุกช่องที่แสดงในกล่อง = แสดง
+ * (ชื่อ/กลุ่มอยู่บนการ์ดแล้ว ไม่นับเป็น "ข้อมูลในกล่อง")
+ */
+export function productHasDetails(
+  product: BilingualProductText & { readonly fdaNumber: string; readonly ingredients: readonly unknown[] },
+  language: Locale,
+): boolean {
+  return (
+    productTaglineOf(product, language).trim() !== "" ||
+    product.ingredients.length > 0 ||
+    productNetWeightOf(product, language).trim() !== "" ||
+    product.fdaNumber.trim() !== "" ||
+    productPackagingOf(product, language).trim() !== "" ||
+    productAllergensOf(product, language).trim() !== "" ||
+    productDetailsOf(product, language).trim() !== ""
+  );
+}
+
 /* ── หมวดสินค้า: ชื่อ + โลโก้ (migration 0037 · รอบที่ 254 · มติ D24) ──────────────
 
    หลังบ้านแก้ "ชื่อหมวด" และ "โลโก้การ์ด" ได้ ⇒ หน้าเว็บต้องเลือกค่าที่ถูกต้อง:

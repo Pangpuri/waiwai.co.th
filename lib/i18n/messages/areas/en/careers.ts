@@ -28,7 +28,7 @@ export const careersPage = {
       departments: "Departments",
     },
     boardTitle: "Open positions",
-    boardIntro: "Browse by department, or press “All” to see every position.",
+    boardIntro: "All open positions",
     filterGroup: "Filter positions by department",
     filterAll: "All",
     positionUnit: "positions",

@@ -77,6 +77,10 @@ export default async function AdminRecipeEditorPage({
             publishedOn: existing?.publishedOn ?? "",
             sortOrder: existing?.sortOrder ?? 0,
             coverPath: existing?.coverPath ?? "",
+            detailsTh: existing?.detailsTh ?? "",
+            detailsEn: existing?.detailsEn ?? "",
+            recipeImagePath: existing?.recipeImagePath ?? "",
+            viewCount: existing?.viewCount ?? 0,
             status: existing?.status ?? "draft",
           }}
         />

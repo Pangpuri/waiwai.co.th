@@ -47,6 +47,18 @@ export type SiteSettings = {
     readonly contactForm: LocalizedValue;
     readonly careers: LocalizedValue;
   };
+  /**
+   * ข้อความหัวหน้า `/products` — **ที่เก็บจริงย้ายไป `page_document` คีย์ `products-page-copy` แล้ว**
+   * (แก้ที่ `/admin/product-categories` · `lib/products/page-copy.ts`)
+   * คงฟิลด์นี้ไว้เป็น **fallback ของค่าเก่า** เพื่อไม่ให้ข้อความที่เคยตั้งไว้หาย
+   */
+  readonly pageCopy: {
+    readonly products: {
+      readonly eyebrow: LocalizedValue;
+      readonly title: LocalizedValue;
+      readonly intro: LocalizedValue;
+    };
+  };
 };
 
 export const EMPTY_SITE_SETTINGS: SiteSettings = {
@@ -63,6 +75,13 @@ export const EMPTY_SITE_SETTINGS: SiteSettings = {
   notices: {
     contactForm: { th: "", en: "" },
     careers: { th: "", en: "" },
+  },
+  pageCopy: {
+    products: {
+      eyebrow: { th: "", en: "" },
+      title: { th: "", en: "" },
+      intro: { th: "", en: "" },
+    },
   },
 };
 
@@ -83,6 +102,13 @@ export function defaultSiteSettings(messages: Messages): SiteSettings {
     notices: {
       contactForm: { th: "", en: "" },
       careers: { th: "", en: "" },
+    },
+    pageCopy: {
+      products: {
+        eyebrow: { th: messages.productsPage.eyebrow, en: messages.productsPage.eyebrow },
+        title: { th: messages.productsPage.title, en: messages.productsPage.title },
+        intro: { th: messages.productsPage.intro, en: messages.productsPage.intro },
+      },
     },
   };
 }
@@ -125,6 +151,9 @@ export function parseSiteSettings(raw: unknown, messages: Messages): SiteSetting
   const rawSocials = raw["socials"];
   const rawNotices = raw["notices"] === undefined ? {} : raw["notices"];
   if (!isRecord(rawNotices)) return { ok: false, problems: ["notices: ต้องเป็นออบเจ็กต์"] };
+  const rawPageCopy = raw["pageCopy"] === undefined ? {} : raw["pageCopy"];
+  if (!isRecord(rawPageCopy)) return { ok: false, problems: ["pageCopy: ต้องเป็นออบเจ็กต์"] };
+  const rawProductsCopy = isRecord(rawPageCopy["products"]) ? rawPageCopy["products"] : {};
 
   const socials: string[] = [];
   if (rawSocials !== undefined && !Array.isArray(rawSocials)) {
@@ -152,6 +181,13 @@ export function parseSiteSettings(raw: unknown, messages: Messages): SiteSetting
       notices: {
         contactForm: toNotice(rawNotices["contactForm"], fallback.notices.contactForm),
         careers: toNotice(rawNotices["careers"], fallback.notices.careers),
+      },
+      pageCopy: {
+        products: {
+          eyebrow: toNotice(rawProductsCopy["eyebrow"], fallback.pageCopy.products.eyebrow),
+          title: toNotice(rawProductsCopy["title"], fallback.pageCopy.products.title),
+          intro: toNotice(rawProductsCopy["intro"], fallback.pageCopy.products.intro),
+        },
       },
     },
   };

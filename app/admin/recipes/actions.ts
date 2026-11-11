@@ -80,6 +80,8 @@ export async function saveRecipeAction(_previous: RecipeSaveState, formData: For
     titleTh: field(formData, "titleTh").trim(),
     titleEn: field(formData, "titleEn").trim(),
     videoId: youTubeIdFromInput(videoIdInput) ?? videoIdInput,
+    detailsTh: formData.has("detailsTh") ? field(formData, "detailsTh").trim() : (existing?.detailsTh ?? ""),
+    detailsEn: formData.has("detailsEn") ? field(formData, "detailsEn").trim() : (existing?.detailsEn ?? ""),
     publishedOn,
     sortOrder: readInt(field(formData, "sortOrder")),
     /* ⚠️ รอบที่ 263: ฟิลด์ไม่ถูกส่ง = ไม่ได้แตะช่องภาพปก ⇒ คงภาพเดิม (ดูเหตุผลใน app/admin/news/actions.ts) */
@@ -88,6 +90,12 @@ export async function saveRecipeAction(_previous: RecipeSaveState, formData: For
         ? null
         : field(formData, "coverPath").trim()
       : (existing?.coverPath ?? null),
+    /* ภาพสูตร (migration 0048) — กติกาเดียวกับภาพปก */
+    recipeImagePath: formData.has("recipeImagePath")
+      ? field(formData, "recipeImagePath").trim() === ""
+        ? null
+        : field(formData, "recipeImagePath").trim()
+      : (existing?.recipeImagePath ?? null),
     status: statusOf(field(formData, "status")),
   };
 
@@ -230,7 +238,7 @@ export async function restoreRecipeRevisionAction(formData: FormData): Promise<v
   await recordRecipeRevision(id, user.email, "ก่อนกู้คืน");
 
   const restore = recipeRestoreOf(snapshot);
-  await updateRecipeForAdmin(id, { ...restore.values, coverPath: restore.coverPath }, user.email);
+  await updateRecipeForAdmin(id, { ...restore.values, coverPath: restore.coverPath, recipeImagePath: restore.recipeImagePath }, user.email);
   await recordRecipeRevision(id, user.email, `กู้คืนรุ่น #${revisionId}`);
   await recordAudit({
     action: "recipe-revision-restore",

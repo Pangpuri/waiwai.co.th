@@ -34,3 +34,11 @@ export const INITIAL_CATEGORY_PRESET_STATE: CategoryPresetState = {
 export type CategoryReorderState = { readonly saved: number; readonly failed: boolean };
 
 export const INITIAL_CATEGORY_REORDER_STATE: CategoryReorderState = { saved: 0, failed: false };
+
+/** สถานะฟอร์ม "ข้อความหัวหน้าผลิตภัณฑ์" (รอบ 342 — ย้ายมาไว้หน้าหมวดสินค้า) */
+export type ProductsPageCopyState = {
+  readonly status: "idle" | "saved" | "error";
+  readonly reason: "" | "database" | "invalid";
+};
+
+export const INITIAL_PRODUCTS_PAGE_COPY_STATE: ProductsPageCopyState = { status: "idle", reason: "" };

@@ -13,9 +13,12 @@ import { readQuery } from "@/lib/db/read";
 import { frameOf, type PrCardFrame } from "@/lib/hero/pr-card-frame";
 import {
   DEFAULT_HERO_SETTING,
+  isHeroSlideLocale,
   parseHeroSetting,
+  selectHeroSlidesForLocale,
   sortHeroPageSlides,
   type HeroPageSlide,
+  type HeroSlideLocale,
   type HeroSetting,
 } from "@/lib/hero/model";
 
@@ -25,6 +28,7 @@ export const PUBLIC_HERO_CONDITION = "deleted_at is null and is_active";
 type HeroSlideRow = {
   readonly id: string;
   readonly sort_order: number;
+  readonly locale: string;
   readonly media_path: string;
   readonly alt_th: string;
   readonly alt_en: string;
@@ -38,6 +42,7 @@ function toSlide(row: HeroSlideRow): HeroPageSlide {
   return {
     id: row.id,
     sortOrder: row.sort_order,
+    locale: isHeroSlideLocale(row.locale) ? row.locale : "all",
     mediaPath: row.media_path,
     altTh: row.alt_th,
     altEn: row.alt_en,
@@ -53,17 +58,18 @@ function toSlide(row: HeroSlideRow): HeroPageSlide {
  * สไลด์ที่หน้าเว็บควรแสดง (เรียงตามลำดับ) — **คืน `[]` เสมอเมื่อมีปัญหา**
  * ไม่มี DB = ไม่ throw · ตารางยังไม่มี (ยังไม่ migrate) = จับ error แล้วคืน `[]`
  */
-export async function listHeroPageSlides(): Promise<readonly HeroPageSlide[]> {
+export async function listHeroPageSlides(locale?: "th" | "en"): Promise<readonly HeroPageSlide[]> {
   if (!isDatabaseConfigured()) return [];
   try {
     const result = await readQuery<HeroSlideRow>(
-      `select id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active
+      `select id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active
          from hero_slide
         where ${PUBLIC_HERO_CONDITION}
         order by sort_order asc, id asc`,
     );
-    const slides = result.rows.map(toSlide);
-    return sortHeroPageSlides(slides.filter((slide) => slide.mediaPath.trim() !== ""));
+    const slides = result.rows.map(toSlide).filter((slide) => slide.mediaPath.trim() !== "");
+    const selected = locale === undefined ? slides : selectHeroSlidesForLocale(slides, locale);
+    return sortHeroPageSlides(selected);
   } catch {
     /* ฐานข้อมูลล่ม/ตารางหาย = หน้าเว็บต้องไม่พัง (ถอยไปใช้เทมเพลต) */
     return [];
@@ -74,7 +80,7 @@ export async function listHeroPageSlides(): Promise<readonly HeroPageSlide[]> {
 export async function listHeroPageSlidesForAdmin(): Promise<readonly HeroPageSlide[]> {
   if (!isDatabaseConfigured()) return [];
   const result = await getPool().query<HeroSlideRow>(
-    `select id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active
+    `select id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active
        from hero_slide
       where deleted_at is null
       order by sort_order asc, id asc`,
@@ -94,10 +100,11 @@ export async function saveHeroPageSlide(
 ): Promise<{ readonly created: boolean }> {
   const preserve = options.preserveOrder === true;
   const result = await getPool().query(
-    `insert into hero_slide (id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `insert into hero_slide (id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      on conflict (id) do update set
-       sort_order = case when $11 then hero_slide.sort_order else excluded.sort_order end,
+       sort_order = case when $12 then hero_slide.sort_order else excluded.sort_order end,
+       locale = excluded.locale,
        media_path = excluded.media_path,
        alt_th = excluded.alt_th,
        alt_en = excluded.alt_en,
@@ -111,6 +118,7 @@ export async function saveHeroPageSlide(
     [
       slide.id,
       slide.sortOrder,
+      slide.locale ?? "all",
       slide.mediaPath,
       slide.altTh,
       slide.altEn,
@@ -134,8 +142,8 @@ export async function saveHeroPageSlide(
 export async function createHeroPageSlide(actor: string): Promise<string | null> {
   const id = `hero-${Date.now().toString(36)}`;
   const result = await getPool().query(
-    `insert into hero_slide (id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
-     values ($1, (select coalesce(max(sort_order), 0) + 10 from hero_slide), '', '', '', 50, 50, 1, true, $2)
+    `insert into hero_slide (id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, updated_by)
+     values ($1, (select coalesce(max(sort_order), 0) + 10 from hero_slide), 'all', '', '', '', 50, 50, 1, true, $2)
      on conflict (id) do nothing`,
     [id, actor],
   );
@@ -145,15 +153,15 @@ export async function createHeroPageSlide(actor: string): Promise<string | null>
 /** บันทึกภาพ/คำอธิบาย/จุดโฟกัส/ซูม/เปิด-ปิด ของสไลด์หนึ่งใบ (ไม่แตะลำดับ) */
 export async function updateHeroPageSlide(
   id: string,
-  input: { readonly mediaPath: string; readonly altTh: string; readonly altEn: string; readonly focusX: number; readonly focusY: number; readonly zoom: number; readonly isActive: boolean },
+  input: { readonly locale: HeroSlideLocale; readonly mediaPath: string; readonly altTh: string; readonly altEn: string; readonly focusX: number; readonly focusY: number; readonly zoom: number; readonly isActive: boolean },
   actor: string,
 ): Promise<boolean> {
   const result = await getPool().query(
     `update hero_slide
-        set media_path = $2, alt_th = $3, alt_en = $4, focus_x = $5, focus_y = $6, zoom = $7, is_active = $8,
-            updated_at = now(), updated_by = $9
+        set locale = $2, media_path = $3, alt_th = $4, alt_en = $5, focus_x = $6, focus_y = $7, zoom = $8, is_active = $9,
+            updated_at = now(), updated_by = $10
       where id = $1 and deleted_at is null`,
-    [id, input.mediaPath, input.altTh, input.altEn, input.focusX, input.focusY, input.zoom, input.isActive, actor],
+    [id, input.locale, input.mediaPath, input.altTh, input.altEn, input.focusX, input.focusY, input.zoom, input.isActive, actor],
   );
   return (result.rowCount ?? 0) > 0;
 }
@@ -255,7 +263,7 @@ function toIsoStamp(value: Date | string | null): string {
 export async function listTrashedHeroPageSlides(): Promise<readonly { slide: HeroPageSlide; deletedAt: string }[]> {
   if (!isDatabaseConfigured()) return [];
   const result = await getPool().query<TrashedHeroSlideRow>(
-    `select id, sort_order, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, deleted_at
+    `select id, sort_order, locale, media_path, alt_th, alt_en, focus_x, focus_y, zoom, is_active, deleted_at
        from hero_slide
       where deleted_at is not null
       order by deleted_at desc, id asc`,

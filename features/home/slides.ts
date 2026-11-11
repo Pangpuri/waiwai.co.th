@@ -12,6 +12,9 @@ import type { Messages } from "@/lib/i18n/messages/th";
  *    รูป `event` (event2.jpg) ยังมีลายน้ำ "METAS NEWS" ของเพจต้นทางติดมาด้วย → ห้ามใช้จริงจนกว่าจะเปลี่ยน
  */
 
+/** ภาพ Hero ภาษาอังกฤษ (migration 0049) — ใช้เป็นค่าเริ่มต้นของสไลด์ locale=en */
+export const EN_HERO_SRC = "/slide/en-hero.gif";
+
 export type HeroSlideId = keyof Messages["hero"]["slides"];
 
 export type HeroSlide = {

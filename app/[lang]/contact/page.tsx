@@ -7,11 +7,7 @@ import { notFound } from "next/navigation";
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 
-import {
-  CONTACT_PHONES,
-  CONTACT_PLANTS,
-  MAP_IMAGE,
-} from "@/features/contact/content";
+import { CONTACT_PLANTS, MAP_IMAGE } from "@/features/contact/content";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -129,25 +125,8 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
           {m.channelsTitle}
         </h2>
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          <div className="rounded-2xl border border-line bg-surface p-5">
-            <h3 className="text-xs font-bold tracking-[0.14em] text-fg-muted uppercase">
-              {m.phoneLabel}
-            </h3>
-            <ul className="mt-3 space-y-1.5">
-              {CONTACT_PHONES.map((phone) => (
-                <li key={phone.tel}>
-                  <a
-                    href={`tel:${phone.tel}`}
-                    className="text-base font-semibold text-link underline-offset-4 hover:underline"
-                  >
-                    {phone.display}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
+        {/* มือถือ: เบอร์โทรอยู่ในการ์ดโรงงานเดียวกัน — ไม่ต้องเรียง เบอร์ · เบอร์ · โรงงาน 1 · โรงงาน 2 */}
+        <div className="mt-8 grid gap-5 lg:grid-cols-2">
           {CONTACT_PLANTS.map((plant) => (
             <div key={plant.id} className="rounded-2xl border border-line bg-surface p-5">
               <h3 className="text-xs font-bold tracking-[0.14em] text-fg-muted uppercase">
@@ -157,6 +136,12 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
                 <span className="font-semibold">{m[plant.nameKey]}</span>
                 <br />
                 {m[plant.addressKey]}
+              </p>
+              <p className="mt-3 text-sm text-fg">
+                <span className="font-semibold">{m.phoneLabel}:</span>{" "}
+                <a href={`tel:${plant.phone.tel}`} className="text-link underline-offset-4 hover:underline">
+                  {plant.phone.display}
+                </a>
               </p>
             </div>
           ))}

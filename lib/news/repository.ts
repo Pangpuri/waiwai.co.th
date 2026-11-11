@@ -48,10 +48,12 @@ export type NewsRecord = {
   readonly publishedLabel: string;
   /** ค่า SEO รายข่าว (ว่างทั้งหมด = ใช้ชื่อ/คำโปรย/ภาพปกเดิม) */
   readonly seo: PageSeo;
+  /** ยอดเข้าชมสะสม (migration 0047) — `bigint` จาก DB ถูกแปลงเป็น number ที่ชั้นนี้ */
+  readonly viewCount: number;
 };
 
 const NEWS_COLUMNS = `n.id, n.source_id, n.source_url, n.title_th, n.title_en, n.excerpt_th, n.excerpt_en,
-       n.cover_media_id, n.body, n.published_label,
+       n.cover_media_id, n.body, n.published_label, n.view_count,
        n.seo_title_th, n.seo_title_en, n.seo_description_th, n.seo_description_en, n.og_image_path, n.seo_noindex,
        to_char(n.published_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as published_local,
        m.width as cover_width, m.height as cover_height`;
@@ -61,6 +63,12 @@ const PUBLIC_NEWS_CONDITION = "n.status = 'published' and n.deleted_at is null";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+/** `bigint` ของ Postgres กลับมาเป็นสตริง — แปลงเป็น number ที่ชั้นข้อมูล */
+function numberValue(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(text(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function positiveInt(value: unknown): number | null {
@@ -102,6 +110,7 @@ function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
     publishedLocal: publishedLocal === "" ? null : publishedLocal,
     publishedLabel: text(row.published_label),
     seo: seoOf(row),
+    viewCount: numberValue(row.view_count),
   };
 }
 
@@ -316,6 +325,27 @@ export async function listNewsIds(): Promise<readonly string[]> {
     return result.rows.map((row) => row.id);
   } catch {
     return [];
+  }
+}
+
+/**
+ * ตั้งยอดวิวขั้นต่ำจากเว็บเดิม (รอบ 342) — **ไม่ลดยอดที่สะสมไว้แล้ว**
+ * ใช้ `greatest(view_count, $2)` ⇒ นำเข้าซ้ำหลังเว็บใหม่มีคนดูแล้ว ไม่ทำให้ยอดถอยหลัง
+ */
+export async function setNewsViewCountAtLeast(sourceId: string, count: number): Promise<boolean> {
+  const id = sourceId.trim();
+  if (!isDatabaseConfigured() || !/^\d{3,}$/.test(id)) return false;
+  const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  if (value === 0) return false;
+  try {
+    const result = await getPool().query(
+      `update news set view_count = greatest(view_count, $2)
+        where source_id = $1 and status = 'published' and deleted_at is null`,
+      [id, value],
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch {
+    return false;
   }
 }
 

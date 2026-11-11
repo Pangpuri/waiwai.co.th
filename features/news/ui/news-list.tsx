@@ -4,7 +4,7 @@ import Link from "next/link";
 import { fillTemplate } from "@/lib/i18n/template";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
-import { formatNewsDate, newsPathOfSourceId } from "@/lib/news/model";
+import { newsPathOfSourceId } from "@/lib/news/model";
 import type { NewsRecord } from "@/lib/news/repository";
 
 /**
@@ -42,12 +42,6 @@ function titleOf(record: NewsRecord, language: Locale): string {
   return language === "en" && english !== "" ? english : record.titleTh;
 }
 
-function excerptOf(record: NewsRecord, language: Locale): string {
-  const english = record.excerptEn.trim();
-  if (language === "en" && english !== "") return english;
-  return record.excerptTh.trim();
-}
-
 export function NewsCard({
   record,
   language,
@@ -58,7 +52,6 @@ export function NewsCard({
   readonly strings: NewsListStrings;
 }) {
   const title = titleOf(record, language);
-  const date = formatNewsDate(record.publishedLocal, language);
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-bg">
@@ -80,23 +73,15 @@ export function NewsCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-5">
-        {date === "" ? null : <p className="text-xs font-semibold tracking-wide text-accent uppercase">{date}</p>}
-        <h3 className="mt-2 text-base leading-snug font-bold text-fg">
+        {/*
+          รอบ 342 (เจ้าของยืนยัน): การ์ดข่าวเหลือ **เฉพาะพาดหัวตัวหนา** — ซ่อนวันที่/คำโปรย/ปุ่มอ่านต่อ
+          ⇒ เห็นหัวข้อชัดที่สุด และไม่ต้องแสดงข้อมูลซ้ำกับหน้ารายละเอียด
+        */}
+        <h3 className="text-base leading-snug font-bold text-fg">
           <Link href={localePath(language, newsPathOfSourceId(record.sourceId))} className="hover:underline">
             {title}
           </Link>
         </h3>
-        {excerptOf(record, language) === "" ? null : (
-          <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-fg-muted">{excerptOf(record, language)}</p>
-        )}
-        <p className="mt-4 pt-1">
-          <Link
-            href={localePath(language, newsPathOfSourceId(record.sourceId))}
-            className="text-sm font-bold text-accent hover:underline"
-          >
-            {strings.readMore}
-          </Link>
-        </p>
       </div>
     </article>
   );

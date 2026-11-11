@@ -5,7 +5,8 @@ import { notFound, permanentRedirect } from "next/navigation";
 
 import { BlockDocumentView } from "@/features/blocks/block-renderer";
 import { catalogSlugs, findCatalogItem, type CatalogItem } from "@/features/products/catalog";
-import { ProductListSection, productListStringsOf } from "@/features/products/ui/product-list";
+import { ProductMarketSection, type ProductMarketTabsStrings } from "@/features/products/ui/product-market-tabs";
+import { productListStringsOf } from "@/features/products/ui/product-list";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { loadLiveBlockDocument } from "@/lib/blocks/page-loader";
 import { productDetailPageId } from "@/lib/blocks/product-detail";
@@ -264,13 +265,19 @@ export default async function ProductCategoryPage({
   const m = messages.productsPage;
 
   /* เอกสารบล็อก/สินค้า อ้างด้วย **รหัสภายใน** และ **ที่อยู่ปัจจุบัน** (ไม่ใช่ที่อยู่เก่าที่ขอมา) */
-  const [liveDocument, products] = await Promise.all([
+  const [liveDocument, domesticProducts, exportProducts] = await Promise.all([
     loadLiveBlockDocument(productDetailPageId(resolved.key)),
-    listProductsByCategory(canonicalSlug),
+    listProductsByCategory(canonicalSlug, "domestic"),
+    listProductsByCategory(canonicalSlug, "export"),
   ]);
 
   const listStrings = productListStringsOf(m);
-  const hasProducts = products.length > 0;
+  const marketStrings: ProductMarketTabsStrings = {
+    group: m.marketTabsLabel,
+    domestic: m.marketDomestic,
+    export: m.marketExport,
+  };
+  const hasProducts = domesticProducts.length > 0 || exportProducts.length > 0;
   const intro = introTextOf(messages, category, lang);
 
   /* ชื่อ + ภาพหมวด: ค่าจากหลังบ้าน (migration 0037/0039) → ถอยค่าในโค้ด/พจนานุกรม */
@@ -286,7 +293,13 @@ export default async function ProductCategoryPage({
           (เคสจริงแบบเดียวกับหน้า /contact รอบ 267) · ตารางสินค้ายังต่อท้ายเสมอ (ไม่ใช่บล็อก)
         */}
         <BlockDocumentView document={liveDocument} language={lang} heading={displayName} />
-        <ProductListSection products={products} language={lang} strings={listStrings} />
+        <ProductMarketSection
+          domestic={domesticProducts}
+          exported={exportProducts}
+          language={lang}
+          strings={marketStrings}
+          listStrings={listStrings}
+        />
       </>
     );
   }
@@ -348,7 +361,13 @@ export default async function ProductCategoryPage({
         </div>
       </section>
 
-      <ProductListSection products={products} language={lang} strings={listStrings} />
+      <ProductMarketSection
+        domestic={domesticProducts}
+        exported={exportProducts}
+        language={lang}
+        strings={marketStrings}
+        listStrings={listStrings}
+      />
     </>
   );
 }

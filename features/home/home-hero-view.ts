@@ -46,6 +46,6 @@ export async function loadHomeHeroView(locale: Locale, messages: Messages): Prom
       imageRatio: cardRatioOf(heroSetting.prCardFrame, cardSizes?.get(cardMediaId)),
     },
     heroTexts: heroTextsOf(homeContent, messages, locale),
-    slides: managedHeroSlideViews(await listHeroPageSlides(), locale),
+    slides: managedHeroSlideViews(await listHeroPageSlides(locale), locale),
   };
 }

@@ -11,8 +11,10 @@ import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { mergeSiteCategories, siteCategoryName } from "@/lib/products/categories";
+import { loadProductsPageCopy } from "@/lib/products/page-copy";
 import { listProductCategoryCards } from "@/lib/products/repository";
 import { withPageSeo } from "@/lib/seo/page-seo";
+import { resolveNotice } from "@/lib/site-settings/model";
 
 /*
   ต่ออายุเพจนี้เองทุก 5 นาที (ตาข่ายกันลืม) — กดเผยแพร่จากหลังบ้านจะสั่งให้สร้างใหม่ทันที (X1.7)
@@ -64,6 +66,11 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
   }
 
   const m = messages.productsPage;
+  /* ข้อความหัวหน้าแก้ได้จาก /admin/product-categories (รอบ 342) — ว่าง = ค่าเดิมจากพจนานุกรม */
+  const pageCopy = await loadProductsPageCopy(lang);
+  const eyebrow = resolveNotice(pageCopy.eyebrow, lang, m.eyebrow);
+  const title = resolveNotice(pageCopy.title, lang, m.title);
+  const intro = resolveNotice(pageCopy.intro, lang, m.intro);
 
   /*
     ── หมวดที่แสดงบนหน้านี้มาจากไหน (รอบที่ 264 · มติ D25) ──────────────────────────
@@ -95,15 +102,15 @@ export default async function ProductsPage({ params }: PageProps<"/[lang]/produc
 
           <p className="mt-8 inline-flex items-center gap-2 text-xs font-bold tracking-[0.18em] text-accent uppercase">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-red" />
-            {m.eyebrow}
+            {eyebrow}
           </p>
 
           <h1 className="mt-4 max-w-3xl font-display text-4xl leading-[1.12] font-extrabold tracking-tight text-fg sm:text-5xl">
-            {m.title}
+            {title}
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            {m.intro}
+            {intro}
           </p>
 
           {/* ข้อความบอกสถานะ "ตัวอย่างรออนุมัติ" — ใช้คอมโพเนนต์กลางให้เหมือนหน้า recipes/news */}

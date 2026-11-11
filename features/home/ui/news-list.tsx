@@ -63,24 +63,10 @@ export function NewsList({ locale, messages, items }: NewsListProps) {
                     )}
 
                     <span className="flex flex-1 flex-col p-6">
-                      {item.published === "" ? null : (
-                        <time dateTime={item.dateTime} className="text-xs font-medium text-fg-muted">
-                          {item.published}
-                        </time>
-                      )}
-
-                      <h3 className="mt-3 font-display text-lg leading-snug font-bold text-fg group-hover:text-accent">
+                      {/* รอบ 342 (เจ้าของยืนยัน): เหลือเฉพาะพาดหัวตัวหนา */}
+                      <h3 className="font-display text-lg leading-snug font-bold text-fg group-hover:text-accent">
                         {item.title}
                       </h3>
-
-                      {item.excerpt === "" ? null : (
-                        <p className="mt-3 flex-1 text-sm leading-relaxed text-fg-muted">{item.excerpt}</p>
-                      )}
-
-                      <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-accent">
-                        {messages.actions.readMore}
-                        <span aria-hidden="true">→</span>
-                      </span>
                     </span>
                   </Link>
                 </article>

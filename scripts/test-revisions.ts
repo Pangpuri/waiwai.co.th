@@ -26,6 +26,7 @@ const product: AdminProductDetail = {
   id: "p1",
   sourceId: "1",
   categoryId: "instant-noodles",
+  market: "domestic",
   nameTh: "บะหมี่",
   nameEn: "",
   groupTh: "กลุ่ม",

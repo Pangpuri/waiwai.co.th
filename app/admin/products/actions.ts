@@ -30,6 +30,7 @@ import {
 } from "@/lib/products/repository";
 import {
   isCatalogCategoryId,
+  isProductMarket,
   productIdOfSourceId,
   validateIngredientInput,
   validateProductInput,
@@ -89,8 +90,9 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
 
   const id = field(formData, "id");
   const categoryId = field(formData, "categoryId");
+  const market = field(formData, "market");
   const nameTh = field(formData, "nameTh");
-  if (nameTh === "" || !isCatalogCategoryId(categoryId)) {
+  if (nameTh === "" || !isCatalogCategoryId(categoryId) || (market !== "" && !isProductMarket(market))) {
     return { status: "error", reason: "title", createdId: null };
   }
 
@@ -112,6 +114,7 @@ export async function saveProductAction(_previous: ProductSaveState, formData: F
     sourceId,
     sourceUrl: "",
     categoryId,
+    market: isProductMarket(market) ? market : "domestic",
     nameTh,
     nameEn: field(formData, "nameEn"),
     groupTh: field(formData, "groupTh"),

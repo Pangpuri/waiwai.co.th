@@ -314,5 +314,5 @@ test("product-detail: หน้าที่เรนเดอร์จากบ�
   const page = readFileSync(path.join(ROOT, "app/[lang]/products/[slug]/page.tsx"), "utf8");
   assert.ok(page.includes("heading={displayName}"), "ต้องส่ง heading ให้ BlockDocumentView (ไม่งั้นไม่มี h1)");
   /* ตารางสินค้ายังต่อท้ายเสมอ — ไม่ใช่บล็อก ⇒ สินค้าจริงหายไม่ได้ */
-  assert.ok(page.includes("<ProductListSection"), "ต้องยังเรนเดอร์รายการสินค้าจากฐานข้อมูล");
+  assert.ok(page.includes("<ProductMarketSection"), "ต้องยังเรนเดอร์รายการสินค้าจากฐานข้อมูล (ทั้งในประเทศ/ส่งออก)");
 });

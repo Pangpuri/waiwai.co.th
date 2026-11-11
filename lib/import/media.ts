@@ -37,13 +37,19 @@ export async function ensureImportedMedia(options: {
   readonly log: (message: string) => void;
   /** เพดานขนาดไฟล์ (ไบต์) — เกิน = ข้าม + รายงาน (กันไฟล์ต้นฉบับยักษ์หลุดเข้ามา · รอบที่ 105) */
   readonly maxBytes?: number;
+  /**
+   * แปลงไฟล์ก่อนตรวจชนิด/เก็บ (รอบ 342) — ใช้กับภาพต้นทางที่เป็น GIF
+   * เพราะคลังภาพรับเฉพาะ PNG/JPEG/WebP · ถ้าไม่ส่ง = เก็บไบต์เดิม
+   */
+  readonly transform?: (bytes: Buffer, url: string) => Promise<Buffer>;
 }): Promise<string | null> {
   const cached = options.cache.get(options.url);
   if (cached !== undefined) return cached;
 
   let mediaId: string | null = null;
   try {
-    const bytes = await options.fetchBinary(options.url);
+    const sourceBytes = await options.fetchBinary(options.url);
+    const bytes = options.transform === undefined ? sourceBytes : await options.transform(sourceBytes, options.url);
     const info = readImageInfo(bytes);
     if (info === null) {
       options.log(`   ⚠️ ข้ามภาพที่ไม่ใช่ PNG/JPEG/WebP: ${options.url}`);
@@ -60,9 +66,16 @@ export async function ensureImportedMedia(options: {
       } else {
         const id = newMediaId();
         const rawName = filenameFromUrl(options.url);
+        /* ถ้ามีการแปลงไฟล์ (เช่น GIF → WebP) ต้องเปลี่ยนนามสกุลให้ตรงชนิดจริง */
+        const filename =
+          options.transform === undefined
+            ? rawName.includes(".")
+              ? rawName
+              : `${rawName}.${extensionFor(info.mime)}`
+            : `${rawName.replace(/\.[a-z0-9]+$/i, "")}.${extensionFor(info.mime)}`;
         await insertMedia({
           id,
-          filename: rawName.includes(".") ? rawName : `${rawName}.${extensionFor(info.mime)}`,
+          filename,
           mime: info.mime,
           sizeBytes: bytes.length,
           width: info.width,
