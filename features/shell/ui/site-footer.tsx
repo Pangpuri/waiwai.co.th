@@ -5,9 +5,10 @@ import type { Messages } from "@/lib/i18n/messages/th";
 import { SITE } from "@/lib/site";
 
 import type { FooterConfig } from "@/lib/chrome/footer";
-import { resolveFooterView } from "@/lib/chrome/footer-view";
+import { compactFooterLinks, resolveFooterView } from "@/lib/chrome/footer-view";
 
 import { buildFooterColumns } from "../nav";
+import { BackToTop } from "./back-to-top";
 import { BrandMark } from "./brand-mark";
 import { LangSwitch } from "./lang-switch";
 import { NavIcon } from "./nav-icon";
@@ -45,6 +46,8 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
   });
 
   const contact = view.contact;
+  /* มือถือ: รวบเมนูเป็นลิงก์ลัดแถวเดียว (ตัดลิงก์ซ้ำกับหัวเว็บ/แถวลิขสิทธิ์) — จอใหญ่ยังใช้ 3 คอลัมน์เดิม */
+  const quickLinks = compactFooterLinks(view);
 
   /*
    * พื้นแดง/พื้นดำ (onDark) — รอบที่ 313 (เคสจริงเจ้าของ: "ตัวอักษรจม")
@@ -66,7 +69,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       {/* ขอบบนโค้งนุ่มแทนเส้นตรง — เนินของแถบนี้ยื่นขึ้นไปในพื้นที่ว่างของ section ด้านบน */}
       <SectionCurve tone="bg-subtle" edge="top" />
 
-      <div className="container-site grid gap-10 py-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:gap-16">
+      <div className="container-site grid gap-8 py-10 sm:gap-10 sm:py-14 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)] lg:gap-16">
         <div>
           {view.logo === null ? (
             <BrandMark locale={locale} label={messages.meta.siteName} logoHeightClass={view.logoHeightClass} />
@@ -83,13 +86,13 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
               />
             </Link>
           )}
-          <p className={`mt-5 max-w-sm text-sm leading-relaxed ${textSoft}`}>
+          <p className={`mt-4 line-clamp-2 max-w-sm text-sm leading-relaxed sm:mt-5 sm:line-clamp-none ${textSoft}`}>
             {view.about}
           </p>
 
           {/* แสดงเฉพาะช่องที่มีข้อมูลจริง — ไม่ใส่ข้อมูลติดต่อสมมติ */}
           {contact.address || contact.phone || contact.email ? (
-            <dl className={`mt-6 space-y-2 text-sm ${textSoft}`}>
+            <dl className={`mt-4 space-y-1.5 text-sm sm:mt-6 sm:space-y-2 ${textSoft}`}>
               {contact.address ? (
                 <div>
                   <dt className={`font-semibold ${textStrong}`}>{view.labels.address}</dt>
@@ -119,7 +122,23 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
+        {quickLinks.length === 0 ? null : (
+          <div className="sm:hidden" data-footer-quick-links="">
+            <nav aria-label={messages.a11y.footerNavigation}>
+              <ul className="flex flex-wrap gap-x-4 gap-y-2">
+                {quickLinks.map((link) => (
+                  <li key={`${link.href}-${link.id}`}>
+                    <Link href={link.href} className={`text-sm ${textSoft} transition-colors ${hoverStrong}`}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
+        )}
+
+        <div className="hidden sm:grid sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8">
           {view.groups.map((column) => (
             <nav key={column.id} aria-label={column.title}>
               <h2 className={`font-display text-sm font-bold tracking-wide ${textStrong}`}>
@@ -148,7 +167,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       </div>
 
       {view.socials.length > 0 ? (
-        <div className={`container-site ${divider} py-6`}>
+        <div className={`container-site ${divider} py-5 sm:py-6`}>
           <h2 className={`font-display text-sm font-bold ${textStrong}`}>{view.labels.follow}</h2>
           <ul className="mt-3 flex flex-wrap gap-2">
             {view.socials.map((item) => (
@@ -179,7 +198,7 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
       ) : null}
 
       <div className={divider}>
-        <div className="container-site flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container-site flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-6">
           <p className={`text-xs ${textSoft}`}>
             © {year} {messages.meta.siteName}. {view.rights}
           </p>
@@ -201,6 +220,8 @@ export function SiteFooter({ locale, messages, footer = null, layoutFooter = fal
           </div>
         </div>
       </div>
+
+      <BackToTop label={messages.actions.backToTop} />
     </footer>
   );
 }

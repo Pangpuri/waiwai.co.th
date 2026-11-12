@@ -163,3 +163,32 @@ export function resolveFooterView(
     cookiesHref: localePath(locale, "/cookie-policy"),
   };
 }
+
+/**
+ * ลิงก์ "เมนูลัด" สำหรับท้ายเว็บบนมือถือ (2026-11-12)
+ *
+ * ทำไมต้องมี: footer มือถือยาว ~820px — เมนู 3 คอลัมน์กินพื้นที่มาก และลิงก์ส่วนใหญ่ซ้ำกับ header
+ * ⇒ รวบเป็นลิงก์แถวเดียวแบบ wrap โดย
+ * - ตัด `privacy`/`cookies` ที่ซ้ำกับแถวลิขสิทธิ์ด้านล่างอยู่แล้ว
+ * - ตัดลิงก์ที่ href ซ้ำกัน (เช่น FAQ กับ Contact ที่ชี้หน้าเดียวกัน)
+ * - จำกัดจำนวน (ค่าเริ่มต้น 8) เพื่อไม่ให้กลับยาวอีกถ้าผู้ดูแลเพิ่มลิงก์ในอนาคต
+ *
+ * ⚠️ ตรรกะล้วน (ไม่แตะ DOM) ⇒ เทสต์ได้ · ลิงก์จริงยังคงอยู่ใน `groups` สำหรับจอใหญ่/SEO
+ */
+export function compactFooterLinks(view: FooterView, limit = 8): readonly FooterViewLink[] {
+  const max = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 8;
+  const seen = new Set<string>();
+  const links: FooterViewLink[] = [];
+
+  for (const group of view.groups) {
+    for (const link of group.links) {
+      if (link.href === view.privacyHref || link.href === view.cookiesHref) continue;
+      if (seen.has(link.href)) continue;
+      seen.add(link.href);
+      links.push(link);
+      if (links.length >= max) return links;
+    }
+  }
+
+  return links;
+}
