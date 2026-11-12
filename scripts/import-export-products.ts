@@ -35,8 +35,9 @@ type ExportSource = {
 };
 
 /**
- * 4 หน้าสินค้าส่งออกที่เจ้าของให้มา (2026-11-11)
+ * 5 หน้าสินค้าส่งออกที่เจ้าของให้มา (2026-11-11 · เพิ่มหน้า 43534 เมื่อ 2026-11-12)
  * ⚠️ 15235 เป็นหน้าของ **ควิกแสบ** ตามเนื้อหาปลายทาง (เจ้าของยืนยันให้ยึดตามหน้าจริง)
+ * ⚠️ 43534 = หมวด dried-vermicelli ที่เคยตกหล่นจากรอบ 342 (เจ้าของแจ้ง: EN ขาดส่วนนี้)
  */
 const SOURCES: readonly ExportSource[] = [
   {
@@ -58,6 +59,11 @@ const SOURCES: readonly ExportSource[] = [
     categoryId: "rod-ded",
     pageId: "15361",
     path: "/en/pages/15361-%20%E0%B8%9C%E0%B8%87%E0%B8%9B%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B8%AA%E0%B8%B3%E0%B9%80%E0%B8%A3%E0%B9%87%E0%B8%88",
+  },
+  {
+    categoryId: "dried-vermicelli",
+    pageId: "43534",
+    path: "/en/pages/43534-Dehydrated%20rice%20vermicelli",
   },
 ];
 

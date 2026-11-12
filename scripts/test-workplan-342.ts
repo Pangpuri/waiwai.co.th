@@ -44,6 +44,20 @@ test("export-parse: หน้าเปล่า/ไม่มีตาราง =
   assert.deepEqual(parseExportProductPage("<html></html>").products, []);
 });
 
+/**
+ * ★ 2026-11-12 — เจ้าของตรวจ EN แล้วพบว่า dried-vermicelli ไม่มีสินค้าส่งออก
+ * ต้นเหตุ: ตัวนำเข้ารอบ 342 มีเพียง 4 หน้า (15154/15235/15324/15361)
+ * ⇒ ล็อกว่าทะเบียนแหล่งนำเข้าต้องมีหน้า 43534 ของหมวด dried-vermicelli ด้วย
+ */
+test("export import: ครอบ dried-vermicelli (หน้า 43534) ไม่ให้ EN ขาดอีก", () => {
+  const source = readFileSync("scripts/import-export-products.ts", "utf8");
+  for (const categoryId of ["instant-noodles", "quick-zabb", "serda", "rod-ded", "dried-vermicelli"]) {
+    assert.ok(source.includes(`categoryId: "${categoryId}"`), `ต้องมีหมวด ${categoryId}`);
+  }
+  assert.ok(source.includes('pageId: "43534"'), "ต้องนำเข้าหน้า 43534 (Dehydrated rice vermicelli)");
+  assert.ok(source.includes("/en/pages/43534-Dehydrated%20rice%20vermicelli"), "ต้องใช้ที่อยู่หน้าส่งออกภาษาอังกฤษ");
+});
+
 test("product market: ค่าที่รู้จักผ่าน · ค่าแปลกปลอมถูกปฏิเสธ", () => {
   assert.equal(isProductMarket("domestic"), true);
   assert.equal(isProductMarket("export"), true);
