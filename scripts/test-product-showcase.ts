@@ -7,7 +7,9 @@ import { codeOf } from "./source-scan.ts";
 import {
   DEFAULT_PRODUCT_SHOWCASE,
   MAX_FEATURED_PER_CATEGORY,
+  MAX_FEATURED_PRODUCT_IDS,
   clampShowcaseOptions,
+  productShowcaseChoicesOf,
   productShowcaseView,
 } from "@/lib/blocks/product-showcase";
 import { createBlock, isBlockType } from "@/lib/blocks/types";
@@ -66,6 +68,17 @@ test("★ product showcase: ตัวเลือกถูกบีบให้�
   assert.equal(clampShowcaseOptions({ featuredPerCategory: 0 }).featuredPerCategory, 1, "ต่ำเกิน = 1");
   assert.equal(clampShowcaseOptions({ featuredPerCategory: 99 }).featuredPerCategory, MAX_FEATURED_PER_CATEGORY, "สูงเกิน = เพดาน");
   assert.deepEqual(clampShowcaseOptions({ categoryIds: ["serda", " serda ", ""] }).categoryIds, ["serda"], "ตัดค่าว่าง/ซ้ำ");
+  assert.deepEqual(
+    clampShowcaseOptions({ featuredProductIds: ["p2", " p2 ", "", "p1"] }).featuredProductIds,
+    ["p2", "p1"],
+    "สินค้าที่เลือกเอง: ตัดค่าว่าง/ซ้ำ",
+  );
+  assert.equal(
+    clampShowcaseOptions({ featuredProductIds: Array.from({ length: 100 }, (_unused, index) => `p${String(index)}`) })
+      .featuredProductIds.length,
+    MAX_FEATURED_PRODUCT_IDS,
+    "สินค้าที่เลือกเองมีเพดาน (กัน JSONB บวม)",
+  );
   assert.equal(clampShowcaseOptions({ showFeatured: false }).showFeatured, false);
 });
 
@@ -87,6 +100,35 @@ test("★ product showcase: ประกอบจากข้อมูลจร�
   const twoPerCategory = productShowcaseView(CATEGORIES, HIGHLIGHTS, { featuredPerCategory: 2 }, "th");
   assert.deepEqual(twoPerCategory.featured.map((row) => row.id), ["p1", "p2", "p3"], "2 ตัวแรกของหมวดแรก + 1 ของหมวดสอง");
   assert.equal(twoPerCategory.featured.find((row) => row.id === "p3")?.href, "/products/serda", "ลิงก์ไปหมวดของสินค้านั้น");
+
+  /*
+    ★ 2026-11-12 — เลือกสินค้าเอง (เจ้าของขอ "ลิส+รูปสินค้าที่จะขึ้นแนะนำ")
+    - ต้องใช้ **เฉพาะที่เลือก** และรักษาลำดับที่เลือก (ไม่ใช่ตัวแรกอัตโนมัติ)
+    - ยังต้องเคารพจำนวนต่อหมวด
+  */
+  const pickedManual = productShowcaseView(
+    CATEGORIES,
+    HIGHLIGHTS,
+    { featuredProductIds: ["p2", "p1", "p3"], featuredPerCategory: 2 },
+    "th",
+  );
+  assert.deepEqual(pickedManual.featured.map((row) => row.id), ["p2", "p1", "p3"], "เลือกเอง: รักษาลำดับ + ตัดตามจำนวนต่อหมวด");
+  const pickedManualOne = productShowcaseView(
+    CATEGORIES,
+    HIGHLIGHTS,
+    { featuredProductIds: ["p2", "p1"], featuredPerCategory: 1 },
+    "th",
+  );
+  assert.deepEqual(pickedManualOne.featured.map((row) => row.id), ["p2"], "จำนวนต่อหมวดต้องมีผลกับสินค้าที่เลือกเองด้วย");
+  const pickedOutside = productShowcaseView(
+    CATEGORIES,
+    HIGHLIGHTS,
+    { categoryIds: ["serda"], featuredProductIds: ["p1", "p3"] },
+    "th",
+  );
+  assert.deepEqual(pickedOutside.featured.map((row) => row.id), ["p3"], "สินค้าของหมวดที่ไม่แสดงต้องถูกข้าม");
+  const missing = productShowcaseView(CATEGORIES, HIGHLIGHTS, { featuredProductIds: ["nope"] }, "th");
+  assert.deepEqual(missing.featured, [], "id ที่ไม่มีอยู่จริงต้องไม่ทำให้พัง");
 
   /* ปิดการ์ดสินค้าแนะนำ = ไม่มีเลย (แต่หมวดยังอยู่) */
   const noFeatured = productShowcaseView(CATEGORIES, HIGHLIGHTS, { showFeatured: false }, "th");
@@ -150,6 +192,7 @@ test("★ product showcase: ลงทะเบียนเป็นชนิด�
         showFeatured: "yes",
         featuredPerCategory: 99,
         categoryIds: ["serda", 7, "serda"],
+        featuredProductIds: ["p2", 7, "p2", " p1 "],
         showCount: "no",
       },
     ],
@@ -165,10 +208,46 @@ test("★ product showcase: ลงทะเบียนเป็นชนิด�
   assert.equal(block.showFeatured, true, "ค่าไม่ใช่ boolean = ใช้ค่าเริ่มต้น");
   assert.equal(block.featuredPerCategory, MAX_FEATURED_PER_CATEGORY);
   assert.deepEqual([...block.categoryIds], ["serda"]);
+  assert.deepEqual([...block.featuredProductIds], ["p2", "p1"], "สินค้าที่เลือกเองถูกบีบ/ตัดค่าซ้ำ/ผิดชนิด");
   assert.equal(block.showCount, true, "ค่าไม่ใช่ boolean = ใช้ค่าเริ่มต้น");
   assert.equal(block.heading.th, "หมวดสินค้า");
   /* ชนิดใหม่ต้องอยู่ในทะเบียนกลาง (ป้าย/ตัวเลือกในตัวสร้างอ่านจากทะเบียน) */
   assert.ok(isBlockType("productShowcase"), "ต้องอยู่ใน BLOCK_TYPES");
+  /* ค่าเริ่มต้นของบล็อกใหม่ = ยังไม่เลือกสินค้า (ใช้อัตโนมัติ) */
+  const created = createBlock("productShowcase", "new-showcase");
+  assert.equal(created.type === "productShowcase" ? created.featuredProductIds.length : -1, 0);
+});
+
+/*
+  ★ 2026-11-12 — ตัวเลือกสินค้าในแผงหลังบ้าน
+  1. ตัวแปลงข้อมูลจริงเป็นตัวเลือกต้องตัดสินค้าของหมวดที่เว็บไม่แสดงออก
+  2. ชั้นฐานข้อมูลต้องคืน **หลายตัวต่อหมวด** (ต้นเหตุบั๊ก "ตั้ง 2–3 ตัวแต่ขึ้น 1")
+     — ห้ามใช้ `distinct on (category_id)` ในตัวอ่านของบล็อกนี้อีก
+*/
+test("★ product showcase: ตัวเลือกสินค้าในหลังบ้านมาจากข้อมูลจริง + คิวรีคืนหลายตัวต่อหมวด", () => {
+  const choices = productShowcaseChoicesOf(CATEGORIES, [
+    ...HIGHLIGHTS,
+    highlight("p9", "hidden-category", "สินค้าในหมวดที่ซ่อน"),
+  ]);
+  assert.deepEqual(choices.categories.map((row) => row.id), ["instant-noodles", "serda"]);
+  assert.equal(choices.categories[0]?.name, "บะหมี่กึ่งสำเร็จรูป", "ชื่อหมวดใช้ค่าเดียวกับหน้าเว็บ (DB → พจนานุกรม)");
+  assert.deepEqual(choices.products.map((row) => row.id), ["p1", "p2", "p3"], "ตัดสินค้าของหมวดที่ไม่แสดงออก");
+  assert.equal(choices.products.find((row) => row.id === "p2")?.title, "บะหมี่กึ่งสำเร็จรูป รสเย็นตาโฟ");
+  assert.equal(choices.products.find((row) => row.id === "p1")?.image, "/media/p1");
+
+  const repo = readFileSync("lib/products/repository.ts", "utf8");
+  const start = repo.indexOf("export async function listProductShowcaseCandidates");
+  assert.ok(start > 0, "ต้องมีตัวอ่านตัวเลือกสินค้าแนะนำสำหรับหลายตัวต่อหมวด");
+  const end = repo.indexOf("/* ── ฝั่งเขียน", start);
+  assert.ok(end > start, "ต้องหาเขตของฟังก์ชันได้");
+  const body = repo.slice(start, end);
+  assert.ok(body.includes("order by p.category_id, p.sort_order, p.id"), "ต้องเรียงตามหมวด/ลำดับสินค้า");
+  assert.equal(body.includes("distinct on"), false, "ห้ามใช้ distinct on — จะเหลือ 1 ตัวต่อหมวด (บั๊กเดิม)");
+  assert.ok(body.includes("left join media"), "สินค้าที่ยังไม่มีภาพต้องยังเลือกได้");
+
+  const loader = readFileSync("lib/blocks/product-showcase-data.ts", "utf8");
+  assert.ok(loader.includes("listProductShowcaseCandidates"), "ตัวโหลดข้อมูลของบล็อกต้องใช้ตัวอ่านหลายตัวต่อหมวด");
+  assert.equal(loader.includes("listProductHighlights"), false, "ห้ามกลับไปใช้ตัวอ่านแบบ 1 ตัวต่อหมวด");
 });
 
 test("★ product showcase: ตัวโหลดข้อมูลจริงเก็บบล็อกได้ครบ (รวมที่ซ้อนในแถว)", async () => {
@@ -217,11 +296,35 @@ test("★ product showcase: แผงแก้ในตัวสร้าง —
     "blockShowcaseFeatured",
     "blockShowcaseFeaturedCount",
     "blockShowcaseHint",
+    "blockShowcaseCategories",
+    "FeaturedProductPicker",
+    "productShowcaseChoices",
+    "featuredProductIds",
   ]) {
     assert.ok(builder.includes(needle), `แผงต้องมี: ${needle}`);
   }
+  const picker = readFileSync("features/admin/ui/featured-product-picker.tsx", "utf8");
+  for (const needle of [
+    "blockShowcaseProductsTitle",
+    "blockShowcaseProductsHint",
+    "blockShowcaseProductsSelected",
+    "blockShowcaseClearProducts",
+    "blockShowcaseFilter",
+    "blockShowcaseNoImage",
+    "maxPerCategory",
+  ]) {
+    assert.ok(picker.includes(needle), `ตัวเลือกสินค้าต้องมี: ${needle}`);
+  }
+  assert.ok(picker.includes("<img"), "รายการสินค้าในหลังบ้านต้องแสดงรูปจริง");
+  assert.ok(!picker.includes("@/lib/products/repository"), "ตัวเลือก (client) ห้ามแตะชั้นฐานข้อมูล");
+  const builderPage = readFileSync("app/admin/builder/[page]/page.tsx", "utf8");
+  assert.ok(
+    builderPage.includes("productShowcaseChoices={productShowcaseChoices}"),
+    "Server Component ต้องส่งหมวด/สินค้าจริงเข้าตัวสร้าง",
+  );
+  assert.ok(builderPage.includes("listProductShowcaseCandidates()"), "ต้องโหลดสินค้าจริงสำหรับแผงเลือก");
   /* บล็อกไดนามิกไม่มีรายการให้แก้ในเอกสาร — แผงต้องไม่แตะ items */
-  const panel = builder.slice(builder.indexOf('case "productShowcase":'), builder.indexOf('case "recipeCards": {'));
+  const panel = builder.slice(builder.indexOf('case "productShowcase":'), builder.indexOf('case "recipeCards":'));
   assert.ok(!panel.includes("setRecipeCards"), "แผงนี้ต้องไม่ยุ่งกับรายการเมนู");
 
   const edit = readFileSync("lib/blocks/edit.ts", "utf8");
@@ -238,6 +341,12 @@ test("★ product showcase: แผงแก้ในตัวสร้าง —
   assert.equal(block.showCount, false, "ปิดจำนวนสินค้าได้");
   const one = setProductShowcaseOptions(doc, "b1", { featuredPerCategory: 0 });
   assert.equal(one.blocks[0]?.type === "productShowcase" ? one.blocks[0].featuredPerCategory : -1, 1, "ต่ำกว่า 1 ถูกบีบ");
+  const manual = setProductShowcaseOptions(doc, "b1", { featuredProductIds: ["p2", "p2", " p1 "] });
+  assert.deepEqual(
+    manual.blocks[0]?.type === "productShowcase" ? [...manual.blocks[0].featuredProductIds] : [],
+    ["p2", "p1"],
+    "setter ต้องเก็บสินค้าที่เลือกและตัดค่าซ้ำ",
+  );
 });
 
 /** ★ รอบที่ 219 — "สินค้าแนะนำ" ต้องแสดงจริง (เจ้าของชี้ว่าบล็อกยังมาไม่ครบ) */
@@ -270,6 +379,17 @@ test("★ product showcase: การ์ดหมวดต้องมีภา�
   assert.ok(block.includes("src={category.image}"), "ต้องใช้พาธภาพจากวิว (ไม่ประกอบเอง)");
   assert.ok(block.includes("alt={category.title}"), "ภาพต้องมี alt (ใช้ชื่อหมวด)");
   assert.ok(block.includes("bg-bg-subtle"), "ต้องมีแผงพื้นจางรองภาพแบบดีไซน์เดิม");
+  /*
+    ★ 2026-11-12 (ฟีดแบ็กเจ้าของ): การ์ดหมวดบนมือถือภาพเล็ก
+    ⇒ กรอบภาพต้องเต็มความกว้างการ์ด + ใช้สัดส่วน 4:3 บนมือถือ แล้วกลับไปความสูงคงที่บนจอใหญ่
+    (ภาพใช้ `h-full w-auto max-w-full object-contain` — ไม่ครอป ไม่ล้นกรอบ)
+  */
+  assert.ok(block.includes("aspect-[4/3]"), "มือถือต้องใช้กรอบภาพสัดส่วน 4:3");
+  assert.ok(block.includes("w-full items-center justify-center"), "กรอบภาพต้องเต็มความกว้างการ์ด");
+  assert.ok(block.includes("max-w-full"), "ภาพต้องไม่ล้นกรอบ");
+  const fallbackShowcase = readFileSync("features/home/ui/products-showcase.tsx", "utf8");
+  assert.ok(fallbackShowcase.includes("aspect-[4/3]"), "เลย์เอาต์โค้ดสำรองต้องใช้กรอบ 4:3 บนมือถือด้วย");
+  assert.ok(fallbackShowcase.includes("max-w-full"), "เลย์เอาต์โค้ดสำรองต้องไม่ปล่อยภาพล้นกรอบ");
   /* การ์ดทั้งใบคลิกได้ (เหมือนดีไซน์เดิม) — ลิงก์เดียวต่อการ์ด */
   const cardLinks = block.match(/<a href=\{localizedBlockHref\(category\.href, language\)\}/g) ?? [];
   assert.equal(cardLinks.length, 1, "การ์ดหมวดต้องมีลิงก์เดียว (ครอบทั้งการ์ด)");

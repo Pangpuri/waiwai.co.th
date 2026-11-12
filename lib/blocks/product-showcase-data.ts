@@ -1,5 +1,10 @@
 import type { Block, BlockDocument } from "@/lib/blocks/types";
-import { listProductCategoryCards, listProductHighlights, type ProductCategoryCardRecord, type ProductHighlightRecord } from "@/lib/products/repository";
+import {
+  listProductCategoryCards,
+  listProductShowcaseCandidates,
+  type ProductCategoryCardRecord,
+  type ProductHighlightRecord,
+} from "@/lib/products/repository";
 
 /**
  * โหลดข้อมูลจริงให้ **บล็อกไดนามิก "หมวดสินค้า + สินค้าแนะนำ"** — รอบที่ 212 (ขั้น 2 ส่วน ข)
@@ -23,7 +28,7 @@ export type ProductShowcaseData = {
 export async function loadProductShowcaseData(document: BlockDocument | null): Promise<ProductShowcaseData | null> {
   if (collectShowcaseBlocks(document?.blocks ?? []).length === 0) return null;
   try {
-    const [categories, highlights] = await Promise.all([listProductCategoryCards(), listProductHighlights()]);
+    const [categories, highlights] = await Promise.all([listProductCategoryCards(), listProductShowcaseCandidates()]);
     return { categories, highlights };
   } catch {
     return null;

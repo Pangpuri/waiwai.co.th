@@ -21,6 +21,7 @@ import { INITIAL_UPLOAD_STATE } from "@/features/admin/upload-state";
 import { AdminToast } from "@/features/admin/ui/admin-toast";
 import { DocumentDiffView, diffSummaryLine } from "@/features/admin/ui/document-diff-view";
 import { ImageDrop } from "@/features/admin/ui/image-drop";
+import { FeaturedProductPicker } from "@/features/admin/ui/featured-product-picker";
 import { BlockLayerList } from "@/features/admin/ui/block-layer-list";
 import { installPreviewNavigationGuard } from "@/features/admin/ui/preview-navigation";
 import {
@@ -145,6 +146,10 @@ import {
   type BlockType,
   type PageLayout,
 } from "@/lib/blocks/types";
+import type {
+  ProductShowcaseCategoryChoice,
+  ProductShowcaseProductChoice,
+} from "@/lib/blocks/product-showcase";
 import { documentErrorsOf, documentWarningsOf, missingEnglishCount, validateDocument } from "@/lib/blocks/validate";
 import { fillTemplate } from "@/lib/i18n/template";
 import { TemplateCoverageNote, type TemplateCoverage } from "@/features/admin/ui/template-coverage-note";
@@ -229,6 +234,17 @@ type Props = {
   readonly storedVersions?: {
     readonly draft: StoredVersionSummary | null;
     readonly published: StoredVersionSummary | null;
+  };
+  /**
+   * ตัวเลือกสินค้าจริงสำหรับ "สินค้าแนะนำ" (2026-11-12)
+   * — Server Component โหลดจาก DB แล้วส่งมา (รวมเพดานต่อหมวดจากค่ากลาง)
+   * ⚠️ ต้องส่งเสมอ: ค่าพวกนี้เป็นข้อมูลจริง ไม่มีค่าเริ่มต้นที่ถูกต้องให้เดา
+   */
+  readonly productShowcaseChoices: {
+    readonly categories: readonly ProductShowcaseCategoryChoice[];
+    readonly products: readonly ProductShowcaseProductChoice[];
+    /** เพดานจำนวนสินค้าที่เลือกได้ต่อหมวด (`MAX_FEATURED_PER_CATEGORY`) */
+    readonly maxPerCategory: number;
   };
   readonly strings: Messages["admin"];
 };
@@ -554,6 +570,7 @@ export function BlockBuilder({
   revisions,
   historyNotice = null,
   storedVersions,
+  productShowcaseChoices,
   strings,
 }: Props) {
   const [document, setDocument] = useState<BlockDocument>(initialDraft);
@@ -1682,11 +1699,33 @@ export function BlockBuilder({
               <p className="text-fg-muted text-xs">{strings.blockRecipeHint}</p>
             </>
           );
-        case "productShowcase":
+        case "productShowcase": {
           /*
             บล็อกไดนามิก (รอบที่ 215) — บล็อกนี้ **ไม่มีเนื้อหาในเอกสาร** (ข้อมูลจริงมาจากฐานข้อมูล)
             ⇒ แผงนี้แก้เฉพาะ "ตัวเลือก": คอลัมน์ · แสดงจำนวน · แสดงสินค้าแนะนำ + จำนวนต่อหมวด
+            ⚠️ 2026-11-12: เพิ่ม "หมวดที่แสดง" + "สินค้าที่จะขึ้นแนะนำ" (ลิสจริงพร้อมภาพ)
+            ⇒ ตัวเลือกสินค้าเก็บเป็น id ในเอกสาร — พรีวิวเห็นผลทันทีโดยไม่ต้องบันทึก
           */
+          const allCategoryIds = productShowcaseChoices.categories.map((row) => row.id);
+          const toggleShowcaseCategory = (categoryId: string, checked: boolean): void => {
+            const nextCategoryIds = checked
+              ? [...block.categoryIds, categoryId]
+              : block.categoryIds.filter((id) => id !== categoryId);
+            /* หมวดที่ไม่แสดงแล้ว = เอาสินค้าที่เลือกไว้ของหมวดนั้นออกด้วย (ไม่ให้ค้างแบบมองไม่เห็น) */
+            const allowed =
+              nextCategoryIds.length === 0 ? new Set(allCategoryIds) : new Set(nextCategoryIds);
+            const nextProductIds = block.featuredProductIds.filter((id) => {
+              const product = productShowcaseChoices.products.find((row) => row.id === id);
+              return product !== undefined && allowed.has(product.categoryId);
+            });
+            update(
+              setProductShowcaseOptions(document, block.id, {
+                categoryIds: nextCategoryIds,
+                featuredProductIds: nextProductIds,
+              }),
+            );
+          };
+
           return (
             <>
               <TextPair
@@ -1701,6 +1740,35 @@ export function BlockBuilder({
                 value={block.body}
                 onChange={(language, next) => update(setBlockText(document, block.id, "body", language, next))}
               />
+              <fieldset className="border-line flex flex-col gap-2 rounded-lg border p-2">
+                <legend className="text-fg-muted px-1 text-xs font-semibold">{strings.blockShowcaseCategories}</legend>
+                {productShowcaseChoices.categories.length === 0 ? (
+                  <p className="text-fg-muted text-xs">{strings.blockShowcaseProductsEmpty}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {productShowcaseChoices.categories.map((category) => {
+                      const checked = block.categoryIds.includes(category.id);
+                      return (
+                        <label
+                          key={category.id}
+                          className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-semibold ${
+                            checked ? "border-brand-red bg-bg-subtle text-fg" : "border-line text-fg-muted hover:bg-bg-subtle"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => toggleShowcaseCategory(category.id, event.target.checked)}
+                            className="border-line accent-brand-red size-4 rounded border"
+                          />
+                          {category.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-fg-muted text-[11px]">{strings.blockShowcaseCategoriesHint}</p>
+              </fieldset>
               <SelectField
                 idBase={`${base}-columns`}
                 label={strings.blockShowcaseColumns}
@@ -1743,6 +1811,16 @@ export function BlockBuilder({
                 ]}
                 onChange={(next) => update(setProductShowcaseOptions(document, block.id, { featuredPerCategory: Number(next) }))}
               />
+              <FeaturedProductPicker
+                categories={productShowcaseChoices.categories}
+                products={productShowcaseChoices.products}
+                categoryIds={block.categoryIds}
+                selectedIds={block.featuredProductIds}
+                perCategory={block.featuredPerCategory}
+                maxPerCategory={productShowcaseChoices.maxPerCategory}
+                strings={strings}
+                onChange={(next) => update(setProductShowcaseOptions(document, block.id, { featuredProductIds: next }))}
+              />
               <label className="text-fg-muted flex flex-col gap-1 text-xs">
                 {strings.blockShowcaseCtaHref}
                 <input
@@ -1755,7 +1833,8 @@ export function BlockBuilder({
               <p className="text-fg-muted text-xs">{strings.blockShowcaseHint}</p>
             </>
           );
-                case "recipeCards":
+        }
+        case "recipeCards":
           /*
             เลือกเมนูใบไหน → แก้เฉพาะใบนั้น
             ใช้ `selectedCard` ชุดเดียวกับบล็อกการ์ด ⇒ คลิกการ์ดเมนูในพรีวิวแล้วเปิดช่องแก้ให้ทันที

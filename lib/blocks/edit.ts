@@ -941,6 +941,7 @@ export function setProductShowcaseOptions(
     block.showFeatured = next.showFeatured;
     block.featuredPerCategory = next.featuredPerCategory;
     block.categoryIds = [...next.categoryIds];
+    block.featuredProductIds = [...next.featuredProductIds];
     block.showCount = next.showCount;
   });
 }

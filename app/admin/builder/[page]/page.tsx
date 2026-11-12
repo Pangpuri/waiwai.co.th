@@ -17,7 +17,12 @@ import { defaultPages } from "@/lib/pages/model";
 import { pathForPage } from "@/lib/pages/paths";
 import { listPages } from "@/lib/pages/repository";
 import { pageSeoExample } from "@/lib/pages/seo-example";
-import { listProductDetailPagePaths } from "@/lib/products/repository";
+import { MAX_FEATURED_PER_CATEGORY, productShowcaseChoicesOf } from "@/lib/blocks/product-showcase";
+import {
+  listProductCategoryCards,
+  listProductDetailPagePaths,
+  listProductShowcaseCandidates,
+} from "@/lib/products/repository";
 import { isPageLive, listRevisions, loadDocumentRow, readPublishSchedule, readStoredVersions } from "@/lib/blocks/repository";
 import { listMedia } from "@/lib/media/repository";
 import type { BlockDocument } from "@/lib/blocks/types";
@@ -133,8 +138,20 @@ export default async function AdminBuilderPage({
   /*
     อ่านข้อมูลของหน้าแบบขนาน (4 คำสั่งไม่ขึ้นแก่กัน) + แถวที่เหลืออีกชุด
     ⚠️ ยังต้องมี DB จริง (ตรวจ `isDatabaseConfigured` ด้านบนแล้ว) — ถ้าไม่มี จะออกก่อนถึงบรรทัดนี้
+    ⚠️ 2026-11-12: เพิ่มหมวด/สินค้าจริงสำหรับ "ตัวเลือกสินค้าแนะนำ" ในแผงของบล็อก productShowcase
+      (ผู้ดูแลต้องเลือกสินค้าพร้อมภาพได้ — ไม่ใช่พิมพ์ id เอง)
   */
-  const [draftRow, publishedRow, revisions, storedVersions, presets, schedule, isLive] = await Promise.all([
+  const [
+    draftRow,
+    publishedRow,
+    revisions,
+    storedVersions,
+    presets,
+    schedule,
+    isLive,
+    productCategoryRows,
+    productCandidateRows,
+  ] = await Promise.all([
     loadDocumentRow(page, "draft"),
     loadDocumentRow(page, "published"),
     listRevisions(page),
@@ -145,6 +162,9 @@ export default async function AdminBuilderPage({
     readPublishSchedule(page),
     /* ใช้กับ "กลับไปใช้ดีไซน์เดิม" (รอบที่ 246) — หน้านี้ใช้บล็อกกับเว็บจริงอยู่ไหม (อ่านจาก DB ห้ามเดา) */
     isPageLive(page).catch(() => false),
+    /* หมวด/สินค้าจริง (เฉพาะที่เว็บแสดง) — ส่งให้ตัวสร้างเพื่อทำลิสเลือกสินค้าพร้อมภาพ */
+    listProductCategoryCards(),
+    listProductShowcaseCandidates(),
   ]);
 
   const parsedDraft = draftRow === null ? null : parseBlockDocument(page, draftRow.raw);
@@ -152,6 +172,10 @@ export default async function AdminBuilderPage({
 
   /* เอกสารที่อ่านจาก DB ต้องผ่าน parse ก่อนใช้ — ถ้าเสียหายให้เริ่มจากหน้าว่าง (ไม่ทำให้หน้าจอพัง) */
   const initialDraft = parsedDraft !== null && parsedDraft.ok ? parsedDraft.document : emptyDocument;
+  const productShowcaseChoices = {
+    ...productShowcaseChoicesOf(productCategoryRows, productCandidateRows),
+    maxPerCategory: MAX_FEATURED_PER_CATEGORY,
+  };
 
   /*
     ── รอบที่ 240 (มติเจ้าของ): "หน้าแรก = กดเผยแพร่แล้วขึ้นเว็บเลย" ────────────────────────
@@ -368,6 +392,7 @@ export default async function AdminBuilderPage({
             previewLiveSrc={localePath("th", livePath)}
             coverage={coverage}
             publishLive={publishLive}
+            productShowcaseChoices={productShowcaseChoices}
             strings={strings}
           />
         </ImageLibraryProvider>

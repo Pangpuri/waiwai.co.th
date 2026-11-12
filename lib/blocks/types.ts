@@ -437,6 +437,8 @@ export type ProductShowcaseBlock = BlockBase & {
   readonly showFeatured: boolean;
   readonly featuredPerCategory: number;
   readonly categoryIds: readonly string[];
+  /** สินค้าที่เลือกเอง (id จากฐานข้อมูล) — ว่าง = อัตโนมัติ N ตัวแรกต่อหมวด */
+  readonly featuredProductIds: readonly string[];
   readonly showCount: boolean;
 };
 
@@ -746,6 +748,7 @@ export function createBlock(type: BlockType, id: string): Block {
         showFeatured: true,
         featuredPerCategory: 1,
         categoryIds: [],
+        featuredProductIds: [],
         showCount: true,
       };
   }

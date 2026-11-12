@@ -49,6 +49,7 @@ export function buildHomeTemplate(): BlockDocument {
       showFeatured: true,
       featuredPerCategory: 1,
       categoryIds: [],
+      featuredProductIds: [],
       showCount: true,
     },
     {

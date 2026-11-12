@@ -75,14 +75,14 @@ export function ProductsShowcase({ locale, messages, categories, highlights, cou
               className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface transition-all hover:-translate-y-1 hover:border-line-strong hover:shadow-lg"
             >
               {/* ภาพจริงของหมวด (จากคลัง) — ถอยไปใช้ภาพในโค้ดถ้ายังไม่มีข้อมูล */}
-              <span className="relative flex h-40 items-center justify-center bg-bg-subtle p-4">
+              <span className="relative flex aspect-[4/3] w-full items-center justify-center bg-bg-subtle p-3 sm:aspect-auto sm:h-40 sm:p-4">
                 <Image
                   src={category.image.src}
                   alt={category.imageAlt}
                   width={category.image.width}
                   height={category.image.height}
                   sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 320px"
-                  className="h-auto max-h-32 w-auto object-contain transition-transform group-hover:scale-105"
+                  className="h-full w-auto max-w-full object-contain transition-transform group-hover:scale-105"
                 />
               </span>
 

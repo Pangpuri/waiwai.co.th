@@ -47,6 +47,7 @@ import {
   listProductCategoriesForAdmin,
   listProductCategoryCards,
   listProductHighlights,
+  listProductShowcaseCandidates,
   listProductsByCategory,
   listProductDetailPagePaths,
   listProductsForAdmin,
@@ -141,6 +142,7 @@ import {
 import { chromePresetPageKey, defaultChromePresetPayload } from "@/lib/chrome/presets";
 import { countRawBlocks } from "@/lib/blocks/migrate";
 import { parseBlockDocument } from "@/lib/blocks/parse";
+import { productShowcaseView } from "@/lib/blocks/product-showcase";
 import { productDetailPageId } from "@/lib/blocks/product-detail";
 import { IMPORTED_CONTENT_PAGES, TEMPLATED_PAGE_IDS, buildBlockTemplate } from "@/lib/blocks/templates";
 import {
@@ -2411,6 +2413,8 @@ async function checkScheduledPublish(): Promise<void> {
  */
 const PRODUCT_CHECK_CATEGORY = "check-db-products";
 const PRODUCT_CHECK_ID = "p999999";
+/* สินค้าตัวที่ 2 ในหมวดเดียวกัน — พิสูจน์ว่า "สินค้าแนะนำหลายตัวต่อหมวด" ทำงานจริง (บั๊ก 2026-11-12) */
+const PRODUCT_CHECK_SECOND_ID = "p999990";
 const PRODUCT_CHECK_ACTOR = "check-db-products@example.invalid";
 
 /* 24) หลังบ้านสินค้า (รอบที่ 134) — ประกาศไว้ตรงนี้เพราะ `main()` ถูกเรียกก่อนนิยามฟังก์ชันส่วนท้าย */
@@ -2512,6 +2516,44 @@ async function checkProductCatalog(): Promise<void> {
       "ต้องได้หมวดละ 1 ตัวเท่านั้น",
     );
 
+    /*
+      ★ 2026-11-12 — บั๊กจริง: ตั้ง "สินค้าแนะนำ 2–3 ตัวต่อหมวด" แล้วหน้าเว็บยังขึ้น 1
+      ต้นเหตุคือตัวอ่านของบล็อกเคยใช้ `distinct on (category_id)` ⇒ พิสูจน์กับ DB จริงว่าตัวอ่านใหม่
+      คืน **หลายตัวต่อหมวด** และวิวตัดตามจำนวนที่ตั้งได้จริง
+    */
+    await upsertProduct(
+      {
+        ...productInput,
+        id: PRODUCT_CHECK_SECOND_ID,
+        sourceId: "999990",
+        sourceUrl: "/th/pages/999990-check",
+        nameTh: "สินค้าทดสอบตัวที่ 2 (ด่านตรวจ)",
+        nameEn: "Check-db product 2",
+        sortOrder: 4,
+      },
+      PRODUCT_CHECK_ACTOR,
+      mediaId,
+    );
+    const candidates = await listProductShowcaseCandidates();
+    const tempCandidates = candidates.filter((row) => row.categoryId === PRODUCT_CHECK_CATEGORY);
+    assert.deepEqual(
+      tempCandidates.map((row) => row.id),
+      [PRODUCT_CHECK_ID, PRODUCT_CHECK_SECOND_ID],
+      "ตัวเลือกสินค้าแนะนำต้องคืนหลายตัวต่อหมวด เรียงตาม sort_order",
+    );
+    const twoPerCategory = productShowcaseView(
+      categoryCards,
+      candidates,
+      { categoryIds: [PRODUCT_CHECK_CATEGORY], featuredPerCategory: 2 },
+      "th",
+    );
+    assert.deepEqual(
+      twoPerCategory.featured.map((row) => row.id),
+      [PRODUCT_CHECK_ID, PRODUCT_CHECK_SECOND_ID],
+      "ตั้ง 2 ตัวต่อหมวดต้องได้ 2 ตัวจริง (ไม่ถูกตัดเหลือ 1)",
+    );
+    await deleteProduct(PRODUCT_CHECK_SECOND_ID);
+
     const usage = await findMediaUsage(mediaId);
     assert.ok(
       usage.some((entry) => entry.kind === "product" && entry.target === `product:${PRODUCT_CHECK_ID}`),
@@ -2532,6 +2574,7 @@ async function checkProductCatalog(): Promise<void> {
     done("สินค้าจากเว็บเดิม: หมวด → สินค้า + ส่วนผสม → อ่านกลับ → ภาพถูกใช้ที่ไหน → ลบ", "พาธภาพ · ลำดับส่วนผสม · idempotent");
   } finally {
     await deleteProduct(PRODUCT_CHECK_ID);
+    await deleteProduct(PRODUCT_CHECK_SECOND_ID);
     assert.equal(
       await countWhere("product_ingredient where product_id = $1", [PRODUCT_CHECK_ID]),
       0,

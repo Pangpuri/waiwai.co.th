@@ -27,6 +27,12 @@ export type ProductShowcaseOptions = {
   readonly featuredPerCategory: number;
   /** เลือกเฉพาะหมวดที่ต้องการ (รหัส = slug) · ว่าง = ทุกหมวด */
   readonly categoryIds: readonly string[];
+  /**
+   * สินค้าที่ผู้ดูแลเลือกให้ขึ้น "สินค้าแนะนำ" เอง (id ของสินค้าในฐานข้อมูล · ตามลำดับที่เลือก)
+   * - ว่าง = ใช้พฤติกรรมเดิม: N ตัวแรกของแต่ละหมวดอัตโนมัติ
+   * - ตัวที่ถูกเลือกแต่ไม่ได้อยู่ในหมวดที่แสดง (หรือถูกลบ) จะถูกข้ามอย่างปลอดภัย
+   */
+  readonly featuredProductIds: readonly string[];
   /** แสดงจำนวนสินค้าบนการ์ดหมวด */
   readonly showCount: boolean;
 };
@@ -36,10 +42,13 @@ export const DEFAULT_PRODUCT_SHOWCASE: ProductShowcaseOptions = {
   showFeatured: true,
   featuredPerCategory: 1,
   categoryIds: [],
+  featuredProductIds: [],
   showCount: true,
 };
 
 export const MAX_FEATURED_PER_CATEGORY = 3;
+/** เพดานรหัสสินค้าที่เลือกเองในเอกสาร (กัน JSONB บวมจากค่าที่ไม่เชื่อถือได้) */
+export const MAX_FEATURED_PRODUCT_IDS = 60;
 
 /** บีบค่าตัวเลือกให้อยู่ในช่วงที่ใช้ได้ (ค่าที่ส่งมาจากเอกสาร/ฟอร์มไม่เชื่อถือได้) */
 export function clampShowcaseOptions(options: Partial<ProductShowcaseOptions>): ProductShowcaseOptions {
@@ -53,6 +62,9 @@ export function clampShowcaseOptions(options: Partial<ProductShowcaseOptions>): 
         ? Math.min(MAX_FEATURED_PER_CATEGORY, Math.max(1, Math.round(per)))
         : DEFAULT_PRODUCT_SHOWCASE.featuredPerCategory,
     categoryIds: [...new Set((options.categoryIds ?? []).map((id) => id.trim()).filter((id) => id !== ""))],
+    featuredProductIds: [
+      ...new Set((options.featuredProductIds ?? []).map((id) => id.trim()).filter((id) => id !== "")),
+    ].slice(0, MAX_FEATURED_PRODUCT_IDS),
     showCount: options.showCount ?? DEFAULT_PRODUCT_SHOWCASE.showCount,
   };
 }
@@ -127,19 +139,30 @@ export function productShowcaseView(
     href: `/products/${row.slug}`,
   }));
 
+  /*
+    สินค้าแนะนำ — มี 2 โหมด
+    1. **เลือกเอง** (`featuredProductIds` ไม่ว่าง): ใช้เฉพาะที่เลือก · เรียงตามลำดับที่เลือกภายในหมวด
+    2. **อัตโนมัติ**: N ตัวแรกของแต่ละหมวดตามลำดับสินค้าในฐานข้อมูล (พฤติกรรมเดิม)
+    ⚠️ ทั้งสองโหมดยังเคารพ `featuredPerCategory` — จำนวนที่ผู้ดูแลตั้งไว้ต้องมีผลจริง
+  */
+  const highlightById = new Map(highlights.map((row) => [row.id, row]));
+  const explicit = options.featuredProductIds.length > 0;
+
   const featuredViews: ProductShowcaseFeaturedView[] = options.showFeatured
-    ? selected.flatMap((category) =>
-        highlights
-          .filter((row) => row.categoryId === category.id)
-          .slice(0, options.featuredPerCategory)
-          .map((row) => ({
-            id: row.id,
-            categoryId: row.categoryId,
-            title: language === "en" && row.nameEn.trim() !== "" ? row.nameEn : row.nameTh,
-            image: row.imagePath,
-            href: `/products/${category.slug}`,
-          })),
-      )
+    ? selected.flatMap((category) => {
+        const rows = explicit
+          ? options.featuredProductIds
+              .map((id) => highlightById.get(id))
+              .filter((row): row is ProductHighlightRecord => row !== undefined && row.categoryId === category.id)
+          : highlights.filter((row) => row.categoryId === category.id);
+        return rows.slice(0, options.featuredPerCategory).map((row) => ({
+          id: row.id,
+          categoryId: row.categoryId,
+          title: language === "en" && row.nameEn.trim() !== "" ? row.nameEn : row.nameTh,
+          image: row.imagePath,
+          href: `/products/${category.slug}`,
+        }));
+      })
     : [];
 
   return { categories: views, featured: featuredViews, isEmpty: views.length === 0 };
@@ -155,11 +178,15 @@ export function showcaseOptionsFromUnknown(raw: Readonly<Record<string, unknown>
   const columns = raw["columns"];
   const per = raw["featuredPerCategory"];
   const ids = raw["categoryIds"];
+  const featured = raw["featuredProductIds"];
   return clampShowcaseOptions({
     columns: columns === 1 || columns === 2 || columns === 3 ? columns : undefined,
     showFeatured: typeof raw["showFeatured"] === "boolean" ? raw["showFeatured"] : undefined,
     featuredPerCategory: typeof per === "number" ? per : undefined,
     categoryIds: Array.isArray(ids) ? ids.filter((value): value is string => typeof value === "string") : undefined,
+    featuredProductIds: Array.isArray(featured)
+      ? featured.filter((value): value is string => typeof value === "string")
+      : undefined,
     showCount: typeof raw["showCount"] === "boolean" ? raw["showCount"] : undefined,
   });
 }
@@ -170,5 +197,47 @@ export const PRODUCT_SHOWCASE_BLOCK_DEFAULTS = {
   showFeatured: DEFAULT_PRODUCT_SHOWCASE.showFeatured,
   featuredPerCategory: DEFAULT_PRODUCT_SHOWCASE.featuredPerCategory,
   categoryIds: DEFAULT_PRODUCT_SHOWCASE.categoryIds,
+  featuredProductIds: DEFAULT_PRODUCT_SHOWCASE.featuredProductIds,
   showCount: DEFAULT_PRODUCT_SHOWCASE.showCount,
 } as const;
+
+/* ── ตัวเลือกสำหรับแผงหลังบ้าน (บริสุทธิ์ · ใช้ได้ทั้งหน้าจอและเทสต์) ─────────── */
+
+export type ProductShowcaseCategoryChoice = {
+  readonly id: string;
+  /** ชื่อที่แสดงในหลังบ้าน (ค่าจากฐานข้อมูลมาก่อน แล้วถอยพจนานุกรม) */
+  readonly name: string;
+};
+
+export type ProductShowcaseProductChoice = {
+  readonly id: string;
+  readonly categoryId: string;
+  readonly title: string;
+  /** `/media/<id>` หรือ null */
+  readonly image: string | null;
+};
+
+/**
+ * แปลงข้อมูลจริงเป็นตัวเลือกของแผงหลังบ้าน — **เฉพาะหมวดที่เว็บแสดงจริง**
+ * (สินค้าในหมวดที่ซ่อน/ถูกลบต้องไม่โผล่ให้เลือก เพราะเลือกแล้วก็ไม่ขึ้นเว็บ)
+ */
+export function productShowcaseChoicesOf(
+  categories: readonly ProductCategoryCardRecord[],
+  highlights: readonly ProductHighlightRecord[],
+): {
+  readonly categories: readonly ProductShowcaseCategoryChoice[];
+  readonly products: readonly ProductShowcaseProductChoice[];
+} {
+  const categoryChoices = categories.map((row) => ({
+    id: row.id,
+    name: categoryNameOf(row.nameTh, row.nameEn, dictionaryCategoryName(row.id, "th"), "th"),
+  }));
+  const allowed = new Set(categoryChoices.map((row) => row.id));
+  const products: ProductShowcaseProductChoice[] = [];
+  for (const row of highlights) {
+    if (!allowed.has(row.categoryId)) continue;
+    const title = row.nameTh.trim() !== "" ? row.nameTh.trim() : row.nameEn.trim();
+    products.push({ id: row.id, categoryId: row.categoryId, title, image: row.imagePath });
+  }
+  return { categories: categoryChoices, products };
+}

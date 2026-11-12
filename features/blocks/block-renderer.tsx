@@ -669,14 +669,14 @@ function BlockView({
                 <li key={category.id} className="border-line bg-surface flex overflow-hidden rounded-xl border">
                   <a href={localizedBlockHref(category.href, language)} className="group flex h-full w-full flex-col">
                     {category.image === null ? null : (
-                      <span className="bg-bg-subtle flex h-40 items-center justify-center p-4">
+                      <span className="bg-bg-subtle flex aspect-[4/3] w-full items-center justify-center p-3 sm:aspect-auto sm:h-40 sm:p-4">
                         <Image
                           src={category.image}
                           alt={category.title}
                           width={320}
                           height={160}
                           sizes="(max-width: 640px) 92vw, 320px"
-                          className="h-auto max-h-32 w-auto object-contain transition-transform group-hover:scale-105"
+                          className="h-full w-auto max-w-full object-contain transition-transform group-hover:scale-105"
                         />
                       </span>
                     )}

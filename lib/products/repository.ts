@@ -553,6 +553,56 @@ export async function listProductHighlights(): Promise<readonly ProductHighlight
   }
 }
 
+/**
+ * **ตัวเลือกสินค้าแนะนำ** สำหรับหลังบ้าน + บล็อกหน้าแรก — คืน **ทุกสินค้าในประเทศที่ยังใช้งาน**
+ * (หลายตัวต่อหมวด) ต่างจาก `listProductHighlights()` ที่ตั้งใจคืน 1 ตัว/หมวดสำหรับเลย์เอาต์เดิม
+ *
+ * ทำไมต้องมีแยก: บั๊กจริงจากเจ้าของ (2026-11-12) — ตั้ง "สินค้าแนะนำ 2–3 ตัวต่อหมวด" แล้วเว็บยังแสดง 1
+ * เพราะคิวรีเดิมใช้ `distinct on (p.category_id)` ⇒ ข้อมูลถูกตัดเหลือตัวเดียวตั้งแต่ชั้นฐานข้อมูล
+ * ⇒ ตัวเลือก "จำนวนต่อหมวด" ไม่มีทางทำงานได้เลย
+ *
+ * ⚠️ ใช้ `left join media` เพื่อให้สินค้าที่ยังไม่มีภาพยังเลือกได้ (การ์ดจะแสดงเฉพาะชื่อ)
+ * ⚠️ เรียงตามหมวด → ลำดับสินค้า → id ⇒ ผลลัพธ์คงที่และตัวเรนเดอร์ตัด N ตัวแรกได้ตรงตามที่เห็นในหลังบ้าน
+ */
+export async function listProductShowcaseCandidates(): Promise<readonly ProductHighlightRecord[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const result = await readQuery<{
+      id: string;
+      categoryId: string;
+      nameTh: string;
+      nameEn: string;
+      imageId: string | null;
+      imageWidth: number | null;
+      imageHeight: number | null;
+    }>(
+      `select p.id,
+              p.category_id as "categoryId",
+              p.name_th     as "nameTh",
+              p.name_en     as "nameEn",
+              m.id          as "imageId",
+              m.width       as "imageWidth",
+              m.height      as "imageHeight"
+         from product p
+         left join media m on m.id = p.image_media_id
+        where ${PUBLIC_PRODUCT_CONDITION} and p.market = 'domestic'
+        order by p.category_id, p.sort_order, p.id`,
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      categoryId: row.categoryId,
+      nameTh: row.nameTh,
+      nameEn: row.nameEn,
+      imagePath: mediaPath(row.imageId),
+      imageWidth: row.imageWidth,
+      imageHeight: row.imageHeight,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /* ── ฝั่งเขียน (ใช้โดยสคริปต์นำเข้า) — โยน error ออกไปถ้าล้มเหลว (ห้ามกลืน) ────── */
 
 /**
