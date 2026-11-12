@@ -161,3 +161,21 @@ test("media: ช่องภาพใช้คลังจาก context แล�
   assert.ok(page.includes("ImageLibraryProvider"), "ต้องมีผู้ให้บริการคลังครอบตัวสร้าง");
   assert.ok(page.includes("listMedia("), "ต้องอ่านรายการจากคลังจริง");
 });
+
+/**
+ * ★ 2026-11-12 — เจ้าของเห็น "คลังภาพหายหลายภาพ" ทั้งที่ข้อมูลอยู่ครบ
+ * ต้นเหตุ: หน้าคลังภาพโหลดแค่ 60 ภาพแรกแล้วไม่มีปุ่มหน้าถัดไป
+ * ⇒ ต้องมีจำนวนภาพต่อหน้า + จำนวนหน้าทั้งหมด + ลิงก์ก่อนหน้า/ถัดไป
+ */
+test("media: หน้าคลังภาพแบ่งหน้าและแสดงช่วงภาพทั้งหมด ไม่ซ่อนภาพเก่า", () => {
+  const page = codeOf("app/admin/media/page.tsx");
+  assert.ok(page.includes("MEDIA_PAGE_SIZE"), "ต้องมีขนาดหน้าคงที่");
+  assert.ok(page.includes("searchMediaCount"), "ต้องนับจำนวนภาพทั้งหมดเพื่อสร้างจำนวนหน้า");
+  assert.ok(page.includes("searchMedia(search, MEDIA_PAGE_SIZE, offset)"), "ต้องอ่านภาพตามหน้า (limit + offset)");
+  assert.ok(page.includes("mediaPageRange"), "ต้องบอกว่ากำลังแสดงภาพช่วงใดจากทั้งหมด");
+  assert.ok(page.includes("mediaPagePrev") && page.includes("mediaPageNext"), "ต้องมีปุ่มก่อนหน้า/ถัดไป");
+
+  const repo = readFileSync(join(import.meta.dirname, "..", "lib", "media", "repository.ts"), "utf8");
+  assert.ok(repo.includes("limit $2 offset $3"), "คิวรีคลังต้องรองรับ offset");
+  assert.ok(repo.includes("export async function searchMediaCount"), "ต้องมีตัวนับจำนวนภาพตามคำค้น");
+});

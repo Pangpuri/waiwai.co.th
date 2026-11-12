@@ -5,7 +5,7 @@ import { MediaItemActions, MediaUpload } from "@/features/admin/ui/media-library
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { formatBytes } from "@/lib/format/bytes";
-import { findMediaUsage, mediaStats, searchMedia, type MediaUsageKind } from "@/lib/media/repository";
+import { findMediaUsage, mediaStats, searchMedia, searchMediaCount, type MediaUsageKind } from "@/lib/media/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { searchParamText } from "@/lib/search/params";
@@ -25,6 +25,8 @@ const FIELD_CLASS =
   "border-line bg-surface text-fg focus-visible:ring-ring w-full rounded-lg border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 const BUTTON_CLASS =
   "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none";
+/** จำนวนภาพต่อหน้า — คลังมีได้หลายร้อยภาพ จึงต้องแบ่งหน้า ไม่โหลดทั้งหมดพร้อมกัน */
+const MEDIA_PAGE_SIZE = 60;
 
 /** ป้ายชื่อชนิดของการใช้งาน (ใช้ `switch` ครอบทุกชนิด ⇒ เพิ่มชนิดใหม่แล้ว type ฟ้องที่นี่ทันที) */
 function usageKindLabel(kind: MediaUsageKind, strings: Messages["admin"]): string {
@@ -51,7 +53,7 @@ function usageKindLabel(kind: MediaUsageKind, strings: Messages["admin"]): strin
 export default async function AdminMediaPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly q?: string }>;
+  readonly searchParams: Promise<{ readonly q?: string; readonly page?: string }>;
 }) {
   const user = await requireAdminUser("media");
   const messages = await getMessagesFor("th");
@@ -64,14 +66,35 @@ export default async function AdminMediaPage({
   */
   const search = searchParamText(query.q, 80);
 
-  const [items, stats] = await Promise.all([searchMedia(search), mediaStats()]);
+  /*
+    แบ่งหน้า: คลังมีได้หลายร้อยภาพ — เดิมโหลดแค่ 60 ภาพแรกแล้วจบ
+    ⇒ ผู้ใช้เห็น "ภาพหาย" ทั้งที่ข้อมูลยังอยู่ครบ · ตอนนี้มีจำนวนหน้า + ช่วงภาพที่เห็นชัดเจน
+  */
+  const rawPage = searchParamText(query.page);
+  const requestedPage = /^\d+$/.test(rawPage) ? Number.parseInt(rawPage, 10) : 1;
+  const total = await searchMediaCount(search);
+  const pageCount = Math.max(1, Math.ceil(total / MEDIA_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, requestedPage), pageCount);
+  const offset = (currentPage - 1) * MEDIA_PAGE_SIZE;
 
-  /* ตรวจการใช้งานทีละภาพ (คลังมีขนาดเล็ก — ตรวจสดทุกครั้งเพื่อความถูกต้อง) */
+  const [items, stats] = await Promise.all([searchMedia(search, MEDIA_PAGE_SIZE, offset), mediaStats()]);
+
+  /* ตรวจการใช้งานทีละภาพ (เฉพาะภาพในหน้านี้) — ตรวจสดทุกครั้งเพื่อความถูกต้อง */
   const usageByItem = new Map<string, Awaited<ReturnType<typeof findMediaUsage>>>();
   for (const item of items) {
     usageByItem.set(item.id, await findMediaUsage(item.id));
   }
-  const unused = items.filter((item) => (usageByItem.get(item.id) ?? []).length === 0).length;
+
+  /* ลิงก์หน้า ถัดไป/ก่อนหน้า — คงคำค้นไว้ */
+  const pageHref = (target: number): string => {
+    const params = new URLSearchParams();
+    if (search !== "") params.set("q", search);
+    if (target > 1) params.set("page", String(target));
+    const queryString = params.toString();
+    return queryString === "" ? "/admin/media" : `/admin/media?${queryString}`;
+  };
+  const rangeFrom = total === 0 ? 0 : offset + 1;
+  const rangeTo = offset + items.length;
 
   const actionStrings = {
     mediaUploadTitle: strings.mediaUploadTitle,
@@ -85,13 +108,54 @@ export default async function AdminMediaPage({
     imageShrinkNote: strings.imageShrinkNote,
   };
 
+  const pagination =
+    total === 0 ? null : (
+      <nav
+        aria-label={strings.mediaTitle}
+        className="border-line bg-surface flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2"
+      >
+        <p className="text-fg-muted text-xs">
+          {fillTemplate(strings.mediaPageRange, {
+            from: String(rangeFrom),
+            to: String(rangeTo),
+            total: String(total),
+          })}
+        </p>
+        {pageCount <= 1 ? null : (
+          <div className="flex flex-wrap items-center gap-2">
+            {currentPage > 1 ? (
+              <Link href={pageHref(currentPage - 1)} className={BUTTON_CLASS}>
+                {strings.mediaPagePrev}
+              </Link>
+            ) : (
+              <span className={`${BUTTON_CLASS} cursor-not-allowed opacity-40`} aria-disabled="true">
+                {strings.mediaPagePrev}
+              </span>
+            )}
+            <span className="text-fg-muted text-xs">
+              {fillTemplate(strings.mediaPageStatus, { page: String(currentPage), pages: String(pageCount) })}
+            </span>
+            {currentPage < pageCount ? (
+              <Link href={pageHref(currentPage + 1)} className={BUTTON_CLASS}>
+                {strings.mediaPageNext}
+              </Link>
+            ) : (
+              <span className={`${BUTTON_CLASS} cursor-not-allowed opacity-40`} aria-disabled="true">
+                {strings.mediaPageNext}
+              </span>
+            )}
+          </div>
+        )}
+      </nav>
+    );
+
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-fg text-2xl font-bold">{strings.mediaTitle}</h1>
         <p className="text-fg-muted text-sm">{strings.mediaHint}</p>
         <p className="text-fg-muted text-xs">
-          {fillTemplate(strings.mediaStats, { count: stats.count, size: formatBytes(stats.totalBytes), unused })}
+          {fillTemplate(strings.mediaStats, { count: stats.count, size: formatBytes(stats.totalBytes) })}
         </p>
         {/* X2.4 — บอกให้ชัดว่า "ลบ" = ย้ายเข้าถังขยะ + ทางไปกู้คืน (ลิงก์แสดงเฉพาะผู้มีสิทธิ์ถังขยะ — X1.10 รอบที่ 85) */}
         <div className="flex flex-wrap items-center gap-3">
@@ -124,6 +188,8 @@ export default async function AdminMediaPage({
           </Link>
         )}
       </form>
+
+      {pagination}
 
       {items.length === 0 ? (
         <p className="border-line bg-surface text-fg-muted rounded-2xl border p-5 text-sm">{strings.mediaNoResults}</p>
@@ -196,6 +262,8 @@ export default async function AdminMediaPage({
           })}
         </ul>
       )}
+
+      {items.length === 0 ? null : pagination}
     </main>
   );
 }

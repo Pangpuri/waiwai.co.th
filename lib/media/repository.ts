@@ -377,10 +377,12 @@ export async function findMediaUsage(id: string): Promise<readonly MediaUsage[]>
   return usage;
 }
 
-/** รายการภาพแบบมีคำค้น (ชื่อไฟล์/คำอธิบายภาพ) — เรียงใหม่สุดก่อน */
-export async function searchMedia(query: string, limit = 60): Promise<readonly MediaListItem[]> {
+/** รายการภาพแบบมีคำค้น (ชื่อไฟล์/คำอธิบายภาพ) — เรียงใหม่สุดก่อน · แบ่งหน้าได้ด้วย offset */
+export async function searchMedia(query: string, limit = 60, offset = 0): Promise<readonly MediaListItem[]> {
   /* ⚠️ ประตูที่ชั้นข้อมูล (รอบที่ 291): ตัดอักขระควบคุม/NUL เสมอ — Postgres รับ `\u0000` ในข้อความไม่ได้ */
   const trimmed = normalizeSearchText(query, 80);
+  const safeLimit = Number.isFinite(limit) ? Math.min(200, Math.max(1, Math.floor(limit))) : 60;
+  const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
   const result = await getPool().query<{
     id: string;
     filename: string;
@@ -396,9 +398,9 @@ export async function searchMedia(query: string, limit = 60): Promise<readonly M
        from media
       where deleted_at is null
         and ($1 = '' or filename ilike '%' || $1 || '%' or alt_th ilike '%' || $1 || '%' or alt_en ilike '%' || $1 || '%')
-      order by created_at desc
-      limit $2`,
-    [trimmed, Math.max(1, Math.min(limit, 200))],
+      order by created_at desc, id desc
+      limit $2 offset $3`,
+    [trimmed, safeLimit, safeOffset],
   );
 
   return result.rows.map((row) => ({
@@ -412,6 +414,20 @@ export async function searchMedia(query: string, limit = 60): Promise<readonly M
     altEn: row.alt_en,
     createdAt: row.created_at.toISOString(),
   }));
+}
+
+/** จำนวนภาพทั้งหมดที่ตรงคำค้น — ใช้คำนวณจำนวนหน้า (ต้องใช้เงื่อนไขเดียวกับ `searchMedia`) */
+export async function searchMediaCount(query: string): Promise<number> {
+  const trimmed = normalizeSearchText(query, 80);
+  const result = await getPool().query<{ count: string }>(
+    `select count(*)::text as count
+       from media
+      where deleted_at is null
+        and ($1 = '' or filename ilike '%' || $1 || '%' or alt_th ilike '%' || $1 || '%' or alt_en ilike '%' || $1 || '%')`,
+    [trimmed],
+  );
+  const count = Number.parseInt(result.rows[0]?.count ?? "0", 10);
+  return Number.isFinite(count) ? count : 0;
 }
 
 /** สรุปตัวเลขของคลังภาพ */
