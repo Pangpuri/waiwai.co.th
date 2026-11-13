@@ -1,3 +1,10 @@
+import {
+  ABOUT_IMAGE_ALT_EN,
+  aboutEnglishBodyOf,
+  aboutEnglishRoleOfHeading,
+  aboutEnglishSectionOfRole,
+  type AboutEnglishSection,
+} from "@/lib/about/english";
 import type { AboutSource } from "@/lib/about/import-parse";
 import { TEMPLATE_BLOCK_VERSION, templateBlockId, templateMedia, templateStyle } from "@/lib/blocks/template-kit";
 import type { Block, BlockDocument, BlockGalleryItem } from "@/lib/blocks/types";
@@ -12,10 +19,29 @@ import type { Block, BlockDocument, BlockGalleryItem } from "@/lib/blocks/types"
  * กติกา
  * - ภาพทุกใบต้องมาจาก **คลังภาพ** (`/media/<id>` — มติ D9) ผ่าน `resolveImage`
  *   ⇒ ยังไม่ได้นำเข้า = `null` ⇒ บล็อกนั้นถูกข้าม (ไม่ใส่ภาพที่ชี้ไปที่อื่น)
- * - **ไม่มี EN** (ต้นทางเป็นไทยล้วน) ⇒ `en: ""` ทั้งหมด (มติ D3/D22) — เจ้าของเติมเองได้ในตัวสร้าง
+ * - **EN**: หน้าต้นทางภาษาอังกฤษมีเนื้อหาคู่กัน (`lib/about/english.ts`) ⇒ เมื่อผู้เรียกส่ง
+ *   `english: true` จะเติม `en` ให้ทุกส่วนที่จับคู่ได้ (มติ D3 ยังเปิดให้ `en: ""` ได้)
+ *   ⚠️ ถ้าเปิด EN แล้วเจอส่วนที่จับคู่ไม่ได้ = **โยน error** (ไม่ปล่อยผ่านเป็นหน้าไทยครึ่ง ๆ กลาง ๆ)
  * - **ไม่แต่งข้อความเพิ่ม** และ **ไม่ใส่บล็อกที่ไม่มีในต้นทาง** (เช่น ปุ่ม CTA ที่ต้นทางไม่มี)
  * - สไตล์เลือกจากพรีเซ็ตแบรนด์เท่านั้น (`templateStyle` — มติ D10)
  */
+
+export type AboutDocumentOptions = {
+  /** true = เติมข้อความ EN จาก `lib/about/english.ts` ให้ทุกส่วน (ค่าเริ่มต้น false = TH อย่างเดียว) */
+  readonly english?: boolean;
+};
+
+/** ข้อความ EN ของส่วนนี้ — `null` เมื่อไม่ได้เปิด EN */
+function englishOf(thHeading: string, options: AboutDocumentOptions): AboutEnglishSection | null {
+  if (options.english !== true) return null;
+  const role = aboutEnglishRoleOfHeading(thHeading);
+  if (role === null) {
+    throw new Error(
+      `ไม่พบข้อความ EN สำหรับส่วน "${thHeading}" — อัปเดต lib/about/english.ts ให้ตรงกับหน้าต้นทางก่อนนำเข้า`,
+    );
+  }
+  return aboutEnglishSectionOfRole(role);
+}
 
 /** คืนพาธ `/media/<id>` ของภาพต้นทาง หรือ `null` ถ้ายังไม่ได้นำเข้า */
 export type AboutImageResolver = (sourceUrl: string) => string | null;
@@ -90,7 +116,11 @@ function headingForEmptySection(paragraphs: readonly string[], pageTitle: string
   return pageTitle.trim();
 }
 
-export function buildAboutDocument(source: AboutSource, resolveImage: AboutImageResolver): BlockDocument {
+export function buildAboutDocument(
+  source: AboutSource,
+  resolveImage: AboutImageResolver,
+  options: AboutDocumentOptions = {},
+): BlockDocument {
   const blocks: Block[] = [];
   let index = 0;
   const nextId = (): string => templateBlockId(index++);
@@ -119,7 +149,7 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
       title: { th: "", en: "" },
       subtitle: { th: "", en: "" },
       note: { th: "", en: "" },
-      image: templateMedia(banner, alt, ""),
+      image: templateMedia(banner, alt, options.english === true ? ABOUT_IMAGE_ALT_EN : ""),
       ctaLabel: { th: "", en: "" },
       ctaHref: "",
     });
@@ -129,17 +159,19 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
   let galleryCount = 0;
   for (const node of source.nodes) {
     if (node.kind === "section") {
+      const headingTh = node.heading !== "" ? node.heading : headingForEmptySection(node.paragraphs, source.pageTitle);
+      const en = englishOf(headingTh, options);
       blocks.push({
         id: nextId(),
         version: TEMPLATE_BLOCK_VERSION,
         type: "richText",
         style: templateStyle(),
         /* ⚠️ ต้นทางไม่มีหัวข้อให้ส่วนเปิดเรื่อง ⇒ ต้องเติม (validator บังคับ) — ดู `headingForEmptySection` */
-        heading: {
-          th: node.heading !== "" ? node.heading : headingForEmptySection(node.paragraphs, source.pageTitle),
-          en: "",
+        heading: { th: headingTh, en: en === null ? "" : en.heading },
+        body: {
+          th: node.paragraphs.join("\n\n"),
+          en: en === null ? "" : aboutEnglishBodyOf(en),
         },
-        body: { th: node.paragraphs.join("\n\n"), en: "" },
         ctaLabel: { th: "", en: "" },
         ctaHref: "",
       });
@@ -152,7 +184,7 @@ export function buildAboutDocument(source: AboutSource, resolveImage: AboutImage
       if (path === null) continue;
       items.push({
         id: `photo-${String(galleryCount + 1)}-${String(at + 1)}`,
-        image: templateMedia(path, alt, ""),
+        image: templateMedia(path, alt, options.english === true ? ABOUT_IMAGE_ALT_EN : ""),
         caption: { th: "", en: "" },
       });
     }

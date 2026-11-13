@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { closePool, isDatabaseConfigured } from "@/db/pool";
+import { ABOUT_IMAGE_ALT_EN } from "@/lib/about/english";
 import { aboutSourceImageUrls, buildAboutDocument } from "@/lib/about/document";
 import { parseAboutPage, type AboutSource } from "@/lib/about/import-parse";
 import { aboutSourceAssetOf } from "@/lib/about/source-assets";
@@ -32,6 +33,8 @@ import { prepareTargetRun } from "./target-env.ts";
  * - **idempotent**: รูป dedupe ด้วย sha256 (`media.sha256`) · รันซ้ำ = ได้เอกสารเดิม
  * - ภาพทุกใบเข้าคลังภาพ (มติ D11) และบล็อกเก็บ **พาธ** `/media/<id>` (มติ D9)
  * - คำที่แก้ = เฉพาะในตาราง `ABOUT_TEXT_FIXES` (มติเจ้าของ) · ตัวเลขที่ต้นทางขัดกันเอง **คงไว้ทั้งคู่**
+ * - **EN**: เติมจาก `lib/about/english.ts` (คัดจากหน้าต้นทาง EN — ตรวจ 2026-11-13)
+ *   ⇒ เอกสารที่นำเข้าใหม่มีทั้ง TH/EN โดยไม่ต้องกรอกมือ · ของเดิมที่ยังว่างใช้ `npm run about:english`
  * - ⚠️ ต้นฉบับเป็นของผู้ตราสินค้าเอง · **ห้าม commit HTML/รูปที่ดึงมา**
  */
 
@@ -44,6 +47,16 @@ const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36";
 /** ผู้เขียนที่บันทึกใน `page_document.updated_by` — ใช้แยก "งานคน" ออกจาก "งานตัวนำเข้า" */
 const ACTOR = "import:waiwai.co.th/about";
+/**
+ * คำนำหน้าของ "งานตัวนำเข้า" ทุกตัวที่แตะหน้า about
+ * (มี `about:import` = TH อย่างเดียว และ `about:english` = เติม EN) ⇒ guard กันงานคน
+ * ต้องมองทั้งคู่ว่าเป็นงานเครื่อง ไม่ใช่ข้อความที่คนพิมพ์เอง
+ */
+const IMPORT_ACTOR_PREFIX = "import:waiwai.co.th/about";
+
+function isImportActor(actor: string | null): boolean {
+  return actor !== null && actor.startsWith(IMPORT_ACTOR_PREFIX);
+}
 
 type Options = {
   readonly dryRun: boolean;
@@ -167,7 +180,7 @@ if (!target.ok) process.exit(1);
   const paths = new Map<string, string>();
 
   if (options.dryRun) {
-    const preview = buildAboutDocument(source, () => "/media/dry-run");
+    const preview = buildAboutDocument(source, () => "/media/dry-run", { english: true });
     if (!checkDocument(preview)) {
       process.exitCode = 1;
       return;
@@ -190,7 +203,7 @@ if (!target.ok) process.exit(1);
         /* ไฟล์ที่เตรียมไว้ล่วงหน้าใช้พาธในเครื่องเป็นชื่อไฟล์ (นามสกุลตรงกับไบต์จริง) */
         url: asset === null ? url : asset.publicPath,
         altTh: source.pageTitle === "" ? "ภาพประกอบของบริษัท" : `ภาพประกอบของบริษัท ${source.pageTitle}`,
-        altEn: "",
+        altEn: ABOUT_IMAGE_ALT_EN,
         cache,
         stats,
         actor: ACTOR,
@@ -207,7 +220,7 @@ if (!target.ok) process.exit(1);
   }
 
   /* ประกอบด้วยพาธภาพจริง แล้วตรวจด้วยด่านเดียวกัน (ด่านนี้ต้องผ่านก่อนเขียนทุกครั้ง) */
-  const finalDocument = buildAboutDocument(source, (url) => paths.get(url) ?? null);
+  const finalDocument = buildAboutDocument(source, (url) => paths.get(url) ?? null, { english: true });
   if (!checkDocument(finalDocument)) {
     log("   ℹ️ ยกเลิก — ไม่เขียนทับฉบับร่าง (รูปที่นำเข้าไปแล้วอยู่ในคลังภาพได้ ไม่มีผลเสีย)");
     process.exitCode = 1;
@@ -216,7 +229,7 @@ if (!target.ok) process.exit(1);
 
   /* ── 4) กันทับงานคน (ค่าเริ่มต้น) ─────────────────────────────────────────── */
   const current = await loadDocumentRow("about", "draft");
-  if (current !== null && current.updatedBy !== null && current.updatedBy !== ACTOR && !options.force) {
+  if (current !== null && !isImportActor(current.updatedBy) && !options.force) {
     log("");
     log(`⚠️ ฉบับร่างของหน้านี้ถูกแก้ล่าสุดโดย "${current.updatedBy}" (ไม่ใช่ตัวนำเข้า)`);
     log(`   เมื่อ ${current.updatedAt} — ยังไม่เขียนทับ (กันงานคนหาย)`);

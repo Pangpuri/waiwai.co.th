@@ -44,6 +44,7 @@
     "news:views": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-news-views.ts",
     "contact:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-contact.ts",
     "about:import": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about.ts",
+    "about:english": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-about-english.ts",
     "brand:logo": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/import-brand-logo.ts",
     "db:push": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-push.ts",
     "db:sync": "node --import ./scripts/alias-hook.mjs --env-file-if-exists=.env.local scripts/db-sync.ts",

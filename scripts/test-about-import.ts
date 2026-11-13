@@ -312,6 +312,7 @@ test("about import: สคริปต์ใช้ท่อนำเข้าก
     "ต้องตรวจด้วย validator จริงด้วย (บั๊ก 2026-10-10: รันแต่ parser ⇒ กดเผยแพร่ไม่ผ่าน)",
   );
   assert.ok(script.includes("--force"), "ต้องมีทางเลือก --force สำหรับทับงานคน");
-  assert.ok(script.includes("updatedBy !== ACTOR"), "ค่าเริ่มต้นต้องไม่ทับงานที่คนแก้");
+  assert.ok(script.includes("isImportActor(current.updatedBy)"), "ค่าเริ่มต้นต้องไม่ทับงานที่คนแก้ (แต่ยอมให้ตัวนำเข้าเขียนทับกันเอง)");
+  assert.ok(script.includes("IMPORT_ACTOR_PREFIX"), "ต้องรู้จัก actor ของตัวนำเข้าทุกตัว (about:import + about:english)");
   assert.ok(!script.includes("dangerouslySetInnerHTML"), "ห้ามตีความ HTML ต้นทางเป็น markup ตรง ๆ");
 });
