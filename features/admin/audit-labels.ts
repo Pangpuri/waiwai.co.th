@@ -61,6 +61,7 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "recipes-page-copy-save": "แก้ข้อความหัวหน้าเมนูอาหาร",
     "news-page-copy-save": "แก้ข้อความหัวหน้าข่าวสาร",
     "careers-page-copy-save": "แก้ข้อความหัวหน้าร่วมงานกับไวไว",
+    "careers-excel-import": strings.auditCareersExcelImport,
     /* หมวดสินค้า (มติ D25 · รอบที่ 264) — ป้ายเป็นข้อความตรง ๆ (พื้นที่ admin ชนเพดานแล้ว) */
     "product-category-create": "เพิ่มหมวดสินค้า",
     "product-category-hide": "ซ่อน/แสดงหมวดสินค้า",
@@ -74,6 +75,8 @@ export function auditActionLabel(strings: Messages["admin"], action: string): st
     "product-category-preset-import": "นำเข้าพรีเซ็ตหมวดสินค้า",
     /* ประกาศรับสมัครงาน (มติ D26 · รอบที่ 265) */
     "job-save": "บันทึกประกาศรับสมัครงาน",
+    "job-publish": "เผยแพร่ประกาศรับสมัครงาน",
+    "job-publish-bulk": "เผยแพร่ฉบับร่างประกาศรับสมัครงานหลายรายการ",
     "job-trash": "ย้ายประกาศเข้าถังขยะ",
     "job-restore": "กู้คืนประกาศรับสมัครงาน",
     "job-revision-restore": "กู้คืนรุ่นของประกาศรับสมัครงาน",

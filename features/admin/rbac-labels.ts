@@ -16,6 +16,8 @@ export function roleLabelOf(role: AdminRole, strings: Messages["admin"]): string
       return strings.rbacRolePublisherName;
     case "admin":
       return strings.rbacRoleAdminName;
+    case "hr":
+      return strings.rbacRoleHrName;
   }
 }
 
@@ -29,6 +31,8 @@ export function permissionLabelOf(permission: AdminPermission, strings: Messages
   switch (permission) {
     case "content":
       return strings.rbacPermissionContent;
+    case "careers":
+      return strings.rbacPermissionCareers;
     case "media":
       return strings.rbacPermissionMedia;
     case "presets":

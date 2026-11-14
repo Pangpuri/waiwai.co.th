@@ -299,6 +299,7 @@ export function jobSnapshotOf(detail: AdminJobPosting): RevisionSnapshot {
     qualificationsEn: detail.qualificationsEn,
     experienceTh: detail.experienceTh,
     experienceEn: detail.experienceEn,
+    postedAt: detail.postedAt,
     sortOrder: detail.sortOrder,
     status: detail.status,
   };
@@ -318,6 +319,7 @@ export type JobRestore = {
     readonly qualificationsEn: string;
     readonly experienceTh: string;
     readonly experienceEn: string;
+    readonly postedAt: string | null;
     readonly sortOrder: number;
     readonly status: "draft" | "published";
   };
@@ -341,6 +343,7 @@ export function jobRestoreOf(snapshot: RevisionSnapshot): JobRestore {
       qualificationsEn: snapshotText(snapshot["qualificationsEn"]),
       experienceTh: snapshotText(snapshot["experienceTh"]),
       experienceEn: snapshotText(snapshot["experienceEn"]),
+      postedAt: typeof snapshot["postedAt"] === "string" ? snapshot["postedAt"] : null,
       sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
       status: snapshot["status"] === "draft" ? "draft" : "published",
     },

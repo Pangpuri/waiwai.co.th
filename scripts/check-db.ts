@@ -87,9 +87,12 @@ import {
   listJobPostings,
   listJobPostingsForAdmin,
   loadJobPostingForAdmin,
+  publishActiveJobDrafts,
+  publishSelectedJobDrafts,
   setJobPostingTrashed,
   updateJobPosting,
   upsertJobPosting,
+  upsertJobPostings,
   type JobWriteInput,
 } from "@/lib/careers/repository";
 import { nextJobSortOrder } from "@/lib/careers/model";
@@ -2825,8 +2828,11 @@ const CATEGORY_PRESET_CHECK_NAME = "check-db-category-preset";
 /* ⚠️ ค่าคงที่ของวงจร 39 (ประกาศรับสมัครงาน) — ต้องอยู่ก่อน `await main()` เช่นกัน (บทเรียน TDZ) */
 const JOB_CHECK_ID = "check-db-job";
 const JOB_CHECK_ID_2 = "check-db-job-2";
+const JOB_CHECK_BATCH_IDS = ["check-db-job-batch-1", "check-db-job-batch-2"] as const;
+const JOB_CHECK_BULK_IDS = ["check-db-job-bulk-draft", "check-db-job-bulk-published", "check-db-job-bulk-trash"] as const;
 const JOB_CHECK_ACTOR = "check-db-job@example.invalid";
 const JOB_CHECK_IMPORTER = "check-db-job-import";
+const JOB_CHECK_BULK_ACTOR = "check-db-job-bulk@example.invalid";
 /* ⚠️ ค่าคงที่ของวงจร 40 (ที่อยู่หมวด + ลบหมวดว่าง · มติ D30 · รอบ 280) — ก่อน `await main()` เช่นกัน */
 const SLUG_CHECK_ID = "check-db-slug";
 const SLUG_CHECK_OLD = "check-db-slug-old";
@@ -4940,6 +4946,7 @@ async function checkJobPostings(): Promise<void> {
     qualificationsEn: "",
     experienceTh: "",
     experienceEn: "",
+    postedAt: null,
     sortOrder: 900,
     status: "draft",
   };
@@ -5006,7 +5013,114 @@ async function checkJobPostings(): Promise<void> {
     assert.equal(forced.protectedEdit, false, "โหมด replace ต้องไม่รายงานว่ากันไว้");
     assert.equal((await loadJobPostingForAdmin(JOB_CHECK_ID))?.titleTh, "จากตัวนำเข้า", "โหมด replace ต้องทับจริง");
 
-    /* 7) ลบถาวรของในถัง = สำเร็จ */
+    /* 7) นำเข้าหลายแถวใน transaction เดียว + วันที่ถูกอ่านกลับ + ป้องกันแก้มือ */
+    const batch = [
+      { ...base, id: JOB_CHECK_BATCH_IDS[0], titleTh: "Batch 1", postedAt: "2026-11-14T01:23:00.000Z" },
+      { ...base, id: JOB_CHECK_BATCH_IDS[1], titleTh: "Batch 2" },
+    ] as const;
+    const batchResult = await upsertJobPostings(batch, JOB_CHECK_IMPORTER, "protect-edited");
+    assert.equal(batchResult.length, 2);
+    assert.ok(batchResult.every((result) => result.created), "นำเข้าชุดใหม่ต้องสร้างครบทุกแถว");
+    assert.equal(
+      (await loadJobPostingForAdmin(JOB_CHECK_BATCH_IDS[0]))?.postedAt,
+      "2026-11-14T01:23:00.000Z",
+      "วันที่ประกาศต้องอ่านกลับเป็น ISO",
+    );
+    assert.equal(
+      await updateJobPosting({ ...batch[0], titleTh: "แก้โดยคน" }, JOB_CHECK_ACTOR),
+      true,
+      "แก้ประกาศนำเข้าด้วยมือได้",
+    );
+    const repeatedBatch = await upsertJobPostings(batch, JOB_CHECK_IMPORTER, "protect-edited");
+    assert.equal(repeatedBatch[0]?.protectedEdit, true, "นำเข้าซ้ำต้องป้องกันแถวที่แก้ด้วยมือ");
+    assert.equal(
+      (await loadJobPostingForAdmin(JOB_CHECK_BATCH_IDS[0]))?.titleTh,
+      "แก้โดยคน",
+      "ข้อมูลที่แก้ด้วยมือต้องไม่ถูกทับ",
+    );
+    assert.equal((await loadJobPostingForAdmin(JOB_CHECK_BATCH_IDS[1]))?.titleTh, "Batch 2");
+
+    /* 8) เผยแพร่ที่เลือกและทั้งหมด; transaction rollback เพื่อไม่แตะร่างจริงในฐานข้อมูล */
+    assert.equal(
+      await createJobPosting(
+        { ...base, id: JOB_CHECK_BULK_IDS[0], titleTh: "Bulk draft" },
+        JOB_CHECK_ACTOR,
+      ),
+      true,
+    );
+    assert.equal(
+      await createJobPosting(
+        { ...base, id: JOB_CHECK_BULK_IDS[1], titleTh: "Bulk published", status: "published" },
+        JOB_CHECK_ACTOR,
+      ),
+      true,
+    );
+    assert.equal(
+      await createJobPosting(
+        { ...base, id: JOB_CHECK_BULK_IDS[2], titleTh: "Bulk trash" },
+        JOB_CHECK_ACTOR,
+      ),
+      true,
+    );
+    assert.equal(await setJobPostingTrashed(JOB_CHECK_BULK_IDS[2], true, JOB_CHECK_ACTOR), true);
+
+    const bulkClient = await getPool().connect();
+    let bulkTransactionOpen = false;
+    try {
+      await bulkClient.query("begin");
+      bulkTransactionOpen = true;
+      const selectedPublishedIds = await publishSelectedJobDrafts(
+        JOB_CHECK_BULK_ACTOR,
+        [JOB_CHECK_BULK_IDS[0]],
+        bulkClient,
+      );
+      assert.deepEqual(selectedPublishedIds, [JOB_CHECK_BULK_IDS[0]], "ต้องเผยแพร่เฉพาะฉบับร่างที่เลือก");
+
+      const selectedState = await bulkClient.query<{ readonly id: string; readonly status: string }>(
+        `select id, status from job_posting where id = any($1::text[])`,
+        [[...JOB_CHECK_BULK_IDS]],
+      );
+      const selectedStates = new Map(selectedState.rows.map((row) => [row.id, row]));
+      assert.equal(selectedStates.get(JOB_CHECK_BULK_IDS[0])?.status, "published");
+      assert.equal(selectedStates.get(JOB_CHECK_BULK_IDS[1])?.status, "published");
+      assert.equal(selectedStates.get(JOB_CHECK_BULK_IDS[2])?.status, "draft");
+
+      const allPublishedIds = await publishActiveJobDrafts(JOB_CHECK_BULK_ACTOR, bulkClient);
+      assert.ok(allPublishedIds.includes(JOB_CHECK_ID_2), "เผยแพร่ทั้งหมดต้องรวมฉบับร่างอื่นที่ยังใช้งานอยู่");
+      assert.ok(allPublishedIds.includes(JOB_CHECK_BULK_IDS[0]) === false, "รายการที่เผยแพร่ไปแล้วต้องไม่ถูกรายงานซ้ำ");
+      assert.ok(!allPublishedIds.includes(JOB_CHECK_BULK_IDS[1]), "รายการที่เผยแพร่ตั้งต้นแล้วต้องไม่ถูกรายงานซ้ำ");
+      assert.ok(!allPublishedIds.includes(JOB_CHECK_BULK_IDS[2]), "ประกาศในถังต้องไม่ถูกเผยแพร่");
+
+      const { rows: bulkRows } = await bulkClient.query<{
+        readonly id: string;
+        readonly status: string;
+        readonly deleted_at: Date | null;
+        readonly posted_at: Date | null;
+        readonly updated_by: string;
+      }>(
+        `select id, status, deleted_at, posted_at, updated_by from job_posting
+          where id = any($1::text[])`,
+        [[JOB_CHECK_ID_2, ...JOB_CHECK_BATCH_IDS, ...JOB_CHECK_BULK_IDS]],
+      );
+      const bulkStates = new Map(bulkRows.map((row) => [row.id, row]));
+      assert.equal(bulkStates.get(JOB_CHECK_BULK_IDS[0])?.status, "published");
+      assert.equal(bulkStates.get(JOB_CHECK_BULK_IDS[0])?.updated_by, JOB_CHECK_BULK_ACTOR);
+      assert.equal(bulkStates.get(JOB_CHECK_BULK_IDS[1])?.updated_by, JOB_CHECK_ACTOR);
+      assert.equal(bulkStates.get(JOB_CHECK_BULK_IDS[2])?.status, "draft");
+      assert.notEqual(bulkStates.get(JOB_CHECK_BULK_IDS[2])?.deleted_at, null);
+      assert.ok(bulkStates.get(JOB_CHECK_BULK_IDS[0])?.posted_at instanceof Date, "วันที่เผยแพร่ที่เลือกต้องเติมเวลาปัจจุบัน");
+      assert.ok(bulkStates.get(JOB_CHECK_ID_2)?.posted_at instanceof Date, "เผยแพร่ทั้งหมดต้องเติมเวลาปัจจุบัน");
+      assert.equal(
+        bulkStates.get(JOB_CHECK_BATCH_IDS[0])?.posted_at?.toISOString(),
+        "2026-11-14T01:23:00.000Z",
+        "วันที่ที่มีอยู่แล้วต้องคงเดิมเมื่อเผยแพร่",
+      );
+    } finally {
+      if (bulkTransactionOpen) await bulkClient.query("rollback");
+      bulkClient.release();
+    }
+
+    /* 9) ลบถาวรของในถัง = สำเร็จ */
     assert.equal(await setJobPostingTrashed(JOB_CHECK_ID, true, JOB_CHECK_ACTOR), true, "ย้ายเข้าถังก่อนลบถาวร");
     assert.equal(await deleteJobForever(JOB_CHECK_ID), true, "ลบถาวรของในถังต้องสำเร็จ");
     assert.equal(await deleteJobForever(JOB_CHECK_ID), false, "ลบซ้ำต้องไม่สำเร็จ");
@@ -5018,12 +5132,16 @@ async function checkJobPostings(): Promise<void> {
 
     done(
       "ประกาศรับสมัครงาน: ร่าง/เผยแพร่/ถังขยะ/ลบถาวร + นำเข้าไม่ทับงานคน",
-      "ประตูอ่านสาธารณะ · ประตูสองทางที่ SQL · คง updated_at/by ของงานคน · reorderRows(job)",
+      "ประตูอ่านสาธารณะ · ประตูสองทางที่ SQL · เลือก/เผยแพร่ทั้งหมดพร้อมเติมวันที่ · คง updated_at/by ของงานคน",
     );
   } finally {
-    await getPool().query("delete from job_posting where id = any($1::text[])", [[JOB_CHECK_ID, JOB_CHECK_ID_2]]);
+    await getPool().query("delete from job_posting where id = any($1::text[])", [
+    [JOB_CHECK_ID, JOB_CHECK_ID_2, ...JOB_CHECK_BATCH_IDS, ...JOB_CHECK_BULK_IDS],
+    ]);
     assert.equal(
-      await countWhere("job_posting where id = any($1::text[])", [[JOB_CHECK_ID, JOB_CHECK_ID_2]]),
+    await countWhere("job_posting where id = any($1::text[])", [
+      [JOB_CHECK_ID, JOB_CHECK_ID_2, ...JOB_CHECK_BATCH_IDS, ...JOB_CHECK_BULK_IDS],
+    ]),
       0,
       "ต้องไม่เหลือประกาศทดสอบ",
     );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { roleLabelOf } from "@/features/admin/rbac-labels";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
@@ -13,10 +14,10 @@ import { fillTemplate } from "@/lib/i18n/template";
  *   ⇒ บอกบทบาทปัจจุบัน + ทางกลับ + ช่องทางขอสิทธิ์
  * - และไม่เปิดเผยว่ามีอะไรอยู่ในส่วนที่ไม่มีสิทธิ์ (ไม่ list เมนูที่เข้าไม่ได้)
  *
- * หมายเหตุ: ใช้สิทธิ์ `content` เป็น "ประตูขั้นต่ำ" — ทุกบทบาทมีสิทธิ์นี้ ⇒ เข้าหน้านี้ได้เสมอเมื่อล็อกอินแล้ว
+ * หมายเหตุ: ใช้สิทธิ์ `careers` เป็นประตูที่ทุกบทบาทมี เพื่อให้บัญชีเฉพาะทางเห็นหน้าปฏิเสธได้ด้วย
  */
 export default async function AdminDeniedPage() {
-  const user = await requireAdminUser("content");
+  const user = await requireAdminUser("careers");
   const strings = (await getMessagesFor("th")).admin;
 
   return (
@@ -28,7 +29,7 @@ export default async function AdminDeniedPage() {
           {fillTemplate(strings.deniedYourRole, { role: roleLabelOf(user.role, strings) })}
         </p>
         <Link
-          href="/admin"
+          href={can(user.role, "content") ? "/admin" : "/admin/careers"}
           className="bg-brand-red text-on-brand focus-visible:ring-ring w-fit rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
         >
           {strings.deniedBack}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   deleteJobForeverAction,
@@ -8,7 +9,8 @@ import {
 } from "@/app/admin/careers/actions";
 import { AdminPageSeoSection } from "@/features/admin/page-seo-section";
 import { PageCopyForm } from "@/features/admin/ui/page-copy-form";
-import { requireAdminUser } from "@/lib/auth/dal";
+import { ADMIN_DENIED_PATH, requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { jobDepartment, jobStats, type JobPosting } from "@/lib/careers/model";
@@ -16,6 +18,10 @@ import { listJobPostingsForAdmin, type AdminJobPosting } from "@/lib/careers/rep
 import { SortableList } from "@/features/admin/ui/sortable-list";
 import { searchParamText } from "@/lib/search/params";
 import { loadCareersPageCopyForEditing } from "@/lib/careers/page-copy";
+import { CareersBulkPublish } from "@/features/admin/ui/careers-bulk-publish";
+import { CareersDraftPublish } from "@/features/admin/ui/careers-draft-publish";
+import { JobBoard } from "@/features/careers/ui/job-board";
+import { buildPostingBoard } from "@/features/careers/board";
 
 /**
  * หลังบ้าน — "ประกาศรับสมัครงาน" ของหน้า /careers (รอบที่ 265 · มติเจ้าของ D26)
@@ -26,7 +32,7 @@ import { loadCareersPageCopyForEditing } from "@/lib/careers/page-copy";
  * รูปแบบเดียวกับจอข่าว/สินค้า/เมนู
  * - แท็บ (ทั้งหมด/ฉบับร่าง/เผยแพร่/ถังขยะ) → ค้นหา → ตาราง → ปุ่มย้าย/กู้คืน/ลบถาวร (**ฟอร์มธรรมดา ไม่ต้องมี JS**)
  * - จัดลำดับด้วย `SortableList` ตัวเดิม (เครื่องมือกลาง `reorderRows("job", …)`)
- * - ทุกอย่างเริ่มด้วย `requireAdminUser("content")`
+ * - ประกาศและถังขยะของประกาศงานใช้สิทธิ์ `careers`; ข้อความหน้า/SEO/ประวัติรุ่น/จัดลำดับใช้ `content`
  * ⚠️ ข้อมูลชุดนี้เล็ก (หลักสิบรายการ) ⇒ กรอง/ค้นหาในหน่วยความจำได้ · ไม่มีแบ่งหน้า (ถ้าโตกว่านี้ค่อยย้ายไป SQL)
  */
 
@@ -59,7 +65,9 @@ export default async function AdminCareersPage({
 }: {
   readonly searchParams: Promise<Readonly<Record<string, string | readonly string[] | undefined>>>;
 }) {
-  const user = await requireAdminUser("content");
+  const user = await requireAdminUser("careers");
+  const canManageCareers = can(user.role, "careers");
+  const canManageContent = can(user.role, "content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
 
@@ -67,9 +75,17 @@ export default async function AdminCareersPage({
   /* ⚠️ ผ่าน `searchParamText` เท่านั้น (ค่าซ้ำ = array · อักขระควบคุม/NUL ต้องถูกตัด) — รอบที่ 291 */
   const tab = tabOf(searchParamText(query.tab));
   const search = searchParamText(query.q, 80);
+  const previewId = searchParamText(query.preview, 120);
+  if (tab === "trash" && !canManageCareers) redirect(ADMIN_DENIED_PATH);
 
-  const [all, careersPageCopy] = await Promise.all([listJobPostingsForAdmin(), loadCareersPageCopyForEditing()]);
+  const [all, careersPageCopy] = await Promise.all([
+    listJobPostingsForAdmin(),
+    canManageContent ? loadCareersPageCopyForEditing() : Promise.resolve(null),
+  ]);
   const visible = all.filter((posting) => inTab(posting, tab) && matches(posting, search));
+  const previewPosting = all.find(
+    (posting) => posting.id === previewId && posting.status === "draft" && posting.deletedAt === null,
+  );
   const active = all.filter((posting) => posting.deletedAt === null);
   const stats = jobStats(active);
 
@@ -85,6 +101,7 @@ export default async function AdminCareersPage({
     published: active.filter((posting) => posting.status === "published").length,
     trash: all.filter((posting) => posting.deletedAt !== null).length,
   };
+  const visibleTabs = canManageCareers ? TAB_IDS : TAB_IDS.filter((item) => item !== "trash");
 
   function tabHref(target: TabId): string {
     const params = new URLSearchParams();
@@ -92,6 +109,14 @@ export default async function AdminCareersPage({
     if (search !== "") params.set("q", search);
     const qs = params.toString();
     return qs === "" ? "/admin/careers" : `/admin/careers?${qs}`;
+  }
+
+  function previewHref(id: string): string {
+    const params = new URLSearchParams();
+    params.set("tab", "draft");
+    if (search !== "") params.set("q", search);
+    params.set("preview", id);
+    return `/admin/careers?${params.toString()}`;
   }
 
   /* รายการจัดลำดับ = ประกาศที่ใช้งานอยู่ทั้งหมด (ของในถังไม่ต้องจัด) */
@@ -130,31 +155,33 @@ export default async function AdminCareersPage({
         </Link>
       </div>
 
-      <PageCopyForm
-        initial={careersPageCopy}
-        action={saveCareersPageCopyAction}
-        strings={{
-          title: m.careersPageCopyTitle,
-          hint: m.careersPageCopyHint,
-          eyebrowTh: messages.admin.pageCopyFieldEyebrowTh,
-          eyebrowEn: messages.admin.pageCopyFieldEyebrowEn,
-          titleTh: messages.admin.pageCopyFieldTitleTh,
-          titleEn: messages.admin.pageCopyFieldTitleEn,
-          introTh: messages.admin.pageCopyFieldIntroTh,
-          introEn: messages.admin.pageCopyFieldIntroEn,
-          save: messages.admin.pageCopySave,
-          saving: messages.admin.pageCopySaving,
-          saved: messages.admin.pageCopySaved,
-          invalid: messages.admin.pageCopyInvalid,
-          failed: messages.admin.pageCopyFailed,
-        }}
-      />
+      {canManageContent && careersPageCopy !== null ? (
+        <PageCopyForm
+          initial={careersPageCopy}
+          action={saveCareersPageCopyAction}
+          strings={{
+            title: m.careersPageCopyTitle,
+            hint: m.careersPageCopyHint,
+            eyebrowTh: messages.admin.pageCopyFieldEyebrowTh,
+            eyebrowEn: messages.admin.pageCopyFieldEyebrowEn,
+            titleTh: messages.admin.pageCopyFieldTitleTh,
+            titleEn: messages.admin.pageCopyFieldTitleEn,
+            introTh: messages.admin.pageCopyFieldIntroTh,
+            introEn: messages.admin.pageCopyFieldIntroEn,
+            save: messages.admin.pageCopySave,
+            saving: messages.admin.pageCopySaving,
+            saved: messages.admin.pageCopySaved,
+            invalid: messages.admin.pageCopyInvalid,
+            failed: messages.admin.pageCopyFailed,
+          }}
+        />
+      ) : null}
 
       {/* SEO ของหน้า /careers — ตัว builder ถูกถอด (รอบ 266) แต่หน้านี้มี URL จริง */}
       <AdminPageSeoSection pageId="careers" messages={messages} role={user.role} className="mt-6" />
 
       <nav aria-label={m.title} className="mt-6 flex flex-wrap items-center gap-2">
-        {TAB_IDS.map((item) => (
+        {visibleTabs.map((item) => (
           <Link
             key={item}
             href={tabHref(item)}
@@ -193,6 +220,27 @@ export default async function AdminCareersPage({
         )}
       </form>
 
+      {tab === "draft" && tabCount.draft > 0 ? (
+        <CareersBulkPublish count={tabCount.draft} strings={m} />
+      ) : null}
+
+      {previewPosting === undefined ? null : (
+        <section className="border-line bg-bg-subtle mt-6 rounded-2xl border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-fg text-base font-semibold">{m.previewDraftTitle}</h2>
+              <p className="text-fg-muted mt-1 text-sm">{m.previewDraftHint}</p>
+            </div>
+            <Link href={tabHref("draft")} className="text-link text-sm underline underline-offset-4">
+              {m.closePreview}
+            </Link>
+          </div>
+          <div className="mt-4">
+            <JobBoard board={buildPostingBoard([previewPosting], messages, "th")} />
+          </div>
+        </section>
+      )}
+
       {visible.length === 0 ? (
         <p className="border-line bg-bg-subtle text-fg-muted mt-8 rounded-xl border px-4 py-6 text-sm">
           {tab === "trash" ? m.emptyTrash : m.empty}
@@ -202,15 +250,22 @@ export default async function AdminCareersPage({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-line text-fg-muted border-b text-left text-xs uppercase">
+                {tab === "draft" ? (
+                  <th scope="col" className="py-2 pr-3 font-semibold">
+                    {m.colSelect}
+                  </th>
+                ) : null}
                 <th scope="col" className="py-2 pr-3 font-semibold">
                   {m.colTitle}
                 </th>
                 <th scope="col" className="py-2 pr-3 font-semibold">
                   {m.colStatus}
                 </th>
-                <th scope="col" className="py-2 pr-3 font-semibold">
-                  {m.colOrder}
-                </th>
+                {canManageContent ? (
+                  <th scope="col" className="py-2 pr-3 font-semibold">
+                    {m.colOrder}
+                  </th>
+                ) : null}
                 <th scope="col" className="py-2 pr-3 font-semibold">
                   {m.colUpdated}
                 </th>
@@ -223,15 +278,32 @@ export default async function AdminCareersPage({
               {visible.map((posting) => {
                 /* `trashed` = อยู่ในถัง — ปุ่มลบถาวรผูกกับค่านี้เท่านั้น (เทสต์บังคับไว้) */
                 const trashed = posting.deletedAt !== null;
+                const canOpenEditor = !trashed || canManageContent;
                 return (
                 <tr key={posting.id} className="border-line border-b align-top">
+                  {tab === "draft" ? (
+                    <td className="py-3 pr-3">
+                      <input
+                        type="checkbox"
+                        form="bulk-publish-form"
+                        name="ids"
+                        value={posting.id}
+                        aria-label={fillTemplate(m.selectForPublish, { title: posting.titleTh })}
+                        className="accent-accent size-4"
+                      />
+                    </td>
+                  ) : null}
                   <td className="py-3 pr-3">
-                    <Link
-                      href={`/admin/careers/${posting.id}`}
-                      className="text-link font-semibold underline underline-offset-4"
-                    >
-                      {posting.titleTh}
-                    </Link>
+                    {canOpenEditor ? (
+                      <Link
+                        href={`/admin/careers/${posting.id}`}
+                        className="text-link font-semibold underline underline-offset-4"
+                      >
+                        {posting.titleTh}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold">{posting.titleTh}</span>
+                    )}
                     <span className="text-fg-muted mt-1 block text-xs">{summaryOf(posting)}</span>
                   </td>
                   <td className="py-3 pr-3">
@@ -240,30 +312,47 @@ export default async function AdminCareersPage({
                     </span>
                     {trashed ? <span className="text-danger mt-1 block text-xs">{m.tabTrash}</span> : null}
                   </td>
-                  <td className="text-fg-muted py-3 pr-3 text-xs">{posting.sortOrder}</td>
+                  {canManageContent ? (
+                    <td className="text-fg-muted py-3 pr-3 text-xs">{posting.sortOrder}</td>
+                  ) : null}
                   <td className="text-fg-muted py-3 pr-3 text-xs">
                     {posting.updatedBy === "" ? posting.updatedAt.slice(0, 10) : `${posting.updatedAt.slice(0, 10)} · ${posting.updatedBy}`}
                   </td>
                   <td className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/admin/careers/${posting.id}`}
-                        className="border-line text-fg hover:bg-surface-raised rounded-lg border px-2.5 py-1 text-xs font-semibold no-underline"
-                      >
-                        {m.edit}
-                      </Link>
-                      <form action={trashJobAction}>
-                        <input type="hidden" name="id" value={posting.id} />
-                        <input type="hidden" name="trashed" value={trashed ? "0" : "1"} />
-                        <button
-                          type="submit"
-                          className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                      {canOpenEditor ? (
+                        <Link
+                          href={`/admin/careers/${posting.id}`}
+                          className="border-line text-fg hover:bg-surface-raised rounded-lg border px-2.5 py-1 text-xs font-semibold no-underline"
                         >
-                          {trashed ? m.restore : m.moveToTrash}
-                        </button>
-                      </form>
+                          {m.edit}
+                        </Link>
+                      ) : null}
+                      {!trashed && posting.status === "draft" ? (
+                        <Link
+                          href={previewHref(posting.id)}
+                          className="border-line text-fg hover:bg-surface-raised rounded-lg border px-2.5 py-1 text-xs font-semibold no-underline"
+                        >
+                          {m.previewPosting}
+                        </Link>
+                      ) : null}
+                      {!trashed && posting.status === "draft" ? (
+                        <CareersDraftPublish id={posting.id} strings={m} />
+                      ) : null}
+                      {canManageCareers ? (
+                        <form action={trashJobAction}>
+                          <input type="hidden" name="id" value={posting.id} />
+                          <input type="hidden" name="trashed" value={trashed ? "0" : "1"} />
+                          <button
+                            type="submit"
+                            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-lg border px-2.5 py-1 text-xs font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                          >
+                            {trashed ? m.restore : m.moveToTrash}
+                          </button>
+                        </form>
+                      ) : null}
 
-                      {trashed ? (
+                      {canManageCareers && trashed ? (
                         <form action={deleteJobForeverAction} className="flex flex-col gap-0.5">
                           <input type="hidden" name="id" value={posting.id} />
                           <button
@@ -285,7 +374,7 @@ export default async function AdminCareersPage({
         </div>
       )}
 
-      {reorderItems.length < 2 ? null : (
+      {!canManageContent || reorderItems.length < 2 ? null : (
         <section className="border-line bg-surface mt-8 rounded-2xl border p-4">
           <h2 className="text-fg text-base font-semibold">{m.reorderTitle}</h2>
           <p className="text-fg-muted mt-1 text-sm">{m.reorderHint}</p>

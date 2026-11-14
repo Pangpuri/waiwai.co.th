@@ -1,6 +1,7 @@
 import { getPool, isDatabaseConfigured } from "@/db/pool";
 import { readQuery } from "@/lib/db/read";
 import { sortJobPostings, type JobPosting } from "@/lib/careers/model";
+import type { PoolClient } from "pg";
 
 /**
  * ชั้นข้อมูล "ประกาศรับสมัครงาน" (`job_posting`) — รอบที่ 265 · มติ D26
@@ -19,7 +20,7 @@ import { sortJobPostings, type JobPosting } from "@/lib/careers/model";
  */
 
 const JOB_COLUMNS = `id, title_th, title_en, department_th, department_en, openings, gender,
-       age_th, age_en, qualifications_th, qualifications_en, experience_th, experience_en, sort_order`;
+       age_th, age_en, qualifications_th, qualifications_en, experience_th, experience_en, posted_at, sort_order`;
 
 /** เงื่อนไข "ประกาศที่เว็บสาธารณะเห็นได้" — ใช้ร่วมทุกคำสั่งอ่านฝั่งเว็บ */
 const PUBLIC_JOB_CONDITION = "status = 'published' and deleted_at is null";
@@ -41,6 +42,7 @@ function toJobPosting(row: Record<string, unknown>): JobPosting | null {
   if (id === "" || titleTh === "") return null;
 
   const openings = Number(row.openings);
+  const postedAt = row.posted_at === null || row.posted_at === undefined ? null : toIsoStamp(row.posted_at);
   return {
     id,
     titleTh,
@@ -55,6 +57,7 @@ function toJobPosting(row: Record<string, unknown>): JobPosting | null {
     qualificationsEn: text(row.qualifications_en),
     experienceTh: text(row.experience_th),
     experienceEn: text(row.experience_en),
+    postedAt,
     sortOrder: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 0,
   };
 }
@@ -185,12 +188,13 @@ export type JobWriteInput = {
   readonly qualificationsEn: string;
   readonly experienceTh: string;
   readonly experienceEn: string;
+  readonly postedAt: string | null;
   readonly sortOrder: number;
   readonly status: string;
 };
 
 const JOB_COLUMN_LIST = `id, title_th, title_en, department_th, department_en, openings, gender,
-       age_th, age_en, qualifications_th, qualifications_en, experience_th, experience_en, sort_order, status`;
+       age_th, age_en, qualifications_th, qualifications_en, experience_th, experience_en, posted_at, sort_order, status`;
 
 function jobValues(input: JobWriteInput, actor: string): unknown[] {
   return [
@@ -207,6 +211,7 @@ function jobValues(input: JobWriteInput, actor: string): unknown[] {
     input.qualificationsEn.trim(),
     input.experienceTh.trim(),
     input.experienceEn.trim(),
+    input.postedAt,
     input.sortOrder,
     input.status,
     actor,
@@ -227,6 +232,7 @@ const PROTECTED_COLUMNS = [
   "qualifications_en",
   "experience_th",
   "experience_en",
+  "posted_at",
   "sort_order",
   "status",
 ] as const;
@@ -257,17 +263,58 @@ export async function upsertJobPosting(
   actor: string,
   mode: JobWriteMode = "replace",
 ): Promise<JobUpsertResult> {
+  const client = await getPool().connect();
+  try {
+    return await upsertJobPostingOnClient(client, input, actor, mode);
+  } finally {
+    client.release();
+  }
+}
+
+/** นำเข้าหลายประกาศใน transaction เดียว — ป้องกันการเขียนได้เพียงบางส่วน */
+export async function upsertJobPostings(
+  inputs: readonly JobWriteInput[],
+  actor: string,
+  mode: JobWriteMode = "replace",
+): Promise<readonly JobUpsertResult[]> {
+  if (inputs.length === 0) return [];
+  const client = await getPool().connect();
+  let transactionOpen = false;
+  try {
+    await client.query("begin");
+    transactionOpen = true;
+    const results: JobUpsertResult[] = [];
+    for (const input of inputs) {
+      results.push(await upsertJobPostingOnClient(client, input, actor, mode));
+    }
+    await client.query("commit");
+    transactionOpen = false;
+    return results;
+  } catch (error) {
+    if (transactionOpen) await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function upsertJobPostingOnClient(
+  client: PoolClient,
+  input: JobWriteInput,
+  actor: string,
+  mode: JobWriteMode,
+): Promise<JobUpsertResult> {
   const assignments = PROTECTED_COLUMNS.map((column) => `${column} = ${guarded(mode, column)}`).join(", ");
   const updatedAt = mode === "protect-edited" ? `case when ${PROTECTED_EDIT_CONDITION} then job_posting.updated_at else now() end` : "now()";
   const updatedBy = mode === "protect-edited" ? `case when ${PROTECTED_EDIT_CONDITION} then job_posting.updated_by else excluded.updated_by end` : "excluded.updated_by";
 
-  const result = await getPool().query<{ previous_total: number; previous_actor: string | null }>(
+  const result = await client.query<{ previous_total: number; previous_actor: string | null }>(
     `with previous as (
        select count(*)::int as total, max(updated_by) as actor from job_posting where id = $1
      ),
      upserted as (
        insert into job_posting (${JOB_COLUMN_LIST}, created_by, updated_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17)
        on conflict (id) do update set ${assignments}, updated_at = ${updatedAt}, updated_by = ${updatedBy}
        returning id
      )
@@ -286,7 +333,7 @@ export async function upsertJobPosting(
 export async function createJobPosting(input: JobWriteInput, actor: string): Promise<boolean> {
   const result = await getPool().query(
     `insert into job_posting (${JOB_COLUMN_LIST}, created_by, updated_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $17)
      on conflict (id) do nothing`,
     jobValues(input, actor),
   );
@@ -299,12 +346,47 @@ export async function updateJobPosting(input: JobWriteInput, actor: string): Pro
     `update job_posting set
         title_th = $2, title_en = $3, department_th = $4, department_en = $5, openings = $6, gender = $7,
         age_th = $8, age_en = $9, qualifications_th = $10, qualifications_en = $11,
-        experience_th = $12, experience_en = $13, sort_order = $14, status = $15,
-        updated_at = now(), updated_by = $16
+        experience_th = $12, experience_en = $13, posted_at = $14, sort_order = $15, status = $16,
+        updated_at = now(), updated_by = $17
       where id = $1 and deleted_at is null`,
     jobValues(input, actor),
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+/** เผยแพร่ฉบับร่างทั้งหมดที่ยังไม่อยู่ในถังขยะ ด้วยคำสั่งเดียว */
+export async function publishActiveJobDrafts(actor: string, client?: PoolClient): Promise<readonly string[]> {
+  return publishJobDrafts(actor, null, client);
+}
+
+/** เผยแพร่เฉพาะฉบับร่างที่เลือกและยังไม่อยู่ในถังขยะ */
+export async function publishSelectedJobDrafts(
+  actor: string,
+  ids: readonly string[],
+  client?: PoolClient,
+): Promise<readonly string[]> {
+  const selectedIds = [...new Set(ids.map((id) => id.trim()).filter((id) => id !== ""))];
+  if (selectedIds.length === 0) return [];
+  return publishJobDrafts(actor, selectedIds, client);
+}
+
+async function publishJobDrafts(
+  actor: string,
+  ids: readonly string[] | null,
+  client?: PoolClient,
+): Promise<readonly string[]> {
+  const database = client ?? getPool();
+  const selection = ids === null ? "" : " and id = any($2::text[])";
+  const values: unknown[] = ids === null ? [actor] : [actor, ids];
+  const result = await database.query<{ id: string }>(
+    `update job_posting
+        set status = 'published', posted_at = coalesce(posted_at, now()),
+            updated_at = now(), updated_by = $1
+      where status = 'draft' and deleted_at is null${selection}
+      returning id`,
+    values,
+  );
+  return result.rows.map((row) => row.id).sort();
 }
 
 /**

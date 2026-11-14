@@ -90,6 +90,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   /* สิทธิ์ของแต่ละลิงก์ในเมนูด้านข้าง (ให้ตรงกับเมนูด้านบน — ซ่อนเฉพาะที่ไม่ควรกด ไม่ใช่มาตรการความปลอดภัย) */
   const sidebarPermission: Readonly<Record<string, AdminPermission>> = {
     "/admin/builder/chrome": "presets",
+    "/admin/careers": "careers",
     "/admin/media": "media",
     "/admin/inbox": "inbox",
     "/admin/preview-links": "preview",
@@ -109,7 +110,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <html lang="th">
       <body className="bg-bg-cream text-fg min-h-dvh antialiased">
         {/* ต่ออายุ "บัตรผ่านดูเว็บระหว่างปิดปรับปรุง" — ทำงานเฉพาะเมื่อเปิดโหมด (รอบที่ 96) */}
-        <MaintenanceBypassPing enabled={user !== null && isMaintenanceEnabled(process.env)} />
+        <MaintenanceBypassPing
+          enabled={user !== null && can(user.role, "content") && isMaintenanceEnabled(process.env)}
+        />
         {user === null ? (
           children
         ) : (

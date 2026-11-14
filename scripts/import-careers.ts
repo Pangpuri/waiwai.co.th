@@ -57,6 +57,7 @@ function postingsFromCode(): readonly JobWriteInput[] {
       qualificationsEn: copyEn.qualifications,
       experienceTh: copy.experience ?? "",
       experienceEn: copyEn.experience ?? "",
+      postedAt: null,
       sortOrder: (index + 1) * JOB_SORT_STEP,
       status: "published",
     };

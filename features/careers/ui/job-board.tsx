@@ -30,6 +30,13 @@ export function JobBoard({ board }: JobBoardProps) {
           <h3 className="font-display text-lg leading-snug font-extrabold text-fg">{card.title}</h3>
 
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            {card.postedAtLabel.trim() === "" ? null : (
+              <>
+                <dt className="text-fg-muted">{labels.fieldPostedAt}</dt>
+                <dd className="text-fg">{card.postedAtLabel}</dd>
+              </>
+            )}
+
             {/* ประกาศใหม่ "ไม่บังคับ" กรอกเพศ/อายุ (มติ D26 ข้อ 4) ⇒ ไม่กรอก = ไม่แสดงบรรทัดว่าง */}
             {card.genderLabel.trim() === "" ? null : (
               <>

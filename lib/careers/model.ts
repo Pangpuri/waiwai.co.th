@@ -32,6 +32,78 @@ export const MAX_JOB_AGE_LENGTH = 80;
 export const MAX_JOB_TEXT_LENGTH = 2000;
 export const MAX_JOB_OPENINGS = 999;
 
+/** แปลง `datetime-local` (เวลาไทย) เป็น timestamp ที่บันทึกใน DB ได้ */
+export function jobPostedAtInstantOf(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(trimmed);
+  if (match === null) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (![year, month, day, hour, minute].every(Number.isInteger)) return null;
+
+  const local = new Date(0);
+  local.setUTCFullYear(year, month - 1, day);
+  local.setUTCHours(hour, minute, 0, 0);
+  if (
+    local.getUTCFullYear() !== year ||
+    local.getUTCMonth() !== month - 1 ||
+    local.getUTCDate() !== day ||
+    local.getUTCHours() !== hour ||
+    local.getUTCMinutes() !== minute
+  ) {
+    return null;
+  }
+
+  return new Date(local.getTime() - 7 * 60 * 60 * 1000).toISOString();
+}
+
+/** แปลง timestamp จาก DB เป็นค่าที่ `datetime-local` แสดงในเวลาไทย */
+export function jobPostedAtLocalOf(value: string | null): string {
+  if (value === null || value.trim() === "") return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const part = (type: string): string => parts.find((item) => item.type === type)?.value ?? "";
+    return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+  } catch {
+    return "";
+  }
+}
+
+/** แสดงวันที่ประกาศตามภาษา โดยยึดเวลาไทยเสมอ */
+export function formatJobPostedAt(value: string | null, language: Language): string {
+  if (value === null || value.trim() === "") return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(language === "th" ? "th-TH" : "en-GB", {
+      timeZone: "Asia/Bangkok",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(date);
+  } catch {
+    return "";
+  }
+}
+
 /** ลำดับที่ใช้กับประกาศใหม่ (ต่อท้ายของเดิม) */
 export const JOB_SORT_STEP = 10;
 export const NEW_JOB_SORT_BASE = 1000;
@@ -56,6 +128,7 @@ export type JobPosting = {
   readonly qualificationsEn: string;
   readonly experienceTh: string;
   readonly experienceEn: string;
+  readonly postedAt: string | null;
   readonly sortOrder: number;
 };
 
@@ -73,6 +146,7 @@ export type JobInput = {
   readonly qualificationsEn: string;
   readonly experienceTh: string;
   readonly experienceEn: string;
+  readonly postedAtLocal: string;
   readonly sortOrder: number;
   readonly status: string;
 };
@@ -86,7 +160,8 @@ export type JobIssueCode =
   | "openings-invalid"
   | "sort-order-invalid"
   | "status-invalid"
-  | "gender-invalid";
+  | "gender-invalid"
+  | "posted-at-invalid";
 
 export type JobIssue = {
   readonly code: JobIssueCode;
@@ -130,6 +205,9 @@ export function validateJobInput(input: JobInput): readonly JobIssue[] {
   }
   if (!isJobStatusValue(input.status)) issues.push({ code: "status-invalid", field: "status" });
   if (!isJobGenderValue(input.gender)) issues.push({ code: "gender-invalid", field: "gender" });
+  if (input.postedAtLocal.trim() !== "" && jobPostedAtInstantOf(input.postedAtLocal) === null) {
+    issues.push({ code: "posted-at-invalid", field: "postedAtLocal" });
+  }
 
   return issues;
 }
@@ -157,11 +235,30 @@ export function isJobStatus(value: string): value is JobStatus {
 
 /* ── การเรียง/ตัวเลข ──────────────────────────────────────────────────────── */
 
-type Sortable = { readonly id: string; readonly sortOrder: number };
+type Sortable = {
+  readonly id: string;
+  readonly sortOrder: number;
+  readonly postedAt?: string | null;
+};
 
-/** เรียงตาม `sort_order` แล้วปิดท้ายด้วย id — **นิ่ง** (เรียกซ้ำได้ผลเดิมเสมอ) */
+function postedAtTimestamp(value: string | null | undefined): number | null {
+  if (value === null || value === undefined || value.trim() === "") return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/** วันที่ประกาศใหม่ก่อน; วันที่ว่าง/ไม่ถูกต้องอยู่ท้าย แล้วใช้ลำดับและ id เป็นตัวตัดสิน — **นิ่ง** */
 export function sortJobPostings<T extends Sortable>(rows: readonly T[]): readonly T[] {
-  return [...rows].sort((a, b) => (a.sortOrder === b.sortOrder ? a.id.localeCompare(b.id) : a.sortOrder - b.sortOrder));
+  return [...rows].sort((a, b) => {
+    const aPostedAt = postedAtTimestamp(a.postedAt);
+    const bPostedAt = postedAtTimestamp(b.postedAt);
+    if (aPostedAt !== null || bPostedAt !== null) {
+      if (aPostedAt === null) return 1;
+      if (bPostedAt === null) return -1;
+      if (aPostedAt !== bPostedAt) return bPostedAt - aPostedAt;
+    }
+    return a.sortOrder === b.sortOrder ? a.id.localeCompare(b.id) : a.sortOrder - b.sortOrder;
+  });
 }
 
 export function nextJobSortOrder(rows: readonly Sortable[]): number {

@@ -128,6 +128,7 @@ test("revision: สแนปช็อตประกาศรับสมัค�
     qualificationsEn: "High school",
     experienceTh: "ไม่จำเป็น",
     experienceEn: "Not required",
+    postedAt: "2026-10-14T03:00:00.000Z",
     sortOrder: 30,
     status: "published",
     deletedAt: null,
@@ -137,7 +138,7 @@ test("revision: สแนปช็อตประกาศรับสมัค�
     updatedBy: "a@b.c",
   } as unknown as Parameters<typeof jobSnapshotOf>[0]);
 
-  for (const key of ["titleTh", "openings", "gender", "status", "sortOrder", "qualificationsTh"]) {
+  for (const key of ["titleTh", "openings", "gender", "status", "sortOrder", "qualificationsTh", "postedAt"]) {
     assert.ok(key in snapshot, `สแนปช็อตต้องมี ${key}`);
   }
   for (const key of ["id", "createdAt", "createdBy", "updatedAt", "updatedBy", "deletedAt"]) {
@@ -150,6 +151,8 @@ test("revision: สแนปช็อตประกาศรับสมัค�
   assert.equal(restore.values.sortOrder, 0);
   assert.equal(restore.values.status, "published", "ค่าไม่รู้จัก ⇒ ปลอดภัยที่สุดคือคงเป็นเผยแพร่");
   assert.equal(restore.values.titleTh, "พนักงานผลิต");
+  assert.equal(restore.values.postedAt, "2026-10-14T03:00:00.000Z");
+  assert.equal(jobRestoreOf({ ...snapshot, postedAt: undefined }).values.postedAt, null, "รุ่นเก่าที่ไม่มีวันที่ต้องกู้เป็นค่าว่าง");
 });
 
 test("revision: จอประกาศรับสมัครงานผูกเก็บรุ่น + กู้คืน + ป้าย audit ครบ", () => {

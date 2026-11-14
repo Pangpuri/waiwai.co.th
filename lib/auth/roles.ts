@@ -8,13 +8,14 @@ import { ADMIN_ROLES, type AdminRole } from "@/lib/auth/types";
  * - และต้องทดสอบได้โดยไม่ต้องมีฐานข้อมูล (`node --test`) ⇒ ที่นี่เก็บ "รหัสสิทธิ์" เท่านั้น
  *   ส่วนข้อความที่ผู้ใช้เห็นอยู่ในพจนานุกรม (th/en)
  *
- * 3 บทบาท (มติ BACKEND_DECISIONS.md § 4 — ตรงกับ `admin_user.role`)
- * - `editor`    = ทำงานเนื้อหา: สร้าง/แก้บล็อก · จัดการคลังภาพ · พรีวิว · พรีเซ็ต
+ * บทบาท (ตรงกับ `admin_user.role`)
+ * - `editor`    = ทำงานเนื้อหา: สร้าง/แก้บล็อก · ประกาศงาน · จัดการคลังภาพ · พรีวิว · พรีเซ็ต
  * - `publisher` = editor + กล่องข้อความลูกค้า (ข้อมูลส่วนบุคคล) + SEO + ถังขยะ (กู้คืน/ลบถาวร)
  * - `admin`     = ทุกอย่าง + บัญชีผู้ใช้ + ตั้งค่าส่วนกลาง + ระยะเก็บข้อมูล/PDPA + โหมดปิดปรับปรุง
+ * - `hr`        = ประกาศรับสมัครงาน + ถังขยะของประกาศงานเท่านั้น
  *
  * หลักการที่ตั้งใจ
- * - **ให้สิทธิ์แบบเพิ่มขึ้น** (editor ⊂ publisher ⊂ admin) ⇒ เทสต์บังคับว่าเป็นจริงทุกคู่
+ * - `editor ⊂ publisher ⊂ admin`; บทบาทเฉพาะทางอย่าง `hr` แยกจากสายนี้
  * - สิทธิ์ที่ "ทำลายข้อมูล/แตะข้อมูลส่วนบุคคล" ต้องไม่ตกอยู่กับบทบาทต่ำสุด (มีเทสต์กัน)
  * - เพิ่มสิทธิ์ใหม่แล้วลืมใส่ในบทบาทใดเลย = เทสต์แดง (ทุกสิทธิ์ต้องมีเจ้าของอย่างน้อยหนึ่งบทบาท)
  */
@@ -22,6 +23,8 @@ import { ADMIN_ROLES, type AdminRole } from "@/lib/auth/types";
 export const ADMIN_PERMISSIONS = [
   /** สร้าง/แก้/เผยแพร่หน้าเว็บและเนื้อหา (ตัวสร้างหน้าเว็บ · เนื้อหาแบบฟิลด์ · หน้า/SEO รายหน้า) */
   "content",
+  /** จัดการประกาศรับสมัครงาน โดยไม่แก้ข้อความหน้า/SEO หรือข้อมูลส่วนอื่น */
+  "careers",
   /** คลังภาพ (อัปโหลด/แก้คำบรรยาย) */
   "media",
   /** พรีเซ็ต (บล็อกสำเร็จรูป · ส่วนกลางของเว็บ) */
@@ -46,11 +49,12 @@ export const ADMIN_PERMISSIONS = [
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
-const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "media", "presets", "preview"];
+const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "careers", "media", "presets", "preview"];
 
 const PUBLISHER_PERMISSIONS: readonly AdminPermission[] = [...EDITOR_PERMISSIONS, "inbox", "seo", "trash"];
 
 const ADMIN_PERMISSIONS_ALL: readonly AdminPermission[] = [...ADMIN_PERMISSIONS];
+const HR_PERMISSIONS: readonly AdminPermission[] = ["careers"];
 
 /**
  * ตารางสิทธิ์จริง — **แหล่งความจริงเดียว**
@@ -61,6 +65,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermissi
   editor: EDITOR_PERMISSIONS,
   publisher: PUBLISHER_PERMISSIONS,
   admin: ADMIN_PERMISSIONS_ALL,
+  hr: HR_PERMISSIONS,
 };
 
 /** สิทธิ์ทั้งหมดของบทบาทนั้น */
@@ -80,5 +85,5 @@ export function isAdminRoleId(value: string): value is AdminRole {
 
 /** บทบาทที่ "ครอบคลุม" บทบาทอื่นทั้งหมด (ใช้ตรวจการถอดบทบาทตัวเอง) */
 export function isStrongerOrEqual(role: AdminRole, other: AdminRole): boolean {
-  return permissionsOf(role).length >= permissionsOf(other).length;
+  return permissionsOf(other).every((permission) => can(role, permission));
 }

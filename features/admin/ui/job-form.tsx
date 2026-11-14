@@ -9,7 +9,12 @@ import { INITIAL_JOB_FORM_STATE } from "@/features/admin/careers-state";
 import { JobBoard } from "@/features/careers/ui/job-board";
 import type { Board, BoardLabels } from "@/features/careers/board";
 import type { Messages } from "@/lib/i18n/messages/th";
-import { JOB_GENDERS, MAX_JOB_TEXT_LENGTH } from "@/lib/careers/model";
+import {
+  JOB_GENDERS,
+  MAX_JOB_TEXT_LENGTH,
+  formatJobPostedAt,
+  jobPostedAtInstantOf,
+} from "@/lib/careers/model";
 
 /**
  * ฟอร์มเพิ่ม/แก้ "ประกาศรับสมัครงาน" (รอบที่ 265 · มติ D26)
@@ -35,12 +40,14 @@ export type JobFormValues = {
   readonly qualificationsEn: string;
   readonly experienceTh: string;
   readonly experienceEn: string;
+  readonly postedAtLocal: string;
   readonly sortOrder: number;
   readonly status: string;
 };
 
 export type JobFormProps = {
   readonly mode: "create" | "edit";
+  readonly canManageOrder: boolean;
   readonly values: JobFormValues;
   readonly strings: Messages["adminCareers"];
   /** ป้ายของกระดานจริง (ส่งเฉพาะข้อความ ไม่ใช่พจนานุกรมทั้งก้อน) */
@@ -99,6 +106,7 @@ export function JobForm(props: JobFormProps) {
         openings: values.openings,
         genderLabel,
         ageLabel: values.ageTh,
+        postedAtLabel: formatJobPostedAt(jobPostedAtInstantOf(values.postedAtLocal), "th"),
         qualificationsLabel: values.qualificationsTh,
         experienceLabel: values.experienceTh.trim() === "" ? m.notSpecifiedPreview : values.experienceTh,
       },
@@ -255,16 +263,30 @@ export function JobForm(props: JobFormProps) {
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <label className="block">
-            <span className={LABEL_CLASS}>{m.fieldSortOrder}</span>
+            <span className={LABEL_CLASS}>{m.fieldPostedAt}</span>
             <input
-              type="number"
-              name="sortOrder"
-              min={0}
-              value={values.sortOrder}
-              onChange={(event) => set("sortOrder", Number.parseInt(event.target.value, 10) || 0)}
+              type="datetime-local"
+              name="postedAtLocal"
+              step="60"
+              value={values.postedAtLocal}
+              onChange={(event) => set("postedAtLocal", event.target.value)}
               className={INPUT_CLASS}
             />
+            <span className="text-fg-muted mt-1 block text-[11px]">{m.fieldPostedAtHint}</span>
           </label>
+          {props.canManageOrder ? (
+            <label className="block">
+              <span className={LABEL_CLASS}>{m.fieldSortOrder}</span>
+              <input
+                type="number"
+                name="sortOrder"
+                min={0}
+                value={values.sortOrder}
+                onChange={(event) => set("sortOrder", Number.parseInt(event.target.value, 10) || 0)}
+                className={INPUT_CLASS}
+              />
+            </label>
+          ) : null}
           {props.mode === "edit" ? (
             <label className="block">
               <span className={LABEL_CLASS}>{m.fieldStatus}</span>

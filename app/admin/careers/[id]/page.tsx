@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { requireAdminUser } from "@/lib/auth/dal";
+import { ADMIN_DENIED_PATH, requireAdminUser } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/roles";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { loadJobPostingForAdmin } from "@/lib/careers/repository";
+import { jobPostedAtLocalOf } from "@/lib/careers/model";
 import { loadEntityRevision, listEntityRevisions } from "@/lib/revisions/repository";
 import { jobSnapshotOf, revisionDiff } from "@/lib/revisions/model";
 import { RevisionHistoryPanel } from "@/features/admin/ui/revision-history";
@@ -25,25 +27,29 @@ export default async function AdminCareerEditPage({
   readonly params: Promise<{ readonly id: string }>;
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("careers");
+  const canManageContent = can(user.role, "content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
 
   const { id } = await params;
   const posting = await loadJobPostingForAdmin(decodeURIComponent(id));
   if (posting === null) notFound();
+  if (posting.deletedAt !== null && !canManageContent) redirect(ADMIN_DENIED_PATH);
 
   /* ── ประวัติรุ่น (รอบที่ 278 · ปิดหนี้ D-265-3) — แม่แบบเดียวกับสินค้า/เมนู/ข่าว ── */
   const revisionParam = (await searchParams).revision;
   const selectedRevisionId = typeof revisionParam === "string" ? revisionParam : "";
-  const currentSnapshot = jobSnapshotOf(posting);
-  const revisions = await listEntityRevisions({ kind: "job", entityId: posting.id, current: currentSnapshot });
+  const revisions = canManageContent
+    ? await listEntityRevisions({ kind: "job", entityId: posting.id, current: jobSnapshotOf(posting) })
+    : [];
   const selectedSnapshot =
-    selectedRevisionId === ""
+    !canManageContent || selectedRevisionId === ""
       ? null
       : await loadEntityRevision({ kind: "job", entityId: posting.id, revisionId: selectedRevisionId });
   const selectedRevision = selectedSnapshot === null ? null : (revisions.find((item) => item.id === selectedRevisionId) ?? null);
-  const revisionChanges = selectedSnapshot === null ? [] : revisionDiff(selectedSnapshot, currentSnapshot);
+  const revisionChanges =
+    selectedSnapshot === null ? [] : revisionDiff(selectedSnapshot, jobSnapshotOf(posting));
 
   const board = buildBoard(messages);
 
@@ -66,6 +72,7 @@ export default async function AdminCareerEditPage({
       <div className="mt-6">
         <JobForm
           mode="edit"
+          canManageOrder={canManageContent}
           strings={m}
           boardLabels={board.labels}
           filterAll={messages.careersPage.filterAll}
@@ -85,29 +92,32 @@ export default async function AdminCareerEditPage({
             qualificationsEn: posting.qualificationsEn,
             experienceTh: posting.experienceTh,
             experienceEn: posting.experienceEn,
-            sortOrder: posting.sortOrder,
+            postedAtLocal: jobPostedAtLocalOf(posting.postedAt),
+            sortOrder: canManageContent ? posting.sortOrder : 0,
             status: posting.status,
           }}
         />
       </div>
 
-      <RevisionHistoryPanel
-        strings={messages.admin}
-        revisions={revisions.map((item) => ({
-          id: item.id,
-          revision: item.revision,
-          note: item.note,
-          createdBy: item.createdBy,
-          createdLocal: item.createdLocal,
-          changeCount: item.changeCount,
-          isCurrent: item.isCurrent,
-        }))}
-        selected={selectedRevision}
-        changes={revisionChanges}
-        restoreAction={restoreJobRevisionAction}
-        entityId={posting.id}
-        basePath={`/admin/careers/${posting.id}`}
-      />
+      {canManageContent ? (
+        <RevisionHistoryPanel
+          strings={messages.admin}
+          revisions={revisions.map((item) => ({
+            id: item.id,
+            revision: item.revision,
+            note: item.note,
+            createdBy: item.createdBy,
+            createdLocal: item.createdLocal,
+            changeCount: item.changeCount,
+            isCurrent: item.isCurrent,
+          }))}
+          selected={selectedRevision}
+          changes={revisionChanges}
+          restoreAction={restoreJobRevisionAction}
+          entityId={posting.id}
+          basePath={`/admin/careers/${posting.id}`}
+        />
+      ) : null}
     </main>
   );
 }

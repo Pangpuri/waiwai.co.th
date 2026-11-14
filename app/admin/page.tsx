@@ -90,7 +90,7 @@ export default async function AdminHomePage() {
   };
 
   /*
-    งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — ทุกบทบาทมีสิทธิ์ `content` จึงไม่ต้องซ่อนการ์ด
+    งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — แสดงให้บทบาทที่มีสิทธิ์ `content`
     อ่านล้วน + คืน null เมื่อยังไม่มีฐานข้อมูล ⇒ การ์ดนี้ไม่ทำให้หน้าภาพรวมพัง
   */
   const schedule = await scheduledPublishOverview();
@@ -323,7 +323,7 @@ export default async function AdminHomePage() {
       </section>
       ) : null}
 
-      {/* ── งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — ทุกบทบาทเข้าถึงได้ (สิทธิ์ content) ── */}
+      {/* ── งานที่ตั้งกำหนดเวลาเผยแพร่ไว้ (X2.7) — แสดงให้บทบาทที่มีสิทธิ์ content ── */}
       {schedule !== null ? (
       <section className="border-line bg-surface flex flex-col gap-3 rounded-2xl border p-5 sm:p-6">
         <div className="flex flex-col gap-0.5">

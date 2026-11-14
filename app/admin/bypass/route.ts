@@ -23,7 +23,7 @@ export async function POST(): Promise<NextResponse> {
   /*
     ตรวจกับฐานข้อมูลก่อนเสมอ — นี่คือหัวใจ: บัตรผ่านออกให้เฉพาะเซสชันที่ยังใช้ได้จริง
     ⚠️ route handler ใช้ redirect() ของ DAL ไม่ได้ ⇒ ตรวจสิทธิ์เองด้วย can(...) (กติกาโปรเจกต์)
-    ใช้สิทธิ์พื้นฐาน "content" (มีทุกบทบาท) เพราะบัตรผ่านมีไว้ "ดูเว็บ" ไม่ได้ให้แก้ข้อมูลอื่น
+    ใช้สิทธิ์ "content" เพราะบัตรผ่านมีไว้ "ดูเว็บ" ไม่ได้ให้แก้ข้อมูลอื่น
   */
   if (user !== null && can(user.role, "content")) {
     await refreshMaintenanceBypass();

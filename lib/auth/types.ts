@@ -4,10 +4,10 @@
  * ⚠️ ไฟล์นี้ต้องไม่มีโค้ดที่แตะ DB/DOM → ใช้ได้ทั้งในเทสต์และใน Server Component
  */
 
-/** บทบาทตาม BACKEND_DECISIONS.md § 4 (เริ่มจาก 3 บทบาทที่ตกลงไว้) */
-export type AdminRole = "editor" | "publisher" | "admin";
+/** บทบาทผู้ดูแลหลังบ้าน: เนื้อหา · ผู้เผยแพร่ · ผู้ดูแล · HR เฉพาะประกาศงาน */
+export type AdminRole = "editor" | "publisher" | "admin" | "hr";
 
-export const ADMIN_ROLES: readonly AdminRole[] = ["editor", "publisher", "admin"];
+export const ADMIN_ROLES: readonly AdminRole[] = ["editor", "publisher", "admin", "hr"];
 
 /**
  * ความยาวรหัสผ่านขั้นต่ำของบัญชีในตาราง `admin_user` (รอบที่ 295 ย้ายมาไว้ที่นี่ = แหล่งความจริงเดียว)

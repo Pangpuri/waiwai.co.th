@@ -6,6 +6,8 @@ import { nextJobSortOrder } from "@/lib/careers/model";
 import { listJobPostingsForAdmin } from "@/lib/careers/repository";
 import { buildBoard } from "@/features/careers/board";
 import { JobForm } from "@/features/admin/ui/job-form";
+import { can } from "@/lib/auth/roles";
+import { CareersSpreadsheetImport } from "@/features/admin/ui/careers-spreadsheet-import";
 
 /**
  * หลังบ้าน — "เพิ่มประกาศรับสมัครงาน" (รอบที่ 265 · มติ D26 ข้อ 5)
@@ -16,13 +18,18 @@ import { JobForm } from "@/features/admin/ui/job-form";
  * - พรีวิวใช้ `JobBoard` ตัวเดียวกับหน้า /careers (ส่งเฉพาะป้ายข้อความที่ใช้จริง)
  */
 export default async function AdminCareerNewPage() {
-  await requireAdminUser("content");
+  const user = await requireAdminUser("careers");
+  const canManageContent = can(user.role, "content");
   const messages = await getMessagesFor("th");
   const m = messages.adminCareers;
 
-  const rows = await listJobPostingsForAdmin();
-  const active = rows.filter((row) => row.deletedAt === null);
-  const sortOrder = nextJobSortOrder(active.map((row) => ({ id: row.id, sortOrder: row.sortOrder })));
+  const sortOrder = canManageContent
+    ? nextJobSortOrder(
+        (await listJobPostingsForAdmin())
+          .filter((row) => row.deletedAt === null)
+          .map((row) => ({ id: row.id, sortOrder: row.sortOrder })),
+      )
+    : 0;
   const board = buildBoard(messages);
 
   return (
@@ -35,9 +42,12 @@ export default async function AdminCareerNewPage() {
       <h1 className="font-display mt-2 text-2xl font-semibold tracking-tight">{m.newTitle}</h1>
       <p className="text-fg-muted mt-1 text-sm">{m.newHint}</p>
 
+      <CareersSpreadsheetImport strings={m} />
+
       <div className="mt-6">
         <JobForm
           mode="create"
+          canManageOrder={canManageContent}
           strings={m}
           boardLabels={board.labels}
           filterAll={messages.careersPage.filterAll}
@@ -57,6 +67,7 @@ export default async function AdminCareerNewPage() {
             qualificationsEn: "",
             experienceTh: "",
             experienceEn: "",
+            postedAtLocal: "",
             sortOrder,
             status: "draft",
           }}

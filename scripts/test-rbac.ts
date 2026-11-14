@@ -26,7 +26,7 @@ import {
  * 1. **ไม่มีหน้าที่ลืมตรวจสิทธิ์** — สแกนทุกไฟล์ใน `app/admin/**` ว่ามี `requireAdminUser("...")`
  *    (ยกเว้นเฉพาะ action ล็อกอิน/ออกจากระบบ ที่ต้องใช้ได้โดยไม่ต้องมีสิทธิ์)
  * 2. สิทธิ์ที่อันตรายต้องไม่ตกกับบทบาทต่ำ (กล่องข้อความลูกค้า · ลบบัญชี · ตั้งค่าระบบ · สิทธิ์คนอื่น)
- * 3. ตารางบทบาท→สิทธิ์ต้อง "เพิ่มขึ้น" เสมอ (editor ⊂ publisher ⊂ admin) และทุกสิทธิ์มีเจ้าของ
+ * 3. บทบาททั่วไปเป็นชุดสิทธิ์เพิ่มขึ้น และบทบาทเฉพาะทางได้เฉพาะสิทธิ์ที่กำหนด
  * 4. บัญชีใน DB: เก็บเฉพาะ hash · กันล็อกตัวเองออก · ลง audit ทุกการเปลี่ยน
  */
 
@@ -145,6 +145,9 @@ test("rbac: หน้าจอ/prévue/action สำคัญผูกกับ�
     { file: "app/admin/builder/chrome/page.tsx", permission: "presets" },
     { file: "app/admin/builder/[page]/page.tsx", permission: "content" },
     { file: "app/[lang]/preview/[page]/page.tsx", permission: "content" },
+    { file: "app/admin/careers/page.tsx", permission: "careers" },
+    { file: "app/admin/careers/new/page.tsx", permission: "careers" },
+    { file: "app/admin/careers/[id]/page.tsx", permission: "careers" },
   ];
 
   for (const { file, permission } of expectations) {
@@ -160,7 +163,7 @@ test("rbac: ลิงก์ข้ามสิทธิ์ต้องถูก�
   /*
     บทเรียน รอบที่ 85: หลังทำ RBAC ยังเหลือจุดที่ UI โชว์ของซึ่งกดแล้วเด้งไป /admin/denied
     (การ์ดถังขยะบน /admin · ลิงก์ถังขยะบนคลังภาพ) เพราะหน้าแม่ใช้สิทธิ์ต่ำกว่าเป้าหมาย
-    เทสต์นี้สแกนอัตโนมัติ: ถ้า "บทบาทต่ำสุดที่เข้าหน้านี้ได้" ยังเข้าเป้าหมายไม่ได้
+    เทสต์นี้สแกนอัตโนมัติ: ถ้ามีบทบาทที่เปิดหน้านี้ได้แต่เข้าเป้าหมายไม่ได้
     ไฟล์นั้นต้องมี `can(user.role, "<permission ของเป้าหมาย>")` กำกับ
   */
   const privilegedRoutes: readonly { readonly prefix: string; readonly permission: AdminPermission }[] = [
@@ -181,13 +184,12 @@ test("rbac: ลิงก์ข้ามสิทธิ์ต้องถูก�
     const own = /requireAdminUser\("([a-z]+)"\)/.exec(source)?.[1];
     if (own === undefined) continue;
 
-    /* บทบาท "ต่ำสุด" ที่เข้าได้ = บทบาทแรกในลำดับที่มีสิทธิ์นี้ (ตารางสิทธิ์เป็นแบบเพิ่มขึ้นเสมอ) */
-    const weakest = ADMIN_ROLES.find((role) => can(role, own as AdminPermission));
-    if (weakest === undefined) continue;
+    const rolesWithAccess = ADMIN_ROLES.filter((role) => can(role, own as AdminPermission));
+    if (rolesWithAccess.length === 0) continue;
 
     for (const { prefix, permission } of privilegedRoutes) {
       if (!source.includes(`href="${prefix}`)) continue;
-      if (can(weakest, permission)) continue; /* เข้าหน้านั้นได้อยู่แล้ว ⇒ ไม่ต้องซ่อน */
+      if (rolesWithAccess.every((role) => can(role, permission))) continue;
       if (source.includes(`can(user.role, "${permission}")`)) continue;
       offenders.push(`${file} → ${prefix} ต้องมี can(user.role, "${permission}")`);
     }
@@ -232,19 +234,25 @@ test("rbac: การ์ดเฉพาะทางบน /admin และกา
 /* ── 2) ตารางสิทธิ์ ───────────────────────────────────────────────────────── */
 
 test("rbac: บทบาทต้องเป็นชุดที่ฐานข้อมูลรู้จัก และตรวจค่าที่ส่งมาจากฟอร์มได้", () => {
-  assert.deepEqual([...ADMIN_ROLES], ["editor", "publisher", "admin"]);
+  assert.deepEqual([...ADMIN_ROLES], ["editor", "publisher", "admin", "hr"]);
   assert.equal(isAdminRole("owner"), false, "บทบาทที่ไม่มีในระบบต้องถูกปฏิเสธ");
+  assert.equal(isAdminRole("hr"), true);
   assert.equal(isAdminRoleId("admin"), true);
+  assert.equal(isAdminRoleId("hr"), true);
   assert.equal(isAdminRoleId("root"), false);
 
   /* ตรงกับ check constraint ในสคีมา (ผู้ใช้รัน `npm run check:db` จะพิสูจน์กับฐานข้อมูลจริงอีกชั้น) */
-  for (const file of ["db/schema.sql", "db/migrations/0001-init.sql"]) {
+  for (const file of ["db/schema.sql", "db/migrations/0052-admin-hr-role.sql"]) {
     const sql = sourceOf(file);
     assert.ok(
-      sql.includes("check (role in ('editor', 'publisher', 'admin'))"),
+      sql.includes("check (role in ('editor', 'publisher', 'admin', 'hr'))"),
       `${file}: ต้องมี check constraint ของบทบาทตรงกับ lib/auth/types.ts`,
     );
   }
+  assert.ok(
+    sourceOf("db/migrations/0001-init.sql").includes("check (role in ('editor', 'publisher', 'admin'))"),
+    "ห้ามแก้ migration เก่าที่รันไปแล้ว",
+  );
 });
 
 test("rbac: สิทธิ์ให้แบบเพิ่มขึ้น (editor ⊂ publisher ⊂ admin) และทุกสิทธิ์มีเจ้าของ", () => {
@@ -264,6 +272,13 @@ test("rbac: สิทธิ์ให้แบบเพิ่มขึ้น (edi
   /* ลำดับความแรง (ใช้ตอนกัน "ถอดบทบาทตัวเอง") */
   assert.equal(isStrongerOrEqual("admin", "publisher"), true);
   assert.equal(isStrongerOrEqual("editor", "publisher"), false);
+  assert.equal(isStrongerOrEqual("hr", "editor"), false, "HR ไม่ครอบคลุมสิทธิ์ทั่วไปของ editor");
+  assert.equal(isStrongerOrEqual("editor", "hr"), true, "editor ทำงานประกาศได้ตามขอบเขตเดิม");
+  assert.deepEqual([...permissionsOf("hr")], ["careers"], "HR ต้องได้เฉพาะสิทธิ์ประกาศรับสมัครงาน");
+  assert.equal(can("hr", "content"), false);
+  assert.equal(can("hr", "users"), false);
+  assert.equal(can("hr", "inbox"), false);
+  assert.equal(can("hr", "trash"), false);
 
   /* สิทธิ์ที่อันตราย: ต้องเป็น admin เท่านั้น */
   for (const permission of ["users", "settings", "retention", "maintenance"] as const) {
@@ -358,6 +373,11 @@ test("rbac: บัญชี env ยังเป็นประตูหลัง
 test("rbac: เมนูหลังบ้านซ่อนลิงก์ตามสิทธิ์ (แต่ไม่ใช่มาตรการความปลอดภัย)", () => {
   const layout = sourceOf("app/admin/layout.tsx");
   assert.ok(layout.includes('"/admin/users": "users"'), "ไซด์บาร์ต้องผูกสิทธิ์ users กับหน้าจัดการบัญชี");
+  assert.ok(layout.includes('"/admin/careers": "careers"'), "เมนูประกาศงานต้องใช้สิทธิ์เฉพาะทาง");
+  assert.ok(
+    layout.includes('enabled={user !== null && can(user.role, "content") && isMaintenanceEnabled(process.env)}'),
+    "HR ต้องไม่รับบัตรผ่าน maintenance จาก layout",
+  );
   assert.ok(layout.includes('sidebarPermission[item.href] ?? "content"'), "ต้องกรองเมนูตามสิทธิ์ของบัญชี");
   assert.ok(layout.includes('href: "/admin/users"'), "มีลิงก์ไปหน้าจัดการบัญชี");
   assert.ok(layout.includes("roleLabelOf("), "แสดงบทบาทของผู้ใช้ปัจจุบัน (ย้ายไปท้ายไซด์บาร์)");
@@ -367,6 +387,11 @@ test("rbac: เมนูหลังบ้านซ่อนลิงก์ต�
   */
   assert.equal(layout.includes("link.permission"), false, "ห้ามมีแถบลิงก์เมนูด้านบนชุดที่สอง");
   assert.equal(layout.includes("messages.admin.chromeTitle"), false, "ห้ามเหลือป้ายเมนูของแถบด้านบน");
+  const denied = sourceOf("app/admin/denied/page.tsx");
+  assert.ok(denied.includes('requireAdminUser("careers")'), "HR ต้องเปิดหน้าแจ้งไม่มีสิทธิ์ได้");
+  assert.ok(denied.includes('can(user.role, "content") ? "/admin" : "/admin/careers"'), "HR ต้องกลับไปหน้า Careers ได้");
+  const login = sourceOf("app/admin/actions.ts");
+  assert.ok(login.includes('redirect(can(outcome.user.role, "content") ? "/admin" : "/admin/careers")'), "HR ต้องเข้าหน้า Careers หลังล็อกอิน");
 });
 
 test("rbac: พจนานุกรมสองภาษามีคีย์ของ RBAC ครบ และไม่พิมพ์รายชื่อบทบาทซ้ำในโค้ด UI", () => {
@@ -377,6 +402,7 @@ test("rbac: พจนานุกรมสองภาษามีคีย์�
       "rbacRoleEditorName",
       "rbacRolePublisherName",
       "rbacRoleAdminName",
+      "rbacRoleHrName",
       "deniedTitle",
       "rbacLastAdminBlocked",
       "rbacSelfBlocked",
@@ -385,6 +411,7 @@ test("rbac: พจนานุกรมสองภาษามีคีย์�
       assert.ok(area.includes(`${key}:`), `${locale}: ขาดคีย์ ${key}`);
     }
     assert.ok(!area.includes('"editor"'), `${locale}: ห้ามพิมพ์รหัสบทบาทซ้ำ (ให้อยู่ใน lib/auth/types.ts)`);
+    assert.ok(sourceOf(`lib/i18n/messages/areas/${locale}/admin.ts`).includes("hr:"), `${locale}: ต้องมีชื่อบทบาท HR บน admin`);
   }
 
   /* ป้ายชื่อบทบาทต้องมีที่เดียว (exhaustive) */

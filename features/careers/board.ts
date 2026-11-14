@@ -18,6 +18,7 @@ import {
   jobDepartments,
   jobExperience,
   jobQualifications,
+  formatJobPostedAt,
   jobTitle,
   sortJobPostings,
   type Language as JobLanguage,
@@ -43,6 +44,7 @@ export type JobCard = {
   readonly ageLabel: string;
   readonly qualificationsLabel: string;
   readonly experienceLabel: string;
+  readonly postedAtLabel: string;
 };
 
 export type BoardFilter = {
@@ -65,6 +67,7 @@ export type BoardLabels = {
   readonly fieldAge: string;
   readonly fieldQualifications: string;
   readonly fieldExperience: string;
+  readonly fieldPostedAt: string;
 };
 
 export type Board = {
@@ -95,6 +98,7 @@ export function buildBoard(messages: Messages, jobs: readonly Job[] = JOBS): Boa
       */
       genderLabel: genderLabels[copy.gender] ?? copy.gender,
       ageLabel: copy.age,
+      postedAtLabel: "",
       qualificationsLabel: copy.qualifications,
       // ต้นฉบับใช้ "-" เมื่อไม่ระบุประสบการณ์ → แสดงข้อความจากพจนานุกรมแทน
       experienceLabel: copy.experience ?? m.notSpecified,
@@ -122,6 +126,7 @@ export function buildBoard(messages: Messages, jobs: readonly Job[] = JOBS): Boa
       fieldAge: m.fields.age,
       fieldQualifications: m.fields.qualifications,
       fieldExperience: m.fields.experience,
+      fieldPostedAt: m.fields.postedAt,
     },
   };
 }
@@ -160,6 +165,7 @@ export function buildPostingBoard(
       /* ไม่ระบุเพศ/อายุ = ค่าว่าง (มติ D26 ข้อ 4) — หน้าจอซ่อนบรรทัดที่ไม่ระบุให้เอง */
       genderLabel: posting.gender === "" ? "" : (genderLabels[posting.gender] ?? ""),
       ageLabel: jobAge(posting, language),
+      postedAtLabel: formatJobPostedAt(posting.postedAt, language),
       qualificationsLabel: jobQualifications(posting, language),
       experienceLabel: experience.trim() === "" ? m.notSpecified : experience,
     };
@@ -186,6 +192,7 @@ export function buildPostingBoard(
       fieldAge: m.fields.age,
       fieldQualifications: m.fields.qualifications,
       fieldExperience: m.fields.experience,
+      fieldPostedAt: m.fields.postedAt,
     },
   };
 }

@@ -171,7 +171,7 @@ export async function resetPasswordAction(
  * - ส่ง `hash` มา = ตัดเซสชันนั้น (sha256 ของ sid — ค่าที่หน้าจอเห็น ไม่ใช่รหัสลับที่เอาไปสวมรอยได้)
  * - ส่งแค่ `userId` = ตัด **ทุกเซสชันของบัญชีนั้น** (ใช้ตอนสงสัยว่าเครื่องหาย)
  * - ไม่ส่งทั้งสอง = **"ตัดเซสชันอื่นทั้งหมดของตัวเอง"** (คงเซสชันที่กำลังใช้อยู่ไว้)
- *   ⚠️ กรณีนี้ใช้สิทธิ์ `content` (มีทุกบทบาท) เพราะเป็นการจัดการเซสชันของตัวเอง — ไม่ใช่ของคนอื่น
+ *    ⚠️ กรณีนี้ใช้สิทธิ์ `content` เพราะเป็นการจัดการเซสชันของตัวเอง — ไม่ใช่ของคนอื่น
  */
 export async function revokeSessionsAction(_previous: RbacActionState, formData: FormData): Promise<RbacActionState> {
   const actor = await requireAdminUser("content");

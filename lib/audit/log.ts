@@ -49,10 +49,13 @@ export type AuditAction =
   | "product-category-preset-import"
   /* ประกาศรับสมัครงาน (มติ D26 · รอบที่ 265) */
   | "job-save"
+  | "job-publish"
+  | "job-publish-bulk"
   | "job-trash"
   | "job-restore"
   | "job-delete"
   | "job-revision-restore"
+  | "careers-excel-import"
   | "news-save"
   | "news-trash"
   | "news-restore"

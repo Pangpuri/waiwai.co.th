@@ -40,6 +40,7 @@ export const careersPage = {
       age: "Age",
       qualifications: "Qualifications",
       experience: "Experience",
+      postedAt: "Posted",
     },
     genders: {
       male: "Male",

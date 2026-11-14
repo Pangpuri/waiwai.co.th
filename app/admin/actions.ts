@@ -21,6 +21,7 @@ import { setPublishSchedule } from "@/lib/blocks/repository";
 import { isBlockBuilderPage } from "@/lib/blocks/templates";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 import { isValidEmail } from "@/lib/validate";
+import { can } from "@/lib/auth/roles";
 
 /**
  * Server Actions ของหลังบ้าน (ไฟล์นี้ส่งออกได้เฉพาะ async function)
@@ -125,7 +126,7 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
   }
 
   /* redirect ต้องอยู่นอก try/catch — ตัวมันเองโยน error ภายในเพื่อหยุด render */
-  redirect("/admin");
+  redirect(can(outcome.user.role, "content") ? "/admin" : "/admin/careers");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -140,7 +141,7 @@ export async function logoutAction(): Promise<void> {
  *
  * - ใช้ `<form action={...}>` ธรรมดา ⇒ ทำงานได้แม้ปิด JavaScript
  * - คงเซสชันที่กำลังใช้อยู่ไว้ (ไม่ใช่ "ออกจากระบบ")
- * - ใช้สิทธิ์ `content` (มีทุกบทบาท) เพราะเป็นการจัดการเซสชันของตัวเอง ไม่ใช่ของคนอื่น
+ * - ใช้สิทธิ์ `content` เพราะเป็นการจัดการเซสชันของตัวเอง ไม่ใช่ของคนอื่น
  */
 export async function revokeOwnOtherSessionsAction(): Promise<void> {
   const user = await requireAdminUser("content");
@@ -168,7 +169,7 @@ export async function purgeRetentionNowAction(): Promise<void> {
  *
  * ทำไมต้องมีปุ่มนี้ทั้งที่ตัวเผยแพร่ตามกำหนดทำงานตอนล็อกอินอยู่แล้ว
  * - กำหนดเวลาที่ครบระหว่างวันจะถูกเก็บไว้จนกว่าจะมีคนล็อกอินใหม่ ⇒ ปุ่มนี้ทำให้ "เห็นแล้วสั่งได้เลย"
- * - ใช้สิทธิ์ `content` (ทุกบทบาทมี) เพราะเป็นการเผยแพร่เนื้อหา ไม่ใช่การแตะข้อมูลส่วนบุคคล
+ * - ใช้สิทธิ์ `content` เพราะเป็นการเผยแพร่เนื้อหา ไม่ใช่การแตะข้อมูลส่วนบุคคล
  * - ล้มเหลวไม่ทำให้หน้าจอพัง (ปุ่มนี้ไม่คืนข้อความ — ร่องรอยใน audit log/การ์ดจะบอกผลเอง)
  */
 export async function publishScheduledNowAction(): Promise<void> {

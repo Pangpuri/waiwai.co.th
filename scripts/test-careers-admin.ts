@@ -8,6 +8,9 @@ import { codeOf } from "./source-scan.ts";
 import { CONTENT_TRASH_KINDS, CONTENT_TRASH_SCREENS } from "@/lib/trash/plan.ts";
 import {
   JOB_GENDERS,
+  formatJobPostedAt,
+  jobPostedAtInstantOf,
+  jobPostedAtLocalOf,
   MAX_JOB_OPENINGS,
   MAX_JOB_TEXT_LENGTH,
   MAX_JOB_TITLE_LENGTH,
@@ -59,6 +62,7 @@ function input(overrides: Partial<JobInput> = {}): JobInput {
     qualificationsEn: "",
     experienceTh: "",
     experienceEn: "",
+    postedAtLocal: "",
     sortOrder: 100,
     status: "draft",
     ...overrides,
@@ -79,6 +83,7 @@ function posting(overrides: Partial<JobPosting> & { readonly id: string }): JobP
     qualificationsEn: "",
     experienceTh: "",
     experienceEn: "",
+    postedAt: null,
     sortOrder: 100,
     ...overrides,
   };
@@ -98,6 +103,15 @@ test("ประกาศงาน: ผ่านเมื่อกรอกแค
     [],
     "ช่อง EN/ฝ่าย/เพศ/อายุ ว่างได้ และเปิดเผยแพร่ได้",
   );
+});
+
+test("ประกาศงาน: วันที่และเวลาแปลงเป็น/จากเวลาไทยอย่างถูกต้อง และวันที่ไม่ถูกต้องถูกปฏิเสธ", () => {
+  const instant = jobPostedAtInstantOf("2026-11-14T00:30");
+  assert.equal(instant, "2026-11-13T17:30:00.000Z");
+  assert.equal(jobPostedAtLocalOf(instant), "2026-11-14T00:30");
+  assert.match(formatJobPostedAt(instant, "th"), /2569/);
+  assert.equal(jobPostedAtInstantOf("2026-02-30T10:00"), null);
+  assert.equal(jobPostedAtInstantOf(""), null);
 });
 
 test("ประกาศงาน: ปฏิเสธเมื่อชื่อไทยว่าง · เพศ/สถานะไม่รู้จัก · จำนวนติดลบ/เกินเพดาน · ลำดับติดลบ", () => {
@@ -138,6 +152,19 @@ test("ประกาศงาน: เรียงตามลำดับแล
   ];
   assert.deepEqual(sortJobPostings(rows).map((row) => row.id), ["c", "a", "b"]);
   assert.deepEqual(sortJobPostings(sortJobPostings(rows)).map((row) => row.id), ["c", "a", "b"], "เรียกซ้ำได้ผลเดิม");
+});
+
+test("ประกาศงาน: วันที่เผยแพร่ใหม่อยู่ก่อนเสมอ · วันที่ว่างหรือผิดรูปแบบอยู่ท้าย", () => {
+  const rows = [
+    posting({ id: "no-date", sortOrder: 50 }),
+    posting({ id: "older", postedAt: "2026-11-13T10:00:00.000Z", sortOrder: 1 }),
+    posting({ id: "newer-b", postedAt: "2026-11-14T10:00:00.000Z", sortOrder: 20 }),
+    posting({ id: "invalid-date", postedAt: "not-a-date", sortOrder: 10 }),
+    posting({ id: "newer-a", postedAt: "2026-11-14T10:00:00.000Z", sortOrder: 10 }),
+  ];
+  const expected = ["newer-a", "newer-b", "older", "invalid-date", "no-date"];
+  assert.deepEqual(sortJobPostings(rows).map((row) => row.id), expected);
+  assert.deepEqual(sortJobPostings(sortJobPostings(rows)).map((row) => row.id), expected, "เรียกซ้ำได้ผลเดิม");
 });
 
 test("ประกาศงาน: ลำดับถัดไป = ต่อท้ายของเดิมเสมอ", () => {
@@ -203,6 +230,8 @@ test("ประกาศงาน: คำสั่งอ่านฝั่งเ
     "ต้องมีเงื่อนไขกลางของประกาศที่ขึ้นเว็บได้",
   );
   assert.ok(repo.includes("getPool()"), "งานเขียน/หลังบ้านต้องใช้ getPool()");
+  assert.ok(repo.includes("sortJobPostings(result.rows.map(toJobPosting)"), "หน้าเว็บต้องใช้ลำดับประกาศกลาง");
+  assert.ok(repo.includes("sortJobPostings(result.rows.map(toAdminJobPosting)"), "หลังบ้านต้องใช้ลำดับประกาศเดียวกับหน้าเว็บ");
 });
 
 test("ประกาศงาน: ประตูถังขยะอยู่ที่ SQL ทั้งสองทาง + ลบถาวรต้องอยู่ในถังเท่านั้น", () => {
@@ -215,11 +244,47 @@ test("ประกาศงาน: ประตูถังขยะอยู่
   assert.ok(repo.includes("deleted_by"), "ต้องบันทึกคนลบไว้ตรวจย้อนหลัง");
 });
 
-test("ประกาศงาน: ทุก action ตรวจสิทธิ์ + ประกาศใหม่เป็นฉบับร่างเท่านั้น", () => {
+test("ประกาศงาน: HR จัดการถังขยะของประกาศได้ แต่แก้หน้า/ลำดับไม่ได้ และประกาศใหม่เป็นฉบับร่าง", () => {
   const actions = codeOf("app/admin/careers/actions.ts");
-  const calls = actions.match(/requireAdminUser\("content"\)/g) ?? [];
-  const exported = actions.match(/export async function \w+/g) ?? [];
-  assert.equal(calls.length, exported.length, "ทุก action ต้องเรียก requireAdminUser (จำนวนต้องเท่ากับ action ที่ export)");
+  const permissions = new Map([
+    ["saveCareersPageCopyAction", "content"],
+    ["saveJobAction", "careers"],
+    ["restoreJobRevisionAction", "content"],
+    ["createJobAction", "careers"],
+    ["trashJobAction", "careers"],
+    ["deleteJobForeverAction", "careers"],
+    ["reorderJobsAction", "content"],
+  ]);
+  for (const [actionName, permission] of permissions) {
+    const start = actions.indexOf(`export async function ${actionName}`);
+    assert.notEqual(start, -1, `${actionName} ต้องยังมีอยู่`);
+    const next = actions.indexOf("\nexport async function ", start + 1);
+    const action = actions.slice(start, next === -1 ? undefined : next);
+    assert.ok(action.includes(`requireAdminUser("${permission}")`), `${actionName} ต้องใช้สิทธิ์ ${permission}`);
+  }
+
+  const listPage = codeOf("app/admin/careers/page.tsx");
+  assert.ok(listPage.includes('requireAdminUser("careers")'), "HR ต้องเปิดหน้ารายการประกาศได้");
+  assert.ok(listPage.includes('can(user.role, "careers")'), "แท็บถังขยะและการลบประกาศต้องใช้สิทธิ์ Careers");
+  assert.ok(listPage.includes("canManageCareers ? TAB_IDS"), "HR ต้องเห็นแท็บถังขยะของประกาศงาน");
+  assert.ok(listPage.includes("canManageCareers && trashed"), "HR ต้องลบถาวรได้เฉพาะประกาศที่อยู่ในถัง");
+  assert.ok(
+    codeOf("app/admin/trash/page.tsx").includes('requireAdminUser("trash")'),
+    "สิทธิ์ถังขยะของ Careers ต้องไม่เปิดถังขยะส่วนกลางให้ HR",
+  );
+  assert.ok(listPage.includes('can(user.role, "content")'), "ส่วนแก้ข้อความหน้า/SEO/ประวัติรุ่น/จัดลำดับต้องตรวจสิทธิ์กว้าง");
+  assert.ok(listPage.includes("const canOpenEditor = !trashed || canManageContent"), "HR ต้องกู้คืนก่อนเปิดแก้ไขประกาศในถัง");
+  const newPage = codeOf("app/admin/careers/new/page.tsx");
+  const editPage = codeOf("app/admin/careers/[id]/page.tsx");
+  assert.ok(newPage.includes('requireAdminUser("careers")'), "HR ต้องเปิดฟอร์มสร้างประกาศได้");
+  assert.ok(editPage.includes('requireAdminUser("careers")'), "HR ต้องเปิดฟอร์มแก้ประกาศได้");
+  assert.ok(editPage.includes("!canManageContent"), "HR ต้องถูกกันจากประกาศในถังขยะ/ประวัติรุ่น");
+  assert.ok(listPage.includes("canManageContent && careersPageCopy !== null"), "HR ต้องไม่เห็นฟอร์มแก้ข้อความหน้า");
+  assert.ok(listPage.includes("!canManageContent || reorderItems.length < 2"), "HR ต้องไม่เห็นเครื่องมือจัดลำดับ");
+
+  assert.ok(actions.includes('existing.deletedAt !== null && !can(user.role, "content")'), "Server Action ต้องกันแก้ประกาศในถัง");
+  assert.ok(actions.includes('const sortOrder = can(user.role, "content") ? input.sortOrder : existing.sortOrder'), "HR เปลี่ยนลำดับประกาศเดิมไม่ได้");
+  assert.ok(actions.includes("nextJobSortOrder("), "ลำดับประกาศใหม่ของ HR ต้องกำหนดจากเซิร์ฟเวอร์");
   assert.ok(actions.includes('status: "draft"'), "createJobAction ต้องตั้งเป็นฉบับร่างเสมอ (มติ D26 ข้อ 5)");
   assert.ok(actions.includes("newJobId(Date.now())"), "รหัสประกาศออกที่เซิร์ฟเวอร์ ไม่รับจากฟอร์ม");
 });
@@ -230,6 +295,45 @@ test("ประกาศงาน: จอหลังบ้านมีฟอร
   assert.equal(forms.length, 1, "ต้องมี <form> เดียวในไฟล์ฟอร์ม (บทเรียนรอบที่ 129)");
   assert.ok(form.includes("JobBoard"), "พรีวิวต้องใช้ตัวเรนเดอร์เดียวกับหน้าเว็บ");
   assert.ok(form.includes("previewBoard"), "พรีวิวต้องสร้างจากค่าที่กรอกค้าง (ไม่ใช่ภาพนิ่ง)");
+});
+
+test("ประกาศงาน: นำเข้าอยู่หน้าสร้าง · ไปหน้าร่างได้ · เผยแพร่ทีละรายการ/เลือก/ทั้งหมด", () => {
+  const listPage = codeOf("app/admin/careers/page.tsx");
+  const createPage = codeOf("app/admin/careers/new/page.tsx");
+  const importUi = codeOf("features/admin/ui/careers-spreadsheet-import.tsx");
+  const bulkUi = codeOf("features/admin/ui/careers-bulk-publish.tsx");
+  const singleUi = codeOf("features/admin/ui/careers-draft-publish.tsx");
+  const actions = codeOf("app/admin/careers/actions.ts");
+  const repo = codeOf("lib/careers/repository.ts");
+
+  assert.ok(!listPage.includes("CareersSpreadsheetImport"), "ตัวนำเข้าไม่ควรอยู่หน้ารายการ");
+  assert.ok(createPage.includes("CareersSpreadsheetImport"), "ตัวนำเข้าต้องอยู่หน้าสร้างประกาศ");
+  assert.ok(importUi.includes("xlsxImportClear"), "ต้องมีปุ่มล้างไฟล์/ตัวอย่างที่ยังไม่บันทึก");
+  assert.ok(importUi.includes("fileInput.current.value = \"\""), "ล้างตัวอย่างต้องล้างไฟล์ที่เลือกด้วย");
+  assert.ok(
+    importUi.includes("Already imported postings are not removed") || importUi.includes("xlsxImportClearHint"),
+    "ข้อความต้องแยกการล้างตัวอย่างออกจากการลบประกาศที่นำเข้าแล้ว",
+  );
+  assert.ok(listPage.includes("CareersBulkPublish"), "ต้องแสดงปุ่มเผยแพร่รวมบนหน้ารายการ");
+  assert.ok(importUi.includes("/admin/careers?tab=draft"), "นำเข้าแล้วต้องมีทางไปดูฉบับร่างทั้งหมด");
+  assert.ok(listPage.includes("buildPostingBoard([previewPosting]"), "พรีวิวต้องใช้ข้อมูลประกาศจริงกับตัวแปลงกระดาน");
+  assert.ok(listPage.includes("m.previewPosting"), "ประกาศฉบับร่างต้องมีปุ่มพรีวิว");
+  assert.ok(listPage.includes('form="bulk-publish-form"'), "checkbox ของแต่ละแถวต้องผูกกับฟอร์มเผยแพร่รวม");
+  assert.ok(listPage.includes("CareersDraftPublish"), "แต่ละฉบับร่างต้องมีปุ่มเผยแพร่");
+  assert.ok(bulkUi.includes("required"), "ต้องยืนยันก่อนเผยแพร่");
+  assert.ok(bulkUi.includes('name="publishAll"'), "ต้องเลือกเผยแพร่ฉบับร่างทั้งหมดได้");
+  assert.ok(bulkUi.includes("publishSelectedJobDraftsAction"), "ฟอร์มต้องใช้ action เผยแพร่รายการที่เลือก");
+
+  for (const actionName of ["publishOneJobDraftAction", "publishSelectedJobDraftsAction"]) {
+    const start = actions.indexOf(`export async function ${actionName}`);
+    assert.notEqual(start, -1, `ต้องมี Server Action ${actionName}`);
+    const next = actions.indexOf("\nexport async function ", start + 1);
+    const publishAction = actions.slice(start, next === -1 ? undefined : next);
+    assert.ok(publishAction.includes('requireAdminUser("careers")'), `${actionName} ต้องตรวจสิทธิ์ Careers`);
+  }
+  assert.ok(actions.includes('field(formData, "confirmPublish")'), "action รวมต้องตรวจคำยืนยันจากฟอร์ม");
+  assert.ok(repo.includes("posted_at = coalesce(posted_at, now())"), "เผยแพร่ต้องใช้เวลาปัจจุบันเมื่อยังไม่มีวันที่");
+  assert.ok(singleUi.includes("publishOneJobDraftAction"), "ปุ่มรายแถวต้องเรียก action เผยแพร่รายการเดียว");
 });
 
 test("ประกาศงาน: พจนานุกรมพื้นที่ใหม่ + มี EN ครบคู่ (ด่าน check:i18n เสริม)", () => {

@@ -39,6 +39,7 @@ export const careersPage = {
       age: "อายุ",
       qualifications: "คุณสมบัติ",
       experience: "ประสบการณ์",
+      postedAt: "วันที่ประกาศ",
     },
     genders: {
       male: "ชาย",

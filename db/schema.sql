@@ -78,7 +78,7 @@ create table if not exists admin_user (
   -- scrypt:N:r:p:<salt b64>:<hash b64> — ตรวจ/ตรวจซ้ำด้วย lib/auth/password.ts
   -- ⚠️ ห้ามใช้ `$` เป็นตัวคั่น: dotenv-expand ของ Next จะตัดค่าเป็นตัวแปร (เคสจริง 2026-10-02)
   password_hash text        not null,
-  role          text        not null check (role in ('editor', 'publisher', 'admin')),
+  role          text        not null check (role in ('editor', 'publisher', 'admin', 'hr')),
   disabled      boolean     not null default false,
   last_login_at timestamptz,
   created_at    timestamptz not null default now()
@@ -579,6 +579,7 @@ create table if not exists job_posting (
   qualifications_en  text        not null default '',
   experience_th      text        not null default '',
   experience_en      text        not null default '',
+  posted_at          timestamptz,
   sort_order         integer     not null default 0,
   status             text        not null default 'draft' check (status in ('draft', 'published')),
   deleted_at         timestamptz,
