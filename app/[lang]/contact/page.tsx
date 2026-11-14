@@ -167,6 +167,7 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
               submitting: m.formSubmitting,
               consent: m.consent,
               sent: m.formSent,
+              notificationFailed: m.formNotificationFailed,
               invalid: m.formInvalid,
               rateLimited: m.formRateLimited,
               unavailable: m.formUnavailable,

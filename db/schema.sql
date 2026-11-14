@@ -288,6 +288,9 @@ create table if not exists form_submission (
   message    text        not null default '',
   payload    jsonb       not null default '{}'::jsonb,
   status     text        not null default 'new' check (status in ('new', 'handled', 'spam')),
+  notification_status text not null default 'not_applicable'
+    check (notification_status in ('not_applicable', 'pending', 'sent', 'failed')),
+  notification_sent_at timestamptz,
   consent    boolean     not null default false,
   created_at timestamptz not null default now(),
   handled_at timestamptz,

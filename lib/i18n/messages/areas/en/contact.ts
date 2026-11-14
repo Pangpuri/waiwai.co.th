@@ -49,6 +49,7 @@ export const contactPage = {
     detailsPlaceholder: "Tell us more",
     formSubmitting: "Sending…",
     formSent: "We have received your message — our team will get back to you soon.",
+    formNotificationFailed: "Your message was saved, but we could not confirm the email notification — please contact the company directly.",
     formInvalid: "Some required details are missing or invalid — please check again.",
     formRateLimited: "Too many submissions — please wait a moment and try again.",
     formUnavailable: "The message system is temporarily unavailable — please try again or call us.",

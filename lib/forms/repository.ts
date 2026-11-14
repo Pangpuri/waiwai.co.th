@@ -11,6 +11,7 @@ import { SUBMISSION_WINDOW_MS, type FormKind, type SubmissionDraft } from "@/lib
  */
 
 export type SubmissionStatus = "new" | "handled" | "spam";
+export type NotificationStatus = "not_applicable" | "pending" | "sent" | "failed";
 
 export type SubmissionRow = {
   readonly id: number;
@@ -21,11 +22,14 @@ export type SubmissionRow = {
   readonly topic: string;
   readonly subject: string;
   readonly message: string;
+  readonly payload: Readonly<Record<string, string>>;
   readonly status: SubmissionStatus;
   readonly consent: boolean;
   readonly createdAt: string;
   readonly handledAt: string | null;
   readonly handledBy: string | null;
+  readonly notificationStatus: NotificationStatus;
+  readonly notificationSentAt: string | null;
 };
 
 type RawRow = {
@@ -37,18 +41,32 @@ type RawRow = {
   readonly topic: string;
   readonly subject: string;
   readonly message: string;
+  readonly payload: unknown;
   readonly status: string;
   readonly consent: boolean;
   readonly created_at: Date;
   readonly handled_at: Date | null;
   readonly handled_by: string | null;
+  readonly notification_status: string;
+  readonly notification_sent_at: Date | null;
 };
 
-const SELECT_COLUMNS = "id, form, email, name, phone, topic, subject, message, status, consent, created_at, handled_at, handled_by";
+const SELECT_COLUMNS =
+  "id, form, email, name, phone, topic, subject, message, payload, status, consent, created_at, handled_at, handled_by, notification_status, notification_sent_at";
 
 function toRow(row: RawRow): SubmissionRow {
   const status: SubmissionStatus = row.status === "handled" || row.status === "spam" ? row.status : "new";
   const form: FormKind = row.form === "newsletter" || row.form === "careers" ? row.form : "contact";
+  const notificationStatus: NotificationStatus =
+    row.notification_status === "pending" || row.notification_status === "sent" || row.notification_status === "failed"
+      ? row.notification_status
+      : "not_applicable";
+  const payload: Record<string, string> = {};
+  if (typeof row.payload === "object" && row.payload !== null && !Array.isArray(row.payload)) {
+    for (const [key, value] of Object.entries(row.payload)) {
+      if (typeof value === "string") payload[key] = value;
+    }
+  }
 
   return {
     id: typeof row.id === "number" ? row.id : Number.parseInt(row.id, 10),
@@ -59,19 +77,24 @@ function toRow(row: RawRow): SubmissionRow {
     topic: row.topic,
     subject: row.subject,
     message: row.message,
+    payload,
     status,
     consent: row.consent === true,
     createdAt: new Date(row.created_at).toISOString(),
     handledAt: row.handled_at === null ? null : new Date(row.handled_at).toISOString(),
     handledBy: row.handled_by,
+    notificationStatus,
+    notificationSentAt: row.notification_sent_at === null ? null : new Date(row.notification_sent_at).toISOString(),
   };
 }
 
 /** บันทึกผู้ติดต่อใหม่ (คืน id) — เรียกจาก action ที่ตรวจ/จำกัดความถี่แล้ว */
 export async function insertSubmission(draft: SubmissionDraft, spam: boolean): Promise<number> {
   const { rows } = await formQuery<{ id: string }>(
-    `insert into form_submission (form, email, name, phone, topic, subject, message, payload, consent, status)
-     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+    `insert into form_submission (
+       form, email, name, phone, topic, subject, message, payload, consent, status, notification_status
+     )
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
      returning id`,
     [
       draft.form,
@@ -84,6 +107,7 @@ export async function insertSubmission(draft: SubmissionDraft, spam: boolean): P
       JSON.stringify(draft.payload),
       draft.consent,
       spam ? "spam" : "new",
+      spam || draft.form === "newsletter" ? "not_applicable" : "pending",
     ],
   );
   return Number.parseInt(rows[0]?.id ?? "0", 10);
@@ -154,6 +178,31 @@ export async function setSubmissionStatus(id: number, status: SubmissionStatus, 
             handled_by = case when $2 = 'new' then null else $3 end
       where id = $1`,
     [id, status, actor.slice(0, 200)],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function setFormNotificationStatus(id: number, status: Exclude<NotificationStatus, "not_applicable">): Promise<boolean> {
+  const { rowCount } = await formQuery(
+    `update form_submission
+        set notification_status = $2,
+            notification_sent_at = case when $2 = 'sent' then now() else null end
+      where id = $1 and form in ('contact', 'careers') and status <> 'spam'`,
+    [id, status],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function setSubmissionNotificationStatus(
+  id: number,
+  status: Exclude<NotificationStatus, "not_applicable">,
+): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    `update form_submission
+        set notification_status = $2,
+            notification_sent_at = case when $2 = 'sent' then now() else null end
+      where id = $1 and form in ('contact', 'careers') and status <> 'spam'`,
+    [id, status],
   );
   return (rowCount ?? 0) > 0;
 }

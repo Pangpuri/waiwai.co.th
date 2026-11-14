@@ -1,10 +1,16 @@
 import Link from "next/link";
 
-import { deleteSubmissionAction, eraseSubjectAction, setSubmissionStatusAction } from "@/app/admin/inbox/actions";
+import {
+  deleteSubmissionAction,
+  eraseSubjectAction,
+  retrySubmissionNotificationAction,
+  setSubmissionStatusAction,
+} from "@/app/admin/inbox/actions";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { formatBytes } from "@/lib/forms/attachment";
 import { countSubmissionsByStatus, listAttachments, listSubmissions, type SubmissionRow, type SubmissionStatus } from "@/lib/forms/repository";
+import { loadFormMailRouting } from "@/lib/forms/mail-routing-repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
 import { fillTemplate } from "@/lib/i18n/template";
 import { erasureIsEmpty, erasureTotal, isPlausibleEmail } from "@/lib/privacy/erasure";
@@ -12,6 +18,8 @@ import { erasurePreview } from "@/lib/privacy/repository";
 import { jobTitleByTopic, jobTitle } from "@/lib/careers/model";
 import { listJobPostingsForAdmin } from "@/lib/careers/repository";
 import { searchParamText } from "@/lib/search/params";
+import { CONTACT_TOPICS } from "@/features/contact/content";
+import { FormMailRoutingForm } from "@/features/admin/ui/form-mail-routing-form";
 
 /**
  * กล่องข้อความหลังบ้าน (X1.9) — ผู้ติดต่อ/ผู้สมัครจากฟอร์มหน้าเว็บ
@@ -63,6 +71,8 @@ export default async function AdminInboxPage({
   const preview = eraseCheckOk && !eraseDbMissing ? await erasurePreview(eraseEmail) : null;
 
   const rows = await listSubmissions({ status, form: formFilter, limit: 100 });
+  const mailRouting = await loadFormMailRouting();
+  const contactTopics = CONTACT_TOPICS.map((id) => ({ id, label: messages.contactPage.topics[id] }));
   /*
     รอบที่ 276 (ปิดหนี้ D-265-2): ใบสมัคร **เก่า** เก็บค่า `topic` เป็นรหัสตำแหน่ง (`j<เวลา>`/คีย์พจนานุกรม)
     ⇒ โหลดรายชื่อประกาศทั้งหมด (รวมในถัง) มาทำพจนานุกรม id → ชื่อ เพื่อแสดงชื่อที่อ่านรู้เรื่องให้เจ้าหน้าที่
@@ -91,6 +101,23 @@ export default async function AdminInboxPage({
           {fillTemplate(strings.inboxCounts, { n: counts.new, h: counts.handled, s: counts.spam })}
         </p>
       </header>
+
+      <FormMailRoutingForm
+        initial={mailRouting}
+        topics={contactTopics}
+        strings={{
+          title: strings.formRoutingTitle,
+          hint: strings.formRoutingHint,
+          toLabel: strings.formRoutingToLabel,
+          ccLabel: strings.formRoutingCcLabel,
+          addressHint: strings.formRoutingAddressHint,
+          careers: strings.formRoutingCareers,
+          save: strings.formRoutingSave,
+          saved: strings.formRoutingSaved,
+          invalid: strings.formRoutingInvalid,
+          failed: strings.formRoutingFailed,
+        }}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((filter) => {
@@ -130,6 +157,15 @@ export default async function AdminInboxPage({
                 <span className={row.status === "new" ? "text-brand-red font-semibold" : "text-fg-muted"}>
                   {row.status === "new" ? strings.inboxFilterNew : row.status === "handled" ? strings.inboxFilterHandled : strings.inboxFilterSpam}
                 </span>
+                {row.notificationStatus === "not_applicable" ? null : (
+                  <span className="text-fg-muted">
+                    {row.notificationStatus === "sent"
+                      ? strings.notificationSent
+                      : row.notificationStatus === "failed"
+                        ? strings.notificationFailed
+                        : strings.notificationPending}
+                  </span>
+                )}
                 <span className="text-fg-muted font-mono">#{row.id}</span>
                 <span className="text-fg-muted ml-auto">{row.createdAt.slice(0, 16).replace("T", " ")}</span>
               </div>
@@ -178,6 +214,15 @@ export default async function AdminInboxPage({
               )}
 
               <div className="flex flex-wrap items-center gap-2">
+                {row.notificationStatus === "pending" || row.notificationStatus === "failed" ? (
+                  <form action={retrySubmissionNotificationAction}>
+                    <input type="hidden" name="id" value={row.id} />
+                    <button type="submit" className={BUTTON_CLASS}>
+                      {strings.notificationRetry}
+                    </button>
+                  </form>
+                ) : null}
+
                 {row.status === "handled" ? (
                   <form action={setSubmissionStatusAction}>
                     <input type="hidden" name="id" value={row.id} />

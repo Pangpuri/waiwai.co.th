@@ -18,7 +18,8 @@ import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
  *   ⇒ ถ้าเส้นทางสาธารณะมีช่องโหว่ที่สั่งเขียนได้ = เขียน/ลบข้อมูลจริงได้ทันที
  * - สคริปต์นี้สร้าง role สิทธิ์แคบให้หน้าเว็บใช้:
  *   · `waiwai_public_ro`   = SELECT เฉพาะตารางที่หน้าเว็บอ่าน (ไม่มีตาราง auth/PII)
- *   · `waiwai_public_form` = SELECT+INSERT เฉพาะ `form_submission`/`form_attachment` (ทางเขียนเดียวของคนนอก)
+ *   · `waiwai_public_form` = SELECT+INSERT เฉพาะ `form_submission`/`form_attachment`
+ *     + UPDATE สถานะอีเมลแจ้งเตือน 2 คอลัมน์ (ไม่เปิดแก้ข้อมูลฟอร์ม)
  * - แล้วเอาค่า URL ไปตั้ง `PUBLIC_DATABASE_URL` / `FORM_DATABASE_URL` (ไม่ commit)
  *
  * ⚠️ ไม่ตั้ง env ทั้งสอง = ระบบถอยไปใช้ connection เดียวกัน (ยังทำงานได้ แต่ไม่มี isolation)
@@ -71,6 +72,7 @@ export const PUBLIC_FORM_TABLES: readonly string[] = ["form_submission", "form_a
  */
 export const NEWS_VIEW_GRANT_COLUMNS: readonly string[] = ["view_count"];
 export const NEWS_VIEW_WHERE_COLUMNS: readonly string[] = ["source_id", "status", "deleted_at"];
+export const FORM_NOTIFICATION_UPDATE_COLUMNS: readonly string[] = ["notification_status", "notification_sent_at"];
 
 /** ตารางอ่อนไหวที่ role **อ่านของหน้าเว็บ** ต้องไม่มีสิทธิ์เด็ดขาด */
 export const FORBIDDEN_FOR_PUBLIC_READ: readonly string[] = [
@@ -171,6 +173,10 @@ function newsViewGrantStatements(role: string): readonly string[] {
   ];
 }
 
+function formNotificationGrantStatements(role: string): readonly string[] {
+  return [`grant update (${FORM_NOTIFICATION_UPDATE_COLUMNS.join(", ")}) on form_submission to ${role}`];
+}
+
 async function applyStatements(statements: readonly string[], dryRun: boolean): Promise<void> {
   for (const statement of statements) {
     if (dryRun) continue;
@@ -225,6 +231,7 @@ async function main(): Promise<void> {
   const readStatements = grantStatements(READ_ROLE, PUBLIC_READ_TABLES, "read");
   const formStatements = grantStatements(FORM_ROLE, PUBLIC_FORM_TABLES, "form");
   const metricStatements = newsViewGrantStatements(FORM_ROLE);
+  const notificationStatements = formNotificationGrantStatements(FORM_ROLE);
 
   if (options.dryRun) {
     process.stdout.write("── SQL ที่จะรัน (dry-run) ──\n");
@@ -235,10 +242,11 @@ async function main(): Promise<void> {
   const roleForm = await ensureRole(FORM_ROLE, options.formPassword, options.dryRun);
   await applyStatements(formStatements, options.dryRun);
   await applyStatements(metricStatements, options.dryRun);
+  await applyStatements(notificationStatements, options.dryRun);
   const seqStatements = await grantSequenceUsage(FORM_ROLE, PUBLIC_FORM_TABLES, options.dryRun);
 
   if (options.dryRun) {
-    for (const statement of [roleRead, ...readStatements, roleForm, ...formStatements, ...metricStatements, ...seqStatements]) {
+    for (const statement of [roleRead, ...readStatements, roleForm, ...formStatements, ...metricStatements, ...notificationStatements, ...seqStatements]) {
       process.stdout.write(`  ${statement};\n`);
     }
     process.stdout.write("\n(dry-run — ไม่ได้แตะฐานข้อมูล)\n");
@@ -250,7 +258,9 @@ async function main(): Promise<void> {
 
   process.stdout.write(`✓ สร้าง/รีเฟรช role เรียบร้อย\n`);
   process.stdout.write(`  · ${READ_ROLE}  → SELECT ${String(PUBLIC_READ_TABLES.length)} ตาราง: ${PUBLIC_READ_TABLES.join(", ")}\n`);
-  process.stdout.write(`  · ${FORM_ROLE} → SELECT/INSERT: ${PUBLIC_FORM_TABLES.join(", ")} · UPDATE news.view_count\n\n`);
+  process.stdout.write(
+    `  · ${FORM_ROLE} → SELECT/INSERT: ${PUBLIC_FORM_TABLES.join(", ")} · UPDATE news.view_count · UPDATE form_submission.${FORM_NOTIFICATION_UPDATE_COLUMNS.join(", ")}\n\n`,
+  );
 
   const mustReveal = options.reveal || options.roGenerated || options.formGenerated;
   process.stdout.write("── ตั้งค่า env (ห้าม commit) ──\n");

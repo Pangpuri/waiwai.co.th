@@ -40,6 +40,7 @@ import { pendingPages } from "./areas/en/pendingPages.ts";
 
 import type { Messages } from "./th";
 import { adminCareers as enAdminCareers } from "./areas/en/adminCareers.ts";
+import { adminInbox } from "./areas/en/adminInbox.ts";
 
 /**
  * English dictionary.
@@ -111,5 +112,6 @@ export const en: Messages = {
     ...adminSchedule,
     ...adminLive,
     ...adminPages,
+    ...adminInbox,
   },
 };

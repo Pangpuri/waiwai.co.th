@@ -222,6 +222,7 @@ export const careersPage = {
     applySubmit: "Send application",
     applySubmitting: "Sending…",
     applySent: "We have received your application — HR will contact you if your profile matches.",
+    applyNotificationFailed: "Your application was saved, but we could not confirm the email notification — please contact the company directly.",
     applyInvalid: "Some required details are missing or invalid — please check again.",
     applyRateLimited: "Too many applications — please wait a moment.",
     applyUnavailable: "The application system is temporarily unavailable — please try again.",

@@ -37,6 +37,7 @@ export function ApplicationForm({
         submitting: m.applySubmitting,
         consent: m.applyConsent,
         sent: m.applySent,
+        notificationFailed: m.applyNotificationFailed,
         invalid: m.applyInvalid,
         rateLimited: m.applyRateLimited,
         unavailable: m.applyUnavailable,

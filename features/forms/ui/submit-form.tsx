@@ -22,6 +22,7 @@ export type SubmitFormStrings = {
   readonly submitting: string;
   readonly consent: string;
   readonly sent: string;
+  readonly notificationFailed: string;
   readonly invalid: string;
   readonly rateLimited: string;
   readonly unavailable: string;
@@ -128,6 +129,8 @@ function StatusMessage({
       ? strings.sent
       : state.status === "rate-limited"
         ? strings.rateLimited
+        : state.status === "notification-failed"
+          ? strings.notificationFailed
         : state.status === "unavailable"
           ? strings.unavailable
           : state.fields.includes("resume") && strings.fileInvalid !== undefined

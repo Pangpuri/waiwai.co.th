@@ -1,0 +1,16 @@
+export const adminInbox = {
+  formRoutingTitle: "อีเมลรับเรื่องจากฟอร์ม",
+  formRoutingHint: "แก้ไขผู้รับและผู้รับสำเนาได้ที่นี่ ค่าที่บันทึกจะใช้กับการส่งฟอร์มครั้งถัดไป",
+  formRoutingToLabel: "ถึง (To)",
+  formRoutingCcLabel: "สำเนา (CC)",
+  formRoutingAddressHint: "ใส่อีเมลได้หลายรายการ คั่นด้วยจุลภาค",
+  formRoutingCareers: "ใบสมัครงานออนไลน์",
+  formRoutingSave: "บันทึกผู้รับอีเมล",
+  formRoutingSaved: "บันทึกผู้รับอีเมลแล้ว",
+  formRoutingInvalid: "กรุณาตรวจสอบรูปแบบอีเมลผู้รับทุกช่อง",
+  formRoutingFailed: "บันทึกผู้รับอีเมลไม่สำเร็จ",
+  notificationPending: "รอส่งอีเมลแจ้งเตือน",
+  notificationSent: "ส่งอีเมลแจ้งเตือนแล้ว",
+  notificationFailed: "ส่งอีเมลแจ้งเตือนไม่สำเร็จ",
+  notificationRetry: "ลองส่งอีเมลอีกครั้ง",
+};

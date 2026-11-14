@@ -13,7 +13,13 @@ import {
   roleCredentialHint,
 } from "@/db/pool";
 import { runWithRoleRetry } from "@/lib/db/read";
-import { FORBIDDEN_FOR_PUBLIC_READ, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, roleUrl } from "./db-roles.ts";
+import {
+  FORBIDDEN_FOR_PUBLIC_READ,
+  FORM_NOTIFICATION_UPDATE_COLUMNS,
+  PUBLIC_FORM_TABLES,
+  PUBLIC_READ_TABLES,
+  roleUrl,
+} from "./db-roles.ts";
 
 /**
  * เทสต์ "least privilege" ของการเชื่อมต่อฐานข้อมูล (รอบที่ 169)
@@ -91,6 +97,7 @@ test("db-roles: role อ่านต้องไม่มีตารางอ�
   assert.deepEqual(leaked, [], "role อ่านของหน้าเว็บต้องไม่มีตาราง auth/PII/ฟอร์ม");
 
   assert.deepEqual([...PUBLIC_FORM_TABLES].sort(), ["form_attachment", "form_submission"]);
+  assert.deepEqual([...FORM_NOTIFICATION_UPDATE_COLUMNS].sort(), ["notification_sent_at", "notification_status"]);
   assert.ok(PUBLIC_READ_TABLES.includes("page_document"), "หน้าเว็บต้องอ่าน page_document ได้ (ฉบับเผยแพร่)");
   assert.ok(PUBLIC_READ_TABLES.includes("media"), "หน้าเว็บต้องอ่าน media ได้ (เสิร์ฟภาพ)");
   /*

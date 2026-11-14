@@ -5,7 +5,13 @@ import type { PublicFormState } from "@/features/forms/state";
 import { isDatabaseConfigured } from "@/lib/content/repository";
 import { MAX_ATTACHMENT_BYTES, readAttachmentInfo, safeAttachmentName } from "@/lib/forms/attachment";
 import { evaluateSubmissionRate, normalizeSubmissionFields, validateSubmission } from "@/lib/forms/model";
-import { insertAttachment, insertSubmission, recentSubmissionTimes } from "@/lib/forms/repository";
+import {
+  insertAttachment,
+  insertSubmission,
+  recentSubmissionTimes,
+  setFormNotificationStatus,
+} from "@/lib/forms/repository";
+import { sendFormNotification } from "@/lib/forms/email-delivery";
 
 /**
  * Server Action ของ "ฟอร์มหน้าเว็บ" (X1.9) — ติดต่อ · รับข่าวสาร (สมัครงานจะตามมา)
@@ -88,6 +94,22 @@ export async function submitPublicFormAction(_previous: PublicFormState, formDat
     if (result.spam) {
       await recordAudit({ action: "publish", actorEmail: null, target: `form-spam:${id}`, detail: result.value.form });
     }
+
+    if (!result.spam && (result.value.form === "contact" || result.value.form === "careers")) {
+      try {
+        await sendFormNotification(result.value, attachment === null ? [] : [attachment]);
+        if (!(await setFormNotificationStatus(id, "sent"))) throw new Error("Could not record email notification status");
+      } catch (error) {
+        console.error("[forms] email notification failed", error instanceof Error ? error.name : "unknown");
+        try {
+          await setFormNotificationStatus(id, "failed");
+        } catch (statusError) {
+          console.error("[forms] could not record failed email notification", statusError instanceof Error ? statusError.name : "unknown");
+        }
+        return { status: "notification-failed", fields: [], consent: true };
+      }
+    }
+
     return { status: "ok", fields: [], consent: true };
   } catch {
     return { status: "unavailable", fields: [], consent };

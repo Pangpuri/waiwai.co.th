@@ -1,0 +1,16 @@
+export const adminInbox = {
+  formRoutingTitle: "Form email recipients",
+  formRoutingHint: "Edit recipients and CCs here. Saved settings apply to future form submissions.",
+  formRoutingToLabel: "To",
+  formRoutingCcLabel: "CC",
+  formRoutingAddressHint: "Enter multiple email addresses separated by commas",
+  formRoutingCareers: "Online job applications",
+  formRoutingSave: "Save email recipients",
+  formRoutingSaved: "Email recipients saved",
+  formRoutingInvalid: "Check the format of every recipient email address",
+  formRoutingFailed: "Could not save email recipients",
+  notificationPending: "Email notification pending",
+  notificationSent: "Email notification sent",
+  notificationFailed: "Email notification failed",
+  notificationRetry: "Retry email notification",
+};

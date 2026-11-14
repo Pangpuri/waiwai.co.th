@@ -4429,7 +4429,7 @@ async function checkReorder(): Promise<void> {
  * 1. `PUBLIC_DATABASE_URL` อ่านตารางสาธารณะได้
  * 2. เขียนผ่าน role อ่าน = **ต้องได้ `insufficient_privilege` (42501)** — เขียนได้ = isolation ไม่จริง (แดง)
  * 3. role อ่านต้องอ่านตารางอ่อนไหว (`form_submission`/`admin_session`) ไม่ได้
- * 4. role ฟอร์ม: INSERT ได้ (แถวจริงแล้วลบ) · UPDATE ตารางฟอร์มไม่ได้ · อ่าน `admin_user` ไม่ได้
+ * 4. role ฟอร์ม: INSERT ได้ · แก้ได้เฉพาะสถานะอีเมลแจ้งเตือน · อ่าน `admin_user` ไม่ได้
  * ⚠️ ใช้ `update … where false` เป็นตัวยิง (ไม่มี side effect) ⇒ DB ไม่สกปรกแม้สิทธิ์หลุด
  */
 function isInsufficientPrivilege(error: unknown): boolean {
@@ -4484,13 +4484,14 @@ async function checkLeastPrivilege(): Promise<void> {
     assert.ok(Number.isFinite(id) && id > 0, "role ฟอร์มต้อง INSERT ได้ (ทางเขียนเดียวของคนนอก)");
     probeId = id;
 
-    let updateDenied = false;
+    await formPool.query("update form_submission set notification_status = notification_status where false");
+    let sensitiveUpdateDenied = false;
     try {
       await formPool.query("update form_submission set handled_by = handled_by where false");
     } catch (error) {
-      updateDenied = isInsufficientPrivilege(error);
+      sensitiveUpdateDenied = isInsufficientPrivilege(error);
     }
-    assert.equal(updateDenied, true, "role ฟอร์มต้องแก้ข้อมูลเดิมไม่ได้ (มีแค่ select/insert)");
+    assert.equal(sensitiveUpdateDenied, true, "role ฟอร์มต้องแก้ข้อมูลผู้ติดต่อไม่ได้");
 
     let adminDenied = false;
     try {
@@ -4500,7 +4501,7 @@ async function checkLeastPrivilege(): Promise<void> {
     }
     assert.equal(adminDenied, true, "role ฟอร์มต้องอ่านตารางผู้ดูแลไม่ได้");
 
-    done("least privilege: role ฟอร์ม INSERT ได้ · แก้/อ่านตารางอ่อนไหวไม่ได้", "form_submission");
+    done("least privilege: role ฟอร์ม INSERT ได้ · แก้ได้เฉพาะสถานะอีเมล · อ่านตารางอ่อนไหวไม่ได้", "form_submission");
   } finally {
     if (probeId !== null) await getPool().query("delete from form_submission where id = $1", [probeId]);
     assert.equal(await countWhere("form_submission where email = $1", [probeEmail]), 0, "ต้องไม่เหลือแถวทดสอบของ role ฟอร์ม");

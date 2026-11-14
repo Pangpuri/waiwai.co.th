@@ -8,7 +8,7 @@
 
 export type PublicFormState = {
   /** null = ยังไม่ส่ง · ok = ส่งสำเร็จ · ค่าอื่น = รหัสข้อผิดพลาด (แปลที่หน้าจอ) */
-  readonly status: "ok" | "invalid" | "rate-limited" | "unavailable" | null;
+  readonly status: "ok" | "invalid" | "rate-limited" | "unavailable" | "notification-failed" | null;
   /** ชื่อฟิลด์ที่มีปัญหา (ให้หน้าจอไฮไลต์) */
   readonly fields: readonly string[];
   readonly consent: boolean;
