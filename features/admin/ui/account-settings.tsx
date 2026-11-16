@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { changeOwnEmailAction, changeOwnPasswordAction } from "@/app/admin/account/actions";
 import { INITIAL_ACCOUNT_ACTION_STATE, type AccountActionCode } from "@/features/admin/account-state";
@@ -12,6 +12,70 @@ const FIELD_CLASS =
 const LABEL_CLASS = "text-fg-muted text-xs";
 const BUTTON_CLASS =
   "bg-brand-red text-on-brand focus-visible:ring-ring w-fit rounded-lg px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40";
+
+function PasswordField({
+  id,
+  name,
+  label,
+  autoComplete,
+  showPasswordLabel,
+  hidePasswordLabel,
+  minLength,
+  describedBy,
+}: {
+  readonly id: string;
+  readonly name: string;
+  readonly label: string;
+  readonly autoComplete: string;
+  readonly showPasswordLabel: string;
+  readonly hidePasswordLabel: string;
+  readonly minLength?: number;
+  readonly describedBy?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className={LABEL_CLASS}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          name={name}
+          autoComplete={autoComplete}
+          minLength={minLength}
+          aria-describedby={describedBy}
+          required
+          className={`${FIELD_CLASS} pr-12`}
+        />
+        <button
+          type="button"
+          aria-label={visible ? hidePasswordLabel : showPasswordLabel}
+          aria-pressed={visible}
+          onClick={() => setVisible((current) => !current)}
+          className="text-fg-muted hover:text-fg focus-visible:ring-ring absolute top-1/2 right-1 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="h-5 w-5"
+          >
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+            <circle cx="12" cy="12" r="3" />
+            {visible ? <path d="m3 3 18 18" /> : null}
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function feedbackOf(
   code: AccountActionCode,
@@ -104,16 +168,14 @@ export function AccountSettings({
               className={FIELD_CLASS}
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.accountCurrentPassword}</span>
-            <input
-              type="password"
-              name="currentPassword"
-              autoComplete="current-password"
-              required
-              className={FIELD_CLASS}
-            />
-          </label>
+          <PasswordField
+            id="account-email-current-password"
+            name="currentPassword"
+            label={strings.accountCurrentPassword}
+            autoComplete="current-password"
+            showPasswordLabel={strings.accountShowPassword}
+            hidePasswordLabel={strings.accountHidePassword}
+          />
           {emailFeedback === null ? null : (
             <p className={emailFeedback.failed ? "text-brand-red text-sm" : "text-fg text-sm"} role={emailFeedback.failed ? "alert" : "status"}>
               {emailFeedback.text}
@@ -131,38 +193,37 @@ export function AccountSettings({
           <p className="text-fg-muted text-sm">{strings.accountPasswordOtherSessions}</p>
         </div>
         <form action={passwordAction} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.accountCurrentPassword}</span>
-            <input
-              type="password"
-              name="currentPassword"
-              autoComplete="current-password"
-              required
-              className={FIELD_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.accountNewPassword}</span>
-            <input
-              type="password"
-              name="nextPassword"
-              autoComplete="new-password"
-              minLength={minPasswordLength}
-              required
-              className={FIELD_CLASS}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.accountConfirmPassword}</span>
-            <input
-              type="password"
-              name="confirmPassword"
-              autoComplete="new-password"
-              minLength={minPasswordLength}
-              required
-              className={FIELD_CLASS}
-            />
-          </label>
+          <PasswordField
+            id="account-password-current-password"
+            name="currentPassword"
+            label={strings.accountCurrentPassword}
+            autoComplete="current-password"
+            showPasswordLabel={strings.accountShowPassword}
+            hidePasswordLabel={strings.accountHidePassword}
+          />
+          <p id="account-password-requirements" className="text-fg-muted text-sm">
+            {fillTemplate(strings.accountPasswordRequirements, { min: minPasswordLength })}
+          </p>
+          <PasswordField
+            id="account-password-new-password"
+            name="nextPassword"
+            label={strings.accountNewPassword}
+            autoComplete="new-password"
+            showPasswordLabel={strings.accountShowPassword}
+            hidePasswordLabel={strings.accountHidePassword}
+            minLength={minPasswordLength}
+            describedBy="account-password-requirements"
+          />
+          <PasswordField
+            id="account-password-confirm-password"
+            name="confirmPassword"
+            label={strings.accountConfirmPassword}
+            autoComplete="new-password"
+            showPasswordLabel={strings.accountShowPassword}
+            hidePasswordLabel={strings.accountHidePassword}
+            minLength={minPasswordLength}
+            describedBy="account-password-requirements"
+          />
           {passwordFeedback === null ? null : (
             <p
               className={passwordFeedback.failed ? "text-brand-red text-sm" : "text-fg text-sm"}

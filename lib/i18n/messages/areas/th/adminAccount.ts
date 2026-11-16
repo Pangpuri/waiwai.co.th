@@ -20,6 +20,10 @@ export const adminAccount = {
   accountPasswordSaved: "เปลี่ยนรหัสผ่านแล้ว — เซสชันอื่นทั้งหมดถูกออกจากระบบ",
   accountPasswordMismatch: "รหัสผ่านใหม่ที่ยืนยันไม่ตรงกัน",
   accountPasswordTooShort: "รหัสผ่านต้องยาวอย่างน้อย {min} ตัวอักษร",
+  accountPasswordRequirements:
+    "รหัสผ่านต้องมีอย่างน้อย {min} ตัวอักษร ระบบตรวจความยาวเท่านั้น ไม่บังคับตัวพิมพ์ใหญ่/เล็ก ตัวเลข หรืออักขระพิเศษ",
+  accountShowPassword: "แสดงรหัสผ่าน",
+  accountHidePassword: "ซ่อนรหัสผ่าน",
   accountWrongPassword: "รหัสผ่านปัจจุบันไม่ถูกต้อง",
   accountRequired: "กรุณากรอกข้อมูลให้ครบทุกช่อง",
   accountUnavailable: "การตั้งค่าบัญชีนี้ไม่พร้อมใช้งาน",

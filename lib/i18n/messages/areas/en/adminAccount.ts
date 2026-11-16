@@ -21,6 +21,10 @@ export const adminAccount = {
   accountPasswordSaved: "Password changed — all other sessions have been signed out.",
   accountPasswordMismatch: "The confirmation password does not match.",
   accountPasswordTooShort: "The password must be at least {min} characters.",
+  accountPasswordRequirements:
+    "Use at least {min} characters. Only the length is checked; uppercase, lowercase, numbers, and symbols are not required.",
+  accountShowPassword: "Show password",
+  accountHidePassword: "Hide password",
   accountWrongPassword: "The current password is incorrect.",
   accountRequired: "Complete every field.",
   accountUnavailable: "Account settings are not available.",

@@ -506,6 +506,19 @@ test("rbac: สถานะของฟอร์มจัดการบัญ�
   assert.ok(actions.includes("generatePassword()"), "รหัสผ่านสร้างฝั่งเซิร์ฟเวอร์เท่านั้น");
 });
 
+test("account settings: password fields can be revealed and show the actual password requirements", () => {
+  const ui = sourceOf("features/admin/ui/account-settings.tsx");
+  assert.ok(ui.includes('type={visible ? "text" : "password"}'), "eye control must reveal or mask the input");
+  assert.ok(ui.includes("aria-label={visible ? hidePasswordLabel : showPasswordLabel}"), "toggle needs an accessible label");
+  assert.ok(ui.includes("minLength={minPasswordLength}"), "new passwords must retain native minimum-length validation");
+  assert.ok(ui.includes("accountPasswordRequirements"), "the minimum and composition rules must be shown");
+
+  assert.ok(th.admin.accountPasswordRequirements.includes("{min}"), "Thai password rules must include the minimum");
+  assert.ok(en.admin.accountPasswordRequirements.includes("{min}"), "English password rules must include the minimum");
+  assert.ok(th.admin.accountShowPassword.length > 0 && th.admin.accountHidePassword.length > 0);
+  assert.ok(en.admin.accountShowPassword.length > 0 && en.admin.accountHidePassword.length > 0);
+});
+
 test("rbac: ชนิดบทบาท/สิทธิ์ต้องมาจากทะเบียนกลาง ไม่มีการCast กลบ", () => {
   const dal = sourceOf("lib/auth/dal.ts");
   assert.ok(!dal.includes("as AdminRole"), "ห้าม cast กลบชนิดบทบาท");
