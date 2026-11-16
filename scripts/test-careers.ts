@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildBoard, filterCards } from "@/features/careers/board";
+import { buildBoard, buildPostingBoard, filterCards } from "@/features/careers/board";
 import { CAREERS_CONTACT } from "@/features/careers/contact";
 import {
   JOBS,
@@ -10,6 +10,7 @@ import {
   jobsInDepartment,
   totalOpenings,
 } from "@/features/careers/jobs";
+import { isJobUpdatedThisMonth } from "@/lib/careers/model";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 
@@ -152,6 +153,45 @@ test("filterCards ตรงกับ jobsInDepartment และ 'all' คืน�
       `ฝ่าย ${department}: มีการ์ดของฝ่ายอื่นหลุดมา`,
     );
   }
+});
+
+test("ป้ายใหม่: นับเดือนตามเวลาไทยและซ่อนทันทีเมื่อเริ่มเดือนถัดไป", () => {
+  const updatedAt = "2026-10-31T17:00:00.000Z";
+  assert.equal(isJobUpdatedThisMonth(updatedAt, new Date("2026-11-30T16:59:59.000Z")), true);
+  assert.equal(isJobUpdatedThisMonth(updatedAt, new Date("2026-11-30T17:00:00.000Z")), false);
+  assert.equal(isJobUpdatedThisMonth("2025-11-15T00:00:00.000Z", new Date("2026-11-15T00:00:00.000Z")), false);
+  assert.equal(isJobUpdatedThisMonth(null, new Date("2026-11-15T00:00:00.000Z")), false);
+  assert.equal(isJobUpdatedThisMonth("not-a-date", new Date("2026-11-15T00:00:00.000Z")), false);
+});
+
+test("กระดานประกาศงาน: แสดงป้ายใหม่ตาม updatedAt และมีข้อความครบสองภาษา", () => {
+  const updatedPosting = {
+    id: "job-new",
+    titleTh: "ตำแหน่งใหม่",
+    titleEn: "New position",
+    departmentTh: "ฝ่ายทดสอบ",
+    departmentEn: "Test department",
+    openings: 1,
+    gender: "",
+    ageTh: "",
+    ageEn: "",
+    qualificationsTh: "",
+    qualificationsEn: "",
+    experienceTh: "",
+    experienceEn: "",
+    postedAt: null,
+    updatedAt: "2026-11-01T00:00:00.000Z",
+    sortOrder: 1,
+  } as const;
+  const now = new Date("2026-11-16T00:00:00.000Z");
+  const thai = buildPostingBoard([updatedPosting], th, "th", now);
+  const english = buildPostingBoard([updatedPosting], en, "en", now);
+
+  assert.equal(thai.cards[0]?.isNewThisMonth, true);
+  assert.equal(english.cards[0]?.isNewThisMonth, true);
+  assert.equal(thai.labels.newBadge, "ใหม่");
+  assert.equal(english.labels.newBadge, "NEW");
+  assert.equal(buildBoard(th).cards.every((card) => !card.isNewThisMonth), true);
 });
 
 test("ข้อมูลติดต่อ: อีเมล/เบอร์โทรต้องใช้ได้จริง (มี @ และขึ้นต้นด้วย +66 สำหรับ tel:)", () => {

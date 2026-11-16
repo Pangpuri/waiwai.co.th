@@ -28,6 +28,7 @@ export const careersPage = {
     },
     boardTitle: "ตำแหน่งที่เปิดรับ",
     boardIntro: "ตำแหน่งที่เปิดรับทั้งหมด",
+    newBadge: "ใหม่",
     filterGroup: "กรองตำแหน่งตามฝ่าย",
     filterAll: "ทั้งหมด",
     positionUnit: "ตำแหน่ง",

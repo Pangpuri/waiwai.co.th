@@ -107,6 +107,7 @@ export function JobForm(props: JobFormProps) {
         genderLabel,
         ageLabel: values.ageTh,
         postedAtLabel: formatJobPostedAt(jobPostedAtInstantOf(values.postedAtLocal), "th"),
+        isNewThisMonth: false,
         qualificationsLabel: values.qualificationsTh,
         experienceLabel: values.experienceTh.trim() === "" ? m.notSpecifiedPreview : values.experienceTh,
       },

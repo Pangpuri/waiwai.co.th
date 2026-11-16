@@ -129,8 +129,29 @@ export type JobPosting = {
   readonly experienceTh: string;
   readonly experienceEn: string;
   readonly postedAt: string | null;
+  readonly updatedAt: string | null;
   readonly sortOrder: number;
 };
+
+/** แสดงป้าย "ใหม่" ตลอดเดือนปฏิทินไทยที่ประกาศถูกแก้ไข */
+export function isJobUpdatedThisMonth(updatedAt: string | null, now: Date): boolean {
+  if (updatedAt === null || updatedAt.trim() === "") return false;
+  const updated = new Date(updatedAt);
+  if (Number.isNaN(updated.getTime()) || Number.isNaN(now.getTime())) return false;
+
+  const yearMonthInBangkok = (date: Date): string => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value ?? "";
+    const month = parts.find((part) => part.type === "month")?.value ?? "";
+    return `${year}-${month}`;
+  };
+
+  return yearMonthInBangkok(updated) === yearMonthInBangkok(now);
+}
 
 /** ข้อมูลที่ฟอร์มหลังบ้านส่งมา (ยังไม่ผ่านการตรวจ) */
 export type JobInput = {

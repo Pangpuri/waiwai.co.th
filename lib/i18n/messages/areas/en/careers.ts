@@ -29,6 +29,7 @@ export const careersPage = {
     },
     boardTitle: "Open positions",
     boardIntro: "All open positions",
+    newBadge: "NEW",
     filterGroup: "Filter positions by department",
     filterAll: "All",
     positionUnit: "positions",

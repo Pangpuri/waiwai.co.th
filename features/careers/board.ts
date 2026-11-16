@@ -19,6 +19,7 @@ import {
   jobExperience,
   jobQualifications,
   formatJobPostedAt,
+  isJobUpdatedThisMonth,
   jobTitle,
   sortJobPostings,
   type Language as JobLanguage,
@@ -45,6 +46,7 @@ export type JobCard = {
   readonly qualificationsLabel: string;
   readonly experienceLabel: string;
   readonly postedAtLabel: string;
+  readonly isNewThisMonth: boolean;
 };
 
 export type BoardFilter = {
@@ -68,6 +70,7 @@ export type BoardLabels = {
   readonly fieldQualifications: string;
   readonly fieldExperience: string;
   readonly fieldPostedAt: string;
+  readonly newBadge: string;
 };
 
 export type Board = {
@@ -99,6 +102,7 @@ export function buildBoard(messages: Messages, jobs: readonly Job[] = JOBS): Boa
       genderLabel: genderLabels[copy.gender] ?? copy.gender,
       ageLabel: copy.age,
       postedAtLabel: "",
+      isNewThisMonth: false,
       qualificationsLabel: copy.qualifications,
       // ต้นฉบับใช้ "-" เมื่อไม่ระบุประสบการณ์ → แสดงข้อความจากพจนานุกรมแทน
       experienceLabel: copy.experience ?? m.notSpecified,
@@ -127,6 +131,7 @@ export function buildBoard(messages: Messages, jobs: readonly Job[] = JOBS): Boa
       fieldQualifications: m.fields.qualifications,
       fieldExperience: m.fields.experience,
       fieldPostedAt: m.fields.postedAt,
+      newBadge: m.newBadge,
     },
   };
 }
@@ -148,6 +153,7 @@ export function buildPostingBoard(
   postings: readonly JobPosting[],
   messages: Messages,
   language: JobLanguage,
+  now: Date = new Date(),
 ): Board {
   const m = messages.careersPage;
   const genderLabels: Readonly<Record<string, string>> = m.genders;
@@ -166,6 +172,7 @@ export function buildPostingBoard(
       genderLabel: posting.gender === "" ? "" : (genderLabels[posting.gender] ?? ""),
       ageLabel: jobAge(posting, language),
       postedAtLabel: formatJobPostedAt(posting.postedAt, language),
+      isNewThisMonth: isJobUpdatedThisMonth(posting.updatedAt, now),
       qualificationsLabel: jobQualifications(posting, language),
       experienceLabel: experience.trim() === "" ? m.notSpecified : experience,
     };
@@ -193,6 +200,7 @@ export function buildPostingBoard(
       fieldQualifications: m.fields.qualifications,
       fieldExperience: m.fields.experience,
       fieldPostedAt: m.fields.postedAt,
+      newBadge: m.newBadge,
     },
   };
 }

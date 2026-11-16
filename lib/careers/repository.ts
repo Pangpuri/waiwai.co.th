@@ -43,6 +43,7 @@ function toJobPosting(row: Record<string, unknown>): JobPosting | null {
 
   const openings = Number(row.openings);
   const postedAt = row.posted_at === null || row.posted_at === undefined ? null : toIsoStamp(row.posted_at);
+  const updatedAt = row.updated_at === null || row.updated_at === undefined ? null : toIsoStamp(row.updated_at);
   return {
     id,
     titleTh,
@@ -58,6 +59,7 @@ function toJobPosting(row: Record<string, unknown>): JobPosting | null {
     experienceTh: text(row.experience_th),
     experienceEn: text(row.experience_en),
     postedAt,
+    updatedAt,
     sortOrder: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : 0,
   };
 }
@@ -69,7 +71,7 @@ export async function listJobPostings(): Promise<readonly JobPosting[]> {
   if (!isDatabaseConfigured()) return [];
   try {
     const result = await readQuery<Record<string, unknown>>(
-      `select ${JOB_COLUMNS} from job_posting
+      `select ${JOB_COLUMNS}, updated_at from job_posting
         where ${PUBLIC_JOB_CONDITION}
         order by sort_order, id`,
     );

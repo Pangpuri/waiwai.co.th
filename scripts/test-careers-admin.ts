@@ -84,6 +84,7 @@ function posting(overrides: Partial<JobPosting> & { readonly id: string }): JobP
     experienceTh: "",
     experienceEn: "",
     postedAt: null,
+    updatedAt: null,
     sortOrder: 100,
     ...overrides,
   };

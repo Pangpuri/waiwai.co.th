@@ -27,7 +27,15 @@ export function JobBoard({ board }: JobBoardProps) {
     <ul className="mt-6 grid gap-5 lg:grid-cols-2">
       {board.cards.map((card) => (
         <li key={card.id} className="flex h-full flex-col rounded-2xl border border-line bg-surface p-5">
-          <h3 className="font-display text-lg leading-snug font-extrabold text-fg">{card.title}</h3>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h3 className="font-display text-lg leading-snug font-extrabold text-fg">{card.title}</h3>
+            {card.isNewThisMonth ? (
+              <span className="border-accent text-accent bg-surface inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold motion-safe:animate-pulse">
+                <span aria-hidden="true">✦</span>
+                {labels.newBadge}
+              </span>
+            ) : null}
+          </div>
 
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {card.postedAtLabel.trim() === "" ? null : (
