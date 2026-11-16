@@ -151,6 +151,8 @@ import { IMPORTED_CONTENT_PAGES, TEMPLATED_PAGE_IDS, buildBlockTemplate } from "
 import {
   createAdminUser,
   createDbUserStore,
+  changeOwnAdminEmail,
+  changeOwnPassword,
   deleteAdminUser,
   resetAdminUserPassword,
   setAdminUserDisabled,
@@ -2254,13 +2256,114 @@ async function checkAdminUsers(): Promise<void> {
     const newPassword = await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-9" }, deps);
     assert.equal(newPassword.kind, "ok", "รหัสผ่านใหม่ต้องใช้ได้");
 
+    /* ── 7) เปลี่ยนรหัสผ่านตัวเอง: รหัสเดิมต้องยืนยัน · คง session ปัจจุบัน · ตัด session อื่น ── */
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    const currentSid = newSessionId();
+    const otherSid = newSessionId();
+    await createAdminSession({ userId: accountId, sid: currentSid, expiresAt });
+    await createAdminSession({ userId: accountId, sid: otherSid, expiresAt });
+
+    const rejectedPassword = await changeOwnPassword({
+      id: accountId,
+      currentPassword: "wrong-current-password",
+      nextPassword: "check-db-Password-10",
+      actor: CHECK_ACTOR,
+      exceptSid: currentSid,
+    });
+    assert.equal(rejectedPassword.ok, false, "รหัสผ่านปัจจุบันผิดต้องเปลี่ยนไม่ได้");
+    assert.equal(
+      rejectedPassword.ok ? null : rejectedPassword.reason,
+      "wrong-password",
+      "ต้องแจ้งเหตุผลรหัสผ่านปัจจุบันไม่ถูกต้อง",
+    );
+
+    assert.equal(
+      (await changeOwnPassword({
+        id: accountId,
+        currentPassword: "check-db-Password-9",
+        nextPassword: "check-db-Password-10",
+        actor: CHECK_ACTOR,
+        exceptSid: currentSid,
+      })).ok,
+      true,
+      "เปลี่ยนรหัสผ่านตัวเองต้องสำเร็จ",
+    );
+    assert.equal((await findAdminSession(currentSid))?.active, true, "session ปัจจุบันต้องใช้งานต่อได้");
+    assert.equal((await findAdminSession(otherSid))?.active, false, "session อื่นต้องถูกเพิกถอน");
+    assert.equal(
+      (await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-9" }, deps)).kind,
+      "invalid",
+      "รหัสผ่านเดิมต้องล็อกอินไม่ได้",
+    );
+    assert.equal(
+      (await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-10" }, deps)).kind,
+      "ok",
+      "รหัสผ่านใหม่ต้องล็อกอินได้",
+    );
+
+    /* ── 8) เปลี่ยนอีเมลตัวเอง: ยืนยันรหัสปัจจุบัน · ป้องกันซ้ำ · อ่าน/ล็อกอินด้วยค่าใหม่ได้ ── */
+    const duplicateEmail = await createAdminUser({
+      email: "check-db-rbac-duplicate@example.invalid",
+      displayName: "บัญชีอีเมลซ้ำ",
+      role: "editor",
+      password: "check-db-Duplicate-6",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(duplicateEmail.ok, true, "สร้างบัญชีสำหรับทดสอบอีเมลซ้ำต้องสำเร็จ");
+
+    const wrongEmailPassword = await changeOwnAdminEmail({
+      id: accountId,
+      currentPassword: "wrong-current-password",
+      nextEmail: "check-db-rbac-renamed@example.invalid",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(wrongEmailPassword.ok, false, "รหัสผ่านปัจจุบันผิดต้องเปลี่ยนอีเมลไม่ได้");
+
+    const duplicateEmailResult = await changeOwnAdminEmail({
+      id: accountId,
+      currentPassword: "check-db-Password-10",
+      nextEmail: "check-db-rbac-duplicate@example.invalid",
+      actor: CHECK_ACTOR,
+    });
+    assert.equal(duplicateEmailResult.ok, false, "อีเมลที่ใช้แล้วต้องเปลี่ยนไม่ได้");
+    assert.equal(
+      duplicateEmailResult.ok ? null : duplicateEmailResult.reason,
+      "duplicate-email",
+      "ต้องระบุกรณีอีเมลซ้ำ",
+    );
+
+    assert.equal(
+      (await changeOwnAdminEmail({
+        id: accountId,
+        currentPassword: "check-db-Password-10",
+        nextEmail: "check-db-rbac-renamed@example.invalid",
+        actor: CHECK_ACTOR,
+      })).ok,
+      true,
+      "เปลี่ยนอีเมลตัวเองต้องสำเร็จ",
+    );
+    assert.equal((await store?.findById(accountId))?.email, "check-db-rbac-renamed@example.invalid");
+    assert.equal(
+      (await attemptLogin({ email: RBAC_TEST_EMAIL, password: "check-db-Password-10" }, deps)).kind,
+      "invalid",
+      "อีเมลเดิมต้องล็อกอินไม่ได้",
+    );
+    assert.equal(
+      (await attemptLogin({ email: "check-db-rbac-renamed@example.invalid", password: "check-db-Password-10" }, deps)).kind,
+      "ok",
+      "อีเมลใหม่ต้องล็อกอินได้",
+    );
+
     /* ── audit: ต้องมีร่องรอยการเปลี่ยนบัญชี ── */
     const { rows: audit } = await pool.query<{ readonly n: string }>(
       "select count(*)::text as n from audit_log where actor_email = $1 and action like 'admin-user-%'",
       [CHECK_ACTOR],
     );
     assert.ok(Number.parseInt(audit[0]?.n ?? "0", 10) >= 4, "การเปลี่ยนบัญชีต้องลง audit ทุกครั้ง");
-    done("บัญชีผู้ดูแลในฐานข้อมูล + บทบาท", "hash · ปิด/เปิด · กันล็อกตัวเองออก · รีเซ็ตรหัส · audit");
+    done(
+      "บัญชีผู้ดูแลในฐานข้อมูล + บทบาท",
+      "hash · ปิด/เปิด · กันล็อกตัวเองออก · reset/self-service email/password · session · audit",
+    );
   } finally {
     /* ⚠️ ล้างทุกบัญชีทดสอบของรอบนี้ (owner · doomed · solo · spare) — ต้องไม่เหลือร่องรอยในฐานข้อมูล dev */
     await pool.query("delete from admin_user where lower(email) = $1 or email like 'check-db-rbac-%'", [RBAC_TEST_EMAIL]);

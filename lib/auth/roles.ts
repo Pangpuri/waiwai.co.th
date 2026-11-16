@@ -12,10 +12,10 @@ import { ADMIN_ROLES, type AdminRole } from "@/lib/auth/types";
  * - `editor`    = ทำงานเนื้อหา: สร้าง/แก้บล็อก · ประกาศงาน · จัดการคลังภาพ · พรีวิว · พรีเซ็ต
  * - `publisher` = editor + กล่องข้อความลูกค้า (ข้อมูลส่วนบุคคล) + SEO + ถังขยะ (กู้คืน/ลบถาวร)
  * - `admin`     = ทุกอย่าง + บัญชีผู้ใช้ + ตั้งค่าส่วนกลาง + ระยะเก็บข้อมูล/PDPA + โหมดปิดปรับปรุง
- * - `hr`        = ประกาศรับสมัครงาน + ถังขยะของประกาศงานเท่านั้น
+ * - `hr`        = ประกาศรับสมัครงาน + เปลี่ยนข้อมูลเข้าสู่ระบบของบัญชีตัวเองเท่านั้น
  *
  * หลักการที่ตั้งใจ
- * - `editor ⊂ publisher ⊂ admin`; บทบาทเฉพาะทางอย่าง `hr` แยกจากสายนี้
+ * - `editor ⊂ publisher ⊂ admin`; บทบาทเฉพาะทางอย่าง `hr` แยกจากสายนี้ · `account` จำกัดการแก้ไขไว้ที่บัญชีของ session ปัจจุบัน
  * - สิทธิ์ที่ "ทำลายข้อมูล/แตะข้อมูลส่วนบุคคล" ต้องไม่ตกอยู่กับบทบาทต่ำสุด (มีเทสต์กัน)
  * - เพิ่มสิทธิ์ใหม่แล้วลืมใส่ในบทบาทใดเลย = เทสต์แดง (ทุกสิทธิ์ต้องมีเจ้าของอย่างน้อยหนึ่งบทบาท)
  */
@@ -47,16 +47,18 @@ export const ADMIN_PERMISSIONS = [
   "maintenance",
   /** รายงานสถิติคลิกแบบ aggregate — ผู้ดูแลระบบเท่านั้น */
   "analytics",
+  /** เปลี่ยนอีเมลเข้าสู่ระบบ/รหัสผ่านของบัญชีตัวเอง */
+  "account",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
-const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "careers", "media", "presets", "preview"];
+const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "careers", "media", "presets", "preview", "account"];
 
 const PUBLISHER_PERMISSIONS: readonly AdminPermission[] = [...EDITOR_PERMISSIONS, "inbox", "seo", "trash"];
 
 const ADMIN_PERMISSIONS_ALL: readonly AdminPermission[] = [...ADMIN_PERMISSIONS];
-const HR_PERMISSIONS: readonly AdminPermission[] = ["careers"];
+const HR_PERMISSIONS: readonly AdminPermission[] = ["careers", "account"];
 
 /**
  * ตารางสิทธิ์จริง — **แหล่งความจริงเดียว**

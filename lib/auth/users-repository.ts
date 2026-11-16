@@ -9,7 +9,7 @@ import {
   type AdminRole,
   type AdminUser,
 } from "@/lib/auth/types";
-import type { AdminAccount, AdminUserStore } from "@/lib/auth/user-store";
+import { ENV_ADMIN_ID, type AdminAccount, type AdminUserStore } from "@/lib/auth/user-store";
 import { recordAudit } from "@/lib/audit/log";
 import { revokeSessionsForUser } from "@/lib/auth/sessions-repository";
 
@@ -192,6 +192,46 @@ export async function createAdminUser(input: CreateAdminUserInput): Promise<Crea
 
 export type UpdateAdminUserResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
+}
+
+/** Change the sign-in email for the authenticated database account only. */
+export async function changeOwnAdminEmail(input: {
+  readonly id: string;
+  readonly currentPassword: string;
+  readonly nextEmail: string;
+  readonly actor: string;
+}): Promise<UpdateAdminUserResult> {
+  if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
+  if (input.id === ENV_ADMIN_ID) return { ok: false, reason: "env-account" };
+  if (!isUsableAdminEmail(input.nextEmail)) return { ok: false, reason: "bad-email" };
+
+  const { rows } = await getPool().query<{ readonly email: string; readonly password_hash: string }>(
+    "select email, password_hash from admin_user where id = $1 and disabled = false",
+    [input.id],
+  );
+  const current = rows[0];
+  if (current === undefined) return { ok: false, reason: "not-found" };
+  if (!(await verifyPassword(input.currentPassword, current.password_hash))) {
+    return { ok: false, reason: "wrong-password" };
+  }
+
+  const nextEmail = normalizeAdminEmail(input.nextEmail);
+  if (normalizeAdminEmail(current.email) === nextEmail) return { ok: false, reason: "same-email" };
+
+  try {
+    const { rowCount } = await getPool().query("update admin_user set email = $2 where id = $1", [input.id, nextEmail]);
+    if (rowCount === 0) return { ok: false, reason: "not-found" };
+  } catch (error) {
+    if (isUniqueViolation(error)) return { ok: false, reason: "duplicate-email" };
+    throw error;
+  }
+
+  await recordAudit({ action: "admin-user-email", actorEmail: input.actor, target: input.id, detail: null });
+  return { ok: true };
+}
+
 /** เปลี่ยนบทบาท — ห้ามถอดบทบาทผู้ดูแลคนสุดท้าย */
 export async function setAdminUserRole(input: {
   readonly id: string;
@@ -336,12 +376,14 @@ export async function changeOwnPassword(input: {
   readonly currentPassword: string;
   readonly nextPassword: string;
   readonly actor: string;
+  readonly exceptSid: string;
 }): Promise<UpdateAdminUserResult> {
   if (!isDatabaseConfigured()) return { ok: false, reason: "no-database" };
+  if (input.id === ENV_ADMIN_ID) return { ok: false, reason: "env-account" };
   if (!isUsableAdminPassword(input.nextPassword)) return { ok: false, reason: "bad-password" };
 
   const { rows } = await getPool().query<{ readonly password_hash: string }>(
-    "select password_hash from admin_user where id = $1",
+    "select password_hash from admin_user where id = $1 and disabled = false",
     [input.id],
   );
   const current = rows[0];
@@ -350,7 +392,21 @@ export async function changeOwnPassword(input: {
   const matches = await verifyPassword(input.currentPassword, current.password_hash);
   if (!matches) return { ok: false, reason: "wrong-password" };
 
-  return await resetAdminUserPassword({ id: input.id, password: input.nextPassword, actor: input.actor });
+  const passwordHash = await hashPassword(input.nextPassword);
+  const { rowCount } = await getPool().query("update admin_user set password_hash = $2 where id = $1", [
+    input.id,
+    passwordHash,
+  ]);
+  if (rowCount === 0) return { ok: false, reason: "not-found" };
+
+  await recordAudit({ action: "admin-user-password", actorEmail: input.actor, target: input.id, detail: null });
+  await revokeSessionsForUser({
+    userId: input.id,
+    actor: input.actor,
+    exceptSid: input.exceptSid,
+    detail: "self-password-change",
+  });
+  return { ok: true };
 }
 
 /** บันทึกเวลาล็อกอินสำเร็จ (เฉพาะบัญชีใน DB — โหมด env ไม่มีแถวให้เขียน) */

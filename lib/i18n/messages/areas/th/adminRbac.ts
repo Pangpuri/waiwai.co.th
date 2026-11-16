@@ -29,6 +29,7 @@ export const adminRbac = {
   rbacPermissionRetention: "ระยะเก็บข้อมูลและลบข้อมูลตามคำขอ (PDPA)",
   rbacPermissionMaintenance: "เปิด/ปิดโหมดปิดปรับปรุงเว็บ",
   rbacPermissionAnalytics: "ดูรายงานสถิติการใช้งานเว็บไซต์",
+  rbacPermissionAccount: "เปลี่ยนอีเมลเข้าสู่ระบบและรหัสผ่านของบัญชีตัวเอง",
   rbacRoleUnknown: "บทบาทไม่ถูกต้อง",
   rbacCreateTitle: "เพิ่มบัญชีใหม่",
   rbacCreateHint: "ระบบจะสร้างรหัสผ่านให้ — คัดลอกเก็บไว้แล้วส่งให้เจ้าของบัญชี (แสดงครั้งเดียว)",
@@ -72,6 +73,7 @@ export const adminRbac = {
   auditAdminUserDisable: "ปิดบัญชีผู้ดูแล",
   auditAdminUserEnable: "เปิดบัญชีผู้ดูแล",
   auditAdminUserPassword: "ตั้งรหัสผ่านใหม่ให้ผู้ดูแล",
+  auditAdminUserEmail: "เปลี่ยนอีเมลเข้าสู่ระบบของบัญชีผู้ดูแล",
   auditAdminUserDelete: "ลบบัญชีผู้ดูแล",
   auditAdminSessionRevoke: "เพิกถอนเซสชันหลังบ้าน",
   /* เซสชันหลังบ้านที่เพิกถอนได้ (รอบที่ 95) */

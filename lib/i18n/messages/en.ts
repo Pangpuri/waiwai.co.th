@@ -42,6 +42,7 @@ import type { Messages } from "./th";
 import { adminCareers as enAdminCareers } from "./areas/en/adminCareers.ts";
 import { adminInbox } from "./areas/en/adminInbox.ts";
 import { adminAnalytics } from "./areas/en/adminAnalytics.ts";
+import { adminAccount } from "./areas/en/adminAccount.ts";
 
 /**
  * English dictionary.
@@ -115,5 +116,6 @@ export const en: Messages = {
     ...adminPages,
     ...adminInbox,
     ...adminAnalytics,
+    ...adminAccount,
   },
 };

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import "../globals.css";
 
+import { logoutAction } from "@/app/admin/actions";
 import { roleLabelOf } from "@/features/admin/rbac-labels";
 import { AdminToastHost } from "@/features/admin/ui/admin-toast";
 import { AdminSidebar, type AdminNavGroup } from "@/features/admin/ui/admin-sidebar";
@@ -83,6 +84,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         { href: "/admin/activity", label: messages.admin.activityTitle },
         { href: "/admin/settings", label: messages.admin.settingsTitle },
         { href: "/admin/users", label: messages.admin.rbacUsersTitle },
+        { href: "/admin/account", label: messages.admin.navAccount },
       ],
     },
   ];
@@ -97,6 +99,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "/admin/trash": "trash",
     "/admin/settings": "settings",
     "/admin/users": "users",
+    "/admin/account": "account",
   };
 
   const visibleGroups: readonly AdminNavGroup[] = sidebarGroups
@@ -120,6 +123,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <div className="flex flex-col lg:flex-row lg:items-start">
             <AdminSidebar
               groups={visibleGroups}
+              logoutAction={logoutAction}
               strings={{
                 toggleOpen: messages.admin.navToggleOpen,
                 toggleClose: messages.admin.navToggleClose,
@@ -128,6 +132,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 /* รอบที่ 242: ย้ายจากแถบด้านบนที่ถูกถอดออก (กันข้อมูลบัญชีหาย) */
                 brand: messages.admin.brand,
                 account: `${user.email} · ${roleLabelOf(user.role, messages.admin)}`,
+                logout: messages.admin.logout,
               }}
             />
             <div className="min-w-0 flex-1">{children}</div>

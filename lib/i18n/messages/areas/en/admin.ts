@@ -29,6 +29,7 @@ import type { adminLive as thAdminLive } from "@/lib/i18n/messages/areas/th/admi
 import type { adminPages as thAdminPages } from "@/lib/i18n/messages/areas/th/adminPages";
 import type { adminInbox as thAdminInbox } from "@/lib/i18n/messages/areas/th/adminInbox";
 import type { adminAnalytics as thAdminAnalytics } from "@/lib/i18n/messages/areas/th/adminAnalytics";
+import type { adminAccount as thAdminAccount } from "@/lib/i18n/messages/areas/th/adminAccount";
 
 /** คีย์ที่ย้ายไปพื้นที่ย่อยแล้ว (media/settings/draft/retention/maintenance/erasure/trash/preview-link/chrome-preset/block-types/schedule/notice/pages) — ไฟล์นี้ไม่ต้องมีอีก */
 type MovedKeys =
@@ -57,7 +58,8 @@ type MovedKeys =
   | keyof typeof thAdminLive
   | keyof typeof thAdminPages
   | keyof typeof thAdminInbox
-  | keyof typeof thAdminAnalytics;
+  | keyof typeof thAdminAnalytics
+  | keyof typeof thAdminAccount;
 
 export const admin: Omit<Messages["admin"], MovedKeys> = {
   brand: "Wai Wai · Admin",

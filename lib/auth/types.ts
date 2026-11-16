@@ -4,7 +4,7 @@
  * ⚠️ ไฟล์นี้ต้องไม่มีโค้ดที่แตะ DB/DOM → ใช้ได้ทั้งในเทสต์และใน Server Component
  */
 
-/** บทบาทผู้ดูแลหลังบ้าน: เนื้อหา · ผู้เผยแพร่ · ผู้ดูแล · HR เฉพาะประกาศงาน */
+/** บทบาทผู้ดูแลหลังบ้าน: เนื้อหา · ผู้เผยแพร่ · ผู้ดูแล · HR จำกัดที่ Careers พร้อมเปลี่ยนข้อมูลบัญชีตัวเอง */
 export type AdminRole = "editor" | "publisher" | "admin" | "hr";
 
 export const ADMIN_ROLES: readonly AdminRole[] = ["editor", "publisher", "admin", "hr"];

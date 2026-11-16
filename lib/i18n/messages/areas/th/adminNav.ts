@@ -3,6 +3,7 @@ export const thAdminNav = {
   navGroupContent: "เนื้อหาเว็บไซต์",
   navGroupData: "จัดการข้อมูล",
   navGroupSystem: "ระบบ",
+  navAccount: "บัญชีของฉัน",
   navChrome: "ส่วนกลางของเว็บ (เมนู/ท้ายเว็บ/ป้ายประกาศ)",
   navHome: "แก้เนื้อหาหน้าแรก",
   navAbout: "แก้เนื้อหาหน้าบริษัท",

@@ -29,6 +29,7 @@ export const adminRbac = {
   rbacPermissionRetention: "Retention periods and erasure requests (PDPA)",
   rbacPermissionMaintenance: "Turn maintenance mode on or off",
   rbacPermissionAnalytics: "View website usage analytics reports",
+  rbacPermissionAccount: "Change your own sign-in email and password",
   rbacRoleUnknown: "Unknown role",
   rbacCreateTitle: "Add an account",
   rbacCreateHint: "The system generates the password — copy it and hand it over (shown once).",
@@ -73,6 +74,7 @@ export const adminRbac = {
   auditAdminUserDisable: "Disabled an admin account",
   auditAdminUserEnable: "Enabled an admin account",
   auditAdminUserPassword: "Reset an admin password",
+  auditAdminUserEmail: "Changed an admin sign-in email",
   auditAdminUserDelete: "Deleted an admin account",
   auditAdminSessionRevoke: "Revoked a back-office session",
   /* Revocable back-office sessions (round 95) */

@@ -40,6 +40,7 @@ import { adminCareers as thAdminCareers } from "./areas/th/adminCareers.ts";
 import { adminPages } from "./areas/th/adminPages.ts";
 import { adminInbox } from "./areas/th/adminInbox.ts";
 import { adminAnalytics } from "./areas/th/adminAnalytics.ts";
+import { adminAccount } from "./areas/th/adminAccount.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -115,6 +116,7 @@ export const th = {
     ...adminPages,
     ...adminInbox,
     ...adminAnalytics,
+    ...adminAccount,
   },
 };
 

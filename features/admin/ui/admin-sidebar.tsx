@@ -28,6 +28,7 @@ export type AdminSidebarStrings = {
   readonly brand: string;
   /** บัญชีที่ล็อกอินอยู่ เช่น "admin@waiwai.co.th · ผู้ดูแลระบบ" */
   readonly account: string;
+  readonly logout: string;
 };
 
 /** ไอคอนเส้น (stroke) 24×24 — ใช้ `currentColor` จึงเปลี่ยนสีตามธีม/token ได้ */
@@ -55,6 +56,7 @@ const ICONS: Readonly<Record<string, string>> = {
   /* มือถือ: ปุ่ม hamburger / ปิด (รอบที่ 320) */
   menu: "M4 7h16M4 12h16M4 17h16",
   close: "M6 6l12 12M18 6 6 18",
+  logout: "M10 17l5-5-5-5M15 12H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7",
 };
 
 function iconFor(href: string): string {
@@ -91,7 +93,15 @@ function Icon({ path, className }: { readonly path: string; readonly className?:
   );
 }
 
-export function AdminSidebar({ groups, strings }: { readonly groups: readonly AdminNavGroup[]; readonly strings: AdminSidebarStrings }) {
+export function AdminSidebar({
+  groups,
+  strings,
+  logoutAction,
+}: {
+  readonly groups: readonly AdminNavGroup[];
+  readonly strings: AdminSidebarStrings;
+  readonly logoutAction: () => Promise<void>;
+}) {
   /*
     สองสถานะแยกกัน (รอบที่ 320)
     - `open` = รางไอคอนบนเดสก์ท็อป (เดิมอย่างเดียว) · ค่าเริ่มต้นเปิด
@@ -275,6 +285,22 @@ export function AdminSidebar({ groups, strings }: { readonly groups: readonly Ad
               <p className="text-fg text-xs font-semibold break-all">{strings.account}</p>
               <p className="text-fg-muted text-xs">{strings.roleHint}</p>
             </div>
+            <form action={logoutAction} className="border-line border-t pt-3">
+              <button
+                type="submit"
+                aria-label={strings.logout}
+                title={strings.logout}
+                className={[
+                  "border-line text-fg hover:bg-surface-raised focus-visible:ring-ring flex w-full items-center justify-start gap-2.5 rounded-lg border px-2 py-1.5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none",
+                  open ? "" : "lg:justify-center lg:gap-0 lg:px-0 lg:py-2",
+                ].join(" ")}
+              >
+                <Icon path={ICONS.logout ?? ""} />
+                <span className={["whitespace-nowrap transition-opacity duration-200", open ? "opacity-100" : "lg:hidden"].join(" ")}>
+                  {strings.logout}
+                </span>
+              </button>
+            </form>
           </div>
         </div>
       </nav>

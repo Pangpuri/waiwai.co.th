@@ -121,6 +121,23 @@ test("rbac: ทุกไฟล์ใน app/admin ต้องตรวจสิ
   );
 });
 
+test("rbac: การตั้งค่าบัญชีจำกัดผู้แก้ไขไว้ที่บัญชีของ session ปัจจุบัน", () => {
+  const accountActions = sourceOf("app/admin/account/actions.ts");
+  const repository = sourceOf("lib/auth/users-repository.ts");
+  const layout = sourceOf("app/admin/layout.tsx");
+  const sidebar = sourceOf("features/admin/ui/admin-sidebar.tsx");
+
+  assert.ok(accountActions.includes('requireAdminUser("account")'));
+  assert.ok(accountActions.includes("id: user.id"), "ต้องใช้ id จาก session ฝั่งเซิร์ฟเวอร์");
+  assert.ok(!accountActions.includes('formData.get("id")'), "ห้ามรับ id เป้าหมายจากแบบฟอร์ม");
+  assert.ok(repository.includes("input.id === ENV_ADMIN_ID"), "บัญชี env ต้องแก้ผ่าน environment เท่านั้น");
+  assert.ok(repository.includes("verifyPassword(input.currentPassword"), "ต้องยืนยันรหัสผ่านปัจจุบัน");
+  assert.ok(repository.includes("exceptSid: input.exceptSid"), "เปลี่ยนรหัสผ่านต้องคง session ปัจจุบัน");
+  assert.ok(layout.includes('"/admin/account": "account"'), "ลิงก์บัญชีต้องแสดงตาม permission account");
+  assert.ok(layout.includes("logoutAction={logoutAction}"), "ส่ง action ออกจากระบบให้ sidebar");
+  assert.ok(sidebar.includes("<form action={logoutAction}"), "sidebar ต้องมีฟอร์มออกจากระบบ");
+});
+
 test("rbac: สถิติคลิกและ export จำกัดเฉพาะ admin", () => {
   assert.ok(can("admin", "analytics"));
   assert.ok(!can("publisher", "analytics"));
@@ -148,6 +165,8 @@ test("rbac: action ล็อกอิน/ออกจากระบบต้อ
 
 test("rbac: หน้าจอ/prévue/action สำคัญผูกกับสิทธิ์ที่ถูกต้อง", () => {
   const expectations: readonly { readonly file: string; readonly permission: AdminPermission }[] = [
+    { file: "app/admin/account/page.tsx", permission: "account" },
+    { file: "app/admin/account/actions.ts", permission: "account" },
     { file: "app/admin/users/page.tsx", permission: "users" },
     { file: "app/admin/users/actions.ts", permission: "users" },
     { file: "app/admin/inbox/page.tsx", permission: "inbox" },
@@ -290,11 +309,12 @@ test("rbac: สิทธิ์ให้แบบเพิ่มขึ้น (edi
   assert.equal(isStrongerOrEqual("editor", "publisher"), false);
   assert.equal(isStrongerOrEqual("hr", "editor"), false, "HR ไม่ครอบคลุมสิทธิ์ทั่วไปของ editor");
   assert.equal(isStrongerOrEqual("editor", "hr"), true, "editor ทำงานประกาศได้ตามขอบเขตเดิม");
-  assert.deepEqual([...permissionsOf("hr")], ["careers"], "HR ต้องได้เฉพาะสิทธิ์ประกาศรับสมัครงาน");
+  assert.deepEqual([...permissionsOf("hr")], ["careers", "account"], "HR ได้เฉพาะ Careers และบัญชีของตัวเอง");
   assert.equal(can("hr", "content"), false);
   assert.equal(can("hr", "users"), false);
   assert.equal(can("hr", "inbox"), false);
   assert.equal(can("hr", "trash"), false);
+  assert.equal(can("hr", "account"), true, "ทุกบทบาทจัดการข้อมูลเข้าสู่ระบบของบัญชีตัวเองได้");
 
   /* สิทธิ์ที่อันตราย: ต้องเป็น admin เท่านั้น */
   for (const permission of ["users", "settings", "retention", "maintenance", "analytics"] as const) {
@@ -348,6 +368,7 @@ test("rbac: บัญชีใน DB เก็บเฉพาะ hash · ตร�
     "admin-user-disable",
     "admin-user-enable",
     "admin-user-password",
+    "admin-user-email",
     "admin-user-delete",
   ]) {
     assert.ok(repo.includes(action), `ต้องลง audit "${action}"`);

@@ -91,7 +91,7 @@ test("audit: รหัสที่ไม่รู้จักคืนรหั�
 });
 
 test("audit: รหัสเหตุการณ์ของบัญชีขึ้นต้นด้วยคำนำหน้าที่ใช้กรอง", () => {
-  for (const action of ["admin-user-create", "admin-user-role", "admin-user-delete"]) {
+  for (const action of ["admin-user-create", "admin-user-role", "admin-user-email", "admin-user-delete"]) {
     assert.ok(action.startsWith(ACCOUNT_AUDIT_PREFIX), `${action} ต้องอยู่ใต้ "${ACCOUNT_AUDIT_PREFIX}"`);
   }
 });

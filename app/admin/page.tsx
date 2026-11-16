@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import {
   clearScheduledPublishAction,
-  logoutAction,
   publishScheduledNowAction,
   purgeRetentionNowAction,
 } from "@/app/admin/actions";
@@ -135,14 +134,6 @@ export default async function AdminHomePage({
           <p className="text-fg-muted text-xs font-medium tracking-wide uppercase">{strings.brand}</p>
           <h1 className="text-fg text-2xl font-bold">{strings.dashboardTitle}</h1>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="border-line text-fg hover:bg-surface-raised focus-visible:ring-ring rounded-xl border px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-          >
-            {strings.logout}
-          </button>
-        </form>
       </header>
 
       <section className="border-line bg-surface flex flex-col gap-4 rounded-2xl border p-5 sm:p-6">

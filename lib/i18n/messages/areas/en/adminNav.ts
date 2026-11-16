@@ -3,6 +3,7 @@ export const enAdminNav = {
   navGroupContent: "Website content",
   navGroupData: "Data",
   navGroupSystem: "System",
+  navAccount: "My account",
   navChrome: "Site-wide (menu / footer / notice)",
   navHome: "Edit home page",
   navAbout: "Edit company page",
