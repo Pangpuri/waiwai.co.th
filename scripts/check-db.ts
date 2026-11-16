@@ -403,6 +403,9 @@ async function main(): Promise<void> {
   /* 32) Least privilege: role อ่านอย่างเดียวเขียนไม่ได้ · role ฟอร์มแตะเฉพาะตารางฟอร์ม (รอบที่ 169) */
   await checkLeastPrivilege();
 
+  /* 32a) สถิติคลิก: ฟังก์ชัน aggregate รับเฉพาะ event ที่อนุญาต และทดสอบได้โดย rollback */
+  await checkAnalyticsMetrics();
+
   /* 33) ถังขยะเนื้อหา: ตัวลบอัตโนมัติลบเฉพาะของที่พ้นกำหนด (รอบที่ 170) */
   await checkContentTrashPurge();
 
@@ -4511,6 +4514,77 @@ async function checkLeastPrivilege(): Promise<void> {
   } finally {
     if (probeId !== null) await getPool().query("delete from form_submission where id = $1", [probeId]);
     assert.equal(await countWhere("form_submission where email = $1", [probeEmail]), 0, "ต้องไม่เหลือแถวทดสอบของ role ฟอร์ม");
+  }
+}
+
+async function checkAnalyticsMetrics(): Promise<void> {
+  const client = await getPool().connect();
+  try {
+    await client.query("begin");
+
+    const before = await client.query<{ readonly clicks: string }>(
+      `select coalesce(clicks, 0)::text as clicks
+         from click_metric_daily
+        where day = (statement_timestamp() at time zone 'Asia/Bangkok')::date
+          and event_type = 'store_click' and source = 'home' and target_id = 'shopee'`,
+    );
+    const beforeClicks = Number(before.rows[0]?.clicks ?? "0");
+
+    const accepted = await client.query<{ readonly recorded: boolean }>(
+      "select public.record_click_metric($1, $2, $3) as recorded",
+      ["store_click", "shopee", "home"],
+    );
+    assert.equal(accepted.rows[0]?.recorded, true, "store click ที่อนุญาตต้องบันทึกได้");
+
+    const after = await client.query<{ readonly clicks: string }>(
+      `select coalesce(clicks, 0)::text as clicks
+         from click_metric_daily
+        where day = (statement_timestamp() at time zone 'Asia/Bangkok')::date
+          and event_type = 'store_click' and source = 'home' and target_id = 'shopee'`,
+    );
+    assert.ok(Number(after.rows[0]?.clicks ?? "0") >= beforeClicks + 1, "ต้องเพิ่มเฉพาะยอดรวมรายวัน");
+
+    const siteViewBefore = await client.query<{ readonly clicks: string }>(
+      `select clicks::text as clicks
+         from click_metric_daily
+        where day = (statement_timestamp() at time zone 'Asia/Bangkok')::date
+          and event_type = 'site_view' and source = 'site' and target_id = 'site'`,
+    );
+    const beforeSiteViews = Number(siteViewBefore.rows[0]?.clicks ?? "0");
+    const siteView = await client.query<{ readonly recorded: boolean }>(
+      "select public.record_click_metric($1, $2, $3) as recorded",
+      ["site_view", "site", "site"],
+    );
+    assert.equal(siteView.rows[0]?.recorded, true, "การเปิดหน้าสาธารณะที่ถูกต้องต้องนับเป็น page view");
+    const siteViewAfter = await client.query<{ readonly clicks: string }>(
+      `select clicks::text as clicks
+         from click_metric_daily
+        where day = (statement_timestamp() at time zone 'Asia/Bangkok')::date
+          and event_type = 'site_view' and source = 'site' and target_id = 'site'`,
+    );
+    assert.ok(Number(siteViewAfter.rows[0]?.clicks ?? "0") >= beforeSiteViews + 1, "ต้องเพิ่มเฉพาะยอด page view รายวัน");
+
+    for (const invalid of [
+      [null, "shopee", "home"],
+      ["store_click", "shopee", null],
+      ["store_click", "unknown-store", "home"],
+      ["site_view", "/en/news/1", "site"],
+      ["site_view", "site", "news"],
+    ] as const) {
+      const rejected = await client.query<{ readonly recorded: boolean }>(
+        "select public.record_click_metric($1, $2, $3) as recorded",
+        [...invalid],
+      );
+      assert.equal(rejected.rows[0]?.recorded, false, "event ที่ไม่ถูกต้องต้องถูกปฏิเสธโดยไม่เขียนข้อมูล");
+    }
+
+    done("สถิติคลิก/เข้าชม: อนุญาตเฉพาะ event ที่กำหนด · ยอดรวมเพิ่ม · ทดสอบแล้ว rollback");
+  } finally {
+    try {
+      await client.query("rollback");
+    } finally {
+      client.release();
+    }
   }
 }
 

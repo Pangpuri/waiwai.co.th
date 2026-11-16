@@ -28,6 +28,7 @@ export const adminRbac = {
   rbacPermissionSettings: "ตั้งค่าข้อมูลองค์กร & SEO ของเว็บ",
   rbacPermissionRetention: "ระยะเก็บข้อมูลและลบข้อมูลตามคำขอ (PDPA)",
   rbacPermissionMaintenance: "เปิด/ปิดโหมดปิดปรับปรุงเว็บ",
+  rbacPermissionAnalytics: "ดูรายงานสถิติการใช้งานเว็บไซต์",
   rbacRoleUnknown: "บทบาทไม่ถูกต้อง",
   rbacCreateTitle: "เพิ่มบัญชีใหม่",
   rbacCreateHint: "ระบบจะสร้างรหัสผ่านให้ — คัดลอกเก็บไว้แล้วส่งให้เจ้าของบัญชี (แสดงครั้งเดียว)",

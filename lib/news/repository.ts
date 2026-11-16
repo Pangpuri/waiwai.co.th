@@ -45,6 +45,8 @@ export type NewsRecord = {
   readonly body: readonly NewsBlock[];
   /** `YYYY-MM-DDTHH:MM` (เวลาไทย) หรือ null */
   readonly publishedLocal: string | null;
+  /** เวลาแก้ไขล่าสุด (ISO) ใช้คำนวณป้าย "ใหม่" รายเดือน */
+  readonly updatedAt: string | null;
   readonly publishedLabel: string;
   /** ค่า SEO รายข่าว (ว่างทั้งหมด = ใช้ชื่อ/คำโปรย/ภาพปกเดิม) */
   readonly seo: PageSeo;
@@ -55,6 +57,7 @@ export type NewsRecord = {
 const NEWS_COLUMNS = `n.id, n.source_id, n.source_url, n.title_th, n.title_en, n.excerpt_th, n.excerpt_en,
        n.cover_media_id, n.body, n.published_label, n.view_count,
        n.seo_title_th, n.seo_title_en, n.seo_description_th, n.seo_description_en, n.og_image_path, n.seo_noindex,
+       n.updated_at,
        to_char(n.published_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD"T"HH24:MI') as published_local,
        m.width as cover_width, m.height as cover_height`;
 
@@ -63,6 +66,14 @@ const PUBLIC_NEWS_CONDITION = "n.status = 'published' and n.deleted_at is null";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function isoStamp(value: unknown): string | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  const raw = text(value).trim();
+  if (raw === "") return null;
+  const timestamp = Date.parse(raw);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 /** `bigint` ของ Postgres กลับมาเป็นสตริง — แปลงเป็น number ที่ชั้นข้อมูล */
@@ -108,6 +119,7 @@ function toNewsRecord(row: Record<string, unknown>): NewsRecord | null {
     coverHeight: positiveInt(row.cover_height),
     body: parseNewsBody(row.body),
     publishedLocal: publishedLocal === "" ? null : publishedLocal,
+    updatedAt: isoStamp(row.updated_at),
     publishedLabel: text(row.published_label),
     seo: seoOf(row),
     viewCount: numberValue(row.view_count),

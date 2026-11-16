@@ -4,6 +4,8 @@ import type { Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { formatRecipeDate, recipeTitleOf, youTubeWatchUrlOf } from "@/lib/recipes/model";
 import type { RecipeRecord } from "@/lib/recipes/repository";
+import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
+import { NewBadge } from "@/features/shell/ui/new-badge";
 
 import { RecipeImageLightbox } from "./recipe-image-lightbox";
 import { VideoFacade } from "./video-facade";
@@ -33,6 +35,7 @@ export type RecipeVideoListStrings = {
   readonly imageOpen: string;
   readonly imageClose: string;
   readonly imageDialog: string;
+  readonly newBadge: string;
 };
 
 export function recipeVideoListStringsOf(page: Messages["recipesPage"]): RecipeVideoListStrings {
@@ -49,6 +52,7 @@ export function recipeVideoListStringsOf(page: Messages["recipesPage"]): RecipeV
     imageOpen: page.dbRecipeImageOpen,
     imageClose: page.dbImageClose,
     imageDialog: page.dbImageDialog,
+    newBadge: page.dbNewBadge,
   };
 }
 
@@ -57,6 +61,7 @@ export function RecipeVideoList({
   language,
   strings,
   titlePlaceholder,
+  trackClicks = false,
 }: {
   readonly recipes: readonly RecipeRecord[];
   readonly language: Locale;
@@ -66,6 +71,7 @@ export function RecipeVideoList({
    * ⚠️ หน้าเว็บจริงไม่ส่งค่านี้ ⇒ พฤติกรรมหน้าเว็บไม่เปลี่ยน (ชื่อว่าง = ชื่อว่าง)
    */
   readonly titlePlaceholder?: string;
+  readonly trackClicks?: boolean;
 }) {
   if (recipes.length === 0) return null;
 
@@ -84,6 +90,7 @@ export function RecipeVideoList({
             const published = formatRecipeDate(recipe.publishedOn, language);
             const details = language === "en" && recipe.detailsEn.trim() !== "" ? recipe.detailsEn : recipe.detailsTh;
             const hasRecipe = details.trim() !== "" || recipe.recipeImagePath !== null;
+            const isNewThisMonth = isUpdatedThisBangkokMonth(recipe.updatedAt, new Date());
             return (
               <li key={recipe.id} className="flex flex-col rounded-2xl border border-line bg-bg p-4">
                 <VideoFacade
@@ -95,9 +102,13 @@ export function RecipeVideoList({
                   coverAlt={title}
                   playLabel={strings.play}
                   unavailableLabel={strings.noCover}
+                  analyticsEvent={trackClicks ? { type: "recipe_click", targetId: recipe.id, source: "recipes" } : undefined}
                 />
 
-                <h3 className="mt-4 text-base leading-snug font-bold text-fg">{title}</h3>
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="text-base leading-snug font-bold text-fg">{title}</h3>
+                  {isNewThisMonth ? <NewBadge label={strings.newBadge} /> : null}
+                </div>
 
                 <p className="mt-1 text-xs text-fg-muted">
                   {fillTemplate(strings.views, { count: formatNumber(recipe.viewCount, language) })}

@@ -65,6 +65,11 @@ test("db-roles: `form` แยกจาก `read` ได้ · `write` ใช้ 
     isolated: true,
   });
   assert.deepEqual(resolveRoleUrl("form", { DATABASE_URL: "postgres://admin" }), { url: "postgres://admin", isolated: false });
+  assert.equal(resolveRoleUrl("analytics", { DATABASE_URL: "postgres://admin" }), null, "analytics ต้อง fail-closed ไม่มี fallback");
+  assert.deepEqual(
+    resolveRoleUrl("analytics", { DATABASE_URL: "postgres://admin", ANALYTICS_DATABASE_URL: "postgres://analytics" }),
+    { url: "postgres://analytics", isolated: true },
+  );
   assert.deepEqual(resolveRoleUrl("write", { DATABASE_URL: "postgres://admin", PUBLIC_DATABASE_URL: "postgres://ro" }), {
     url: "postgres://admin",
     isolated: false,
@@ -78,6 +83,7 @@ test("db-roles: ไม่มี URL เลย = null (ผู้เรียก f
   const status = databaseRoleStatus({ DATABASE_URL: "postgres://admin", PUBLIC_DATABASE_URL: "postgres://ro" });
   assert.equal(status.read?.isolated, true);
   assert.equal(status.form?.isolated, false, "ไม่ได้ตั้ง FORM_DATABASE_URL ⇒ ยังไม่ isolated");
+  assert.equal(status.analytics, null, "ยังไม่ตั้ง ANALYTICS_DATABASE_URL ⇒ collector ต้องปิด");
 });
 
 test("db-roles: สร้าง URL ของ role โดยคง host/พารามิเตอร์เดิม และ encode รหัสผ่าน", () => {
@@ -108,6 +114,18 @@ test("db-roles: role อ่านต้องไม่มีตารางอ�
     PUBLIC_READ_TABLES.includes("product_category_slug_history"),
     "หน้าเว็บต้องอ่านประวัติที่อยู่ของหมวดได้ (ทำ 301)",
   );
+});
+
+test("db-roles: analytics แยก credential และได้เฉพาะ EXECUTE ฟังก์ชัน aggregate", () => {
+  const pool = read("db", "pool.ts");
+  const grants = read("scripts", "db-roles.ts");
+  const migration = read("db", "migrations", "0054-click-metrics.sql");
+
+  assert.ok(pool.includes('readonly ANALYTICS_DATABASE_URL?: string'));
+  assert.ok(grants.includes("grant execute on function public.record_click_metric(text, text, text) to ${role}"));
+  assert.ok(grants.includes("revoke all privileges on all tables in schema public from ${role}"));
+  assert.ok(migration.includes("revoke all on function public.record_click_metric(text, text, text) from public"));
+  assert.ok(migration.includes("revoke all on table click_metric_daily from public"));
 });
 
 /* ── สแกนซอร์ส: ฟังก์ชันสาธารณะต้องใช้ประตูอ่าน ───────────────────────────── */
@@ -184,7 +202,12 @@ test("db-roles: credential เปลี่ยนกลางคัน — ทิ
   assert.equal(isRoleAuthFailure(Object.assign(new Error("role ไม่มี"), { code: "28000" })), true);
 
   /* ข้อความบอกทางแก้ต้องมีทั้ง env key และคำสั่งที่ต้องรัน */
-  for (const [role, envKey] of [["read", "PUBLIC_DATABASE_URL"], ["form", "FORM_DATABASE_URL"], ["write", "DATABASE_URL"]] as const) {
+  for (const [role, envKey] of [
+    ["read", "PUBLIC_DATABASE_URL"],
+    ["form", "FORM_DATABASE_URL"],
+    ["analytics", "ANALYTICS_DATABASE_URL"],
+    ["write", "DATABASE_URL"],
+  ] as const) {
     const hint = roleCredentialHint(role);
     assert.ok(hint.includes(envKey), `${role}: ต้องบอก ${envKey}`);
     assert.ok(hint.includes("db:roles") && hint.includes(".env.local"), `${role}: ต้องบอกคำสั่งที่ต้องรัน`);

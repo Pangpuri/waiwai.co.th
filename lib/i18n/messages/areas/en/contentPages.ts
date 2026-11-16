@@ -30,6 +30,7 @@ export const recipesPage = {
     dbPublished: "Published",
     dbNoCover: "No cover image yet",
     dbViews: "Views: {count}",
+    dbNewBadge: "NEW",
     dbRecipeDetails: "View recipe",
     dbRecipeImageOpen: "Open recipe image",
     dbImageClose: "Close image",
@@ -62,5 +63,6 @@ export const newsPage = {
     dbNext: "Next",
     dbPageLabel: "Pagination",
     dbPublished: "Published",
+    dbNewBadge: "NEW",
     dbBackToNews: "Back to all news",
 };

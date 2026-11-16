@@ -39,6 +39,7 @@ import { cookiePolicyPage } from "./areas/th/cookiePolicy.ts";
 import { adminCareers as thAdminCareers } from "./areas/th/adminCareers.ts";
 import { adminPages } from "./areas/th/adminPages.ts";
 import { adminInbox } from "./areas/th/adminInbox.ts";
+import { adminAnalytics } from "./areas/th/adminAnalytics.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -113,6 +114,7 @@ export const th = {
     /* หน้าจอตั้งค่าหน้าของตัวสร้าง — ชื่อ/เมนูของหน้า detail ถูกล็อก (รอบที่ 286) */
     ...adminPages,
     ...adminInbox,
+    ...adminAnalytics,
   },
 };
 

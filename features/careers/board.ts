@@ -71,6 +71,7 @@ export type BoardLabels = {
   readonly fieldExperience: string;
   readonly fieldPostedAt: string;
   readonly newBadge: string;
+  readonly applyPosition: string;
 };
 
 export type Board = {
@@ -132,6 +133,7 @@ export function buildBoard(messages: Messages, jobs: readonly Job[] = JOBS): Boa
       fieldExperience: m.fields.experience,
       fieldPostedAt: m.fields.postedAt,
       newBadge: m.newBadge,
+      applyPosition: m.applyPosition,
     },
   };
 }
@@ -201,6 +203,7 @@ export function buildPostingBoard(
       fieldExperience: m.fields.experience,
       fieldPostedAt: m.fields.postedAt,
       newBadge: m.newBadge,
+      applyPosition: m.applyPosition,
     },
   };
 }

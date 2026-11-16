@@ -45,6 +45,8 @@ export const ADMIN_PERMISSIONS = [
   "retention",
   /** โหมดปิดปรับปรุงเว็บ */
   "maintenance",
+  /** รายงานสถิติคลิกแบบ aggregate — ผู้ดูแลระบบเท่านั้น */
+  "analytics",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];

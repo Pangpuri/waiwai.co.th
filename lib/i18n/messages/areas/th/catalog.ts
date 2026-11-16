@@ -68,4 +68,5 @@ export const productsPage = {
     dbFda: "เลข อย.",
     dbPackaging: "ขนาดบรรจุ",
     dbNoImage: "ยังไม่มีภาพสินค้า",
+    dbNewBadge: "ใหม่",
 };

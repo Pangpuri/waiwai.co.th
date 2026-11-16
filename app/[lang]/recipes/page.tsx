@@ -82,7 +82,7 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
     return (
       <>
         <BlockDocumentView document={liveDocument} language={lang} />
-        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} />
+        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} trackClicks />
       </>
     );
   }
@@ -120,7 +120,7 @@ export default async function RecipesPage({ params }: PageProps<"/[lang]/recipes
         ⚠️ ถ้าฐานข้อมูลว่าง/ล่ม ⇒ ยังเห็นการ์ดทดสอบเหมือนเดิม (ไม่ทำให้หน้าเว็บพัง)
       */}
       {recipes.length > 0 ? (
-        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} />
+        <RecipeVideoList recipes={recipes} language={lang} strings={listStrings} trackClicks />
       ) : null /* รอบที่ 273: ไม่มีเมนูจริง = ไม่แสดงอะไร (เลิกใช้การ์ดทดสอบ) */}
     </>
   );

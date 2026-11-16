@@ -20,9 +20,10 @@ import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
  *   · `waiwai_public_ro`   = SELECT เฉพาะตารางที่หน้าเว็บอ่าน (ไม่มีตาราง auth/PII)
  *   · `waiwai_public_form` = SELECT+INSERT เฉพาะ `form_submission`/`form_attachment`
  *     + UPDATE สถานะอีเมลแจ้งเตือน 2 คอลัมน์ (ไม่เปิดแก้ข้อมูลฟอร์ม)
- * - แล้วเอาค่า URL ไปตั้ง `PUBLIC_DATABASE_URL` / `FORM_DATABASE_URL` (ไม่ commit)
+ * - แล้วเอาค่า URL ไปตั้ง `PUBLIC_DATABASE_URL` / `FORM_DATABASE_URL` / `ANALYTICS_DATABASE_URL` (ไม่ commit)
  *
  * ⚠️ ไม่ตั้ง env ทั้งสอง = ระบบถอยไปใช้ connection เดียวกัน (ยังทำงานได้ แต่ไม่มี isolation)
+ * ⚠️ ไม่ตั้ง `ANALYTICS_DATABASE_URL` = collector ปิดแบบ fail-closed (ไม่มี fallback ไป owner)
  * ⚠️ รันซ้ำได้ (idempotent): revoke สิทธิ์เดิมของ role แล้ว grant ชุดที่กำหนดใหม่ทุกครั้ง
  * ⚠️ ห้ามใส่รหัสผ่านลงในโค้ด/ไฟล์ที่ commit — รับทาง flag/env หรือสุ่มให้แล้วแสดงครั้งเดียว
  *
@@ -30,12 +31,13 @@ import { closePool, getPool, isDatabaseConfigured } from "@/db/pool";
  *   npm run db:roles                      # สุ่มรหัสผ่าน + แสดง URL ให้คัดลอก
  *   npm run db:roles -- --reveal          # ใช้รหัสที่ตั้งไว้ และแสดง URL เต็ม
  *   npm run db:roles -- --dry-run         # ดู SQL ที่จะรัน (ไม่แตะฐานข้อมูล)
- *   npm run db:roles -- --ro-password=... --form-password=... --reveal
+ *   npm run db:roles -- --ro-password=... --form-password=... --analytics-password=... --reveal
  */
 
 /* ⚠️ export เพราะ `check:target` ตรวจว่า role เหล่านี้มีจริงบนปลายทาง (รอบที่ 283) — ที่เดียว ห้ามพิมพ์ซ้ำ */
 export const READ_ROLE = "waiwai_public_ro";
 export const FORM_ROLE = "waiwai_public_form";
+export const ANALYTICS_ROLE = "waiwai_analytics_ingest";
 
 /**
  * ตารางที่ **หน้าเว็บสาธารณะอ่าน** — ต้องตรงกับ `readQuery()` ที่ใช้จริง (รอบนี้)
@@ -90,9 +92,11 @@ type Options = {
   readonly reveal: boolean;
   readonly roPassword: string;
   readonly formPassword: string;
+  readonly analyticsPassword: string;
   /** true = สุ่มรหัสใหม่ (ผู้เรียกต้องแสดงให้เห็น ไม่งั้นผู้ใช้เอาไปใช้ไม่ได้) */
   readonly roGenerated: boolean;
   readonly formGenerated: boolean;
+  readonly analyticsGenerated: boolean;
 };
 
 function parseArgs(argv: readonly string[]): Options {
@@ -100,17 +104,29 @@ function parseArgs(argv: readonly string[]): Options {
   let reveal = false;
   let roPassword = process.env["PUBLIC_DB_PASSWORD"]?.trim() ?? "";
   let formPassword = process.env["FORM_DB_PASSWORD"]?.trim() ?? "";
+  let analyticsPassword = process.env["ANALYTICS_DB_PASSWORD"]?.trim() ?? "";
 
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
     else if (arg === "--reveal") reveal = true;
     else if (arg.startsWith("--ro-password=")) roPassword = arg.slice("--ro-password=".length);
     else if (arg.startsWith("--form-password=")) formPassword = arg.slice("--form-password=".length);
+    else if (arg.startsWith("--analytics-password=")) analyticsPassword = arg.slice("--analytics-password=".length);
   }
 
   const roGenerated = roPassword === "";
   const formGenerated = formPassword === "";
-  return { dryRun, reveal, roPassword: roGenerated ? generatePassword() : roPassword, formPassword: formGenerated ? generatePassword() : formPassword, roGenerated, formGenerated };
+  const analyticsGenerated = analyticsPassword === "";
+  return {
+    dryRun,
+    reveal,
+    roPassword: roGenerated ? generatePassword() : roPassword,
+    formPassword: formGenerated ? generatePassword() : formPassword,
+    analyticsPassword: analyticsGenerated ? generatePassword() : analyticsPassword,
+    roGenerated,
+    formGenerated,
+    analyticsGenerated,
+  };
 }
 
 /** URL ของ role (ใช้ host/port/db/พารามิเตอร์เดิมจาก DATABASE_URL) */
@@ -177,6 +193,15 @@ function formNotificationGrantStatements(role: string): readonly string[] {
   return [`grant update (${FORM_NOTIFICATION_UPDATE_COLUMNS.join(", ")}) on form_submission to ${role}`];
 }
 
+function analyticsGrantStatements(role: string): readonly string[] {
+  return [
+    `grant usage on schema public to ${role}`,
+    `revoke all privileges on all tables in schema public from ${role}`,
+    `revoke all privileges on all sequences in schema public from ${role}`,
+    `grant execute on function public.record_click_metric(text, text, text) to ${role}`,
+  ];
+}
+
 async function applyStatements(statements: readonly string[], dryRun: boolean): Promise<void> {
   for (const statement of statements) {
     if (dryRun) continue;
@@ -202,7 +227,7 @@ async function main(): Promise<void> {
   /*
     `--target` = สร้าง/รีเฟรช role บน **ฐานข้อมูลปลายทาง** (คลาวด์) — รอบที่ 282
     ⚠️ role อยู่ในฐานข้อมูลนั้น ๆ ⇒ การตั้ง least privilege บนโฮสต์จริงต้องรันธงนี้
-       แล้วเอาค่า PUBLIC_DATABASE_URL/FORM_DATABASE_URL ที่พิมพ์ได้ไปวางใน env ของโฮสต์
+       แล้วเอาค่า URL ที่พิมพ์ได้ไปวางใน env ของโฮสต์
   */
   const wantsTarget = targetRequested(process.argv.slice(2), process.env);
   if (wantsTarget.requested) {
@@ -232,6 +257,7 @@ async function main(): Promise<void> {
   const formStatements = grantStatements(FORM_ROLE, PUBLIC_FORM_TABLES, "form");
   const metricStatements = newsViewGrantStatements(FORM_ROLE);
   const notificationStatements = formNotificationGrantStatements(FORM_ROLE);
+  const analyticsStatements = analyticsGrantStatements(ANALYTICS_ROLE);
 
   if (options.dryRun) {
     process.stdout.write("── SQL ที่จะรัน (dry-run) ──\n");
@@ -244,9 +270,21 @@ async function main(): Promise<void> {
   await applyStatements(metricStatements, options.dryRun);
   await applyStatements(notificationStatements, options.dryRun);
   const seqStatements = await grantSequenceUsage(FORM_ROLE, PUBLIC_FORM_TABLES, options.dryRun);
+  const roleAnalytics = await ensureRole(ANALYTICS_ROLE, options.analyticsPassword, options.dryRun);
+  await applyStatements(analyticsStatements, options.dryRun);
 
   if (options.dryRun) {
-    for (const statement of [roleRead, ...readStatements, roleForm, ...formStatements, ...metricStatements, ...notificationStatements, ...seqStatements]) {
+    for (const statement of [
+      roleRead,
+      ...readStatements,
+      roleForm,
+      ...formStatements,
+      ...metricStatements,
+      ...notificationStatements,
+      ...seqStatements,
+      roleAnalytics,
+      ...analyticsStatements,
+    ]) {
       process.stdout.write(`  ${statement};\n`);
     }
     process.stdout.write("\n(dry-run — ไม่ได้แตะฐานข้อมูล)\n");
@@ -255,24 +293,28 @@ async function main(): Promise<void> {
 
   const publicUrl = roleUrl(adminUrl, READ_ROLE, options.roPassword);
   const formUrl = roleUrl(adminUrl, FORM_ROLE, options.formPassword);
+  const analyticsUrl = roleUrl(adminUrl, ANALYTICS_ROLE, options.analyticsPassword);
 
   process.stdout.write(`✓ สร้าง/รีเฟรช role เรียบร้อย\n`);
   process.stdout.write(`  · ${READ_ROLE}  → SELECT ${String(PUBLIC_READ_TABLES.length)} ตาราง: ${PUBLIC_READ_TABLES.join(", ")}\n`);
   process.stdout.write(
     `  · ${FORM_ROLE} → SELECT/INSERT: ${PUBLIC_FORM_TABLES.join(", ")} · UPDATE news.view_count · UPDATE form_submission.${FORM_NOTIFICATION_UPDATE_COLUMNS.join(", ")}\n\n`,
   );
+  process.stdout.write(`  · ${ANALYTICS_ROLE} → EXECUTE public.record_click_metric(...) only\n`);
 
-  const mustReveal = options.reveal || options.roGenerated || options.formGenerated;
+  const mustReveal = options.reveal || options.roGenerated || options.formGenerated || options.analyticsGenerated;
   process.stdout.write("── ตั้งค่า env (ห้าม commit) ──\n");
   if (mustReveal) {
-    if (options.roGenerated || options.formGenerated) {
+    if (options.roGenerated || options.formGenerated || options.analyticsGenerated) {
       process.stdout.write("⚠️ รหัสผ่านถูกสุ่มให้รอบนี้ — คัดลอกเก็บไว้เดี๋ยวนี้ (แสดงครั้งเดียว)\n");
     }
     process.stdout.write(`PUBLIC_DATABASE_URL=${publicUrl}\n`);
     process.stdout.write(`FORM_DATABASE_URL=${formUrl}\n`);
+    process.stdout.write(`ANALYTICS_DATABASE_URL=${analyticsUrl}\n`);
   } else {
     process.stdout.write(`PUBLIC_DATABASE_URL=${maskUrl(publicUrl)}\n`);
     process.stdout.write(`FORM_DATABASE_URL=${maskUrl(formUrl)}\n`);
+    process.stdout.write(`ANALYTICS_DATABASE_URL=${maskUrl(analyticsUrl)}\n`);
     process.stdout.write("(ซ่อนรหัสผ่าน — ใส่ --reveal เพื่อแสดงเต็ม)\n");
   }
 
@@ -283,8 +325,8 @@ async function main(): Promise<void> {
   */
   if (wantsTarget.requested) {
     process.stdout.write(
-      "\nℹ️ ให้ `check:target` พิสูจน์สิทธิ์จริง: เก็บสองบรรทัดข้างบนใน .env.local เป็น\n" +
-        "   TARGET_PUBLIC_DATABASE_URL=… · TARGET_FORM_DATABASE_URL=… (ห้าม commit)\n",
+      "\nℹ️ ให้ `check:target` พิสูจน์สิทธิ์จริง: เก็บ URL ของ role ปลายทางใน .env.local เป็น\n" +
+        "   TARGET_PUBLIC_DATABASE_URL=… · TARGET_FORM_DATABASE_URL=… · TARGET_ANALYTICS_DATABASE_URL=… (ห้าม commit)\n",
     );
   }
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { SectionCurve } from "@/features/shell/ui/section-curve";
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { TrackedLink } from "@/features/analytics/ui/tracked-link";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import type { HomeRecipeItem } from "../view-models";
@@ -50,8 +51,9 @@ export function Recipes({ locale, messages, items }: RecipesProps) {
           {hasReal
             ? items.map((item) => (
                 <li key={item.id}>
-                  <Link
+                  <TrackedLink
                     href={item.href}
+                    event={{ type: "recipe_click", targetId: item.id, source: "home" }}
                     className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface transition-all hover:-translate-y-1 hover:shadow-lg"
                   >
                     {item.image === null ? (
@@ -79,7 +81,7 @@ export function Recipes({ locale, messages, items }: RecipesProps) {
                         {messages.actions.viewAllRecipes} →
                       </span>
                     </span>
-                  </Link>
+                  </TrackedLink>
                 </li>
               ))
             : null}

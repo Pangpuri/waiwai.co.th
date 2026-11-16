@@ -1,9 +1,9 @@
 import { getPool, closePool } from "@/db/pool";
 import { describeMediaRefIssue, mediaRefIssues, type MediaCatalogEntry, type PageDocumentRow } from "@/lib/db/media-refs";
 import { describePlan, planMigrations, type MigrationState } from "@/lib/db/migrations";
-import { FORM_ROLE, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, READ_ROLE } from "./db-roles.ts";
+import { ANALYTICS_ROLE, FORM_ROLE, PUBLIC_FORM_TABLES, PUBLIC_READ_TABLES, READ_ROLE } from "./db-roles.ts";
 import { loadMigrationFiles } from "./migration-files.ts";
-import { probeFormRole, probeReadRole, type RoleProbeOutcome } from "./role-probe.ts";
+import { probeAnalyticsRole, probeFormRole, probeReadRole, type RoleProbeOutcome } from "./role-probe.ts";
 import { selectTargetUrl, targetBanner } from "./target-env.ts";
 
 /**
@@ -20,7 +20,7 @@ import { selectTargetUrl, targetBanner } from "./target-env.ts";
  *    · ขาด = **ตก** (ต้องรัน `npm run db:migrate --target`)
  *    · ไฟล์ที่รันแล้วถูกแก้ทีหลัง (checksum ไม่ตรง) = **ตก** (อันตรายกว่า: DB กับไฟล์ไม่ตรงกันแล้ว)
  *    · ยังไม่มีตาราง `schema_migration` เลย = **ตก** (ปลายทางว่าง/ยังไม่เคย migrate)
- * 2. **role แบบ least privilege มีจริงไหม** (`waiwai_public_ro` · `waiwai_public_form`)
+ * 2. **role แบบ least privilege มีจริงไหม** (`waiwai_public_ro` · `waiwai_public_form` · `waiwai_analytics_ingest`)
  *    · ขาด = **เตือน**โดยค่าเริ่มต้น (เว็บยังทำงานได้แต่ไม่มีการแยกสิทธิ์ — มติ D23)
  *    · ใส่ `--strict` = ถือเป็น **ตก** (ใช้ก่อนเปิดใช้จริง/ใน CI ที่มี credential)
  * 3. **role อ่าน/ฟอร์มอ่านได้จริงไหม** (รอบที่ 286 · ปิดหนี้ D-283-2 — เก็บแค่ "มี role" ไม่พอ)
@@ -42,6 +42,7 @@ type Options = {
   /** URL ของ role อ่านบนปลายทาง (ถ้าไม่ส่ง = ข้ามการพิสูจน์) */
   readonly readUrl: string;
   readonly formUrl: string;
+  readonly analyticsUrl: string;
 };
 
 function parseArgs(argv: readonly string[]): Options {
@@ -49,6 +50,7 @@ function parseArgs(argv: readonly string[]): Options {
   let strict = false;
   let readUrl = process.env["TARGET_PUBLIC_DATABASE_URL"]?.trim() ?? "";
   let formUrl = process.env["TARGET_FORM_DATABASE_URL"]?.trim() ?? "";
+  let analyticsUrl = process.env["TARGET_ANALYTICS_DATABASE_URL"]?.trim() ?? "";
   for (const arg of argv) {
     if (arg === "--json") json = true;
     /* `check:target` ยิงปลายทางเสมอ ⇒ รับ `--target` ไว้ได้ (กันผู้ใช้พิมพ์ตามคำสั่งอื่นแล้ว 500) */
@@ -56,9 +58,10 @@ function parseArgs(argv: readonly string[]): Options {
     else if (arg === "--strict") strict = true;
     else if (arg.startsWith("--read-url=")) readUrl = arg.slice("--read-url=".length).trim();
     else if (arg.startsWith("--form-url=")) formUrl = arg.slice("--form-url=".length).trim();
+    else if (arg.startsWith("--analytics-url=")) analyticsUrl = arg.slice("--analytics-url=".length).trim();
     else if (arg.trim() !== "") throw new Error(`ไม่รู้จักตัวเลือก: ${arg}`);
   }
-  return { json, strict, readUrl, formUrl };
+  return { json, strict, readUrl, formUrl, analyticsUrl };
 }
 
 /** สถานะ migration ของปลายทาง — `hasTable = false` = ยังไม่เคยรันด้วยระบบนี้ */
@@ -92,7 +95,7 @@ async function readPublicTableCount(): Promise<number> {
 }
 
 async function readMissingRoles(): Promise<readonly string[]> {
-  const wanted = [READ_ROLE, FORM_ROLE];
+  const wanted = [READ_ROLE, FORM_ROLE, ANALYTICS_ROLE];
   const { rows } = await getPool().query<{ rolname: string }>(
     `select rolname from pg_roles where rolname = any($1::text[])`,
     [wanted],
@@ -162,7 +165,7 @@ async function main(): Promise<void> {
   const warnings: string[] = [];
   if (missingRoles.length > 0) {
     warnings.push(
-      `ยังไม่มี role: ${missingRoles.join(" · ")} ⇒ รัน \`npm run db:roles --target --reveal\` แล้วตั้ง PUBLIC_DATABASE_URL/FORM_DATABASE_URL บนโฮสต์ (มติ D23)`,
+      `ยังไม่มี role: ${missingRoles.join(" · ")} ⇒ รัน \`npm run db:roles --target --reveal\` แล้วตั้ง URL ของ role ที่เกี่ยวข้องบนโฮสต์ (มติ D23)`,
     );
   }
 
@@ -173,9 +176,11 @@ async function main(): Promise<void> {
   */
   const readProbe = options.readUrl === "" ? null : await probeReadRole(options.readUrl, PUBLIC_READ_TABLES);
   const formProbe = options.formUrl === "" ? null : await probeFormRole(options.formUrl, PUBLIC_FORM_TABLES);
+  const analyticsProbe = options.analyticsUrl === "" ? null : await probeAnalyticsRole(options.analyticsUrl);
   const skippedProbes: string[] = [];
   if (readProbe === null) skippedProbes.push("role อ่าน (TARGET_PUBLIC_DATABASE_URL)");
   if (formProbe === null) skippedProbes.push("role ฟอร์ม (TARGET_FORM_DATABASE_URL)");
+  if (analyticsProbe === null) skippedProbes.push("role analytics (TARGET_ANALYTICS_DATABASE_URL)");
   if (skippedProbes.length > 0) {
     warnings.push(
       `ข้ามการพิสูจน์สิทธิ์: ${skippedProbes.join(" · ")} ⇒ เอามาจาก \`npm run db:roles -- --target --reveal\` แล้วเก็บใน .env.local (ห้าม commit)`,
@@ -184,6 +189,7 @@ async function main(): Promise<void> {
   for (const [label, outcome] of [
     ["role อ่าน", readProbe],
     ["role ฟอร์ม", formProbe],
+    ["role analytics", analyticsProbe],
   ] as const) {
     if (outcome === null) continue;
     if (outcome.ok) continue;
@@ -227,7 +233,7 @@ async function main(): Promise<void> {
           modified: plan?.modified.map((item) => item.id) ?? [],
           publicTables: tableCount,
           missingRoles,
-          probes: { read: probeJson(readProbe), form: probeJson(formProbe) },
+          probes: { read: probeJson(readProbe), form: probeJson(formProbe), analytics: probeJson(analyticsProbe) },
           mediaRefs: {
             documents: mediaData.rows.length,
             catalog: mediaData.catalog.length,
@@ -260,7 +266,7 @@ async function main(): Promise<void> {
     );
     process.stdout.write(
       missingRoles.length === 0
-        ? "role least privilege: ครบ (waiwai_public_ro · waiwai_public_form)\n"
+        ? "role least privilege: ครบ (waiwai_public_ro · waiwai_public_form · waiwai_analytics_ingest)\n"
         : `role least privilege: ขาด ${missingRoles.join(" · ")}\n`,
     );
     /* ผลการพิสูจน์สิทธิ์จริง (ต่อด้วย role นั้น) — ข้ามจะบอกตรง ๆ ว่าไม่ได้พิสูจน์ */
@@ -272,6 +278,11 @@ async function main(): Promise<void> {
     if (formProbe !== null) {
       process.stdout.write(
         `  · role ฟอร์ม: ${formProbe.ok ? "✓" : "✗"} ต่อด้วย ${formProbe.role} · อ่านได้ ${String(formProbe.readable)}/${String(PUBLIC_FORM_TABLES.length)} ตาราง\n`,
+      );
+    }
+    if (analyticsProbe !== null) {
+      process.stdout.write(
+        `  · role analytics: ${analyticsProbe.ok ? "✓" : "✗"} ต่อด้วย ${analyticsProbe.role} · เรียกฟังก์ชัน aggregate ได้และอ่านตารางโดยตรงไม่ได้\n`,
       );
     }
 

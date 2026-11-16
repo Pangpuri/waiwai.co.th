@@ -4,6 +4,7 @@ import type { WhereToBuyView } from "@/lib/content/home-section";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import { WHERE_TO_BUY_ANCHOR } from "@/lib/blocks/marketplace-links";
+import { TrackedLink } from "@/features/analytics/ui/tracked-link";
 
 import { SectionHeading } from "./section-heading";
 
@@ -37,8 +38,9 @@ export function WhereToBuy({ messages, view }: WhereToBuyProps) {
         <ul className="mt-9 flex flex-wrap justify-center gap-4">
           {view.marketplaces.map((marketplace) => (
             <li key={marketplace.id} className="w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.667rem)] lg:w-[calc(25%-0.75rem)]">
-              <a
+              <TrackedLink
                 href={marketplace.href}
+                event={{ type: "store_click", targetId: marketplace.id, source: "home" }}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="group bg-surface text-fg border-line hover:border-line-strong focus-visible:ring-ring relative flex h-full min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border px-4 py-5 text-center shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:outline-none"
@@ -59,7 +61,7 @@ export function WhereToBuy({ messages, view }: WhereToBuyProps) {
                   {marketplace.label}
                 </span>
                 <span className="sr-only"> {messages.a11y.newWindow}</span>
-              </a>
+              </TrackedLink>
             </li>
           ))}
         </ul>

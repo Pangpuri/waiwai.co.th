@@ -199,6 +199,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     imagePath: fields.imagePath === "" ? null : fields.imagePath,
     imageWidth: null,
     imageHeight: null,
+    updatedAt: null,
     sortOrder: 0,
     ingredients: ingredients.map((item, index) => ({
       sortOrder: index + 1,

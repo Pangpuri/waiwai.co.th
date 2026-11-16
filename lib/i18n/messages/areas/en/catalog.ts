@@ -70,4 +70,5 @@ export const productsPage = {
     dbFda: "FDA number",
     dbPackaging: "Packaging",
     dbNoImage: "No product image yet",
+    dbNewBadge: "NEW",
 };

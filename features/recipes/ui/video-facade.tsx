@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { trackClick } from "@/lib/analytics/tracking";
+import type { ClickEvent } from "@/lib/analytics/model";
+
 import { youTubeEmbedUrlOf } from "@/lib/recipes/model";
 
 /**
@@ -28,6 +31,7 @@ export function VideoFacade({
   coverAlt,
   playLabel,
   unavailableLabel,
+  analyticsEvent,
 }: {
   readonly videoId: string;
   readonly title: string;
@@ -37,6 +41,7 @@ export function VideoFacade({
   readonly coverAlt: string;
   readonly playLabel: string;
   readonly unavailableLabel: string;
+  readonly analyticsEvent?: ClickEvent;
 }) {
   const [playing, setPlaying] = useState(false);
 
@@ -58,7 +63,10 @@ export function VideoFacade({
   return (
     <button
       type="button"
-      onClick={() => setPlaying(true)}
+      onClick={() => {
+        if (analyticsEvent !== undefined) trackClick(analyticsEvent);
+        setPlaying(true);
+      }}
       aria-label={`${playLabel}: ${title}`}
       className="group border-line focus-visible:ring-ring relative block aspect-video w-full overflow-hidden rounded-xl border focus-visible:ring-2 focus-visible:outline-none"
     >

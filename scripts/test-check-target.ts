@@ -126,8 +126,10 @@ test("check:target — ต้องพิสูจน์ 'role อ่านไ�
   const source = codeOf("scripts/check-target.ts");
   assert.ok(source.includes("probeReadRole("), "ต้องพิสูจน์ role อ่าน");
   assert.ok(source.includes("probeFormRole("), "ต้องพิสูจน์ role ฟอร์ม");
+  assert.ok(source.includes("probeAnalyticsRole("), "ต้องพิสูจน์ role analytics");
   assert.ok(source.includes("TARGET_PUBLIC_DATABASE_URL"), "รับ URL ของ role อ่านจาก env (ไม่เดาค่าให้)");
   assert.ok(source.includes("TARGET_FORM_DATABASE_URL"), "รับ URL ของ role ฟอร์มจาก env");
+  assert.ok(source.includes("TARGET_ANALYTICS_DATABASE_URL"), "รับ URL ของ role analytics จาก env");
   assert.ok(source.includes('"--read-url="'), "รับ URL ทาง flag ได้ด้วย");
   assert.ok(source.includes("ข้ามการพิสูจน์สิทธิ์"), "ไม่มี URL = **ข้ามอย่างเปิดเผย** ไม่ใช่ผ่านเงียบ ๆ");
   assert.ok(source.includes("PUBLIC_READ_TABLES"), "รายการตารางต้องมาจาก db-roles.ts (แหล่งเดียว)");
@@ -175,4 +177,5 @@ test("role-probe — ชื่อตารางต้องผ่านด่�
 test("db-roles --target — บอกทางเก็บ URL ของ role ให้ check:target พิสูจน์สิทธิ์ต่อ", () => {
   const source = codeOf("scripts/db-roles.ts");
   assert.ok(source.includes("TARGET_PUBLIC_DATABASE_URL"), "ต้องบอกชื่อ env ที่ check:target ใช้");
+  assert.ok(source.includes("TARGET_ANALYTICS_DATABASE_URL"), "ต้องบอก URL role analytics ที่ check:target ใช้");
 });

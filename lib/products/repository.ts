@@ -57,6 +57,8 @@ export type ProductRecord = {
   /** ขนาดจริงของภาพ (อ่านจากหัวไฟล์ตอนนำเข้า) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด */
   readonly imageWidth: number | null;
   readonly imageHeight: number | null;
+  /** เวลาแก้ไขล่าสุด (ISO) ใช้คำนวณป้าย "ใหม่" รายเดือน */
+  readonly updatedAt: string | null;
   readonly sortOrder: number;
   readonly ingredients: readonly ProductIngredientRecord[];
 };
@@ -93,7 +95,7 @@ export type ProductCategoryRecord = {
   "column reference \"id\" is ambiguous" แล้วหน้าจะไม่แสดงสินค้าเลยทั้งที่ข้อมูลอยู่ (เจอจริงตอนเขียนด่าน check:db)
 */
 const PRODUCT_COLUMNS =
-  "p.id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.sort_order";
+  "p.id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.updated_at, p.sort_order";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -101,6 +103,14 @@ function text(value: unknown): string {
 
 function mediaPath(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? `/media/${value}` : null;
+}
+
+function isoStamp(value: unknown): string | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  const raw = text(value).trim();
+  if (raw === "") return null;
+  const timestamp = Date.parse(raw);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 /** ค่าประเภทตลาดจาก DB — ค่าแปลกปลอม/ยังไม่ migrate = domestic (ไม่ทำให้หน้าพัง) */
@@ -150,6 +160,7 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
     imagePath: mediaPath(row.image_media_id),
     imageWidth: typeof row.image_width === "number" && row.image_width > 0 ? row.image_width : null,
     imageHeight: typeof row.image_height === "number" && row.image_height > 0 ? row.image_height : null,
+    updatedAt: isoStamp(row.updated_at),
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
     ingredients: readIngredients(row.ingredients),
   };

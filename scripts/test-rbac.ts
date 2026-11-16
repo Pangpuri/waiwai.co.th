@@ -121,6 +121,20 @@ test("rbac: ทุกไฟล์ใน app/admin ต้องตรวจสิ
   );
 });
 
+test("rbac: สถิติคลิกและ export จำกัดเฉพาะ admin", () => {
+  assert.ok(can("admin", "analytics"));
+  assert.ok(!can("publisher", "analytics"));
+  assert.ok(!can("editor", "analytics"));
+  assert.ok(!can("hr", "analytics"));
+
+  const exportRoute = sourceOf("app/admin/analytics/export/route.ts");
+  assert.ok(exportRoute.includes('requireAdminUser("analytics")'));
+
+  const dashboard = sourceOf("app/admin/page.tsx");
+  assert.ok(dashboard.includes('can(user.role, "analytics")'));
+  assert.ok(dashboard.includes("canAnalytics ? await loadAnalyticsReport"));
+});
+
 test("rbac: action ล็อกอิน/ออกจากระบบต้องไม่ผูกกับสิทธิ์ และ action ลบข้อมูลส่วนบุคคลต้องเป็น admin", () => {
   const actions = sourceOf("app/admin/actions.ts");
   assert.ok(actions.includes("export async function loginAction"), "ยังมี action ล็อกอิน");
@@ -176,6 +190,7 @@ test("rbac: ลิงก์ข้ามสิทธิ์ต้องถูก�
     { prefix: "/admin/builder/chrome", permission: "presets" },
     { prefix: "/admin/builder/footer", permission: "presets" },
     { prefix: "/admin/builder/navbar", permission: "presets" },
+    { prefix: "/admin/analytics", permission: "analytics" },
   ];
 
   const offenders: string[] = [];
@@ -208,6 +223,7 @@ test("rbac: การ์ดเฉพาะทางบน /admin และกา
   assert.ok(overview.includes('can(user.role, "retention")'), "การ์ดระยะเก็บข้อมูล/ปุ่มลบ ต้องผูกกับสิทธิ์ retention");
   assert.ok(overview.includes('can(user.role, "maintenance")'), "การ์ดโหมดปิดปรับปรุง ต้องผูกกับสิทธิ์ maintenance");
   assert.ok(overview.includes('can(user.role, "trash")'), "การ์ดถังขยะ ต้องผูกกับสิทธิ์ trash");
+  assert.ok(overview.includes('can(user.role, "analytics")'), "สถิติต้องแสดงเฉพาะผู้ดูแลที่มีสิทธิ์ analytics");
 
   /*
     การ์ด SEO รายหน้า (ตัวสร้างหน้า) = ผู้เผยแพร่ขึ้นไป และการบันทึกก็ใช้สิทธิ์เดียวกัน
@@ -281,7 +297,7 @@ test("rbac: สิทธิ์ให้แบบเพิ่มขึ้น (edi
   assert.equal(can("hr", "trash"), false);
 
   /* สิทธิ์ที่อันตราย: ต้องเป็น admin เท่านั้น */
-  for (const permission of ["users", "settings", "retention", "maintenance"] as const) {
+  for (const permission of ["users", "settings", "retention", "maintenance", "analytics"] as const) {
     assert.deepEqual(
       ADMIN_ROLES.filter((role) => can(role, permission)),
       ["admin"],

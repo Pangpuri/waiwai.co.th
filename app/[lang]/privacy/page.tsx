@@ -88,9 +88,10 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
     { title: m.collectContactTitle, body: m.collectContactBody },
     { title: m.collectNewsletterTitle, body: m.collectNewsletterBody },
     { title: m.collectCareersTitle, body: m.collectCareersBody },
+    { title: m.collectAnalyticsTitle, body: m.collectAnalyticsBody },
   ];
 
-  const purposes = [m.purposeReply, m.purposeNews, m.purposeRecruit, m.purposeSecurity];
+  const purposes = [m.purposeReply, m.purposeNews, m.purposeRecruit, m.purposeSecurity, m.purposeAnalytics];
 
   const rights = [
     { title: m.rightAccessTitle, body: m.rightAccessBody },

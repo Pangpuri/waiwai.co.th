@@ -53,6 +53,8 @@ export function permissionLabelOf(permission: AdminPermission, strings: Messages
       return strings.rbacPermissionRetention;
     case "maintenance":
       return strings.rbacPermissionMaintenance;
+    case "analytics":
+      return strings.rbacPermissionAnalytics;
   }
 }
 

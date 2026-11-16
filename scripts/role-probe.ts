@@ -149,3 +149,38 @@ export function probeReadRole(url: string, tables: readonly string[]): Promise<R
 export function probeFormRole(url: string, tables: readonly string[]): Promise<RoleProbeOutcome> {
   return probeRole(url, tables, "form");
 }
+
+export async function probeAnalyticsRole(url: string): Promise<RoleProbeOutcome> {
+  const client = new Client({ connectionString: url });
+  try {
+    await client.connect();
+    const result = await client.query<{
+      readonly role: string;
+      readonly canRecord: boolean;
+      readonly canAccessMetrics: boolean;
+    }>(
+      `select current_user as role,
+              has_function_privilege(current_user, 'public.record_click_metric(text,text,text)', 'EXECUTE') as "canRecord",
+              (has_table_privilege(current_user, 'public.click_metric_daily', 'SELECT')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'INSERT')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'UPDATE')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'DELETE')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'TRUNCATE')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'REFERENCES')
+               or has_table_privilege(current_user, 'public.click_metric_daily', 'TRIGGER')) as "canAccessMetrics"`,
+    );
+    const row = result.rows[0];
+    if (row === undefined) {
+      return { ok: false, role: "", readable: 0, failures: ["ตรวจสิทธิ์ analytics ไม่ได้: query ไม่คืนผล"] };
+    }
+
+    const failures: string[] = [];
+    if (!row.canRecord) failures.push("role analytics เรียก public.record_click_metric ไม่ได้");
+    if (row.canAccessMetrics) failures.push("role analytics เข้าถึงตาราง click_metric_daily โดยตรงได้ (ต้องไม่ได้)");
+    return { ok: failures.length === 0, role: row.role, readable: 0, failures };
+  } catch (error) {
+    return { ok: false, role: "", readable: 0, failures: [`ตรวจ role analytics ไม่สำเร็จ: ${messageOf(error)}`] };
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}

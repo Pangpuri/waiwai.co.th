@@ -1,6 +1,8 @@
 "use client";
 
 import type { Board } from "../board";
+import { NewBadge } from "@/features/shell/ui/new-badge";
+import { trackClick } from "@/lib/analytics/tracking";
 
 /**
  * กระดานรับสมัครงาน — **แสดงเฉพาะตำแหน่งที่เปิดรับ** (รอบ 342 · คำสั่งเจ้าของ 2026-11-11)
@@ -30,10 +32,7 @@ export function JobBoard({ board }: JobBoardProps) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h3 className="font-display text-lg leading-snug font-extrabold text-fg">{card.title}</h3>
             {card.isNewThisMonth ? (
-              <span className="border-accent text-accent bg-surface inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold motion-safe:animate-pulse">
-                <span aria-hidden="true">✦</span>
-                {labels.newBadge}
-              </span>
+              <NewBadge label={labels.newBadge} />
             ) : null}
           </div>
 
@@ -70,6 +69,17 @@ export function JobBoard({ board }: JobBoardProps) {
               </>
             )}
           </dl>
+          <a
+            href="#careers-application"
+            onClick={() => {
+              const position = document.getElementById("apply-position");
+              if (position instanceof HTMLSelectElement) position.value = card.title;
+              trackClick({ type: "career_apply", targetId: card.id, source: "careers" });
+            }}
+            className="bg-brand-red text-on-brand focus-visible:ring-ring mt-5 w-fit rounded-xl px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {labels.applyPosition}
+          </a>
         </li>
       ))}
     </ul>

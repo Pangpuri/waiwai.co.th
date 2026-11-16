@@ -82,6 +82,7 @@ const recipeRow: RecipeRecord = {
   videoProvider: "youtube",
   videoId: "abc123",
   publishedOn: "2026-08-01",
+  updatedAt: null,
   sortOrder: 1,
 };
 
@@ -98,6 +99,7 @@ const newsRow: NewsRecord = {
   coverHeight: 300,
   body: [],
   publishedLocal: "2026-09-12T11:28",
+  updatedAt: null,
   publishedLabel: "12 กันยายน 2026 11:28",
   seo: EMPTY_PAGE_SEO,
   viewCount: 0,

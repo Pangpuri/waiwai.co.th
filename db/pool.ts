@@ -11,26 +11,30 @@ import type { PoolClient } from "pg";
  *
  * ── Least privilege (รอบที่ 169) ─────────────────────────────────────────────
  * แยก "บทบาทการเชื่อมต่อ" ตามงาน เพื่อจำกัดขอบเขตความเสียหาย (blast radius)
- *   · write = หลังบ้าน (`DATABASE_URL`)              → เขียนได้ทุกตาราง
- *   · read  = หน้าเว็บสาธารณะ (`PUBLIC_DATABASE_URL`) → SELECT เฉพาะตารางสาธารณะ (role `waiwai_public_ro`)
- *   · form  = ฟอร์มสาธารณะ (`FORM_DATABASE_URL`)      → INSERT/SELECT เฉพาะตารางฟอร์ม (role `waiwai_public_form`)
+ *   · write     = หลังบ้าน (`DATABASE_URL`)                 → เขียนได้ทุกตาราง
+ *   · read      = หน้าเว็บสาธารณะ (`PUBLIC_DATABASE_URL`)   → SELECT เฉพาะตารางสาธารณะ
+ *   · form      = ฟอร์มสาธารณะ (`FORM_DATABASE_URL`)        → INSERT/SELECT เฉพาะตารางฟอร์ม
+ *   · analytics = collector (`ANALYTICS_DATABASE_URL`)      → EXECUTE ฟังก์ชัน aggregate เท่านั้น
  *
  * ⚠️ ไม่ตั้ง env ของ read/form = **ถอยไปใช้ connection เดียวกัน** (เดโม/เครื่อง dev ยังทำงานได้)
  *    ⇒ ยังไม่มี isolation จนกว่าจะตั้ง — ดู `databaseRoleStatus()` และ `scripts/db-roles.ts`
+ * ⚠️ analytics ไม่มี fallback ไปใช้ `DATABASE_URL` — ไม่ตั้งค่าแล้ว collector ปิดแบบ fail-closed
  *
  * มติ D9: ที่เก็บบทบาท/พาธไม่ได้อยู่ที่นี่ — ที่นี่เก็บเฉพาะ "แถวเนื้อหา" (path ไม่ใช่ URL)
  */
 
-export type DatabaseRole = "write" | "read" | "form";
+export type DatabaseRole = "write" | "read" | "form" | "analytics";
 
 type PoolGlobal = typeof globalThis & {
   __waiwaiPool?: Pool;
   __waiwaiReadPool?: Pool;
   __waiwaiFormPool?: Pool;
+  __waiwaiAnalyticsPool?: Pool;
   /** เวลาที่รีเซ็ตล่าสุด (กัน reset storm — เคสจริง 2026-10-14) */
   __waiwaiPoolResetAt?: number;
   __waiwaiReadPoolResetAt?: number;
   __waiwaiFormPoolResetAt?: number;
+  __waiwaiAnalyticsPoolResetAt?: number;
 };
 
 /** ค่าที่อ่านจาก env — แยกเป็น type เพื่อทดสอบ `resolveRoleUrl()` แบบ pure ได้ */
@@ -39,6 +43,7 @@ export type DatabaseEnv = {
   readonly DATABASE_URL?: string;
   readonly PUBLIC_DATABASE_URL?: string;
   readonly FORM_DATABASE_URL?: string;
+  readonly ANALYTICS_DATABASE_URL?: string;
   /** เพดาน connection ต่อ pool (ค่าเริ่มต้น 3) */
   readonly PG_POOL_MAX?: string;
 };
@@ -60,7 +65,15 @@ function clean(value: string | undefined): string {
  */
 export function resolveRoleUrl(role: DatabaseRole, env: DatabaseEnv): ResolvedRoleUrl | null {
   const admin = clean(env.DATABASE_URL);
-  const dedicated = role === "read" ? clean(env.PUBLIC_DATABASE_URL) : role === "form" ? clean(env.FORM_DATABASE_URL) : "";
+  const dedicated =
+    role === "read"
+      ? clean(env.PUBLIC_DATABASE_URL)
+      : role === "form"
+        ? clean(env.FORM_DATABASE_URL)
+        : role === "analytics"
+          ? clean(env.ANALYTICS_DATABASE_URL)
+          : "";
+  if (role === "analytics" && dedicated === "") return null;
   if (dedicated !== "") return { url: dedicated, isolated: true };
   if (admin === "") return null;
   return { url: admin, isolated: false };
@@ -70,8 +83,13 @@ export function resolveRoleUrl(role: DatabaseRole, env: DatabaseEnv): ResolvedRo
 export function databaseRoleStatus(env: DatabaseEnv = process.env): {
   readonly read: ResolvedRoleUrl | null;
   readonly form: ResolvedRoleUrl | null;
+  readonly analytics: ResolvedRoleUrl | null;
 } {
-  return { read: resolveRoleUrl("read", env), form: resolveRoleUrl("form", env) };
+  return {
+    read: resolveRoleUrl("read", env),
+    form: resolveRoleUrl("form", env),
+    analytics: resolveRoleUrl("analytics", env),
+  };
 }
 
 export function isDatabaseConfigured(): boolean {
@@ -88,12 +106,17 @@ export function isFormRoleConfigured(): boolean {
   return resolveRoleUrl("form", process.env)?.isolated === true;
 }
 
+/** ตั้ง `ANALYTICS_DATABASE_URL` (role สำหรับเพิ่มยอด aggregate เท่านั้น) แล้วหรือยัง */
+export function isAnalyticsIngestConfigured(): boolean {
+  return resolveRoleUrl("analytics", process.env)?.isolated === true;
+}
+
 /**
  * เพดาน connection ต่อ pool ของโปรเซสนี้ (env `PG_POOL_MAX` · ค่าเริ่มต้น 3 · 1..20)
  *
  * ⚠️ เคสจริง 2026-10-14: ผู้ใช้กดเพิ่ม/เผยแพร่ภาพป้ายประกาศ แล้วเจอ
  * `sorry, too many clients already (53300)` จาก Postgres
- *   · ต้นเหตุ: ต่อ 1 โปรเซสมีได้ถึง **3 pool** (หลังบ้าน/อ่าน/ฟอร์ม) × `max` เดิม 5 = 15 connection
+ *   · ต้นเหตุ: ต่อ 1 โปรเซสมีได้ถึง **4 pool** (หลังบ้าน/อ่าน/ฟอร์ม/analytics) × `max` เดิม 5 = 20 connection
  *     และ dev รันคำขอขนานกันหลายใบ ⇒ pool โตถึงเพดานเร็ว · พอมีหลายโปรเซส (dev ค้าง + build + สคริปต์)
  *     ก็ชน `max_connections = 100` ของกล่อง Postgres ⇒ คำขอใหม่ถูกปฏิเสธทันที
  *   · แก้: ลดเพดานต่อ pool + คืน connection เร็วขึ้น + กันการรีเซ็ตถี่ (ดู `resetRolePool`)
@@ -142,8 +165,22 @@ const POOL_RESET_MIN_INTERVAL_MS = 2_000;
 
 export function resetRolePool(role: DatabaseRole): boolean {
   const scope = globalThis as PoolGlobal;
-  const key = role === "read" ? "__waiwaiReadPool" : role === "form" ? "__waiwaiFormPool" : "__waiwaiPool";
-  const stampKey = role === "read" ? "__waiwaiReadPoolResetAt" : role === "form" ? "__waiwaiFormPoolResetAt" : "__waiwaiPoolResetAt";
+  const key =
+    role === "read"
+      ? "__waiwaiReadPool"
+      : role === "form"
+        ? "__waiwaiFormPool"
+        : role === "analytics"
+          ? "__waiwaiAnalyticsPool"
+          : "__waiwaiPool";
+  const stampKey =
+    role === "read"
+      ? "__waiwaiReadPoolResetAt"
+      : role === "form"
+        ? "__waiwaiFormPoolResetAt"
+        : role === "analytics"
+          ? "__waiwaiAnalyticsPoolResetAt"
+          : "__waiwaiPoolResetAt";
   const pool = scope[key];
   if (pool === undefined) return false;
 
@@ -184,8 +221,22 @@ export function connectionExhaustedHint(): string {
  * มีเทสต์คุมว่าต้องบอกทั้ง "env key" และ "คำสั่งที่ต้องรัน" เสมอ
  */
 export function roleCredentialHint(role: DatabaseRole): string {
-  const envKey = role === "read" ? "PUBLIC_DATABASE_URL" : role === "form" ? "FORM_DATABASE_URL" : "DATABASE_URL";
-  const label = role === "read" ? "อ่านอย่างเดียว (หน้าเว็บสาธารณะ)" : role === "form" ? "ฟอร์มสาธารณะ" : "หลังบ้าน";
+  const envKey =
+    role === "read"
+      ? "PUBLIC_DATABASE_URL"
+      : role === "form"
+        ? "FORM_DATABASE_URL"
+        : role === "analytics"
+          ? "ANALYTICS_DATABASE_URL"
+          : "DATABASE_URL";
+  const label =
+    role === "read"
+      ? "อ่านอย่างเดียว (หน้าเว็บสาธารณะ)"
+      : role === "form"
+        ? "ฟอร์มสาธารณะ"
+        : role === "analytics"
+          ? "บันทึกสถิติ"
+          : "หลังบ้าน";
   return [
     `เชื่อมต่อฐานข้อมูลด้วย role ${label} ไม่สำเร็จ — รหัสผ่านใน ${envKey} ไม่ตรงกับที่ตั้งไว้ในฐานข้อมูล`,
     "แก้: รัน `npm run db:roles -- --reveal` แล้วอัปเดตค่าใน .env.local ให้ตรงกัน",
@@ -243,6 +294,20 @@ export function getFormPool(): Pool {
   return pool;
 }
 
+/** Collector-only pool — has EXECUTE on the aggregate-write function and never falls back to DATABASE_URL. */
+export function getAnalyticsPool(): Pool {
+  const resolved = resolveRoleUrl("analytics", process.env);
+  if (resolved === null || !resolved.isolated) throw new Error("ANALYTICS_DATABASE_URL is not set");
+
+  const scope = globalThis as PoolGlobal;
+  const existing = scope.__waiwaiAnalyticsPool;
+  if (existing !== undefined) return existing;
+
+  const pool = createPool(resolved.url);
+  scope.__waiwaiAnalyticsPool = pool;
+  return pool;
+}
+
 /** รันงานใน transaction — rollback อัตโนมัติถ้ามี error (ใช้ตอนบันทึกเนื้อหา) */
 export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
@@ -266,10 +331,11 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
 /** ปิด pool ทั้งหมด — ใช้ในสคริปต์ CLI เพื่อให้โปรเซสจบจริง */
 export async function closePool(): Promise<void> {
   const scope = globalThis as PoolGlobal;
-  const pools = [scope.__waiwaiPool, scope.__waiwaiReadPool, scope.__waiwaiFormPool];
+  const pools = [scope.__waiwaiPool, scope.__waiwaiReadPool, scope.__waiwaiFormPool, scope.__waiwaiAnalyticsPool];
   scope.__waiwaiPool = undefined;
   scope.__waiwaiReadPool = undefined;
   scope.__waiwaiFormPool = undefined;
+  scope.__waiwaiAnalyticsPool = undefined;
 
   await Promise.all(
     pools.map(async (pool) => {

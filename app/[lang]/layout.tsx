@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Anuphan, IBM_Plex_Sans_Thai } from "next/font/google";
 
 import "../globals.css";
 
 import { CookieBanner } from "@/features/shell/ui/cookie-banner";
+import { PageViewTracker } from "@/features/analytics/ui/page-view-tracker";
 import { DocumentStateSync } from "@/features/shell/ui/document-state-sync";
 import { InlineScript } from "@/features/shell/ui/inline-script";
 import { MourningNotice } from "@/features/shell/ui/mourning-notice";
@@ -148,6 +150,9 @@ export default async function LocaleLayout({
       </head>
 
       <body className="flex min-h-dvh flex-col">
+        <Suspense fallback={null}>
+          <PageViewTracker locale={chromeLocale} />
+        </Suspense>
         {/* คง attribute ที่สคริปต์ก่อน paint ตั้งไว้ (คุกกี้/ประกาศ/hero/reveal) ข้ามการสลับภาษา */}
         <DocumentStateSync />
 

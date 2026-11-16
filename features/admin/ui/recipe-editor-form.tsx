@@ -114,6 +114,7 @@ export function RecipeEditorForm(props: RecipeEditorFormProps) {
     videoProvider: "youtube",
     videoId: detectedVideoId ?? "",
     publishedOn: fields.publishedOn === "" ? null : fields.publishedOn,
+    updatedAt: null,
     sortOrder: 0,
   };
 

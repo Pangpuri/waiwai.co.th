@@ -8,6 +8,10 @@ import {
 } from "@/app/admin/actions";
 import { auditActionLabel, auditStamp } from "@/features/admin/audit-labels";
 import { listRecentAudit } from "@/lib/audit/log";
+import { isAnalyticsIngestConfigured } from "@/db/pool";
+import { AnalyticsDashboard } from "@/features/admin/ui/analytics-dashboard";
+import { isAnalyticsPeriod } from "@/lib/analytics/model";
+import { loadAnalyticsReport } from "@/lib/analytics/repository";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/roles";
 import { scheduledPublishOverview } from "@/lib/blocks/publish-scheduler";
@@ -38,10 +42,22 @@ import { trashStats } from "@/lib/trash/repository";
  * หน้านี้รวม "ร่องรอยการใช้งาน" (X2.2) และ "ระยะเก็บข้อมูลส่วนบุคคล" (X2b) ไว้ที่เดียว
  * ⇒ เจ้าของเห็นทันทีว่ามีข้อมูลหมดอายุค้างอยู่ไหม และกดลบเองได้โดยไม่ต้องรอรอบอัตโนมัติ
  */
-export default async function AdminHomePage() {
+export default async function AdminHomePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{
+    readonly [key: string]: string | string[] | undefined;
+    readonly analyticsPeriod?: string | string[] | undefined;
+  }>;
+}) {
   const user = await requireAdminUser("content");
   const messages = await getMessagesFor("th");
   const strings = messages.admin;
+  const canAnalytics = can(user.role, "analytics");
+  const search = await searchParams;
+  const requestedPeriod = Array.isArray(search.analyticsPeriod) ? null : search.analyticsPeriod;
+  const analyticsPeriod = isAnalyticsPeriod(requestedPeriod) ? requestedPeriod : "week";
+  const analyticsReport = canAnalytics ? await loadAnalyticsReport(analyticsPeriod) : null;
 
   /* ร่องรอยการใช้งาน (X2.2) — เดิมตาราง audit_log แต่ว่างเปล่า ⇒ ตอนนี้เขียนทุกครั้งที่ล็อกอิน/เผยแพร่ */
   const audit = await listRecentAudit(8);
@@ -167,6 +183,14 @@ export default async function AdminHomePage() {
           </Link>
         </div>
       </section>
+
+      {canAnalytics ? (
+        <AnalyticsDashboard
+          report={analyticsReport}
+          collectorConfigured={isAnalyticsIngestConfigured()}
+          strings={strings}
+        />
+      ) : null}
 
       {/* ── ระยะเก็บข้อมูลส่วนบุคคล (X2b) — เฉพาะผู้มีสิทธิ์ retention ──────────── */}
       {canRetention ? (

@@ -14,6 +14,8 @@ import {
 import type { Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import type { ProductRecord } from "@/lib/products/repository";
+import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
+import { NewBadge } from "@/features/shell/ui/new-badge";
 
 /**
  * รายการสินค้าในหมวด — ส่วนที่แสดง **ข้อมูลที่นำเข้าจากเว็บเดิม** (S3 ส่วนที่ 3 · รอบที่ 103)
@@ -39,6 +41,7 @@ export type ProductListStrings = {
   readonly fda: string;
   readonly packaging: string;
   readonly noImage: string;
+  readonly newBadge: string;
 };
 
 export function productListStringsOf(page: Messages["productsPage"]): ProductListStrings {
@@ -55,6 +58,7 @@ export function productListStringsOf(page: Messages["productsPage"]): ProductLis
     fda: page.dbFda,
     packaging: page.dbPackaging,
     noImage: page.dbNoImage,
+    newBadge: page.dbNewBadge,
   };
 }
 
@@ -118,6 +122,7 @@ export function ProductListSection({
             const allergens = productAllergensOf(product, language);
             /* รอบ 342: ไม่มีข้อมูลในกล่อง = ไม่แสดง dropdown (สินค้าส่งออกบางตัวมีแค่ชื่อ/ภาพ) */
             const hasDetails = productHasDetails(product, language);
+            const isNewThisMonth = isUpdatedThisBangkokMonth(product.updatedAt, new Date());
 
             /* `min-w-0` = การ์ดยอมหดต่ำกว่า min-content ของตารางส่วนผสม (กันล้นจอบนมือถือ) */
             return (
@@ -135,7 +140,10 @@ export function ProductListSection({
                   />
                 )}
 
-                <h3 className="text-fg mt-3 text-base leading-snug font-semibold">{label}</h3>
+                <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="text-fg text-base leading-snug font-semibold">{label}</h3>
+                  {isNewThisMonth ? <NewBadge label={strings.newBadge} /> : null}
+                </div>
                 {group === "" ? null : <p className="text-fg-muted mt-0.5 text-xs">{group}</p>}
 
                 {hasDetails ? (

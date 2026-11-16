@@ -28,6 +28,7 @@ export const adminRbac = {
   rbacPermissionSettings: "Edit organisation details & site SEO",
   rbacPermissionRetention: "Retention periods and erasure requests (PDPA)",
   rbacPermissionMaintenance: "Turn maintenance mode on or off",
+  rbacPermissionAnalytics: "View website usage analytics reports",
   rbacRoleUnknown: "Unknown role",
   rbacCreateTitle: "Add an account",
   rbacCreateHint: "The system generates the password — copy it and hand it over (shown once).",

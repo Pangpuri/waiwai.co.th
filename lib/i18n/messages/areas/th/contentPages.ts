@@ -30,6 +30,7 @@ export const recipesPage = {
     dbPublished: "เผยแพร่เมื่อ",
     dbNoCover: "ยังไม่มีภาพปก",
     dbViews: "เข้าชม {count} ครั้ง",
+    dbNewBadge: "ใหม่",
     dbRecipeDetails: "ดูสูตรอาหาร",
     dbRecipeImageOpen: "เปิดดูภาพสูตร",
     dbImageClose: "ปิดภาพ",
@@ -62,5 +63,6 @@ export const newsPage = {
     dbNext: "ถัดไป",
     dbPageLabel: "แบ่งหน้า",
     dbPublished: "เผยแพร่เมื่อ",
+    dbNewBadge: "ใหม่",
     dbBackToNews: "กลับไปหน้าข่าวสารทั้งหมด",
 };

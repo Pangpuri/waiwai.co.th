@@ -2,7 +2,8 @@
  * Dictionary area: the /privacy page (privacy policy) — X2b
  *
  * ⚠️ This version adapts the company's **previous policy** and checks it against what the system
- *    actually does (the retention periods come from `lib/retention/plan.ts`). It has an effective
+ *    actually does (personal-data retention periods come from `lib/retention/plan.ts`; aggregate
+ *    statistics are not linked to visitors and are retained continuously). It has an effective
  *    date and version, so there is no "draft" badge on the page.
  */
 export const privacyPage = {
@@ -41,7 +42,7 @@ export const privacyPage = {
     "The committee appointed under the Personal Data Protection Act B.E. 2562 (2019), responsible for supervising and issuing rules on personal data protection",
 
   collectTitle: "What we collect",
-  collectIntro: "We collect only the information you enter in the forms on this website.",
+  collectIntro: "We collect information you enter in forms and record aggregate daily counts of public page views and selected link clicks.",
   collectContactTitle: "Contact form",
   collectContactBody: "Your name, email, phone number (if provided), the topic you chose, and your message",
   collectNewsletterTitle: "Newsletter form",
@@ -49,8 +50,11 @@ export const privacyPage = {
   collectCareersTitle: "Job application form",
   collectCareersBody:
     "Your name, the position you applied for, email, phone number, a short introduction, and the résumé file you attach (if any)",
+  collectAnalyticsTitle: "Website engagement statistics",
+  collectAnalyticsBody:
+    "Each opening or navigation to a public page is counted, including direct visits from search results without first visiting the home page, along with marketplace, news, recipe, and job application clicks. Counts are daily aggregates, do not identify individuals, and are retained continuously without a scheduled deletion date",
   collectNote:
-    "We do not collect sensitive personal data through this website, and we do not collect data from sources other than you · Our hosting provider may keep access logs (such as IP address and time) as part of standard system security",
+    "Page views count page openings, not unique visitors · These statistics do not record IP addresses, sessions, full URLs, names, or email addresses · We do not collect sensitive personal data through this website · Our hosting provider may separately keep technical access logs (such as IP address and time) for system security",
 
   purposeTitle: "What we use it for",
   purposeIntro: "We use your information only for the purposes below — nothing else",
@@ -58,12 +62,13 @@ export const privacyPage = {
   purposeNews: "To send you news and activities from Wai Wai — only with your consent, which you can withdraw at any time",
   purposeRecruit: "To consider your application and get in touch about recruitment",
   purposeSecurity: "To keep the system secure and to audit content changes (staff of the site operator only)",
+  purposeAnalytics: "To understand aggregate public page views and interest in marketplaces, news, recipes, and job postings from daily counts that do not identify visitors",
   purposeBasis:
     "Legal bases: contact form — your consent when you submit the form, or the Company's legitimate interest in responding to your enquiry · newsletter — your consent (withdrawable at any time) · job application — your consent or steps taken before entering into an employment contract · system security — the Company's legitimate interest",
 
   retentionTitle: "How long we keep it",
   retentionIntro:
-    "We keep data only as long as needed, per the periods below. When a period ends, the system deletes the data automatically (the same values the deletion job uses).",
+    "Personal data is kept for the periods below and deleted automatically when each period ends, using the same values as the deletion job. Aggregate engagement statistics are retained continuously as described in the note.",
   retentionColData: "Data type",
   retentionColKeep: "Kept for",
   retentionLabelContact: "Contact form messages",
@@ -76,7 +81,7 @@ export const privacyPage = {
   retentionLabelAuditLog: "Content change log (staff only)",
   retentionLabelAdminSession: "Back-office sign-in sessions (staff only)",
   retentionNote:
-    "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · the latest revision of each page is always kept so mistakes can be restored · if you want your data deleted earlier, contact us using the details below",
+    "Deletion is permanent and cannot be undone · résumé files are deleted together with the application · the latest revision of each page is always kept so mistakes can be restored · aggregate daily statistics are not linked to visitors and are retained continuously without a scheduled deletion date · if you want personal data deleted earlier, contact us using the details below",
 
   rightsTitle: "Your rights",
   rightsIntro: "Under the Personal Data Protection Act B.E. 2562 (2019) you have the following rights",
@@ -108,7 +113,7 @@ export const privacyPage = {
     "We do not sell your data or disclose it for marketing · We disclose it only as necessary to service providers engaged by the Company, who process it on our instructions: our website hosting provider (Vercel) and our database provider (Neon — the database is located in Singapore) · When you press play on a YouTube video on the recipes page, your browser connects directly to YouTube (no connection is made before you press play) · We may disclose data to government or regulatory authorities where required by law",
   cookiesTitle: "Cookies and similar technologies",
   cookiesBody:
-    "This website uses no marketing or analytics cookies and no third-party tracking scripts · We use localStorage in your browser to remember your theme, the dismissal of the cookie notice, the announcement notice and the PR card — this stays in your browser and is not sent back to us · A session cookie is used only by back-office staff to sign in",
+    "This website uses no analytics cookies or third-party tracking scripts · Each public page opening is counted with selected clicks as first-party daily aggregates on the server, without cookies, full URLs, or links to individual visitors, and retained continuously without a scheduled deletion date · localStorage remembers your theme, cookie notice choice, announcement notice and PR card · A session cookie is used only by back-office staff to sign in",
   securityTitle: "Security measures",
   securityBody:
     "We apply security measures for personal data, including role-based access control · staff passwords stored as one-way hashes · sign-in rate limiting · activity logging for content changes · separate database credentials for the public site, public forms and the back office · data backups and restore testing",
@@ -121,6 +126,6 @@ export const privacyPage = {
     "To exercise your rights or ask about your personal data, contact the Data Protection Officer using the data controller details above, or send us a message through the contact form",
   contactFormLabel: "Go to the contact form",
   updatedTitle: "Effective date and version",
-  updatedBody: "Effective 22 October 2026 · Version 1.0 · Last updated 22 October 2026",
+  updatedBody: "Effective 16 November 2026 · Version 1.1 · Last updated 16 November 2026",
   backHome: "Back to home",
 };

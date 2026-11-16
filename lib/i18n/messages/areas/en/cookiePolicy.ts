@@ -30,7 +30,7 @@ export const cookiePolicyPage = {
 
   summaryTitle: "In short",
   summaryBody:
-    "This site does not use analytics or advertising cookies. The cookies we set are only for administrator sessions. What most visitors store are preferences in localStorage — kept in your browser and not sent back to us.",
+    "This site does not use analytics or advertising cookies. Public page openings and selected clicks are counted as first-party daily aggregates on the server, without cookies or identifying visitors, and retained continuously without a scheduled deletion date. The only cookies we set are for administrator sessions.",
 
   whatTitle: "What cookies and localStorage are",
   whatBody:
@@ -77,7 +77,7 @@ export const cookiePolicyPage = {
 
   notUsedTitle: "Cookies we do not use",
   notUsedBody:
-    "We do not use analytics cookies (such as Google Analytics), advertising or remarketing cookies, or third-party cookies that track you across sites. We do not build marketing profiles.",
+    "We do not use analytics cookies (such as Google Analytics), advertising or remarketing cookies, or third-party cookies that track you across sites. Aggregate public page-view and click counts do not use cookies, record full URLs, or build visitor profiles.",
 
   thirdPartyTitle: "Service providers and third parties",
   thirdPartyBody:
@@ -92,7 +92,7 @@ export const cookiePolicyPage = {
   choicesAll: "Accept all — record that you consent",
   choicesEssential: "Essential only — record that you consent to essential items only",
   choicesSame:
-    "Both choices currently use exactly the same items because the site has no analytics or marketing cookies. The two options exist so your decision is explicit, and they will become meaningfully different if optional cookies are added later.",
+    "Both choices currently use exactly the same items because the site has no analytics or marketing cookies. Aggregate page-view and click statistics do not use cookies and are not affected by this choice.",
   choicesChange: "You can change your mind at any time by using the button below to clear your previous answer; the cookie banner will then appear again.",
   consentButton: "Change cookie settings",
   consentStatus: "Your previous answer was cleared — the cookie banner will appear at the bottom of the screen.",
@@ -114,6 +114,6 @@ export const cookiePolicyPage = {
   contactLink: "Go to the contact page",
 
   updatedTitle: "Effective date and version",
-  updatedBody: "Effective 7 November 2026 · Version 1.0 · Last updated 7 November 2026",
+  updatedBody: "Effective 16 November 2026 · Version 1.2 · Last updated 16 November 2026",
   backHome: "Back to home",
 };

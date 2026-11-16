@@ -1,7 +1,9 @@
 import type { Pool, QueryResult, QueryResultRow } from "pg";
 
 import {
+  getPool,
   getFormPool,
+  getAnalyticsPool,
   getReadPool,
   isRoleAuthFailure,
   resetRolePool,
@@ -45,7 +47,7 @@ function warnOnce(role: DatabaseRole, error: unknown): void {
  * - ล้มด้วย "credential ใช้ไม่ได้" = **ทิ้ง pool แล้วลองใหม่ 1 ครั้ง** (กรณีเพิ่งรัน `db:roles` ระหว่างเซิร์ฟเวอร์รัน)
  * - ล้มซ้ำ = เตือนครั้งเดียว + โยน error ที่บอกทางแก้ (ผู้ใช้/admin รู้ว่าต้องทำอะไรต่อ)
  */
-/** คำสั่งเดียวที่ต้องรันผ่าน pool ของบทบาทหนึ่ง (แยกออกมาให้เทสต์ได้โดยไม่ต้องมี DB) */
+/** คำสั่งเดียวที่ต้องรันผ่าน pool ของ role สาธารณะ (แยกออกมาให้เทสต์ได้โดยไม่ต้องมี DB) */
 export type RoleQueryRun<T> = {
   readonly role: DatabaseRole;
   /** รันคำสั่งด้วย pool ปัจจุบัน */
@@ -75,7 +77,13 @@ export async function queryWithRole<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[],
 ): Promise<QueryResult<T>> {
-  const pool = (): Pool => (role === "read" ? getReadPool() : getFormPool());
+  const pool = (): Pool => {
+    if (role === "read") return getReadPool();
+    if (role === "form") return getFormPool();
+    if (role === "analytics") return getAnalyticsPool();
+    if (role === "write") return getPool();
+    throw new Error(`Unsupported database role: ${String(role)}`);
+  };
 
   return runWithRoleRetry({
     role,

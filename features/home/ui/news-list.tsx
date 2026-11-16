@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { localePath, type Locale } from "@/lib/i18n/config";
+import { TrackedLink } from "@/features/analytics/ui/tracked-link";
 import type { Messages } from "@/lib/i18n/messages/th";
 
 import type { HomeNewsItem } from "../view-models";
@@ -47,7 +48,11 @@ export function NewsList({ locale, messages, items }: NewsListProps) {
           ? items.map((item) => (
               <li key={item.id}>
                 <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface transition-colors hover:border-line-strong">
-                  <Link href={item.href} className="group flex h-full flex-col focus-visible:outline-offset-4">
+                  <TrackedLink
+                    href={item.href}
+                    event={{ type: "news_click", targetId: item.id, source: "home" }}
+                    className="group flex h-full flex-col focus-visible:outline-offset-4"
+                  >
                     {item.image === null ? (
                       <span aria-hidden="true" className="block h-44 bg-bg-subtle" />
                     ) : (
@@ -68,7 +73,7 @@ export function NewsList({ locale, messages, items }: NewsListProps) {
                         {item.title}
                       </h3>
                     </span>
-                  </Link>
+                  </TrackedLink>
                 </article>
               </li>
             ))

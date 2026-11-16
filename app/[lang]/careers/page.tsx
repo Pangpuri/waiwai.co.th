@@ -12,6 +12,7 @@ import { listJobPostings } from "@/lib/careers/repository";
 import { loadCareersPageCopy } from "@/lib/careers/page-copy";
 import { ApplicationForm } from "@/features/careers/ui/application-form";
 import { JobBoard } from "@/features/careers/ui/job-board";
+import { CareersPageView } from "@/features/analytics/ui/careers-page-view";
 import { Breadcrumb } from "@/features/shell/ui/breadcrumb";
 import { buildAlternates, isLocale, localePath } from "@/lib/i18n/config";
 import { getMessages, getMessagesFor } from "@/lib/i18n/dictionaries";
@@ -101,6 +102,7 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
 
   return (
     <>
+      <CareersPageView />
       <section className="border-b border-line bg-bg-subtle">
         <div className="container-site py-12 lg:py-16">
           <Breadcrumb
@@ -138,7 +140,7 @@ export default async function CareersPage({ params }: PageProps<"/[lang]/careers
         </div>
       </section>
 
-      <section className="border-t border-line bg-bg-subtle">
+      <section id="careers-application" className="border-t border-line bg-bg-subtle">
         <div className="container-site py-16 lg:py-24">
           <h2 className="font-display text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">
             {m.applyTitle}

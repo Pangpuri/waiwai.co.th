@@ -6,6 +6,9 @@ import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { formatNewsDate, formatViewCount, newsPathOfSourceId } from "@/lib/news/model";
 import type { NewsRecord } from "@/lib/news/repository";
+import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
+import { NewBadge } from "@/features/shell/ui/new-badge";
+import { TrackedLink } from "@/features/analytics/ui/tracked-link";
 
 /**
  * รายการข่าว (การ์ด + แบ่งหน้า) — Server Component (หน้า /news · รอบที่ 105)
@@ -25,6 +28,7 @@ export type NewsListStrings = {
   readonly previous: string;
   readonly next: string;
   readonly pageLabel: string;
+  readonly newBadge: string;
 };
 
 export function newsListStringsOf(page: Messages["newsPage"]): NewsListStrings {
@@ -38,6 +42,7 @@ export function newsListStringsOf(page: Messages["newsPage"]): NewsListStrings {
     previous: page.dbPrevious,
     next: page.dbNext,
     pageLabel: page.dbPageLabel,
+    newBadge: page.dbNewBadge,
   };
 }
 
@@ -58,10 +63,15 @@ export function NewsCard({
   const title = titleOf(record, language);
   const published = formatNewsDate(record.publishedLocal, language);
   const views = fillTemplate(strings.views, { count: formatViewCount(record.viewCount, language) });
+  const isNewThisMonth = isUpdatedThisBangkokMonth(record.updatedAt, new Date());
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-bg">
-      <Link href={localePath(language, newsPathOfSourceId(record.sourceId))} className="block">
+      <TrackedLink
+        href={localePath(language, newsPathOfSourceId(record.sourceId))}
+        event={{ type: "news_click", targetId: record.id, source: "news" }}
+        className="block"
+      >
         {record.coverPath === null ? (
           <span className="bg-bg-subtle text-fg-muted flex aspect-[4/3] items-center justify-center px-3 text-center text-xs">
             {strings.noCover}
@@ -76,7 +86,7 @@ export function NewsCard({
             className="aspect-[4/3] h-auto w-full object-cover"
           />
         )}
-      </Link>
+      </TrackedLink>
 
       <div className="flex flex-1 flex-col p-5">
         {/* รอบ 342 ต่อ (คำเจ้าของ): ใต้ภาพแสดงวันที่เผยแพร่ + จำนวนเข้าชม */}
@@ -88,11 +98,18 @@ export function NewsCard({
           )}
           <span>{views}</span>
         </div>
-        <h3 className="text-base leading-snug font-bold text-fg">
-          <Link href={localePath(language, newsPathOfSourceId(record.sourceId))} className="hover:underline">
-            {title}
-          </Link>
-        </h3>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="text-base leading-snug font-bold text-fg">
+            <TrackedLink
+              href={localePath(language, newsPathOfSourceId(record.sourceId))}
+              event={{ type: "news_click", targetId: record.id, source: "news" }}
+              className="hover:underline"
+            >
+              {title}
+            </TrackedLink>
+          </h3>
+          {isNewThisMonth ? <NewBadge label={strings.newBadge} /> : null}
+        </div>
       </div>
     </article>
   );
