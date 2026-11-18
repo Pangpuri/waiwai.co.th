@@ -208,55 +208,72 @@ export default async function AdminMediaPage({
                   <img src={path} alt={item.altTh} className="max-h-40 w-auto rounded-lg" loading="lazy" />
                 </div>
 
-                <div className="flex flex-col gap-0.5 text-xs">
+                <div className="flex flex-col gap-1 text-xs">
                   <span className="text-fg truncate font-semibold">{item.filename}</span>
-                  <span className="text-fg-muted">
-                    {formatBytes(item.sizeBytes)}
-                    {item.width === null || item.height === null ? "" : ` · ${item.width}×${item.height}`}
-                    {` · ${item.createdAt.slice(0, 10)}`}
-                  </span>
-                  <span className="text-fg-muted">
-                    {strings.mediaPath}: <code className="font-mono">{path}</code>
-                  </span>
+
+                  <details className="product-card-details border-line rounded-xl border px-2.5 py-2">
+                    <summary className="product-card-details-summary text-fg focus-visible:ring-ring flex cursor-pointer items-center justify-between gap-2 text-[11px] font-semibold focus-visible:ring-2 focus-visible:outline-none">
+                      {strings.mediaManage}
+                    </summary>
+
+                    <div className="product-card-details-body mt-3 flex flex-col gap-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-fg-muted">
+                          {formatBytes(item.sizeBytes)}
+                          {item.width === null || item.height === null ? "" : ` · ${item.width}×${item.height}`}
+                          {` · ${item.createdAt.slice(0, 10)}`}
+                        </span>
+                        <span className="text-fg-muted">
+                          {strings.mediaPath}: <code className="break-all font-mono">{path}</code>
+                        </span>
+                      </div>
+
+                      <div
+                        className={`rounded-lg p-2 text-[11px] ${
+                          used ? "bg-surface-raised text-fg" : "bg-surface-raised text-fg-muted"
+                        }`}
+                      >
+                        {used ? (
+                          <>
+                            <span className="font-semibold">
+                              {strings.mediaUsage}: {usage.length}
+                            </span>
+                            <ul className="mt-0.5 flex flex-col">
+                              {usage.slice(0, 5).map((entry) => (
+                                <li key={`${entry.kind}-${entry.target}`} className="font-mono">
+                                  {usageKindLabel(entry.kind, strings)} · {entry.target}
+                                  {entry.detail === null ? "" : ` · ${entry.detail}`}
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        ) : (
+                          strings.mediaUnused
+                        )}
+                      </div>
+
+                      {/* แก้คำอธิบายภาพ (a11y) — ฟอร์มธรรมดา ใช้ได้แม้ปิด JS */}
+                      <form action={updateMediaAltAction} className="flex flex-col gap-1 border-t border-line pt-2">
+                        <input type="hidden" name="id" value={item.id} />
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-fg-muted text-[11px]">{strings.mediaAltTh}</span>
+                          <input type="text" name="altTh" defaultValue={item.altTh} maxLength={300} className={FIELD_CLASS} />
+                        </label>
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-fg-muted text-[11px]">{strings.mediaAltEn}</span>
+                          <input type="text" name="altEn" defaultValue={item.altEn} maxLength={300} className={FIELD_CLASS} />
+                        </label>
+                        <button type="submit" className={`${BUTTON_CLASS} self-start`}>
+                          {strings.mediaSaveAlt}
+                        </button>
+                      </form>
+
+                      <div className="border-t border-line pt-2">
+                        <MediaItemActions id={item.id} strings={actionStrings} used={used} />
+                      </div>
+                    </div>
+                  </details>
                 </div>
-
-                <div className={`rounded-lg p-2 text-[11px] ${used ? "bg-surface-raised text-fg" : "bg-surface-raised text-fg-muted"}`}>
-                  {used ? (
-                    <>
-                      <span className="font-semibold">
-                        {strings.mediaUsage}: {usage.length}
-                      </span>
-                      <ul className="mt-0.5 flex flex-col">
-                        {usage.slice(0, 5).map((entry) => (
-                          <li key={`${entry.kind}-${entry.target}`} className="font-mono">
-                            {usageKindLabel(entry.kind, strings)} · {entry.target}
-                            {entry.detail === null ? "" : ` · ${entry.detail}`}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : (
-                    strings.mediaUnused
-                  )}
-                </div>
-
-                {/* แก้คำอธิบายภาพ (a11y) — ฟอร์มธรรมดา ใช้ได้แม้ปิด JS */}
-                <form action={updateMediaAltAction} className="flex flex-col gap-1">
-                  <input type="hidden" name="id" value={item.id} />
-                  <label className="flex flex-col gap-0.5">
-                    <span className="text-fg-muted text-[11px]">{strings.mediaAltTh}</span>
-                    <input type="text" name="altTh" defaultValue={item.altTh} maxLength={300} className={FIELD_CLASS} />
-                  </label>
-                  <label className="flex flex-col gap-0.5">
-                    <span className="text-fg-muted text-[11px]">{strings.mediaAltEn}</span>
-                    <input type="text" name="altEn" defaultValue={item.altEn} maxLength={300} className={FIELD_CLASS} />
-                  </label>
-                  <button type="submit" className={`${BUTTON_CLASS} self-start`}>
-                    {strings.mediaSaveAlt}
-                  </button>
-                </form>
-
-                <MediaItemActions id={item.id} strings={actionStrings} used={used} />
               </li>
             );
           })}
