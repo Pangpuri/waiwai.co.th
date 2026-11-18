@@ -128,7 +128,7 @@ export default async function AdminHomePage({
   const maintenanceFlag = maintenanceFlagOf(process.env[MAINTENANCE_ENV_VAR]);
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col">
           <p className="text-fg-muted text-xs font-medium tracking-wide uppercase">{strings.brand}</p>

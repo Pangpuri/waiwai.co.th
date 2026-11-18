@@ -34,7 +34,7 @@ export const thAdminCategories = {
   fieldNameEn: "ชื่อหมวด (อังกฤษ)",
   fieldDescriptionTh: "คำอธิบาย (ไทย)",
   fieldDescriptionEn: "คำอธิบาย (อังกฤษ)",
-  fieldImage: "ภาพหัวหมวด",
+  fieldImage: "*ภาพหัวหมวด (โดยภาพนี้จะโชว์ที่หน้าแรกของเว็บไซต์)",
   fieldImageHint: "ใช้แสดงบนหน้ารายละเอียดหมวด",
   fieldLogo: "โลโก้การ์ด",
   fieldLogoHint: "ใช้แสดงบนการ์ดหน้า /products และหน้าแรก",

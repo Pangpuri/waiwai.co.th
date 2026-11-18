@@ -49,16 +49,18 @@ export const ADMIN_PERMISSIONS = [
   "analytics",
   /** เปลี่ยนอีเมลเข้าสู่ระบบ/รหัสผ่านของบัญชีตัวเอง */
   "account",
+  /** คู่มือการใช้งานระบบหลังบ้าน */
+  "manual",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
-const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "careers", "media", "presets", "preview", "account"];
+const EDITOR_PERMISSIONS: readonly AdminPermission[] = ["content", "careers", "media", "presets", "preview", "account", "manual"];
 
 const PUBLISHER_PERMISSIONS: readonly AdminPermission[] = [...EDITOR_PERMISSIONS, "inbox", "seo", "trash"];
 
 const ADMIN_PERMISSIONS_ALL: readonly AdminPermission[] = [...ADMIN_PERMISSIONS];
-const HR_PERMISSIONS: readonly AdminPermission[] = ["careers", "account"];
+const HR_PERMISSIONS: readonly AdminPermission[] = ["careers", "account", "manual"];
 
 /**
  * ตารางสิทธิ์จริง — **แหล่งความจริงเดียว**

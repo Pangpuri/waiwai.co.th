@@ -30,6 +30,7 @@ export const adminRbac = {
   rbacPermissionMaintenance: "Turn maintenance mode on or off",
   rbacPermissionAnalytics: "View website usage analytics reports",
   rbacPermissionAccount: "Change your own sign-in email and password",
+  rbacPermissionManual: "View backend user manual and configuration guide",
   rbacRoleUnknown: "Unknown role",
   rbacCreateTitle: "Add an account",
   rbacCreateHint: "The system generates the password — copy it and hand it over (shown once).",

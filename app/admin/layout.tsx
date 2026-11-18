@@ -81,6 +81,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       label: messages.admin.navGroupSystem,
       items: [
         { href: "/admin", label: messages.admin.dashboardTitle },
+        { href: "/admin/manual", label: messages.admin.navManual },
         { href: "/admin/activity", label: messages.admin.activityTitle },
         { href: "/admin/settings", label: messages.admin.settingsTitle },
         { href: "/admin/users", label: messages.admin.rbacUsersTitle },
@@ -100,6 +101,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     "/admin/settings": "settings",
     "/admin/users": "users",
     "/admin/account": "account",
+    "/admin/manual": "manual",
   };
 
   const visibleGroups: readonly AdminNavGroup[] = sidebarGroups
@@ -133,6 +135,30 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 brand: messages.admin.brand,
                 account: `${user.email} · ${roleLabelOf(user.role, messages.admin)}`,
                 logout: messages.admin.logout,
+                tips: {
+                  "/admin": messages.admin.tipDashboard,
+                  "/admin/builder/chrome": messages.admin.tipChrome,
+                  "/admin/hero": messages.admin.tipHero,
+                  "/admin/builder/home": messages.admin.tipHome,
+                  "/admin/builder/about": messages.admin.tipAbout,
+                  "/admin/builder/certifications": messages.admin.tipCertifications,
+                  "/admin/builder/executives": messages.admin.tipExecutives,
+                  "/admin/product-categories": messages.admin.tipCategories,
+                  "/admin/products": messages.admin.tipProducts,
+                  "/admin/recipes": messages.admin.tipRecipes,
+                  "/admin/news": messages.admin.tipNews,
+                  "/admin/careers": messages.admin.tipCareers,
+                  "/admin/builder/contact": messages.admin.tipContact,
+                  "/admin/media": messages.admin.tipMedia,
+                  "/admin/inbox": messages.admin.tipInbox,
+                  "/admin/preview-links": messages.admin.tipPreviewLinks,
+                  "/admin/trash": messages.admin.tipTrash,
+                  "/admin/manual": messages.admin.tipManual,
+                  "/admin/activity": messages.admin.tipActivity,
+                  "/admin/settings": messages.admin.tipSettings,
+                  "/admin/users": messages.admin.tipUsers,
+                  "/admin/account": messages.admin.tipAccount,
+                },
               }}
             />
             <div className="min-w-0 flex-1">{children}</div>

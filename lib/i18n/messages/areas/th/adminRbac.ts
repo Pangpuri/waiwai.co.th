@@ -30,6 +30,7 @@ export const adminRbac = {
   rbacPermissionMaintenance: "เปิด/ปิดโหมดปิดปรับปรุงเว็บ",
   rbacPermissionAnalytics: "ดูรายงานสถิติการใช้งานเว็บไซต์",
   rbacPermissionAccount: "เปลี่ยนอีเมลเข้าสู่ระบบและรหัสผ่านของบัญชีตัวเอง",
+  rbacPermissionManual: "ดูคู่มือการใช้งานระบบหลังบ้านและคำแนะนำการตั้งค่า",
   rbacRoleUnknown: "บทบาทไม่ถูกต้อง",
   rbacCreateTitle: "เพิ่มบัญชีใหม่",
   rbacCreateHint: "ระบบจะสร้างรหัสผ่านให้ — คัดลอกเก็บไว้แล้วส่งให้เจ้าของบัญชี (แสดงครั้งเดียว)",

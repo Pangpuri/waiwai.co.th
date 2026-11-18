@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ADMIN_SIDEBAR_STORAGE_KEY } from "@/lib/admin/ui-storage";
+import { AdminTooltip } from "@/features/admin/ui/admin-tooltip";
 
 /**
  * เมนูด้านข้างของหลังบ้าน (รอบที่ 156–157)
@@ -29,6 +30,8 @@ export type AdminSidebarStrings = {
   /** บัญชีที่ล็อกอินอยู่ เช่น "admin@waiwai.co.th · ผู้ดูแลระบบ" */
   readonly account: string;
   readonly logout: string;
+  /** คำแนะนำการใช้งาน (Tooltip) ของแต่ละเมนู */
+  readonly tips?: Readonly<Record<string, string>>;
 };
 
 /** ไอคอนเส้น (stroke) 24×24 — ใช้ `currentColor` จึงเปลี่ยนสีตามธีม/token ได้ */
@@ -145,7 +148,7 @@ export function AdminSidebar({
         "border-line bg-surface shrink-0 border-b lg:sticky lg:top-0 lg:h-dvh lg:border-r lg:border-b-0 lg:overflow-x-hidden lg:overflow-y-auto",
         /* ลื่น: ปรับความกว้างด้วย transition (ไม่ unmount เมนู ⇒ ไม่กระพริบแบบรีโหลดทั้งหน้า) */
         "transition-[width] duration-300 ease-in-out",
-        open ? "w-full lg:w-72" : "w-full lg:w-16",
+        open ? "w-full lg:w-88" : "w-full lg:w-16",
       ].join(" ")}
     >
       {/*
@@ -239,6 +242,7 @@ export function AdminSidebar({
                 <ul className="flex flex-col gap-0.5">
                   {group.items.map((item) => {
                     const active = isActive(item.href);
+                    const tipText = strings.tips?.[item.href];
                     return (
                       <li key={item.href}>
                         <Link
@@ -248,20 +252,23 @@ export function AdminSidebar({
                           /* มือถือ: กดเมนูแล้วหุบให้อัตโนมัติ · เดสก์ท็อปไม่มีผล */
                           onClick={() => setMobileOpen(false)}
                           className={[
-                            "flex items-center justify-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150",
+                            "flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors duration-150",
                             open ? "" : "lg:justify-center lg:gap-0 lg:px-0 lg:py-2",
                             active ? "bg-brand-red text-on-brand font-semibold" : "text-fg hover:bg-surface-raised",
                           ].join(" ")}
                         >
-                          <Icon path={iconFor(item.href)} />
-                          <span
-                            className={[
-                              "truncate text-sm whitespace-nowrap transition-opacity duration-200",
-                              open ? "opacity-100" : "lg:hidden",
-                            ].join(" ")}
-                          >
-                            {item.label}
-                          </span>
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <Icon path={iconFor(item.href)} />
+                            <span
+                              className={[
+                                "text-sm leading-snug transition-opacity duration-200",
+                                open ? "opacity-100" : "lg:hidden",
+                              ].join(" ")}
+                            >
+                              {item.label}
+                            </span>
+                          </div>
+                          {open && tipText && <AdminTooltip text={tipText} />}
                         </Link>
                       </li>
                     );
