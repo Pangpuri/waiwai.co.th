@@ -10,7 +10,7 @@ import {
   parseNewsListingPage,
   sourceIdOfNewsPath,
 } from "@/lib/news/import-parse";
-import { MAX_NEWS_BLOCKS, newsBodyImageIds, newsBodyPlainText, parseNewsBody, validateNewsBody } from "@/lib/news/body";
+import { MAX_NEWS_BLOCKS, NEWS_IMAGE_QUALITY, newsBodyImageIds, newsBodyPlainText, parseNewsBody, validateNewsBody } from "@/lib/news/body";
 import { applyNewsDateOverride, newsDateOverrideOf, NEWS_DATE_OVERRIDES } from "@/lib/news/date-overrides";
 import {
   formatNewsDate,
@@ -382,6 +382,24 @@ test("news: หน้ารายละเอียดเรนเดอร์�
   const body = sourceOf("features/news/ui/news-body.tsx");
   assert.ok(!body.includes("dangerouslySetInnerHTML"));
   assert.ok(body.includes("block.text"), "ข้อความต้องเรนเดอร์เป็นข้อความล้วน");
+});
+
+test("news: ภาพในเนื้อข่าวใช้ quality สูงกว่า default และ next.config อนุญาตค่านั้น", () => {
+  /*
+    Next 16 อนุญาตเฉพาะ quality ที่อยู่ใน `images.qualities`
+    ⇒ ต้องมีทั้งค่าที่ компонентส่ง และค่าใน next.config — ถ้าลืมอย่างใดอย่างหนึ่ง
+      Next จะ coerce กลับไป 75 แล้วความคมชัดจะไม่เปลี่ยน (เงียบ ๆ)
+  */
+  assert.ok(NEWS_IMAGE_QUALITY > 75 && NEWS_IMAGE_QUALITY <= 100, "คุณภาพภาพข่าวต้องสูงกว่า default และอยู่ในช่วง 1–100");
+
+  const body = sourceOf("features/news/ui/news-body.tsx");
+  assert.ok(body.includes("quality={NEWS_IMAGE_QUALITY}"), "ภาพในเนื้อข่าวต้องส่ง quality ที่สูงขึ้นให้ next/image");
+
+  const config = sourceOf("next.config.ts");
+  assert.ok(
+    config.includes("qualities: [75, NEWS_IMAGE_QUALITY]"),
+    "next.config ต้องอนุญาต quality ของภาพข่าวด้วย ไม่เช่นนั้น Next จะลดกลับไป 75",
+  );
 });
 
 test("news: สคริปต์นำเข้ามีตัวช่วยกลาง + เพดานขนาดรูปกันไฟล์ยักษ์", () => {

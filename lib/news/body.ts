@@ -30,6 +30,17 @@ export type NewsImageBlock = {
 
 export type NewsBlock = NewsParagraphBlock | NewsHeadingBlock | NewsImageBlock;
 
+/**
+ * คุณภาพการบีบอัดของภาพข่าวที่ส่งผ่าน `next/image` (รอบ 365)
+ *
+ * - Next 16 อนุญาตเฉพาะค่า quality ที่ระบุใน `images.qualities` (next.config.ts)
+ *   ค่าเริ่มต้นของโปรเจกต์คือ 75 ซึ่งใช้กับภาพส่วนอื่น
+ * - ภาพในเนื้อข่าวใช้ค่าที่สูงขึ้นเพื่อให้ตัวอักษร/รายละเอียดในภาพคมขึ้น
+ * - **ไม่กระทบไฟล์ใน DB** — ไฟล์ต้นฉบับยังเป็นไบต์เดิมทุกประการ
+ *   ค่านี้มีผลเฉพาะไฟล์ที่ Next สร้างตอนเสิร์ฟให้ผู้ชม
+ */
+export const NEWS_IMAGE_QUALITY = 90;
+
 /** เพดานกันข้อมูลเพี้ยน/ไฟล์ใหญ่ผิดปกติ (ข่าวที่ยาวที่สุดที่พบ ~4,400 ตัวอักษร) */
 export const MAX_NEWS_BLOCKS = 300;
 export const MAX_NEWS_TEXT_LENGTH = 6000;

@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { NEWS_IMAGE_QUALITY } from "@/lib/news/body";
 import { legacyRedirectRules } from "@/lib/routing/redirects";
 import { contentSecurityPolicy } from "@/lib/security/csp";
 
@@ -22,6 +23,15 @@ const nextConfig: NextConfig = {
     "192.168.10.*", // เผื่อ IP ในวงเดียวกันเปลี่ยน
     "172.31.192.1", // Hyper-V Default Switch (IP ที่ `next dev` พิมพ์ให้ — คนละ adapter กับวงแลนด์)
   ],
+
+  /*
+    Next 16 บังคับให้ระบุรายการ quality ที่อนุญาต (ค่าเริ่มต้นมีแค่ 75)
+    - 75 = ค่าเริ่มต้นของภาพส่วนอื่นทั้งเว็บ
+    - NEWS_IMAGE_QUALITY = ภาพในเนื้อข่าว (ขอความคมชัดขึ้นโดยไม่แตะไฟล์ใน DB)
+  */
+  images: {
+    qualities: [75, NEWS_IMAGE_QUALITY],
+  },
 
   /*
     ⚠️ จำเป็นสำหรับ "อัปโหลดภาพ" (เจอจริง 2026-10-02)

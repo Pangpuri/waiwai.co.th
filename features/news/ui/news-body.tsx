@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 import type { MediaSize } from "@/lib/media/repository";
-import type { NewsBlock } from "@/lib/news/body";
+import { NEWS_IMAGE_QUALITY, type NewsBlock } from "@/lib/news/body";
 
 /**
  * เนื้อหาข่าว (หน้า /news · รอบที่ 105) — Server Component
@@ -46,6 +46,7 @@ export function NewsBody({
                 width={size?.width ?? FALLBACK_WIDTH}
                 height={size?.height ?? FALLBACK_HEIGHT}
                 sizes="(max-width: 768px) 92vw, 720px"
+                quality={NEWS_IMAGE_QUALITY}
                 className="h-auto w-full rounded-xl border border-line"
               />
               {caption !== "" ? (
