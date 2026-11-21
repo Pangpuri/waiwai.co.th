@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { refreshPublicSite } from "@/lib/cache/refresh";
 
 import type { SettingsState } from "@/features/admin/settings-state";
+import type { CoverUploadState } from "@/features/admin/ui/cover-image-picker";
 import { recordAudit } from "@/lib/audit/log";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { publishDraft, saveJsonDraft } from "@/lib/blocks/repository";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { storeImageFile } from "@/lib/media/upload";
 import { SITE_SETTINGS_PAGE_KEY, parseSiteSettings, siteSettingsErrorsOf, validateSiteSettings } from "@/lib/site-settings/model";
 
 /**
@@ -68,6 +70,29 @@ async function prepare(formData: FormData): Promise<{ readonly ok: true; readonl
   }
 
   return { ok: true, value: parsed.value };
+}
+
+/**
+ * อัปโหลดภาพของหน้าตั้งค่า (ไอคอนเว็บ / รูปแชร์เริ่มต้น)
+ * - ใช้ท่อกลาง `storeImageFile` ตัวเดียวกับคลังภาพ/ข่าว/สินค้า (sniff + 5MB + ย่อ/WebP ฝั่งเบราว์เซอร์)
+ * - คืน **พาธ** `/media/<id>` (มติ D9) แล้วฟอร์มเก็บลง hidden input
+ */
+export async function uploadSettingsImageAction(
+  _previous: CoverUploadState,
+  formData: FormData,
+): Promise<CoverUploadState> {
+  await requireAdminUser("settings");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { status: "invalid", path: "", reason: "no-file" };
+  }
+
+  const stored = await storeImageFile(file, "site-settings");
+  if (!stored.ok) return { status: "invalid", path: "", reason: stored.reason };
+
+  revalidatePath("/admin/settings");
+  return { status: "ok", path: stored.path, reason: "" };
 }
 
 export async function saveSettingsAction(_previous: SettingsState, formData: FormData): Promise<SettingsState> {

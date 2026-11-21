@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { codeOf } from "./source-scan.ts";
+
 import { th } from "@/lib/i18n/messages/th";
 import { LOCALES } from "@/lib/i18n/config";
 import { defaultPages } from "@/lib/pages/model";
@@ -236,4 +238,26 @@ test("EMPTY_SITE_SETTINGS: ว่างทุกช่องแต่ยัง�
   /* ว่าง = ยังไม่ตั้ง ⇒ ตรวจแล้วมีแต่คำเตือน ไม่มี error ยกเว้นชื่อเว็บว่าง */
   assert.equal(EMPTY_SITE_SETTINGS.favicon, "");
   assert.equal(siteSettingsErrorsOf(validateSiteSettings(EMPTY_SITE_SETTINGS)).some((issue) => issue.code === "empty-th"), true);
+});
+
+test("settings: ไอคอนเว็บ/รูปแชร์อัปโหลดได้เหมือนส่วนอื่น และชี้ไปแก้โลโก้หัวเว็บ", () => {
+  const form = codeOf("features/admin/ui/settings-form.tsx");
+  assert.equal(
+    (form.match(/<CoverImagePicker/g) ?? []).length,
+    2,
+    "ต้องมีตัวเลือกภาพ 2 ช่อง (ไอคอนเว็บ + รูปแชร์เริ่มต้น)",
+  );
+  assert.ok(form.includes('fieldName="favicon"'), "ไอคอนเว็บต้องส่งค่าผ่านช่อง favicon");
+  assert.ok(form.includes('fieldName="defaultOgImage"'), "รูปแชร์ต้องส่งค่าผ่านช่อง defaultOgImage");
+  assert.ok(form.includes("uploadAction={uploadAction}"), "ต้องใช้ upload action ที่ตรวจสิทธิ์ settings");
+  assert.ok(form.includes('href="/admin/builder/chrome"'), "ต้องมีลิงก์ไปแก้โลโก้หัวเว็บที่หน้าส่วนกลาง");
+
+  const page = codeOf("app/admin/settings/page.tsx");
+  assert.ok(page.includes("listMedia("), "หน้าตั้งค่าต้องโหลดคลังภาพให้เลือก");
+  assert.ok(page.includes("uploadSettingsImageAction"), "หน้าตั้งค่าต้องส่ง upload action ให้ฟอร์ม");
+
+  const actions = codeOf("app/admin/settings/actions.ts");
+  assert.ok(actions.includes("export async function uploadSettingsImageAction"), "ต้องมี Server Action สำหรับอัปโหลดภาพตั้งค่า");
+  assert.ok(actions.includes('requireAdminUser("settings")'), "ต้องตรวจสิทธิ์ settings ก่อนอัปโหลด");
+  assert.ok(actions.includes("storeImageFile"), "ต้องใช้ท่อกลาง storeImageFile (sniff + 5MB + WebP)");
 });

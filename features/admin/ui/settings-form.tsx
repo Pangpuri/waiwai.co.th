@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { publishSettingsAction, saveSettingsAction } from "@/app/admin/settings/actions";
 import { AdminToast } from "@/features/admin/ui/admin-toast";
+import {
+  CoverImagePicker,
+  type CoverImagePickerLabels,
+  type CoverUploadAction,
+  type CoverUploadState,
+} from "@/features/admin/ui/cover-image-picker";
+import type { ImageGridItem } from "@/features/admin/ui/image-grid-picker";
 import { INITIAL_SETTINGS_STATE } from "@/features/admin/settings-state";
 import { MAX_NOTICE_LENGTH, MAX_SOCIALS, type SiteSettings } from "@/lib/site-settings/model";
 import { SITE } from "@/lib/site";
@@ -27,6 +34,7 @@ const BUTTON_CLASS =
 
 /** โฮสต์จริงจากค่ากลาง (`lib/site.ts`) — ห้ามพิมพ์โดเมนซ้ำในคอมโพเนนต์นี้ */
 const SITE_HOST = new URL(SITE.url).host;
+const INITIAL_SETTINGS_UPLOAD_STATE: CoverUploadState = { status: "idle", path: "", reason: "" };
 
 function SaveButton({ label, primary = false }: { readonly label: string; readonly primary?: boolean }) {
   const { pending } = useFormStatus();
@@ -51,6 +59,8 @@ export function SettingsForm({
   exampleTitle,
   exampleDescription,
   exampleOgImage,
+  library,
+  uploadAction,
 }: {
   readonly initial: SiteSettings;
   readonly messages: Messages;
@@ -59,10 +69,31 @@ export function SettingsForm({
   readonly exampleDescription: string;
   /** รูปแชร์ที่มีผลกับหน้าแรก (SEO รายหน้า → defaultOgImage) */
   readonly exampleOgImage: string;
+  /** คลังภาพให้เลือกไอคอนเว็บ/รูปแชร์ */
+  readonly library: readonly ImageGridItem[];
+  /** Server Action ที่ตรวจสิทธิ์ `settings` ก่อนเก็บภาพ */
+  readonly uploadAction: CoverUploadAction;
 }) {
   const strings = messages.admin;
+  const [favicon, setFavicon] = useState(initial.favicon);
+  const [defaultOgImage, setDefaultOgImage] = useState(initial.defaultOgImage);
   const [saveState, saveAction] = useActionState(saveSettingsAction, INITIAL_SETTINGS_STATE);
   const [publishState, publishAction] = useActionState(publishSettingsAction, INITIAL_SETTINGS_STATE);
+
+  const pickerLabels = (field: string): CoverImagePickerLabels => ({
+    field,
+    previewAlt: field,
+    empty: strings.settingsImageEmpty,
+    upload: strings.settingsImageUpload,
+    uploadHint: strings.settingsImageUploadHint,
+    uploading: strings.settingsImageUploading,
+    uploadFailed: strings.settingsImageUploadFailed,
+    pickFromLibrary: strings.settingsImagePickFromLibrary,
+    cancel: strings.settingsImageCancel,
+    remove: strings.settingsImageRemove,
+    storedInLibrary: strings.settingsImageStoredInLibrary,
+    noImages: strings.settingsImageNoImages,
+  });
 
   const state = publishState.status === "idle" ? saveState : publishState;
   const statusText =
@@ -88,14 +119,38 @@ export function SettingsForm({
             <span className={LABEL_CLASS}>{strings.settingsNameEn}</span>
             <input type="text" name="nameEn" defaultValue={initial.name.en} maxLength={60} className={FIELD_CLASS} />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.settingsFavicon}</span>
-            <input type="text" name="favicon" defaultValue={initial.favicon} placeholder="/media/…" className={FIELD_CLASS} />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className={LABEL_CLASS}>{strings.settingsDefaultOg}</span>
-            <input type="text" name="defaultOgImage" defaultValue={initial.defaultOgImage} placeholder="/media/…" className={FIELD_CLASS} />
-          </label>
+          <div className="flex flex-col gap-1">
+            <CoverImagePicker
+              labels={pickerLabels(strings.settingsFavicon)}
+              value={favicon}
+              onChange={setFavicon}
+              library={library}
+              uploadAction={uploadAction}
+              initialUploadState={INITIAL_SETTINGS_UPLOAD_STATE}
+              fieldName="favicon"
+              previewClassName="h-24 w-24"
+              previewImageClassName="h-full w-full object-contain"
+            />
+            <p className="text-fg-muted text-[11px] leading-relaxed">{strings.settingsFaviconHint}</p>
+            <Link
+              href="/admin/builder/chrome"
+              className="text-link w-fit text-[11px] font-semibold underline underline-offset-4"
+            >
+              {strings.settingsHeaderLogoLink}
+            </Link>
+          </div>
+          <div className="flex flex-col gap-1">
+            <CoverImagePicker
+              labels={pickerLabels(strings.settingsDefaultOg)}
+              value={defaultOgImage}
+              onChange={setDefaultOgImage}
+              library={library}
+              uploadAction={uploadAction}
+              initialUploadState={INITIAL_SETTINGS_UPLOAD_STATE}
+              fieldName="defaultOgImage"
+            />
+            <p className="text-fg-muted text-[11px] leading-relaxed">{strings.settingsDefaultOgHint}</p>
+          </div>
         </div>
 
         <fieldset className="border-line flex flex-col gap-2 rounded-xl border p-3">

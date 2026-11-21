@@ -58,6 +58,10 @@ export type CoverImagePickerProps = {
   readonly initialUploadState: CoverUploadState;
   /** ชื่อช่อง hidden ที่ส่งพาธ — ค่าเริ่มต้น `coverPath` (ใช้ `seoOgImagePath` กับ SEO รายข่าว) */
   readonly fieldName?: string;
+  /** คลาสของกรอบพรีวิว (ค่าเริ่มต้น h-24 w-36) — ใช้ h-24 w-24 กับไอคอนเว็บ */
+  readonly previewClassName?: string;
+  /** คลาสของภาพในกรอบ (ค่าเริ่มต้น object-cover) — ใช้ object-contain กับไอคอนเว็บ */
+  readonly previewImageClassName?: string;
 };
 
 const INPUT_CLASS =
@@ -74,6 +78,8 @@ export function CoverImagePicker({
   uploadAction,
   initialUploadState,
   fieldName = "coverPath",
+  previewClassName = "h-24 w-36",
+  previewImageClassName = "h-full w-full object-cover",
 }: CoverImagePickerProps) {
   const [picking, setPicking] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -115,7 +121,7 @@ export function CoverImagePicker({
       <span className={LABEL_CLASS}>{labels.field}</span>
 
       <div className="flex flex-wrap items-start gap-3">
-        <span className="border-line bg-bg-subtle block h-24 w-36 shrink-0 overflow-hidden rounded-lg border">
+        <span className={`border-line bg-bg-subtle block shrink-0 overflow-hidden rounded-lg border ${previewClassName}`}>
           {value === "" ? (
             <span className="text-fg-muted flex h-full items-center justify-center px-2 text-center text-xs">
               {labels.empty}
@@ -126,7 +132,7 @@ export function CoverImagePicker({
               alt={labels.previewAlt}
               width={288}
               height={192}
-              className="h-full w-full object-cover"
+              className={previewImageClassName}
               unoptimized
             />
           )}

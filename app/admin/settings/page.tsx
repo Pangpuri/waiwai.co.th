@@ -1,9 +1,12 @@
 import { SettingsForm } from "@/features/admin/ui/settings-form";
 import { requireAdminUser } from "@/lib/auth/dal";
 import { getMessagesFor } from "@/lib/i18n/dictionaries";
+import { listMedia } from "@/lib/media/repository";
 import { loadPageSeo } from "@/lib/pages/repository";
 import { resolveSeo } from "@/lib/seo/page-seo";
 import { loadSiteSettingsForEditing } from "@/lib/site-settings/loader";
+
+import { uploadSettingsImageAction } from "./actions";
 
 /**
  * ข้อมูลองค์กร & SEO (X1.3 + X1.4) — ชื่อเว็บ · ไอคอน · รูปแชร์ · ข้อมูลนิติบุคคล · โซเชียล
@@ -18,12 +21,15 @@ export default async function AdminSettingsPage() {
   const strings = messages.admin;
 
   /* ใช้ฉบับร่างถ้ามี (ผู้แก้เห็นงานค้างของตัวเอง) — ไม่มีก็ฉบับเผยแพร่/ค่าเริ่มต้น */
-  const [{ settings, draftUpdatedAt, publishedAt }, homeSeo] = await Promise.all([
+  const [{ settings, draftUpdatedAt, publishedAt }, homeSeo, media] = await Promise.all([
     loadSiteSettingsForEditing(),
     /* ค่าจริงของหน้าแรก: SEO ที่ตั้งจาก /admin/builder/home (ถ้ามี) → ไม่มีใช้ค่าเริ่มต้นจากพจนานุกรม */
     loadPageSeo("home"),
+    /* คลังภาพสำหรับเลือกไอคอนเว็บ/รูปแชร์ — หน้าตั้งค่าเป็นสิทธิ์ admin ซึ่งมี media อยู่แล้ว */
+    listMedia(60),
   ]);
   const resolvedHomeSeo = homeSeo === null ? null : resolveSeo(homeSeo, "th");
+  const library = media.map((item) => ({ id: item.id, filename: item.filename, path: `/media/${item.id}` }));
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-4 px-4 py-8">
@@ -38,6 +44,8 @@ export default async function AdminSettingsPage() {
         exampleTitle={resolvedHomeSeo?.title ?? messages.meta.homeTitle}
         exampleDescription={resolvedHomeSeo?.description ?? messages.meta.homeDescription}
         exampleOgImage={resolvedHomeSeo?.ogImagePath ?? settings.defaultOgImage}
+        library={library}
+        uploadAction={uploadSettingsImageAction}
       />
 
       <p className="text-fg-muted text-xs">
