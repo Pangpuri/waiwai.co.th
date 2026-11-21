@@ -4,7 +4,7 @@ import Link from "next/link";
 import { fillTemplate } from "@/lib/i18n/template";
 import { localePath, type Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
-import { formatNewsDate, formatViewCount, newsPathOfSourceId } from "@/lib/news/model";
+import { formatNewsDate, formatViewCount, newsInstantOf, newsPathOfSourceId } from "@/lib/news/model";
 import type { NewsRecord } from "@/lib/news/repository";
 import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
 import { NewBadge } from "@/features/shell/ui/new-badge";
@@ -63,7 +63,11 @@ export function NewsCard({
   const title = titleOf(record, language);
   const published = formatNewsDate(record.publishedLocal, language);
   const views = fillTemplate(strings.views, { count: formatViewCount(record.viewCount, language) });
-  const isNewThisMonth = isUpdatedThisBangkokMonth(record.updatedAt, new Date());
+  /*
+    ป้าย "ใหม่" ของข่าวต้องอิงวันเผยแพร่ ไม่ใช่วันแก้ไข
+    — แก้ข่าวเก่าแล้วกดเผยแพร่ใหม่ต้องไม่ทำให้ป้ายกลับมา
+  */
+  const isNewThisMonth = isUpdatedThisBangkokMonth(newsInstantOf(record.publishedLocal), new Date());
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-bg">

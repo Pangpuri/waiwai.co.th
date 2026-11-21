@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { en } from "@/lib/i18n/messages/en";
 import { th } from "@/lib/i18n/messages/th";
 import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
+import { newsInstantOf } from "@/lib/news/model";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -19,11 +20,28 @@ test("ป้ายใหม่: ใช้เดือนปฏิทินไท
   assert.equal(isUpdatedThisBangkokMonth("2026-09-30T16:59:59.000Z", now), false);
   assert.equal(isUpdatedThisBangkokMonth("invalid", now), false);
   assert.equal(isUpdatedThisBangkokMonth(null, now), false);
+
+  /* ข่าวเก็บเวลาไทยแบบไม่มี offset ⇒ ต้องแปลงเป็น instant ของไทยก่อนเทียบเดือน */
+  assert.equal(isUpdatedThisBangkokMonth(newsInstantOf("2026-11-01T00:30"), now), true);
+  assert.equal(isUpdatedThisBangkokMonth(newsInstantOf("2026-10-31T23:30"), now), false);
 });
 
-test("ป้ายใหม่: ข่าว/สินค้า/เมนูอ่าน updated_at และใช้คอมโพเนนต์ป้ายร่วม", () => {
+test("ป้ายใหม่ของข่าว: ใช้วันเผยแพร่ ไม่ใช่วันแก้ไข", () => {
+  const repository = sourceOf("lib/news/repository.ts");
+  assert.ok(repository.includes("published_at"), "repository ต้องอ่าน published_at เพื่อคำนวณป้ายใหม่");
+  assert.ok(!repository.includes("readonly updatedAt"), "NewsRecord ต้องไม่มี updatedAt ที่ใช้ตัดสินป้ายใหม่อีก");
+
+  const component = sourceOf("features/news/ui/news-list.tsx");
+  assert.ok(
+    component.includes("isUpdatedThisBangkokMonth(newsInstantOf(record.publishedLocal)"),
+    "ป้ายใหม่ของข่าวต้องเทียบเดือนจาก publishedLocal",
+  );
+  assert.ok(!component.includes("record.updatedAt"), "ห้ามใช้ updatedAt ตัดสินป้ายใหม่ของข่าว");
+  assert.ok(component.includes("<NewBadge"), "ต้องแสดงคอมโพเนนต์ป้ายร่วม");
+});
+
+test("ป้ายใหม่: สินค้า/เมนูอ่าน updated_at และใช้คอมโพเนนต์ป้ายร่วม", () => {
   const cases = [
-    ["lib/news/repository.ts", "n.updated_at", "updatedAt: isoStamp(row.updated_at)", "features/news/ui/news-list.tsx"],
     [
       "lib/products/repository.ts",
       "p.updated_at",
