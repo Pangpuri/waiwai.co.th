@@ -465,6 +465,8 @@ create table if not exists product (
   packaging_en   text        not null default '',
   image_media_id text        references media (id) on delete set null,
   sort_order     integer     not null default 0,
+  /* วันเผยแพร่จริง (migration 0056 · รอบ 367) — ใช้ป้าย "ใหม่" · การแก้ไขไม่เปลี่ยนค่านี้ */
+  published_at   timestamptz not null default now(),
   /* ถังขยะของสินค้า (migration 0022 · รอบที่ 139) — null = ใช้งาน · มีค่า = อยู่ในถัง (กู้คืนได้) */
   deleted_at     timestamptz,
   /* ใครลบ (migration 0026 · รอบที่ 177) — คู่กับ deleted_at เสมอ: กู้คืนแล้วล้างทั้งคู่ */

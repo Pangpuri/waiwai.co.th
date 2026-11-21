@@ -4,7 +4,7 @@ import type { Locale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages/th";
 import { formatRecipeDate, recipeTitleOf, youTubeWatchUrlOf } from "@/lib/recipes/model";
 import type { RecipeRecord } from "@/lib/recipes/repository";
-import { isUpdatedThisBangkokMonth } from "@/lib/date/updated-this-month";
+import { isDateInCurrentBangkokMonth } from "@/lib/date/updated-this-month";
 import { NewBadge } from "@/features/shell/ui/new-badge";
 
 import { RecipeImageLightbox } from "./recipe-image-lightbox";
@@ -90,7 +90,8 @@ export function RecipeVideoList({
             const published = formatRecipeDate(recipe.publishedOn, language);
             const details = language === "en" && recipe.detailsEn.trim() !== "" ? recipe.detailsEn : recipe.detailsTh;
             const hasRecipe = details.trim() !== "" || recipe.recipeImagePath !== null;
-            const isNewThisMonth = isUpdatedThisBangkokMonth(recipe.updatedAt, new Date());
+            /* ป้าย "ใหม่" อิงวันเผยแพร่เมนู (published_on) ไม่ใช่วันแก้ไข */
+            const isNewThisMonth = isDateInCurrentBangkokMonth(recipe.publishedOn, new Date());
             return (
               <li key={recipe.id} className="flex flex-col rounded-2xl border border-line bg-bg p-4">
                 <VideoFacade

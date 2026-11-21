@@ -57,8 +57,8 @@ export type ProductRecord = {
   /** ขนาดจริงของภาพ (อ่านจากหัวไฟล์ตอนนำเข้า) — ใช้ตั้งสัดส่วนภาพโดยไม่ต้องรอโหลด */
   readonly imageWidth: number | null;
   readonly imageHeight: number | null;
-  /** เวลาแก้ไขล่าสุด (ISO) ใช้คำนวณป้าย "ใหม่" รายเดือน */
-  readonly updatedAt: string | null;
+  /** วันเผยแพร่สินค้า (ISO) — ใช้คำนวณป้าย "ใหม่" รายเดือน · แก้ไขสินค้าไม่เปลี่ยนค่านี้ */
+  readonly publishedAt: string | null;
   readonly sortOrder: number;
   readonly ingredients: readonly ProductIngredientRecord[];
 };
@@ -95,7 +95,7 @@ export type ProductCategoryRecord = {
   "column reference \"id\" is ambiguous" แล้วหน้าจะไม่แสดงสินค้าเลยทั้งที่ข้อมูลอยู่ (เจอจริงตอนเขียนด่าน check:db)
 */
 const PRODUCT_COLUMNS =
-  "p.id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.updated_at, p.sort_order";
+  "p.id, p.category_id, p.market, p.name_th, p.name_en, p.group_th, p.group_en, p.tagline_th, p.tagline_en, p.details_th, p.details_en, p.allergens_th, p.allergens_en, p.net_weight_th, p.net_weight_en, p.fda_number, p.packaging_th, p.packaging_en, p.image_media_id, p.published_at, p.sort_order";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -160,7 +160,7 @@ function toProductRecord(row: Record<string, unknown>): ProductRecord | null {
     imagePath: mediaPath(row.image_media_id),
     imageWidth: typeof row.image_width === "number" && row.image_width > 0 ? row.image_width : null,
     imageHeight: typeof row.image_height === "number" && row.image_height > 0 ? row.image_height : null,
-    updatedAt: isoStamp(row.updated_at),
+    publishedAt: isoStamp(row.published_at),
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
     ingredients: readIngredients(row.ingredients),
   };

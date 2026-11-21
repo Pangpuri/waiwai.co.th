@@ -122,7 +122,8 @@ export function ProductListSection({
             const allergens = productAllergensOf(product, language);
             /* รอบ 342: ไม่มีข้อมูลในกล่อง = ไม่แสดง dropdown (สินค้าส่งออกบางตัวมีแค่ชื่อ/ภาพ) */
             const hasDetails = productHasDetails(product, language);
-            const isNewThisMonth = isUpdatedThisBangkokMonth(product.updatedAt, new Date());
+            /* ป้าย "ใหม่" อิงวันเผยแพร่สินค้า ไม่ใช่วันแก้ไข */
+            const isNewThisMonth = isUpdatedThisBangkokMonth(product.publishedAt, new Date());
 
             /* `min-w-0` = การ์ดยอมหดต่ำกว่า min-content ของตารางส่วนผสม (กันล้นจอบนมือถือ) */
             return (

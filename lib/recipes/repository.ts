@@ -44,10 +44,8 @@ export type RecipeRecord = {
   readonly viewCountUpdatedAt: string | null;
   readonly videoProvider: "youtube";
   readonly videoId: string;
-  /** ISO `YYYY-MM-DD` หรือ null */
+  /** ISO `YYYY-MM-DD` หรือ null — ใช้แสดงผลและคำนวณป้าย "ใหม่" */
   readonly publishedOn: string | null;
-  /** เวลาแก้ไขล่าสุด (ISO) ใช้คำนวณป้าย "ใหม่" รายเดือน */
-  readonly updatedAt: string | null;
   readonly sortOrder: number;
 };
 
@@ -103,7 +101,6 @@ function toRecipeRecord(row: Record<string, unknown>): RecipeRecord | null {
     videoProvider: "youtube",
     videoId,
     publishedOn: text(row.published_on) === "" ? null : text(row.published_on),
-    updatedAt: isoStamp(row.updated_at),
     sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0,
   };
 }
@@ -120,7 +117,7 @@ export async function listRecipes(): Promise<readonly RecipeRecord[]> {
       `select r.id, r.source_id, r.source_url, r.title_th, r.title_en, r.cover_media_id,
               r.details_th, r.details_en, r.recipe_image_media_id, r.view_count,
               r.view_count_updated_at,
-              r.video_provider, r.video_id, r.published_on::text as published_on, r.updated_at, r.sort_order,
+              r.video_provider, r.video_id, r.published_on::text as published_on, r.sort_order,
               m.width as cover_width, m.height as cover_height,
               ri.width as recipe_image_width, ri.height as recipe_image_height
          from recipe r

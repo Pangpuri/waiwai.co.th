@@ -82,7 +82,6 @@ const recipeRow: RecipeRecord = {
   videoProvider: "youtube",
   videoId: "abc123",
   publishedOn: "2026-08-01",
-  updatedAt: null,
   sortOrder: 1,
 };
 
