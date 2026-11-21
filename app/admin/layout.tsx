@@ -135,6 +135,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 brand: messages.admin.brand,
                 account: `${user.email} · ${roleLabelOf(user.role, messages.admin)}`,
                 logout: messages.admin.logout,
+                tooltipAriaLabel: messages.admin.tooltipAriaLabel,
+                tooltipTitle: messages.admin.tooltipTitle,
+                tooltipHeading: messages.admin.tooltipHeading,
                 tips: {
                   "/admin": messages.admin.tipDashboard,
                   "/admin/builder/chrome": messages.admin.tipChrome,

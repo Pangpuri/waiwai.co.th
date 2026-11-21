@@ -41,6 +41,7 @@ import { adminPages } from "./areas/th/adminPages.ts";
 import { adminInbox } from "./areas/th/adminInbox.ts";
 import { adminAnalytics } from "./areas/th/adminAnalytics.ts";
 import { adminAccount } from "./areas/th/adminAccount.ts";
+import { adminManual } from "./areas/th/adminManual.ts";
 
 /**
  * พจนานุกรมภาษาไทย — เป็น "ต้นทางของ type"
@@ -87,6 +88,7 @@ export const th = {
   /* ประกาศรับสมัครงานของหน้า /careers (มติ D26 · รอบที่ 265) */
   adminCareers: thAdminCareers,
   adminCategories: thAdminCategories,
+  adminManual,
   admin: {
     ...admin,
     ...adminMedia,

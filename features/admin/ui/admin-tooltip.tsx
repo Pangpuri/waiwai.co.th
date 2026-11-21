@@ -2,7 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 
-export function AdminTooltip({ text }: { readonly text: string }) {
+export function AdminTooltip({
+  text,
+  ariaLabel,
+  title,
+  heading,
+}: {
+  readonly text: string;
+  readonly ariaLabel: string;
+  readonly title: string;
+  readonly heading: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -28,8 +38,8 @@ export function AdminTooltip({ text }: { readonly text: string }) {
           e.stopPropagation();
           setOpen((current) => !current);
         }}
-        aria-label="คำแนะนำเมนู"
-        title="คลิกเพื่อดูคำแนะนำการใช้งาน"
+        aria-label={ariaLabel}
+        title={title}
         className="border-line bg-surface hover:bg-surface-raised text-fg-muted hover:text-fg flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-bold transition shadow-xs"
       >
         ?
@@ -38,7 +48,7 @@ export function AdminTooltip({ text }: { readonly text: string }) {
       {open && (
         <div className="absolute right-0 top-7 z-50 w-64 rounded-xl border border-line bg-surface p-3 text-xs text-fg shadow-lg">
           <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="font-semibold text-primary">คำแนะนำการใช้งาน</span>
+            <span className="font-semibold text-accent">{heading}</span>
             <button
               type="button"
               onClick={(e) => {

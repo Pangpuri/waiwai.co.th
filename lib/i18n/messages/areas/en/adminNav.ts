@@ -42,6 +42,9 @@ export const enAdminNav = {
   tipSettings: "Configure site settings such as maintenance mode and data retention duration.",
   tipUsers: "Manage admin accounts, roles, permissions, and active status.",
   tipAccount: "Change password and review your logged-in account details.",
+  tooltipAriaLabel: "Menu help",
+  tooltipTitle: "Click to view usage guidance",
+  tooltipHeading: "Usage guidance",
   /* Round 293: admin 404 page (used to be Next's default error document) */
   pageNotFoundTitle: "This admin page does not exist",
   pageNotFoundBody: "The link may have moved, or the address is incomplete — pick a screen from the sidebar, or go back to the dashboard.",

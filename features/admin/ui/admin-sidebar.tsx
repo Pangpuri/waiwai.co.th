@@ -30,6 +30,10 @@ export type AdminSidebarStrings = {
   /** บัญชีที่ล็อกอินอยู่ เช่น "admin@waiwai.co.th · ผู้ดูแลระบบ" */
   readonly account: string;
   readonly logout: string;
+  /** ข้อความของปุ่ม/หัวกล่องคำแนะนำการใช้งาน (Tooltip) */
+  readonly tooltipAriaLabel: string;
+  readonly tooltipTitle: string;
+  readonly tooltipHeading: string;
   /** คำแนะนำการใช้งาน (Tooltip) ของแต่ละเมนู */
   readonly tips?: Readonly<Record<string, string>>;
 };
@@ -268,7 +272,14 @@ export function AdminSidebar({
                               {item.label}
                             </span>
                           </div>
-                          {open && tipText && <AdminTooltip text={tipText} />}
+                          {open && tipText && (
+                            <AdminTooltip
+                              text={tipText}
+                              ariaLabel={strings.tooltipAriaLabel}
+                              title={strings.tooltipTitle}
+                              heading={strings.tooltipHeading}
+                            />
+                          )}
                         </Link>
                       </li>
                     );

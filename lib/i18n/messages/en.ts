@@ -43,6 +43,7 @@ import { adminCareers as enAdminCareers } from "./areas/en/adminCareers.ts";
 import { adminInbox } from "./areas/en/adminInbox.ts";
 import { adminAnalytics } from "./areas/en/adminAnalytics.ts";
 import { adminAccount } from "./areas/en/adminAccount.ts";
+import { adminManual } from "./areas/en/adminManual.ts";
 
 /**
  * English dictionary.
@@ -88,6 +89,7 @@ export const en: Messages = {
   /* ประกาศรับสมัครงานของหน้า /careers (มติ D26 · รอบที่ 265) */
   adminCareers: enAdminCareers,
   adminCategories: enAdminCategories,
+  adminManual,
   admin: {
     ...admin,
     ...adminMedia,
