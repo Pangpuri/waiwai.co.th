@@ -309,7 +309,16 @@ test("rbac: สิทธิ์ให้แบบเพิ่มขึ้น (edi
   assert.equal(isStrongerOrEqual("editor", "publisher"), false);
   assert.equal(isStrongerOrEqual("hr", "editor"), false, "HR ไม่ครอบคลุมสิทธิ์ทั่วไปของ editor");
   assert.equal(isStrongerOrEqual("editor", "hr"), true, "editor ทำงานประกาศได้ตามขอบเขตเดิม");
-  assert.deepEqual([...permissionsOf("hr")], ["careers", "account"], "HR ได้เฉพาะ Careers และบัญชีของตัวเอง");
+  /*
+    HR ต้องเปิดคู่มือการใช้งานได้ (เมนู /admin/manual ใช้สิทธิ์ `manual`)
+    — สิทธิ์นี้ยังจำกัดอยู่ที่อ่านคู่มือ ไม่ให้แตะเนื้อหาหน้าเว็บ/ข้อมูลลูกค้า
+  */
+  assert.deepEqual(
+    [...permissionsOf("hr")],
+    ["careers", "account", "manual"],
+    "HR ได้เฉพาะ Careers, บัญชีของตัวเอง และคู่มือการใช้งาน",
+  );
+  assert.equal(can("hr", "manual"), true, "HR ต้องเปิดคู่มือการใช้งานหลังบ้านได้");
   assert.equal(can("hr", "content"), false);
   assert.equal(can("hr", "users"), false);
   assert.equal(can("hr", "inbox"), false);
