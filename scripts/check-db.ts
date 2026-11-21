@@ -2367,7 +2367,10 @@ async function checkAdminUsers(): Promise<void> {
   } finally {
     /* ⚠️ ล้างทุกบัญชีทดสอบของรอบนี้ (owner · doomed · solo · spare) — ต้องไม่เหลือร่องรอยในฐานข้อมูล dev */
     await pool.query("delete from admin_user where lower(email) = $1 or email like 'check-db-rbac-%'", [RBAC_TEST_EMAIL]);
-    await pool.query("delete from audit_log where actor_email = $1 and action like 'admin-user-%'", [CHECK_ACTOR]);
+    await pool.query(
+      "delete from audit_log where actor_email = $1 and (action like 'admin-user-%' or action = 'admin-session-revoke')",
+      [CHECK_ACTOR],
+    );
     assert.equal(await countWhere("admin_user where lower(email) = $1", [RBAC_TEST_EMAIL]), 0, "ต้องไม่เหลือบัญชีทดสอบ");
     assert.equal(await countWhere("admin_user where email like 'check-db-rbac-%'", []), 0, "ต้องไม่เหลือบัญชีทดสอบ (รวมบัญชีที่สร้างรอบที่ 90)");
   }
