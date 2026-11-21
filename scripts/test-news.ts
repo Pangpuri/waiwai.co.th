@@ -366,6 +366,18 @@ test("news: หน้ารายละเอียดเรนเดอร์�
   assert.ok(!detail.includes("robots: { index: false, follow: false }"), "ห้าม hardcode noindex (เปิด index แล้ว)");
   assert.ok(detail.includes("withPageSeo("), "ต้องผ่าน withPageSeo");
   assert.ok(detail.includes("loadMediaSizes"), "ต้องอ่านขนาดรูปจากคลังเพื่อกันภาพกระตุก (CLS)");
+  /*
+    รอบ 364 (คำสั่งเจ้าของ): ภาพปกมีไว้สำหรับการ์ด/รูปแชร์เท่านั้น
+    — รุ่นที่นำเข้าคือ 400×300 ⇒ เอามาแสดงในบทความอีกครั้งจะซ้ำกับภาพในเนื้อหาและเบลอ
+  */
+  assert.ok(
+    !detail.includes("src={record.coverPath}"),
+    "ห้ามเรนเดอร์ภาพปกซ้ำในเนื้อข่าว (ภาพปกเป็นรุ่นย่อ 400×300)",
+  );
+  assert.ok(
+    detail.includes("images: record.coverPath === null ? undefined"),
+    "ภาพปกยังต้องใช้เป็นรูปแชร์ (Open Graph) แม้ไม่แสดงในบทความ",
+  );
 
   const body = sourceOf("features/news/ui/news-body.tsx");
   assert.ok(!body.includes("dangerouslySetInnerHTML"));

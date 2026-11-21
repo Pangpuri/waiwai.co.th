@@ -310,7 +310,6 @@ export function NewsEditorForm(props: NewsEditorFormProps) {
             titleEn={titleEn}
             excerptTh={excerptTh}
             excerptEn={excerptEn}
-            coverPath={cover}
             publishedLocal={publishedLocal}
             blocks={parseNewsEditorBlocks(blocks.map((item) => (item.kind === "image" ? { kind: "image", mediaId: item.mediaId, alt: item.alt } : { kind: item.kind, text: item.text })))}
             sizes={props.previewSizes}

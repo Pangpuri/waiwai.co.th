@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 
 import { NewsBody } from "@/features/news/ui/news-body";
@@ -20,7 +19,7 @@ import { formatNewsDate } from "@/lib/news/model";
  *   ไม่เขียนตัวเรนเดอร์ใหม่ ⇒ สิ่งที่เห็นในพรีวิว = สิ่งที่คนอ่านเห็น (มีเทสต์สแกนกันการเขียนซ้ำ)
  * - ขนาดรูปส่งเข้ามาเป็น **รายการธรรมดา** (ไม่ส่ง `Map` ข้าม RSC boundary) แล้วประกอบเป็น Map ที่นี่
  * - สลับ ไทย/อังกฤษ ได้ เพื่อดูว่าผู้อ่านภาษาอังกฤษเห็นอะไร (EN ว่าง = ถอยไปใช้ไทย ตามมติ D3)
- * - ไม่มี JS ของหน้าเว็บถูกโหลดเพิ่ม: ใช้ `<Image unoptimized>` ในพรีวิวเท่านั้น
+ * - ไม่มี JS ของหน้าเว็บถูกโหลดเพิ่ม: ใช้ตัวเรนเดอร์ `NewsBody` ตัวเดียวกับหน้าเว็บจริง
  */
 
 export type NewsPreviewSize = { readonly id: string; readonly width: number | null; readonly height: number | null };
@@ -31,7 +30,6 @@ type NewsPreviewProps = {
   readonly titleEn: string;
   readonly excerptTh: string;
   readonly excerptEn: string;
-  readonly coverPath: string;
   readonly publishedLocal: string;
   readonly blocks: readonly NewsBlock[];
   readonly sizes: readonly NewsPreviewSize[];
@@ -78,19 +76,6 @@ export function NewsPreview(props: NewsPreviewProps) {
       </div>
 
       <div className="border-line bg-surface mt-3 overflow-hidden rounded-xl border">
-        {props.coverPath === "" ? null : (
-          <span className="bg-bg-subtle block">
-            <Image
-              src={props.coverPath}
-              alt={m.newsAdminCoverAlt}
-              width={1200}
-              height={800}
-              className="h-auto w-full object-cover"
-              unoptimized
-            />
-          </span>
-        )}
-
         <div className="p-5">
           {dateLabel === "" ? null : (
             <p className="text-fg-muted text-xs font-medium">{dateLabel}</p>

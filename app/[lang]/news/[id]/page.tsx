@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -124,19 +123,14 @@ export default async function NewsDetailPage({ params }: PageProps<"/[lang]/news
       </section>
 
       <article className="container-site py-10 lg:py-14">
-        {record.coverPath === null ? null : (
-          <Image
-            src={record.coverPath}
-            alt={title}
-            width={record.coverWidth ?? 400}
-            height={record.coverHeight ?? 300}
-            sizes="(max-width: 768px) 92vw, 720px"
-            priority
-            className="mx-auto h-auto w-full max-w-3xl rounded-2xl border border-line"
-          />
-        )}
-
-        <div className="mx-auto mt-10 max-w-3xl">
+        {/*
+          ไม่เรนเดอร์ภาพปกซ้ำในเนื้อข่าว (รอบ 364 · คำสั่งเจ้าของ 2026-11-21)
+          - ภาพปกที่นำเข้ามาเป็นรุ่นย่อ 400×300 สำหรับการ์ดในหน้ารายการ
+          - ภาพในเนื้อข่าวเป็นรุ่น 1024×768 (หรือ fallback) และมักเป็นภาพเดียวกัน
+            ⇒ เอามาแสดงในบทความอีกครั้งจะได้ภาพซ้ำที่ความละเอียดต่ำและเบลอ
+          - ภาพปกยังใช้ต่อใน metadata (Open Graph) โดยไม่แสดงบนหน้า
+        */}
+        <div className="mx-auto max-w-3xl">
           <NewsBody blocks={record.body} sizes={sizes} />
         </div>
 

@@ -236,6 +236,13 @@ test("news admin: พรีวิวต้องใช้ตัวเรนเ�
   );
   assert.ok(/<NewsBody blocks={props.blocks} sizes={sizes}/.test(preview), "ต้องเรนเดอร์เนื้อหาผ่าน NewsBody");
   assert.ok(!preview.includes("dangerouslySetInnerHTML"), "พรีวิวห้ามตีความเป็น HTML");
+  /*
+    รอบ 364: ภาพปก (400×300) ไม่ถูกแสดงในบทความแล้ว ⇒ พรีวิวต้องตรงกัน
+    (ไม่ส่ง coverPath เข้าพรีวิว · ไม่มี <Image> ของภาพปกในพรีวิว)
+  */
+  assert.ok(!preview.includes("props.coverPath"), "พรีวิวต้องไม่แสดงภาพปกซ้ำในเนื้อข่าว");
+  assert.equal((preview.match(/<Image\b/g) ?? []).length, 0, "พรีวิวไม่ต้องมี <Image> ของภาพปกอีก");
+  assert.ok(!form.includes("coverPath={cover}"), "ฟอร์มต้องไม่ส่งภาพปกเข้าพรีวิวแล้ว");
   assert.equal(
     (publicBody.match(/export function NewsBody/g) ?? []).length,
     1,
